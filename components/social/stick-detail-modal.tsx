@@ -1,0 +1,922 @@
+"use client"
+
+import { useState, useEffect } from "react"
+import { useUser } from "@/contexts/user-context"
+import { Dialog, DialogContent, DialogTitle, DialogDescription } from "@/components/ui/dialog"
+import { Button } from "@/components/ui/button"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Textarea } from "@/components/ui/textarea"
+import { User, Calendar, Filter, MessageSquare, Pencil, Trash2, BookOpen, LinkIcon } from "lucide-react"
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { ReplyModal, REPLY_CATEGORIES } from "@/components/social/reply-modal"
+import { formatDistanceToNow } from "date-fns"
+import { Badge } from "@/components/ui/badge"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuCheckboxItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
+import { SocialStickTabs } from "@/components/social/social-stick-tabs"
+import { KnowledgeBaseDrawer } from "@/components/social/knowledge-base-drawer"
+import { AddCitationModal } from "@/components/social/add-citation-modal"
+import { StickSummaryCard } from "@/components/social/stick-summary-card"
+import { RelatedKBArticles } from "@/components/social/related-kb-articles"
+import { FollowButton } from "@/components/social/follow-button"
+
+interface Reply {
+  id: string
+  content: string
+  color: string
+  category: string
+  created_at: string
+  updated_at: string
+  user_id: string
+  parent_reply_id: string | null
+  users: {
+    id: string
+    full_name: string | null
+    username: string | null
+    email: string
+    avatar_url: string | null
+  }
+  replies?: Reply[]
+}
+
+interface SocialStick {
+  id: string
+  topic: string
+  content: string
+  color: string
+  created_at: string
+  user_id: string
+  social_pad_id: string
+  users?: {
+    id: string
+    full_name: string | null
+    email: string
+  }
+  replies?: Reply[]
+  details?: string
+  live_summary?: string
+  action_items?: Array<{ title: string; owner: string; status: string; due_hint?: string }>
+  suggested_questions?: string[]
+  last_summarized_at?: string
+  summary_reply_count?: number
+  ai_generated_tags?: string[]
+}
+
+interface StickDetailModalProps {
+  open: boolean
+  onOpenChange: (open: boolean) => void
+  stickId: string
+  onUpdate?: () => void
+}
+
+export function StickDetailModal({ open, onOpenChange, stickId, onUpdate }: StickDetailModalProps) {
+  const { user } = useUser()
+  const [stick, setStick] = useState<SocialStick | null>(null)
+  const [loading, setLoading] = useState(false)
+  const [replyModalOpen, setReplyModalOpen] = useState(false)
+  const [parentReply, setParentReply] = useState<Reply | null>(null)
+  const [editingReplyId, setEditingReplyId] = useState<string | null>(null)
+  const [editReplyContent, setEditReplyContent] = useState("")
+  const [isPadOwner, setIsPadOwner] = useState(false)
+  const [isAdmin, setIsAdmin] = useState(false)
+  const [selectedCategories, setSelectedCategories] = useState<string[]>(REPLY_CATEGORIES.map((c) => c.value))
+  const [editDetails, setEditDetails] = useState("")
+
+  const [isEditing, setIsEditing] = useState(false)
+  const [tempTopic, setTempTopic] = useState("")
+  const [tempContent, setTempContent] = useState("")
+  const [currentTopic, setCurrentTopic] = useState("")
+  const [currentContent, setCurrentContent] = useState("")
+
+  const [showKBDrawer, setShowKBDrawer] = useState(false)
+  const [showCitationModal, setShowCitationModal] = useState(false)
+  const [citations, setCitations] = useState<any[]>([])
+  const [padId, setPadId] = useState<string>("")
+
+  const [isSummarizing, setIsSummarizing] = useState(false)
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (user?.id) {
+      setCurrentUserId(user.id)
+    }
+  }, [user])
+
+  const toggleCategory = (category: string) => {
+    setSelectedCategories((prevCategories) =>
+      prevCategories.includes(category) ? prevCategories.filter((c) => c !== category) : [...prevCategories, category],
+    )
+  }
+
+  const fetchWithRetry = async (url: string, options?: RequestInit, maxRetries = 3): Promise<Response> => {
+    let lastError: Error | null = null
+
+    for (let attempt = 0; attempt < maxRetries; attempt++) {
+      try {
+        const response = await fetch(url, options)
+
+        if (response.status === 429) {
+          // Rate limited - wait and retry
+          const retryAfter = response.headers.get("Retry-After")
+          const waitTime = retryAfter ? Number.parseInt(retryAfter, 10) * 1000 : Math.pow(2, attempt) * 1000
+          console.log(`[v0] Rate limited, waiting ${waitTime}ms before retry ${attempt + 1}/${maxRetries}`)
+          await new Promise((resolve) => setTimeout(resolve, waitTime))
+          continue
+        }
+
+        return response
+      } catch (error) {
+        lastError = error as Error
+        // Network error - wait and retry
+        const waitTime = Math.pow(2, attempt) * 500
+        console.log(`[v0] Network error, waiting ${waitTime}ms before retry ${attempt + 1}/${maxRetries}`)
+        await new Promise((resolve) => setTimeout(resolve, waitTime))
+      }
+    }
+
+    throw lastError || new Error("Max retries exceeded")
+  }
+
+  useEffect(() => {
+    if (open && stickId) {
+      fetchStick()
+    }
+  }, [open, stickId])
+
+  useEffect(() => {
+    if (stick) {
+      setCurrentTopic(stick.topic)
+      setCurrentContent(stick.content)
+      setTempTopic(stick.topic)
+      setTempContent(stick.content)
+    }
+  }, [stick])
+
+  const fetchStick = async () => {
+    try {
+      setLoading(true)
+      const response = await fetchWithRetry(`/api/social-sticks/${stickId}`)
+      if (response.ok) {
+        const data = await response.json()
+        setStick(data.stick)
+        setEditDetails(data.stick.details || "")
+
+        if (user && data.stick.social_pad_id) {
+          const padResponse = await fetchWithRetry(`/api/social-pads/${data.stick.social_pad_id}`)
+          if (padResponse.ok) {
+            const padData = await padResponse.json()
+            setIsPadOwner(padData.pad.owner_id === user.id)
+
+            try {
+              const memberResponse = await fetchWithRetry(`/api/social-pads/${data.stick.social_pad_id}/members`)
+
+              // Check if response is JSON before parsing
+              const contentType = memberResponse.headers.get("content-type")
+              if (contentType && contentType.includes("application/json")) {
+                if (memberResponse.ok) {
+                  const memberData = await memberResponse.json()
+                  const userMembership = memberData.members?.find((m: any) => m.user_id === user.id)
+                  setIsAdmin(userMembership?.role === "admin")
+                } else {
+                  console.error("[v0] Failed to fetch members:", memberResponse.status)
+                }
+              } else {
+                // Response is not JSON, log the text for debugging
+                const text = await memberResponse.text()
+                console.error("[v0] Non-JSON response from members API:", text.substring(0, 100))
+              }
+            } catch (memberError) {
+              console.error("[v0] Error fetching members:", memberError)
+              // Continue without member data - don't block the modal from opening
+            }
+          }
+        }
+      }
+    } catch (error) {
+      console.error("[v0] Error fetching stick:", error)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    if (stick?.social_pad_id) {
+      setPadId(stick.social_pad_id)
+      fetchCitations()
+    }
+  }, [stick])
+
+  const fetchCitations = async () => {
+    if (!stickId) return
+    try {
+      const response = await fetch(`/api/social-sticks/${stickId}/citations`)
+      if (response.ok) {
+        const data = await response.json()
+        setCitations(data.citations || [])
+      }
+    } catch (error) {
+      console.error("[v0] Error fetching citations:", error)
+    }
+  }
+
+  const handleDeleteCitation = async (citationId: string) => {
+    if (!confirm("Remove this citation?")) return
+    try {
+      const response = await fetch(`/api/social-sticks/${stickId}/citations?citationId=${citationId}`, {
+        method: "DELETE",
+      })
+      if (response.ok) {
+        setCitations(citations.filter((c) => c.id !== citationId))
+      }
+    } catch (error) {
+      console.error("[v0] Error deleting citation:", error)
+    }
+  }
+
+  const handleSubmitReply = async (content: string, category: string) => {
+    if (!stick) return
+
+    try {
+      console.log(
+        "[v0] Submitting reply to stick:",
+        stickId,
+        "parent:",
+        parentReply?.id || "none",
+        "category:",
+        category,
+      )
+      const response = await fetch(`/api/social-sticks/${stickId}/replies`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          content,
+          color: "#fef3c7",
+          parent_reply_id: parentReply?.id || null,
+          category,
+        }),
+      })
+
+      if (response.ok) {
+        const data = await response.json()
+        console.log("[v0] Reply created successfully:", data.reply.id)
+
+        const newReply: Reply = {
+          ...data.reply,
+          replies: [],
+        }
+
+        setStick((prev) => {
+          if (!prev) return prev
+          const updatedReplies = [...(prev.replies || []), newReply]
+          return { ...prev, replies: updatedReplies }
+        })
+
+        setReplyModalOpen(false)
+        setParentReply(null)
+
+        if (stick.last_summarized_at) {
+          handleRegenerateSummary()
+        }
+
+        onUpdate?.()
+      } else {
+        console.error("[v0] Failed to create reply:", response.status)
+      }
+    } catch (error) {
+      console.error("[v0] Error submitting reply:", error)
+    }
+  }
+
+  const handleStartEditReply = (reply: Reply) => {
+    setEditingReplyId(reply.id)
+    setEditReplyContent(reply.content)
+  }
+
+  const handleSaveReply = async (replyId: string) => {
+    if (!editReplyContent.trim()) return
+
+    try {
+      console.log("[v0] Updating reply:", replyId)
+      const response = await fetch(`/api/social-sticks/${stickId}/replies`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          reply_id: replyId,
+          content: editReplyContent,
+        }),
+      })
+
+      if (response.ok) {
+        console.log("[v0] Reply updated successfully")
+        await fetchStick()
+        setEditingReplyId(null)
+        setEditReplyContent("")
+        onUpdate?.()
+      } else {
+        console.error("[v0] Failed to update reply:", response.status)
+        alert("Failed to update reply. Please try again.")
+      }
+    } catch (error) {
+      console.error("[v0] Error updating reply:", error)
+      alert("An error occurred while updating the reply.")
+    }
+  }
+
+  const handleOpenReplyModal = (reply?: Reply) => {
+    setParentReply(reply || null)
+    setReplyModalOpen(true)
+  }
+
+  const handleDeleteReply = async (replyId: string) => {
+    if (!confirm("Are you sure you want to delete this reply? This action cannot be undone.")) {
+      return
+    }
+
+    try {
+      console.log("[v0] Deleting reply:", replyId)
+      const response = await fetch(`/api/social-sticks/${stickId}/replies?replyId=${replyId}`, {
+        method: "DELETE",
+      })
+
+      if (response.ok) {
+        console.log("[v0] Reply deleted successfully")
+        await fetchStick()
+        onUpdate?.()
+      } else {
+        console.error("[v0] Failed to delete reply:", response.status)
+        alert("Failed to delete reply. Please try again.")
+      }
+    } catch (error) {
+      console.error("[v0] Error deleting reply:", error)
+      alert("An error occurred while deleting the reply.")
+    }
+  }
+
+  const handleEditReply = async (replyId: string, content: string) => {
+    try {
+      console.log("[v0] Editing reply:", replyId)
+      const response = await fetch(`/api/social-sticks/${stickId}/replies`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ reply_id: replyId, content }),
+      })
+
+      if (response.ok) {
+        console.log("[v0] Reply edited successfully")
+        await fetchStick()
+        onUpdate?.()
+      } else {
+        const errorData = await response.json().catch(() => ({ error: "Unknown error" }))
+        console.error("[v0] Failed to edit reply:", response.status, errorData)
+        alert(errorData.error || "Failed to edit reply. Please try again.")
+        throw new Error(errorData.error)
+      }
+    } catch (error) {
+      console.error("[v0] Error editing reply:", error)
+      throw error
+    }
+  }
+
+  const getDisplayName = (reply: Reply) => {
+    if (!reply.users) return "Unknown User"
+    return reply.users.full_name || reply.users.username || reply.users.email
+  }
+
+  const getInitials = (reply: Reply) => {
+    if (!reply.users) return "??"
+    const name = reply.users.full_name || reply.users.username || reply.users.email
+    return name.substring(0, 2).toUpperCase()
+  }
+
+  const organizeReplies = (replies: Reply[]): Reply[] => {
+    const replyMap = new Map<string, Reply>()
+    const rootReplies: Reply[] = []
+
+    replies.forEach((reply) => {
+      replyMap.set(reply.id, { ...reply, replies: [] })
+    })
+
+    replies.forEach((reply) => {
+      const replyWithChildren = replyMap.get(reply.id)!
+      if (reply.parent_reply_id) {
+        const parent = replyMap.get(reply.parent_reply_id)
+        if (parent) {
+          parent.replies = parent.replies || []
+          parent.replies.push(replyWithChildren)
+        } else {
+          rootReplies.push(replyWithChildren)
+        }
+      } else {
+        rootReplies.push(replyWithChildren)
+      }
+    })
+
+    const sortReplies = (replies: Reply[]) => {
+      replies.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+      replies.forEach((reply) => {
+        if (reply.replies && reply.replies.length > 0) {
+          sortReplies(reply.replies)
+        }
+      })
+    }
+
+    sortReplies(rootReplies)
+    return rootReplies
+  }
+
+  const filterRepliesByCategory = (replies: Reply[]): Reply[] => {
+    return replies
+      .filter((reply) => selectedCategories.includes(reply.category))
+      .map((reply) => {
+        // Create a copy of the reply with filtered nested replies
+        const filteredReply = { ...reply }
+        if (reply.replies && reply.replies.length > 0) {
+          filteredReply.replies = filterRepliesByCategory(reply.replies)
+        }
+        return filteredReply
+      })
+  }
+
+  const groupRepliesByCategory = (replies: Reply[]) => {
+    const grouped = new Map<string, Reply[]>()
+
+    replies.forEach((reply) => {
+      if (!grouped.has(reply.category)) {
+        grouped.set(reply.category, [])
+      }
+      grouped.get(reply.category)!.push(reply)
+    })
+
+    return grouped
+  }
+
+  const renderReply = (reply: Reply, depth = 0) => {
+    if (!reply) return null
+
+    const isOwner = reply.user_id === user?.id
+    const canDelete = isOwner || isPadOwner || isAdmin
+    const canEditReply = isOwner
+    const isEditing = editingReplyId === reply.id
+
+    return (
+      <div key={reply.id} className={depth > 0 ? "ml-8 mt-3" : ""}>
+        <Card className="bg-white border shadow-sm">
+          <CardContent className="pt-4">
+            <div className="flex items-start gap-3">
+              <Avatar className="h-8 w-8">
+                {reply.users?.avatar_url && (
+                  <AvatarImage src={reply.users.avatar_url || "/placeholder.svg"} alt={getDisplayName(reply)} />
+                )}
+                <AvatarFallback className="text-xs">{getInitials(reply)}</AvatarFallback>
+              </Avatar>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center justify-between mb-1">
+                  <div className="flex items-center gap-2 text-sm flex-wrap">
+                    <span className="font-semibold text-gray-900">{getDisplayName(reply)}</span>
+                    <Badge variant="secondary" className="text-xs">
+                      {reply.category}
+                    </Badge>
+                    <span className="text-gray-500">
+                      {formatDistanceToNow(new Date(reply.created_at), { addSuffix: true })}
+                    </span>
+                    {reply.updated_at !== reply.created_at && <span className="text-xs text-gray-400">(edited)</span>}
+                  </div>
+                  <div className="flex gap-1">
+                    {isOwner && !isEditing && (
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8"
+                        onClick={() => handleStartEditReply(reply)}
+                        title="Edit reply"
+                      >
+                        <Pencil className="h-4 w-4" />
+                      </Button>
+                    )}
+                    {canDelete && !isEditing && (
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8 text-red-600 hover:text-red-700 hover:bg-red-50"
+                        onClick={() => handleDeleteReply(reply.id)}
+                        title="Delete reply"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    )}
+                    {canEditReply && isEditing && (
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8"
+                        onClick={() => handleEditReply(reply.id, editReplyContent)}
+                        title="Save reply"
+                      >
+                        <Pencil className="h-4 w-4" />
+                      </Button>
+                    )}
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8"
+                      onClick={() => handleOpenReplyModal(reply)}
+                      title="Reply to this comment"
+                    >
+                      <MessageSquare className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
+                {isEditing ? (
+                  <div className="space-y-2">
+                    <Textarea
+                      value={editReplyContent}
+                      onChange={(e) => setEditReplyContent(e.target.value)}
+                      rows={2}
+                      maxLength={1000}
+                      className="text-sm"
+                    />
+                    <div className="flex justify-between items-center">
+                      <span className="text-xs text-gray-500">{editReplyContent.length}/1000</span>
+                      <div className="flex gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            setEditingReplyId(null)
+                            setEditReplyContent("")
+                          }}
+                        >
+                          Cancel
+                        </Button>
+                        <Button size="sm" onClick={() => handleSaveReply(reply.id)}>
+                          Save
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <p className="text-sm text-gray-800 whitespace-pre-wrap break-words">{reply.content}</p>
+                )}
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+        {reply.replies && reply.replies.length > 0 && (
+          <div className="space-y-3 mt-3">
+            {reply.replies.map((nestedReply) => renderReply(nestedReply, depth + 1))}
+          </div>
+        )}
+      </div>
+    )
+  }
+
+  const handleFocus = () => {
+    if (stick && stick.user_id === user?.id && !isEditing) {
+      setIsEditing(true)
+      setTempTopic(currentTopic)
+      setTempContent(currentContent)
+    }
+  }
+
+  const handleCancel = () => {
+    setCurrentTopic(tempTopic)
+    setCurrentContent(tempContent)
+    setIsEditing(false)
+  }
+
+  const handleStick = async () => {
+    try {
+      const response = await fetch(`/api/social-sticks/${stickId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          topic: currentTopic,
+          content: currentContent,
+        }),
+      })
+
+      if (response.ok) {
+        setStick((prev) => (prev ? { ...prev, topic: currentTopic, content: currentContent } : null))
+        setTempTopic(currentTopic)
+        setTempContent(currentContent)
+        setIsEditing(false)
+        onUpdate?.()
+      }
+    } catch (error) {
+      console.error("Error updating stick:", error)
+    }
+  }
+
+  const handleRegenerateSummary = async () => {
+    if (!stickId) return
+
+    setIsSummarizing(true)
+    try {
+      const response = await fetch(`/api/social-sticks/${stickId}/summarize`, {
+        method: "POST",
+      })
+
+      if (response.ok) {
+        const data = await response.json()
+        setStick((prev) =>
+          prev
+            ? {
+                ...prev,
+                live_summary: data.summary,
+                action_items: data.actionItems,
+                suggested_questions: data.suggestedQuestions,
+                last_summarized_at: new Date().toISOString(),
+                summary_reply_count: data.replyCount,
+              }
+            : null,
+        )
+      }
+    } catch (error) {
+      console.error("[v0] Error regenerating summary:", error)
+    } finally {
+      setIsSummarizing(false)
+    }
+  }
+
+  const handleInsertQuestion = (question: string) => {
+    setParentReply(null)
+    setReplyModalOpen(true)
+  }
+
+  if (!stick && !loading) return null
+
+  const organizedReplies = stick?.replies ? organizeReplies(stick.replies) : []
+  const filteredReplies = filterRepliesByCategory(organizedReplies)
+  const groupedReplies = groupRepliesByCategory(filteredReplies)
+  const isOwner = stick?.user_id === user?.id
+
+  return (
+    <>
+      <Dialog open={open} onOpenChange={onOpenChange}>
+        <DialogContent className="max-w-[95vw] h-[95vh] w-full p-0 gap-0">
+          <DialogTitle className="sr-only">Stick Details</DialogTitle>
+          <DialogDescription className="sr-only">View and manage stick content, replies, and media</DialogDescription>
+
+          <div className="flex flex-col h-full overflow-y-auto">
+            <div className="flex items-center justify-between p-6 border-b bg-white shrink-0">
+              <h2 className="text-2xl font-bold text-gray-900">Stick Details</h2>
+            </div>
+
+            <div className="flex-1 overflow-y-auto min-h-0">
+              {loading ? (
+                <div className="flex items-center justify-center h-full">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600" />
+                </div>
+              ) : stick ? (
+                <div className="p-6 bg-gray-50">
+                  <div className="max-w-4xl mx-auto space-y-6">
+                    <Card className="bg-white border-2 shadow-lg">
+                      <CardHeader>
+                        <div className="flex items-center justify-between mb-4">
+                          <CardTitle className="text-2xl">Stick Content</CardTitle>
+                          <div className="flex gap-2">
+                            <FollowButton
+                              entityType="social_stick"
+                              entityId={stick.id}
+                              entityName={stick.topic}
+                              variant="icon"
+                            />
+                            <Button
+                              variant="outline"
+                              size="icon"
+                              onClick={() => setShowKBDrawer(true)}
+                              title="View knowledge base"
+                            >
+                              <BookOpen className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="outline"
+                              size="icon"
+                              onClick={() => setShowCitationModal(true)}
+                              title="Add citation"
+                            >
+                              <LinkIcon className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="outline"
+                              size="icon"
+                              onClick={() => handleOpenReplyModal()}
+                              title="Reply to stick"
+                            >
+                              <MessageSquare className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </div>
+                      </CardHeader>
+                      <CardContent>
+                        <SocialStickTabs
+                          noteId={stickId}
+                          initialTopic={currentTopic}
+                          initialContent={currentContent}
+                          initialDetails={stick.details || ""}
+                          onTopicChange={setCurrentTopic}
+                          onContentChange={setCurrentContent}
+                          onTopicFocus={handleFocus}
+                          onContentFocus={handleFocus}
+                          onDetailsChange={async (details: string) => {
+                            try {
+                              const response = await fetch(`/api/social-stick-tabs`, {
+                                method: "PUT",
+                                headers: { "Content-Type": "application/json" },
+                                body: JSON.stringify({ socialStickId: stickId, details }),
+                              })
+
+                              if (response.ok) {
+                                setStick((prev) => (prev ? { ...prev, details } : null))
+                                onUpdate?.()
+                              }
+                            } catch (error) {
+                              console.error("Error updating details:", error)
+                              throw error
+                            }
+                          }}
+                          readOnly={!isOwner}
+                          showMedia={true}
+                          isEditing={isEditing}
+                          onCancel={handleCancel}
+                          onStick={handleStick}
+                        />
+                        <div className="mt-4 pt-4 border-t flex items-center gap-4 text-sm text-gray-500">
+                          <div className="flex items-center gap-1">
+                            <User className="h-4 w-4" />
+                            {stick.users?.full_name || stick.users?.email || "Unknown"}
+                          </div>
+                          <div className="flex items-center gap-1">
+                            <Calendar className="h-4 w-4" />
+                            {formatDistanceToNow(new Date(stick.created_at), { addSuffix: true })}
+                          </div>
+                        </div>
+
+                        {citations.length > 0 && (
+                          <div className="mt-4 pt-4 border-t">
+                            <h4 className="text-sm font-semibold mb-2 flex items-center gap-2">
+                              <LinkIcon className="h-4 w-4" />
+                              Citations & References ({citations.length})
+                            </h4>
+                            <div className="space-y-2">
+                              {citations.map((citation: any) => (
+                                <div
+                                  key={citation.id}
+                                  className="flex items-start justify-between p-2 bg-gray-50 rounded border"
+                                >
+                                  <div className="flex-1 min-w-0">
+                                    <div className="flex items-center gap-2">
+                                      <Badge variant="outline" className="text-xs">
+                                        {citation.citation_type}
+                                      </Badge>
+                                      <p className="text-sm font-medium">
+                                        {citation.kb_article?.title || citation.external_title}
+                                      </p>
+                                    </div>
+                                    {citation.citation_note && (
+                                      <p className="text-xs text-gray-500 mt-1">{citation.citation_note}</p>
+                                    )}
+                                  </div>
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-6 w-6 text-red-600"
+                                    onClick={() => handleDeleteCitation(citation.id)}
+                                  >
+                                    <Trash2 className="h-3 w-3" />
+                                  </Button>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </CardContent>
+                    </Card>
+
+                    {padId && (
+                      <RelatedKBArticles
+                        padId={padId}
+                        stickTags={stick.ai_generated_tags || []}
+                        stickContent={stick.content}
+                        onCiteArticle={() => setShowCitationModal(true)}
+                      />
+                    )}
+
+                    <StickSummaryCard
+                      summary={stick.live_summary}
+                      actionItems={stick.action_items}
+                      suggestedQuestions={stick.suggested_questions}
+                      lastSummarizedAt={stick.last_summarized_at}
+                      replyCount={stick.replies?.length || 0}
+                      summaryReplyCount={stick.summary_reply_count}
+                      onRegenerateSummary={handleRegenerateSummary}
+                      onInsertQuestion={handleInsertQuestion}
+                      isLoading={isSummarizing}
+                      showGenerateButton={!stick.live_summary && (stick.replies?.length || 0) > 0}
+                    />
+
+                    <div className="space-y-4">
+                      <div className="flex items-center justify-between">
+                        <h3 className="text-xl font-bold text-gray-900">Replies ({stick.replies?.length || 0})</h3>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="outline" size="sm">
+                              <Filter className="h-4 w-4 mr-2" />
+                              Filter by Category
+                              {selectedCategories.length < REPLY_CATEGORIES.length && (
+                                <Badge variant="secondary" className="ml-2">
+                                  {selectedCategories.length}
+                                </Badge>
+                              )}
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end" className="w-64">
+                            {REPLY_CATEGORIES.map((category) => (
+                              <DropdownMenuCheckboxItem
+                                key={category.value}
+                                checked={selectedCategories.includes(category.value)}
+                                onCheckedChange={() => toggleCategory(category.value)}
+                              >
+                                <div className="flex flex-col">
+                                  <span className="font-medium">{category.label}</span>
+                                  <span className="text-xs text-gray-500">{category.description}</span>
+                                </div>
+                              </DropdownMenuCheckboxItem>
+                            ))}
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </div>
+
+                      {filteredReplies.length > 0 ? (
+                        <div className="space-y-6">
+                          {Array.from(groupedReplies.entries()).map(([category, replies]) => (
+                            <div key={category} className="space-y-3">
+                              <h4 className="text-lg font-semibold text-gray-800 flex items-center gap-2">
+                                {category}
+                                <Badge variant="outline">{replies.length}</Badge>
+                              </h4>
+                              <div className="space-y-4">{replies.map((reply) => renderReply(reply))}</div>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <Card>
+                          <CardContent className="py-12 text-center text-gray-500">
+                            {selectedCategories.length === 0
+                              ? "Please select at least one category to view replies."
+                              : "No replies yet. Be the first to reply!"}
+                          </CardContent>
+                        </Card>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              ) : null}
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <ReplyModal
+        open={replyModalOpen}
+        onOpenChange={(open) => {
+          setReplyModalOpen(open)
+          if (!open) {
+            setParentReply(null)
+          }
+        }}
+        onSubmit={handleSubmitReply}
+        parentReplyContent={parentReply?.content}
+        title={parentReply ? "Reply to Comment" : "Reply to Stick"}
+      />
+
+      {padId && (
+        <>
+          <KnowledgeBaseDrawer
+            open={showKBDrawer}
+            onOpenChange={setShowKBDrawer}
+            padId={padId}
+            onSelectArticle={(article) => {
+              setShowKBDrawer(false)
+              setShowCitationModal(true)
+            }}
+          />
+          <AddCitationModal
+            open={showCitationModal}
+            onOpenChange={setShowCitationModal}
+            stickId={stickId}
+            padId={padId}
+            onCitationAdded={() => {
+              fetchCitations()
+              setShowCitationModal(false)
+            }}
+          />
+        </>
+      )}
+    </>
+  )
+}

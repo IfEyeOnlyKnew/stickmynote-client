@@ -1,0 +1,19 @@
+<service>
+  <id>StickyNoteApp</id>
+  <name>Sticky Note Application</name>
+  <description>Sticky Note collaboration application running on Node.js</description>
+  <executable>node</executable>
+  <arguments>server.js</arguments>
+  <workingdirectory>C:\inetpub\stickmynote</workingdirectory>
+  <env name="NODE_ENV" value="production"/>
+  <env name="PORT" value="3000"/>
+  <logpath>C:\inetpub\stickmynote\logs</logpath>
+  <log mode="roll-by-size">
+    <sizeThreshold>10240</sizeThreshold>
+    <keepFiles>8</keepFiles>
+  </log>
+  <onfailure action="restart" delay="10 sec"/>
+  <onfailure action="restart" delay="20 sec"/>
+  <onfailure action="restart" delay="30 sec"/>
+  <resetfailure>1 hour</resetfailure>
+</service>

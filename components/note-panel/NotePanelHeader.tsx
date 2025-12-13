@@ -1,0 +1,49 @@
+"use client"
+
+import type React from "react"
+
+import { Share2, Lock, Trash2 } from "lucide-react"
+import { Button } from "@/components/ui/button"
+import type { Note } from "@/types/note"
+
+interface NotePanelHeaderProps {
+  note: Note
+  onUpdateSharing: (noteId: string, isShared: boolean) => void
+  onDeleteNote: (noteId: string) => void
+}
+
+export const NotePanelHeader: React.FC<NotePanelHeaderProps> = ({ note, onUpdateSharing, onDeleteNote }) => {
+  return (
+    <div className="flex items-center justify-between mb-3">
+      <div className="flex items-center gap-2">
+        {/* No fullscreen button in panel mode since it's already a panel view */}
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={(e) => {
+            e.stopPropagation()
+            onUpdateSharing(note.id, !note.is_shared)
+          }}
+          className="h-6 w-6 p-0"
+          title={note.is_shared ? "Make private" : "Make shared"}
+        >
+          {note.is_shared ? <Share2 className="h-3 w-3" /> : <Lock className="h-3 w-3" />}
+        </Button>
+      </div>
+      <div className="flex items-center gap-1">
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={(e) => {
+            e.stopPropagation()
+            onDeleteNote(note.id)
+          }}
+          className="h-6 w-6 p-0 text-red-500 hover:text-red-700"
+          title="Delete note"
+        >
+          <Trash2 className="h-3 w-3" />
+        </Button>
+      </div>
+    </div>
+  )
+}

@@ -1,0 +1,63 @@
+"use client"
+
+import type React from "react"
+import { createContext, useContext } from "react"
+import type { Note } from "@/types/note"
+
+interface NoteContextValue {
+  note: Note
+  currentUserId?: string
+  readOnly: boolean
+  isNewNote: boolean
+  isOwner: boolean
+  generatingTags?: string | null
+  hideGenerateTags: boolean
+
+  // Event handlers
+  onOpenFullscreen?: (noteId: string) => void
+  onClose?: () => void
+  onUpdateSharing: (noteId: string, isShared: boolean) => void
+  onUpdateColor: (noteId: string, color: string) => void
+  onDeleteNote: (noteId: string) => void
+  onTopicChange: (noteId: string, topic: string) => void
+  onContentChange: (noteId: string, content: string) => void
+  onDetailsChange: (noteId: string, details: string) => void
+  onGenerateTags: (noteId: string, topic: string) => void
+  onMouseDown?: (e: React.MouseEvent, noteId: string) => void
+  onFocusTopicTextarea?: (noteId: string) => void
+  onAddReply: (noteId: string, content: string, color?: string) => Promise<void>
+  onEditReply?: (replyId: string, content: string, color?: string) => Promise<void>
+  onDeleteReply?: (replyId: string) => Promise<void>
+
+  // State management
+  focusTopicId?: string | null
+  onNoteHeightChange?: (noteId: string, height: number) => void
+  onCancelNewNote?: (noteId: string) => void
+  onStickNewNote?: (noteId: string) => void
+  onReplyFormToggle?: (noteId: string, isVisible: boolean) => void
+  hasActiveReplyForm?: boolean
+  onEditStateChange?: (noteId: string, isEditing: boolean) => void
+  hasUnsavedChanges?: boolean
+  onNoteUpdate?: (updatedNote: Note) => void
+  lastInteractedNote?: string | null
+  onNoteInteraction?: (noteId: string) => void
+}
+
+const NoteContext = createContext<NoteContextValue | null>(null)
+
+export const useNoteContext = () => {
+  const context = useContext(NoteContext)
+  if (!context) {
+    throw new Error("useNoteContext must be used within a NoteProvider")
+  }
+  return context
+}
+
+interface NoteProviderProps {
+  children: React.ReactNode
+  value: NoteContextValue
+}
+
+export const NoteProvider: React.FC<NoteProviderProps> = ({ children, value }) => {
+  return <NoteContext.Provider value={value}>{children}</NoteContext.Provider>
+}

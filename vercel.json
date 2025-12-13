@@ -1,0 +1,12 @@
+{
+  "crons": [
+    {
+      "path": "/api/automation/execute-reminders",
+      "schedule": "*/5 * * * *"
+    },
+    {
+      "path": "/api/cron/send-digests",
+      "schedule": "0 * * * *"
+    }
+  ]
+}
