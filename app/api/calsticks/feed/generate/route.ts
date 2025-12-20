@@ -1,12 +1,12 @@
 import { NextResponse } from "next/server"
-import { createSupabaseServer } from "@/lib/supabase-server"
+import { createServiceDatabaseClient } from "@/lib/database/database-adapter"
 import { randomBytes } from "crypto"
 import { getCachedAuthUser } from "@/lib/auth/cached-auth"
 
 export async function POST(request: Request) {
   try {
-    const supabase = await createSupabaseServer()
-    const authResult = await getCachedAuthUser(supabase)
+    const db = await createServiceDatabaseClient()
+    const authResult = await getCachedAuthUser()
     if (authResult.rateLimited) {
       return NextResponse.json({ error: "Rate limited" }, { status: 429, headers: { "Retry-After": "30" } })
     }
@@ -18,7 +18,7 @@ export async function POST(request: Request) {
     // Generate a secure random token
     const token = randomBytes(32).toString("hex")
 
-    const { data, error } = await supabase
+    const { data, error } = await db
       .from("calendar_feeds")
       .upsert(
         {
@@ -49,8 +49,8 @@ export async function POST(request: Request) {
 
 export async function GET(request: Request) {
   try {
-    const supabase = await createSupabaseServer()
-    const authResult = await getCachedAuthUser(supabase)
+    const db = await createServiceDatabaseClient()
+    const authResult = await getCachedAuthUser()
     if (authResult.rateLimited) {
       return NextResponse.json({ error: "Rate limited" }, { status: 429, headers: { "Retry-After": "30" } })
     }
@@ -59,7 +59,7 @@ export async function GET(request: Request) {
     }
     const user = { id: authResult.userId }
 
-    const { data: feed } = await supabase
+    const { data: feed } = await db
       .from("calendar_feeds")
       .select("token")
       .eq("user_id", user.id)

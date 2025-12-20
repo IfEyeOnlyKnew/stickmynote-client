@@ -12,6 +12,6 @@ interface PageProps {
   }
 }
 
-export default function IntakeFormPage({ params }: PageProps) {
+export default function IntakeFormPage({ params }: Readonly<PageProps>) {
   return <IntakeFormClient token={params.token} />
 }

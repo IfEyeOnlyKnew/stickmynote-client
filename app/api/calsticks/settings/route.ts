@@ -1,13 +1,13 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { createSupabaseServer } from "@/lib/supabase-server"
+import { createServiceDatabaseClient } from "@/lib/database/database-adapter"
 import { getCachedAuthUser } from "@/lib/auth/cached-auth"
 
 // Get user's calstick settings
 export async function GET() {
   try {
-    const supabase = await createSupabaseServer()
+    const db = await createServiceDatabaseClient()
 
-    const authResult = await getCachedAuthUser(supabase)
+    const authResult = await getCachedAuthUser()
     if (authResult.rateLimited) {
       return NextResponse.json(
         { error: "Rate limit exceeded. Please try again in a moment." },
@@ -19,7 +19,7 @@ export async function GET() {
     }
     const user = authResult.user
 
-    const { data, error } = await supabase
+    const { data, error } = await db
       .from("users")
       .select("calstick_auto_archive_days")
       .eq("id", user.id)
@@ -39,9 +39,9 @@ export async function GET() {
 // Update user's calstick settings
 export async function PATCH(request: NextRequest) {
   try {
-    const supabase = await createSupabaseServer()
+    const db = await createServiceDatabaseClient()
 
-    const authResult = await getCachedAuthUser(supabase)
+    const authResult = await getCachedAuthUser()
     if (authResult.rateLimited) {
       return NextResponse.json(
         { error: "Rate limit exceeded. Please try again in a moment." },
@@ -60,7 +60,7 @@ export async function PATCH(request: NextRequest) {
       return NextResponse.json({ error: "Invalid autoArchiveDays value" }, { status: 400 })
     }
 
-    const { error } = await supabase
+    const { error } = await db
       .from("users")
       .update({ calstick_auto_archive_days: autoArchiveDays })
       .eq("id", user.id)

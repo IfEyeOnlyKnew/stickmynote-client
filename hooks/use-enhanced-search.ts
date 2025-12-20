@@ -29,9 +29,11 @@ export function useEnhancedSearch<T extends SearchableItem>(
   }, [items, fuzzySearch])
 
   // Load saved filters
+  /* eslint-disable react-hooks/exhaustive-deps */
   useEffect(() => {
     loadSavedFilters()
   }, [])
+  /* eslint-enable react-hooks/exhaustive-deps */
 
   // Load search history from localStorage
   useEffect(() => {
@@ -88,6 +90,7 @@ export function useEnhancedSearch<T extends SearchableItem>(
   }
 
   // Perform fuzzy search
+  /* eslint-disable react-hooks/exhaustive-deps */
   const results = useMemo(() => {
     if (!query.trim()) {
       return items.map((item) => ({ item, score: 1, matches: [] }))
@@ -96,6 +99,7 @@ export function useEnhancedSearch<T extends SearchableItem>(
     addToHistory(query)
     return fuzzySearch.search(query, { threshold: 0.3, limit: 50 })
   }, [query, items, fuzzySearch])
+  /* eslint-enable react-hooks/exhaustive-deps */
 
   return {
     query,

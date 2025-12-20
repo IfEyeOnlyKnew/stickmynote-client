@@ -1,11 +1,10 @@
 "use client"
 
-import type React from "react"
+import React, { Fragment, useEffect, useState, useCallback, useRef } from "react"
 import type { WorkflowStatus } from "@/types/social-workflow"
 import { DecisionCockpitSidebar } from "@/components/social/decision-cockpit-sidebar"
 import { PromoteToCalStickDialog } from "@/components/social/promote-to-calstick-dialog"
 
-import { useEffect, useState, useCallback, useRef } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
@@ -38,8 +37,8 @@ import { UserMenu } from "@/components/user-menu"
 import { formatDistanceToNow } from "date-fns"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { useUser } from "@/contexts/user-context"
+import { useOrganization } from "@/contexts/organization-context"
 import { StickDetailModal } from "@/components/social/stick-detail-modal"
-import { Fragment } from "react"
 import { useSocialNotifications } from "@/hooks/use-social-notifications"
 import { useRealtimeSticks } from "@/hooks/use-realtime-sticks"
 import { usePresence } from "@/hooks/use-presence"
@@ -65,8 +64,6 @@ async function fetchWithRetry(
   maxRetries = 3,
   baseDelay = 1000,
 ): Promise<Response | null> {
-  let lastError: Error | null = null
-
   for (let attempt = 0; attempt < maxRetries; attempt++) {
     try {
       const response = await fetch(url, options)
@@ -84,7 +81,7 @@ async function fetchWithRetry(
 
       return response
     } catch (error) {
-      lastError = error instanceof Error ? error : new Error(String(error))
+      console.error("Fetch attempt failed:", error)
       if (attempt < maxRetries - 1) {
         const delay = baseDelay * Math.pow(2, attempt)
         await new Promise((resolve) => setTimeout(resolve, delay))
@@ -97,10 +94,10 @@ async function fetchWithRetry(
 }
 
 async function safeJsonParse<T>(response: Response | null, defaultValue: T): Promise<T> {
-  if (!response || !response.ok) return defaultValue
+  if (!response?.ok) return defaultValue
 
   const contentType = response.headers.get("content-type")
-  if (!contentType || !contentType.includes("application/json")) {
+  if (!contentType?.includes("application/json")) {
     return defaultValue
   }
 
@@ -108,6 +105,64 @@ async function safeJsonParse<T>(response: Response | null, defaultValue: T): Pro
     return await response.json()
   } catch {
     return defaultValue
+  }
+}
+
+function groupSticksByPadVisibility(
+  sticks: { social_pad_id: string; reply_count?: number }[],
+  allPads: { id: string; is_public: boolean }[],
+): { publicGrouped: Record<string, any[]>; privateGrouped: Record<string, any[]> } {
+  const publicGrouped: Record<string, any[]> = {}
+  const privateGrouped: Record<string, any[]> = {}
+
+  for (const stick of sticks) {
+    const padId = stick.social_pad_id
+    const pad = allPads.find((p) => p.id === padId)
+
+    if (pad?.is_public) {
+      if (!publicGrouped[padId]) publicGrouped[padId] = []
+      publicGrouped[padId].push(stick)
+    } else {
+      if (!privateGrouped[padId]) privateGrouped[padId] = []
+      privateGrouped[padId].push(stick)
+    }
+  }
+
+  return { publicGrouped, privateGrouped }
+}
+
+function sortStickGroups(
+  groups: Record<string, { created_at: string }[]>,
+): Record<string, any[]> {
+  return Object.entries(groups).reduce(
+    (acc, [padId, padSticks]) => {
+      acc[padId] = padSticks.toSorted(
+        (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
+      )
+      return acc
+    },
+    {} as Record<string, any[]>,
+  )
+}
+
+async function processInvitesForPad(padId: string): Promise<void> {
+  try {
+    console.log("[v0] Checking for pending invites to process")
+    const processResponse = await fetchWithRetry(
+      `/api/pads/${padId}/process-invites`,
+      { method: "POST", credentials: "include" },
+      2,
+      500,
+    )
+    if (processResponse) {
+      const processData = await safeJsonParse<{ message: string }>(processResponse, { message: "" })
+      if (processData.message) {
+        console.log("[v0] Processed pending invites:", processData.message)
+      }
+    }
+  } catch (error) {
+    // Silently ignore invite processing errors - expected for users without pending invites
+    console.debug("Invite processing skipped:", error)
   }
 }
 
@@ -155,10 +210,169 @@ interface SocialStick {
   calstick_id?: string | null
 }
 
+interface StickTableRowProps {
+  stick: SocialStick
+  replies: Reply[]
+  isExpanded: boolean
+  isSelected: boolean
+  onToggle: (stickId: string) => void
+  onSelect: (stickId: string) => void
+  onOpen: (stickId: string) => void
+  onPromoteReply: (stickId: string, topic: string, replyId: string, content: string) => void
+  onNavigateToCalstick: (calstickId: string) => void
+}
+
+const StickTableRow = React.memo(function StickTableRow({
+  stick,
+  replies,
+  isExpanded,
+  isSelected,
+  onToggle,
+  onSelect,
+  onOpen,
+  onPromoteReply,
+  onNavigateToCalstick,
+}: StickTableRowProps) {
+  const handleRowClick = useCallback(() => {
+    onToggle(stick.id)
+  }, [onToggle, stick.id])
+
+  const handleCheckboxChange = useCallback(() => {
+    onSelect(stick.id)
+  }, [onSelect, stick.id])
+
+  const handleOpenClick = useCallback(() => {
+    onOpen(stick.id)
+  }, [onOpen, stick.id])
+
+  const stopPropagation = useCallback((e: React.MouseEvent) => {
+    e.stopPropagation()
+  }, [])
+
+  return (
+    <Fragment>
+      <TableRow className="cursor-pointer hover:bg-gray-50" onClick={handleRowClick}>
+        <TableCell onClick={stopPropagation}>
+          <Checkbox
+            checked={isSelected}
+            onCheckedChange={handleCheckboxChange}
+            onClick={stopPropagation}
+          />
+        </TableCell>
+        <TableCell>
+          {isExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+        </TableCell>
+        <TableCell className="font-medium">
+          <div className="flex items-center gap-2">
+            <div className="w-1 h-8 rounded" style={{ backgroundColor: stick.color }} />
+            {stick.topic}
+          </div>
+        </TableCell>
+        <TableCell onClick={stopPropagation}>
+          <WorkflowStatusBadge status={stick.workflow_status || "idea"} size="sm" />
+        </TableCell>
+        <TableCell className="max-w-md">
+          {stick.live_summary ? (
+            <div className="space-y-1">
+              <p className="line-clamp-2 text-sm text-gray-600">{stick.content}</p>
+              <p className="text-xs text-blue-600 italic line-clamp-1">{stick.live_summary}</p>
+            </div>
+          ) : (
+            <p className="line-clamp-2 text-sm text-gray-600">{stick.content}</p>
+          )}
+        </TableCell>
+        <TableCell className="text-sm">
+          {stick.users?.full_name || stick.users?.email || "Unknown"}
+        </TableCell>
+        <TableCell className="text-center">
+          <Badge variant="secondary" className="flex items-center gap-1 justify-center">
+            <MessageSquare className="h-3 w-3" />
+            {stick.reply_count || 0}
+          </Badge>
+        </TableCell>
+        <TableCell className="text-sm text-gray-500">
+          {formatDistanceToNow(new Date(stick.created_at), { addSuffix: true })}
+        </TableCell>
+        <TableCell className="text-center" onClick={stopPropagation}>
+          <Button variant="ghost" size="sm" onClick={handleOpenClick} title="View and edit stick">
+            <Eye className="h-4 w-4" />
+          </Button>
+        </TableCell>
+      </TableRow>
+
+      {isExpanded && (
+        <TableRow>
+          <TableCell colSpan={9} className="bg-gray-50">
+            <div className="py-4 px-6">
+              <h4 className="font-semibold mb-3 flex items-center gap-2">
+                <MessageSquare className="h-4 w-4" />
+                Replies ({replies?.length || 0})
+              </h4>
+              {replies && replies.length > 0 ? (
+                <div className="space-y-3">
+                  {replies.map((reply) => (
+                    <Card
+                      key={reply.id}
+                      className="p-4"
+                      style={{ borderLeftWidth: "3px", borderLeftColor: reply.color }}
+                    >
+                      <div className="flex items-start justify-between gap-4">
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm mb-2">{reply.content}</p>
+                          <div className="flex items-center gap-3 text-xs text-gray-500">
+                            <div className="flex items-center gap-1">
+                              <User className="h-3 w-3" />
+                              {reply.users?.full_name || reply.users?.email || "Unknown"}
+                            </div>
+                            <div className="flex items-center gap-1">
+                              <Calendar className="h-3 w-3" />
+                              {formatDistanceToNow(new Date(reply.created_at), { addSuffix: true })}
+                            </div>
+                          </div>
+                        </div>
+                        <div className="flex-shrink-0">
+                          {reply.calstick_id ? (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => onNavigateToCalstick(reply.calstick_id!)}
+                              title="View in CalSticks"
+                              className="text-green-600 hover:text-green-700 hover:bg-green-50"
+                            >
+                              <ExternalLink className="h-4 w-4" />
+                            </Button>
+                          ) : (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => onPromoteReply(stick.id, stick.topic, reply.id, reply.content)}
+                              title="Promote this reply to CalStick"
+                              className="text-purple-600 hover:text-purple-700 hover:bg-purple-50"
+                            >
+                              <ArrowRight className="h-4 w-4" />
+                            </Button>
+                          )}
+                        </div>
+                      </div>
+                    </Card>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-sm text-gray-500 italic">No replies yet</p>
+              )}
+            </div>
+          </TableCell>
+        </TableRow>
+      )}
+    </Fragment>
+  )
+})
+
 export default function SocialHubPage() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const { user } = useUser()
+  const { currentOrg } = useOrganization()
   const { isAuthorized, isLoading: guardLoading } = useHubModeGuard()
   const [publicPads, setPublicPads] = useState<SocialPad[]>([])
   const [privatePads, setPrivatePads] = useState<SocialPad[]>([])
@@ -178,13 +392,11 @@ export default function SocialHubPage() {
   const [selectedStickIds, setSelectedStickIds] = useState<Set<string>>(new Set())
   const [showShortcutsHelp, setShowShortcutsHelp] = useState(false)
   const { isOpen: isCommandPaletteOpen, setIsOpen: setIsCommandPaletteOpen } = useCommandPalette()
-  const [stickReactions, setStickReactions] = useState<Record<string, any[]>>({})
-  const [kbDrawerPadId, setKbDrawerPadId] = useState<string | null>(null)
+    const [kbDrawerPadId, setKbDrawerPadId] = useState<string | null>(null)
 
   const [isDecisionCockpitOpen, setIsDecisionCockpitOpen] = useState(false)
   const [promoteDialogOpen, setPromoteDialogOpen] = useState(false)
-  const [workflowFilter, setWorkflowFilter] = useState<string | null>(null)
-
+  
   const [replyToPromote, setReplyToPromote] = useState<{
     stickId: string
     replyId: string
@@ -195,8 +407,7 @@ export default function SocialHubPage() {
   const fetchAttempted = useRef(false)
   const initialPadId = searchParams.get("padId")
 
-  const [padRoles, setPadRoles] = useState<Record<string, string>>({})
-  const [showActivityModal, setShowActivityModal] = useState(false)
+    const [showActivityModal, setShowActivityModal] = useState(false)
   const [showNotificationsModal, setShowNotificationsModal] = useState(false)
 
   const handleReplyCreated = async (reply: any) => {
@@ -213,10 +424,10 @@ export default function SocialHubPage() {
   }
 
   const { isConnected: realtimeConnected } = useRealtimeSticks({
-    onStickCreated: () => fetchData(),
-    onStickUpdated: () => fetchData(),
-    onStickDeleted: () => fetchData(),
-    onReplyCreated: handleReplyCreated,
+    onStickCreated: () => void fetchData(),
+    onStickUpdated: () => void fetchData(),
+    onStickDeleted: () => void fetchData(),
+    onReplyCreated: (reply) => void handleReplyCreated(reply),
   })
 
   const { presenceUsers, isConnected: presenceConnected } = usePresence()
@@ -227,22 +438,12 @@ export default function SocialHubPage() {
 
     setLoading(true)
     try {
+      // Fetch pads
       const padsResponse = await fetchWithRetry("/api/social-pads")
       const padsData = await safeJsonParse<{ pads: SocialPad[] }>(padsResponse, { pads: [] })
       const allPads = padsData.pads || []
 
-      if (allPads.length > 0) {
-        console.log("[v0] Total pads fetched:", allPads.length)
-      }
-
-      // Roles are already included in the pads response via owner_id
-      const rolesMap: Record<string, string> = {}
-      for (const pad of allPads) {
-        if (pad.owner_id === user.id) {
-          rolesMap[pad.id] = "owner"
-        }
-      }
-      setPadRoles(rolesMap)
+      if (allPads.length > 0) console.log("[v0] Total pads fetched:", allPads.length)
 
       const publicPadsList = allPads.filter((pad: SocialPad) => pad.is_public)
       const privatePadsList = allPads.filter((pad: SocialPad) => !pad.is_public)
@@ -253,15 +454,11 @@ export default function SocialHubPage() {
       setPublicPads(publicPadsList)
       setPrivatePads(privatePadsList)
 
+      // Fetch sticks
       const timestamp = Date.now()
       const sticksResponse = await fetchWithRetry(
         `/api/social-sticks?_t=${timestamp}`,
-        {
-          credentials: "include",
-          headers: {
-            "Cache-Control": "no-cache",
-          },
-        },
+        { credentials: "include", headers: { "Cache-Control": "no-cache" } },
         3,
         1000,
       )
@@ -269,46 +466,17 @@ export default function SocialHubPage() {
       const sticksData = await safeJsonParse<{ sticks: SocialStick[] }>(sticksResponse, { sticks: [] })
       const sticks = sticksData.sticks || []
 
-      if (sticks.length > 0) {
-        console.log("[v0] Total sticks fetched:", sticks.length)
-      }
+      if (sticks.length > 0) console.log("[v0] Total sticks fetched:", sticks.length)
 
       const sticksWithCounts = sticks.map((stick: SocialStick) => ({
         ...stick,
         reply_count: stick.reply_count || 0,
       }))
 
-      const publicGrouped: Record<string, SocialStick[]> = {}
-      const privateGrouped: Record<string, SocialStick[]> = {}
-
-      for (const stick of sticksWithCounts) {
-        const padId = stick.social_pad_id
-        const pad = allPads.find((p: SocialPad) => p.id === padId)
-
-        if (pad?.is_public) {
-          if (!publicGrouped[padId]) publicGrouped[padId] = []
-          publicGrouped[padId].push(stick)
-        } else {
-          if (!privateGrouped[padId]) privateGrouped[padId] = []
-          privateGrouped[padId].push(stick)
-        }
-      }
-
-      const sortedPublicSticks = Object.entries(publicGrouped).reduce(
-        (acc, [padId, padSticks]) => {
-          acc[padId] = padSticks.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
-          return acc
-        },
-        {} as Record<string, SocialStick[]>,
-      )
-
-      const sortedPrivateSticks = Object.entries(privateGrouped).reduce(
-        (acc, [padId, padSticks]) => {
-          acc[padId] = padSticks.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
-          return acc
-        },
-        {} as Record<string, SocialStick[]>,
-      )
+      // Group and sort sticks
+      const { publicGrouped, privateGrouped } = groupSticksByPadVisibility(sticksWithCounts, allPads)
+      const sortedPublicSticks = sortStickGroups(publicGrouped)
+      const sortedPrivateSticks = sortStickGroups(privateGrouped)
 
       console.log("[v0] Public sticks count:", Object.values(sortedPublicSticks).flat().length)
       console.log("[v0] Private sticks count:", Object.values(sortedPrivateSticks).flat().length)
@@ -316,44 +484,9 @@ export default function SocialHubPage() {
       setPublicSticks(sortedPublicSticks)
       setPrivateSticks(sortedPrivateSticks)
 
+      // Process invites if needed
       if (initialPadId) {
-        try {
-          console.log("[v0] Checking for pending invites to process")
-          const processResponse = await fetchWithRetry(
-            `/api/pads/${initialPadId}/process-invites`,
-            {
-              method: "POST",
-              credentials: "include",
-            },
-            2,
-            500,
-          )
-          if (processResponse) {
-            const processData = await safeJsonParse<{ message: string }>(processResponse, { message: "" })
-            if (processData.message) {
-              console.log("[v0] Processed pending invites:", processData.message)
-            }
-          }
-        } catch (error) {
-          // Silently ignore invite processing errors
-        }
-      }
-
-      if (sticks.length > 0) {
-        const reactionsResponse = await fetchWithRetry("/api/social-sticks/reactions", {}, 2, 500)
-        if (reactionsResponse) {
-          const reactionsData = await safeJsonParse<{ reactions: any[] }>(reactionsResponse, { reactions: [] })
-          if (reactionsData.reactions) {
-            const reactionsMap: Record<string, any[]> = {}
-            reactionsData.reactions.forEach((reaction: { social_stick_id: string }) => {
-              if (!reactionsMap[reaction.social_stick_id]) {
-                reactionsMap[reaction.social_stick_id] = []
-              }
-              reactionsMap[reaction.social_stick_id].push(reaction)
-            })
-            setStickReactions(reactionsMap)
-          }
-        }
+        await processInvitesForPad(initialPadId)
       }
     } catch (error) {
       console.error("Error fetching data:", error)
@@ -413,9 +546,9 @@ export default function SocialHubPage() {
   const handleTabChange = (value: string) => {
     console.log("[v0] Tab change to:", value)
     setActiveTab(value)
-    const newUrl = new URL(window.location.href)
+    const newUrl = new URL(globalThis.location.href)
     newUrl.searchParams.set("tab", value)
-    window.history.replaceState({}, "", newUrl.toString())
+    globalThis.history.replaceState({}, "", newUrl.toString())
   }
 
   const handleToggleStickSelection = (stickId: string, event?: React.MouseEvent) => {
@@ -509,9 +642,25 @@ export default function SocialHubPage() {
     fetchData()
   }
 
-  const handleFilterFromCockpit = (filter: string) => {
-    setWorkflowFilter(filter)
-  }
+  const handlePadCheckboxChange = useCallback(
+    (_padId: string, sticks: SocialStick[], checked: boolean | "indeterminate") => {
+      const newSelected = new Set(selectedStickIds)
+      if (checked === true) {
+        sticks.forEach((s) => newSelected.add(s.id))
+      } else {
+        sticks.forEach((s) => newSelected.delete(s.id))
+      }
+      setSelectedStickIds(newSelected)
+    },
+    [selectedStickIds],
+  )
+
+  const handleNavigateToCalstick = useCallback(
+    (calstickId: string) => {
+      router.push(`/calsticks?stickId=${calstickId}`)
+    },
+    [router],
+  )
 
   const recentPads = [...publicPads, ...privatePads]
     .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
@@ -590,17 +739,9 @@ export default function SocialHubPage() {
                               sticksByPad[pad.id].every((s) => selectedStickIds.has(s.id)) &&
                               sticksByPad[pad.id].length > 0
                             }
-                            onCheckedChange={(checked) => {
-                              if (checked) {
-                                const newSelected = new Set(selectedStickIds)
-                                sticksByPad[pad.id].forEach((s) => newSelected.add(s.id))
-                                setSelectedStickIds(newSelected)
-                              } else {
-                                const newSelected = new Set(selectedStickIds)
-                                sticksByPad[pad.id].forEach((s) => newSelected.delete(s.id))
-                                setSelectedStickIds(newSelected)
-                              }
-                            }}
+                            onCheckedChange={(checked) =>
+                              handlePadCheckboxChange(pad.id, sticksByPad[pad.id], checked)
+                            }
                           />
                         </TableHead>
                         <TableHead className="w-12"></TableHead>
@@ -615,137 +756,18 @@ export default function SocialHubPage() {
                     </TableHeader>
                     <TableBody>
                       {sticksByPad[pad.id].map((stick) => (
-                        <Fragment key={stick.id}>
-                          <TableRow className="cursor-pointer hover:bg-gray-50" onClick={() => toggleStick(stick.id)}>
-                            <TableCell onClick={(e) => e.stopPropagation()}>
-                              <Checkbox
-                                checked={selectedStickIds.has(stick.id)}
-                                onCheckedChange={() => handleToggleStickSelection(stick.id)}
-                                onClick={(e) => handleToggleStickSelection(stick.id, e as any)}
-                              />
-                            </TableCell>
-                            <TableCell>
-                              {expandedSticks.has(stick.id) ? (
-                                <ChevronDown className="h-4 w-4" />
-                              ) : (
-                                <ChevronRight className="h-4 w-4" />
-                              )}
-                            </TableCell>
-                            <TableCell className="font-medium">
-                              <div className="flex items-center gap-2">
-                                <div className="w-1 h-8 rounded" style={{ backgroundColor: stick.color }} />
-                                {stick.topic}
-                              </div>
-                            </TableCell>
-                            <TableCell onClick={(e) => e.stopPropagation()}>
-                              <WorkflowStatusBadge status={stick.workflow_status || "idea"} size="sm" />
-                            </TableCell>
-                            <TableCell className="max-w-md">
-                              {stick.live_summary ? (
-                                <div className="space-y-1">
-                                  <p className="line-clamp-2 text-sm text-gray-600">{stick.content}</p>
-                                  <p className="text-xs text-blue-600 italic line-clamp-1">{stick.live_summary}</p>
-                                </div>
-                              ) : (
-                                <p className="line-clamp-2 text-sm text-gray-600">{stick.content}</p>
-                              )}
-                            </TableCell>
-                            <TableCell className="text-sm">
-                              {stick.users?.full_name || stick.users?.email || "Unknown"}
-                            </TableCell>
-                            <TableCell className="text-center">
-                              <Badge variant="secondary" className="flex items-center gap-1 justify-center">
-                                <MessageSquare className="h-3 w-3" />
-                                {stick.reply_count || 0}
-                              </Badge>
-                            </TableCell>
-                            <TableCell className="text-sm text-gray-500">
-                              {formatDistanceToNow(new Date(stick.created_at), { addSuffix: true })}
-                            </TableCell>
-                            <TableCell className="text-center" onClick={(e) => e.stopPropagation()}>
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => handleOpenStick(stick.id)}
-                                title="View and edit stick"
-                              >
-                                <Eye className="h-4 w-4" />
-                              </Button>
-                            </TableCell>
-                          </TableRow>
-
-                          {expandedSticks.has(stick.id) && (
-                            <TableRow>
-                              <TableCell colSpan={9} className="bg-gray-50">
-                                <div className="py-4 px-6">
-                                  <h4 className="font-semibold mb-3 flex items-center gap-2">
-                                    <MessageSquare className="h-4 w-4" />
-                                    Replies ({replies[stick.id]?.length || 0})
-                                  </h4>
-                                  {replies[stick.id] && replies[stick.id].length > 0 ? (
-                                    <div className="space-y-3">
-                                      {replies[stick.id].map((reply) => (
-                                        <Card
-                                          key={reply.id}
-                                          className="p-4"
-                                          style={{ borderLeftWidth: "3px", borderLeftColor: reply.color }}
-                                        >
-                                          <div className="flex items-start justify-between gap-4">
-                                            <div className="flex-1 min-w-0">
-                                              <p className="text-sm mb-2">{reply.content}</p>
-                                              <div className="flex items-center gap-3 text-xs text-gray-500">
-                                                <div className="flex items-center gap-1">
-                                                  <User className="h-3 w-3" />
-                                                  {reply.users?.full_name || reply.users?.email || "Unknown"}
-                                                </div>
-                                                <div className="flex items-center gap-1">
-                                                  <Calendar className="h-3 w-3" />
-                                                  {formatDistanceToNow(new Date(reply.created_at), { addSuffix: true })}
-                                                </div>
-                                              </div>
-                                            </div>
-                                            <div className="flex-shrink-0">
-                                              {!reply.calstick_id ? (
-                                                <Button
-                                                  variant="ghost"
-                                                  size="sm"
-                                                  onClick={() =>
-                                                    handleOpenPromoteReplyDialog(
-                                                      stick.id,
-                                                      stick.topic,
-                                                      reply.id,
-                                                      reply.content,
-                                                    )
-                                                  }
-                                                  title="Promote this reply to CalStick"
-                                                  className="text-purple-600 hover:text-purple-700 hover:bg-purple-50"
-                                                >
-                                                  <ArrowRight className="h-4 w-4" />
-                                                </Button>
-                                              ) : (
-                                                <Button
-                                                  variant="ghost"
-                                                  size="sm"
-                                                  onClick={() => router.push(`/calsticks?stickId=${reply.calstick_id}`)}
-                                                  title="View in CalSticks"
-                                                  className="text-green-600 hover:text-green-700 hover:bg-green-50"
-                                                >
-                                                  <ExternalLink className="h-4 w-4" />
-                                                </Button>
-                                              )}
-                                            </div>
-                                          </div>
-                                        </Card>
-                                      ))}
-                                    </div>
-                                  ) : (
-                                    <p className="text-sm text-gray-500 italic">No replies yet</p>
-                                  )}
-                                </div>
-                              </TableCell>
-                            </TableRow>
-                          )}
-                        </Fragment>
+                        <StickTableRow
+                          key={stick.id}
+                          stick={stick}
+                          replies={replies[stick.id] || []}
+                          isExpanded={expandedSticks.has(stick.id)}
+                          isSelected={selectedStickIds.has(stick.id)}
+                          onToggle={toggleStick}
+                          onSelect={handleToggleStickSelection}
+                          onOpen={handleOpenStick}
+                          onPromoteReply={handleOpenPromoteReplyDialog}
+                          onNavigateToCalstick={handleNavigateToCalstick}
+                        />
                       ))}
                     </TableBody>
                   </Table>
@@ -827,10 +849,12 @@ export default function SocialHubPage() {
                   </span>
                 )}
               </Button>
-              <Button onClick={() => router.push("/social/hubs")} className="bg-purple-600 hover:bg-purple-700">
-                <Plus className="h-4 w-4 mr-2" />
-                Create Social Pad
-              </Button>
+              {!currentOrg?.settings?.disable_manual_hub_creation && (
+                <Button onClick={() => router.push("/social/hubs")} className="bg-purple-600 hover:bg-purple-700">
+                  <Plus className="h-4 w-4 mr-2" />
+                  Create Social Pad
+                </Button>
+              )}
               <Button
                 onClick={() => router.push("/social/admin/cleanup-policies")}
                 className="bg-green-600 hover:bg-green-700"
@@ -902,17 +926,19 @@ export default function SocialHubPage() {
                   <Shield className="h-4 w-4 mr-2" />
                   Cleanup Policies
                 </Button>
-                <div className="pt-2 border-t">
-                  <Button
-                    className="w-full bg-purple-600 hover:bg-purple-700"
-                    onClick={() => {
-                      router.push("/social/hubs")
-                      setIsMobileMenuOpen(false)
-                    }}
-                  >
-                    <Plus className="h-5 w-5 sm:h-6 sm:w-6" />
-                  </Button>
-                </div>
+                {!currentOrg?.settings?.disable_manual_hub_creation && (
+                  <div className="pt-2 border-t">
+                    <Button
+                      className="w-full bg-purple-600 hover:bg-purple-700"
+                      onClick={() => {
+                        router.push("/social/hubs")
+                        setIsMobileMenuOpen(false)
+                      }}
+                    >
+                      <Plus className="h-5 w-5 sm:h-6 sm:w-6" />
+                    </Button>
+                  </div>
+                )}
               </CardContent>
             </Card>
           )}
@@ -964,7 +990,7 @@ export default function SocialHubPage() {
       <DecisionCockpitSidebar
         isOpen={isDecisionCockpitOpen}
         onClose={() => setIsDecisionCockpitOpen(false)}
-        onFilterSelect={handleFilterFromCockpit}
+        onFilterSelect={() => {}}
       />
 
       <SocialAnalyticsSidebar isOpen={isAnalyticsSidebarOpen} onClose={() => setIsAnalyticsSidebarOpen(false)} />
@@ -974,7 +1000,7 @@ export default function SocialHubPage() {
         onOpenChange={setIsCommandPaletteOpen}
         recentPads={recentPads}
         onCreateStick={() => router.push("/social/hubs")}
-        onCreatePad={() => router.push("/social/hubs")}
+        onCreatePad={currentOrg?.settings?.disable_manual_hub_creation ? undefined : () => router.push("/social/hubs")}
       />
 
       <BulkActionsToolbar

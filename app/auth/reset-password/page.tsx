@@ -2,7 +2,6 @@
 
 import type React from "react"
 
-import { createSupabaseBrowser } from "@/lib/supabase-browser"
 import { Button } from "@/components/ui/button"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import Link from "next/link"
@@ -27,28 +26,31 @@ export default function ResetPasswordPage() {
     email: "",
   })
 
-  const supabase = createSupabaseBrowser()
-
   const handleResetPassword = async (e: React.FormEvent) => {
     e.preventDefault()
     setIsSubmitting(true)
     clearErrors()
 
     try {
-      const { error } = await supabase.auth.resetPasswordForEmail(formData.email, {
-        redirectTo: `${window.location.origin}/auth/reset-password/confirm`,
+      const response = await fetch("/api/auth/reset-password", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: formData.email }),
       })
 
-      if (error) {
-        setFieldError("email", error.message)
-      } else {
+      const data = await response.json()
+
+      if (response.ok) {
         setFieldError("email", "") // Clear error to show success
         // Show success message by setting a "positive" error
         setTimeout(() => {
           setFieldError("email", "✓ Check your email for the password reset link!")
         }, 100)
+      } else {
+        setFieldError("email", data.error || "Failed to send reset email")
       }
-    } catch (err) {
+    } catch (error_) {
+      console.error("Reset password error:", error_)
       setFieldError("email", "An unexpected error occurred. Please try again.")
     } finally {
       setIsSubmitting(false)
@@ -67,7 +69,7 @@ export default function ResetPasswordPage() {
             </div>
             <h1 className="text-2xl font-bold text-gray-900">Reset Password</h1>
             <p className="text-gray-600 mt-2">
-              Enter your email address and we'll send you a link to reset your password.
+              Enter your email address and we&apos;ll send you a link to reset your password.
             </p>
           </div>
 

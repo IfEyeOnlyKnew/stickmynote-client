@@ -1,5 +1,5 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { createSupabaseServer } from "@/lib/supabase-server"
+import { createServiceDatabaseClient } from "@/lib/database/database-adapter"
 import { validateUUID } from "@/lib/input-validation-enhanced"
 import { applyRateLimit } from "@/lib/rate-limiter-enhanced"
 import { getCachedAuthUser, createRateLimitResponse, createUnauthorizedResponse } from "@/lib/auth/cached-auth"
@@ -40,9 +40,9 @@ export async function DELETE(request: NextRequest, context: { params: Promise<{ 
       return NextResponse.json({ error: "Rate limit exceeded" }, { status: 429, headers: { "Retry-After": "60" } })
     }
 
-    const supabase = await createSupabaseServer()
+    const db = await createServiceDatabaseClient()
 
-    const { data: stick, error: fetchError } = await supabase
+    const { data: stick, error: fetchError } = await db
       .from("paks_pad_sticks")
       .select("id, user_id, pad_id, org_id")
       .eq("id", stickId)
@@ -60,7 +60,7 @@ export async function DELETE(request: NextRequest, context: { params: Promise<{ 
 
     const isStickOwner = stick.user_id === user.id
 
-    const { data: pad } = await supabase
+    const { data: pad } = await db
       .from("paks_pads")
       .select("owner_id")
       .eq("id", stick.pad_id)
@@ -69,7 +69,7 @@ export async function DELETE(request: NextRequest, context: { params: Promise<{ 
 
     const isPadOwner = pad?.owner_id === user.id
 
-    const { data: membership } = await supabase
+    const { data: membership } = await db
       .from("paks_pad_members")
       .select("role")
       .eq("pad_id", stick.pad_id)
@@ -84,7 +84,7 @@ export async function DELETE(request: NextRequest, context: { params: Promise<{ 
       return NextResponse.json({ error: "Permission denied" }, { status: 403 })
     }
 
-    const { error } = await supabase.from("paks_pad_sticks").delete().eq("id", stickId).eq("org_id", orgContext.orgId)
+    const { error } = await db.from("paks_pad_sticks").delete().eq("id", stickId).eq("org_id", orgContext.orgId)
 
     if (error) {
       console.error("Error deleting Stick:", error)
@@ -129,9 +129,9 @@ export async function PUT(request: NextRequest, context: { params: Promise<{ id:
     const body = await request.json()
     const { topic, content, details, color } = body
 
-    const supabase = await createSupabaseServer()
+    const db = await createServiceDatabaseClient()
 
-    const { data: stick } = await supabase
+    const { data: stick } = await db
       .from("paks_pad_sticks")
       .select("user_id, pad_id, org_id")
       .eq("id", stickId)
@@ -144,7 +144,7 @@ export async function PUT(request: NextRequest, context: { params: Promise<{ id:
 
     const isStickOwner = stick.user_id === user.id
 
-    const { data: pad } = await supabase
+    const { data: pad } = await db
       .from("paks_pads")
       .select("owner_id")
       .eq("id", stick.pad_id)
@@ -152,7 +152,7 @@ export async function PUT(request: NextRequest, context: { params: Promise<{ id:
       .maybeSingle()
     const isPadOwner = pad?.owner_id === user.id
 
-    const { data: membership } = await supabase
+    const { data: membership } = await db
       .from("paks_pad_members")
       .select("role")
       .eq("pad_id", stick.pad_id)
@@ -167,7 +167,7 @@ export async function PUT(request: NextRequest, context: { params: Promise<{ id:
       return NextResponse.json({ error: "Permission denied" }, { status: 403 })
     }
 
-    const { data: updatedStick, error } = await supabase
+    const { data: updatedStick, error } = await db
       .from("paks_pad_sticks")
       .update({
         topic,
@@ -223,9 +223,9 @@ export async function PATCH(request: NextRequest, context: { params: Promise<{ i
 
     const body = await request.json()
 
-    const supabase = await createSupabaseServer()
+    const db = await createServiceDatabaseClient()
 
-    const { data: stick } = await supabase
+    const { data: stick } = await db
       .from("paks_pad_sticks")
       .select("user_id, pad_id, org_id")
       .eq("id", stickId)
@@ -238,7 +238,7 @@ export async function PATCH(request: NextRequest, context: { params: Promise<{ i
 
     const isStickOwner = stick.user_id === user.id
 
-    const { data: pad } = await supabase
+    const { data: pad } = await db
       .from("paks_pads")
       .select("owner_id")
       .eq("id", stick.pad_id)
@@ -246,7 +246,7 @@ export async function PATCH(request: NextRequest, context: { params: Promise<{ i
       .maybeSingle()
     const isPadOwner = pad?.owner_id === user.id
 
-    const { data: membership } = await supabase
+    const { data: membership } = await db
       .from("paks_pad_members")
       .select("role")
       .eq("pad_id", stick.pad_id)
@@ -271,7 +271,7 @@ export async function PATCH(request: NextRequest, context: { params: Promise<{ i
     if (body.color !== undefined) updateData.color = body.color
     if (body.is_quickstick !== undefined) updateData.is_quickstick = body.is_quickstick
 
-    const { data: updatedStick, error } = await supabase
+    const { data: updatedStick, error } = await db
       .from("paks_pad_sticks")
       .update(updateData)
       .eq("id", stickId)

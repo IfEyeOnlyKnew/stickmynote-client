@@ -1,4 +1,4 @@
-import { createClient } from "@/lib/supabase/server"
+import { createDatabaseClient } from "@/lib/database/database-adapter"
 import { NextResponse } from "next/server"
 import { getOrgContext } from "@/lib/auth/get-org-context"
 import { getCachedAuthUser } from "@/lib/auth/cached-auth"
@@ -6,9 +6,9 @@ import { getCachedAuthUser } from "@/lib/auth/cached-auth"
 export async function POST(request: Request, { params }: { params: Promise<{ stickId: string; replyId: string }> }) {
   try {
     const { stickId, replyId } = await params
-    const supabase = await createClient()
+    const db = await createDatabaseClient()
 
-    const { user, error: authError, rateLimited } = await getCachedAuthUser(supabase)
+    const { user, error: authError, rateLimited } = await getCachedAuthUser()
 
     if (rateLimited) {
       return NextResponse.json({ error: "Too many requests" }, { status: 429 })
@@ -30,7 +30,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ sti
       assigneeId?: string
     }
 
-    const { data: reply, error: replyError } = await supabase
+    const { data: reply, error: replyError } = await db
       .from("social_stick_replies")
       .select("id, content, color, social_stick_id, user_id, org_id, calstick_id")
       .eq("id", replyId)
@@ -52,7 +52,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ sti
       )
     }
 
-    const { data: socialStick, error: stickError } = await supabase
+    const { data: socialStick, error: stickError } = await db
       .from("social_sticks")
       .select("id, topic, social_pad_id")
       .eq("id", stickId)
@@ -62,7 +62,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ sti
       return NextResponse.json({ error: "Parent stick not found" }, { status: 404 })
     }
 
-    const { data: parentStick } = await supabase
+    const { data: parentStick } = await db
       .from("paks_pad_sticks")
       .select("id, pad_id")
       .eq("pad_id", socialStick.social_pad_id)
@@ -73,7 +73,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ sti
 
     // If no parent stick exists, create one
     if (!stickIdForCalstick) {
-      const { data: newStick, error: newStickError } = await supabase
+      const { data: newStick, error: newStickError } = await db
         .from("paks_pad_sticks")
         .insert({
           topic: `Social: ${socialStick.topic || "Untitled"}`,
@@ -114,7 +114,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ sti
       calstickData.calstick_assignee_id = assigneeId
     }
 
-    const { data: calstick, error: calstickError } = await supabase
+    const { data: calstick, error: calstickError } = await db
       .from("paks_pad_stick_replies")
       .insert(calstickData)
       .select("id")
@@ -126,7 +126,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ sti
     }
 
     // Update the social stick reply with the CalStick reference
-    const { error: updateError } = await supabase
+    const { error: updateError } = await db
       .from("social_stick_replies")
       .update({
         calstick_id: calstick.id,

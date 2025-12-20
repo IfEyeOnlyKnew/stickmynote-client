@@ -1,9 +1,6 @@
 "use client"
 
-import { useEffect } from "react"
-
-import type React from "react"
-import { useState } from "react"
+import { useEffect, useState } from "react"
 
 import { useRouter } from "next/navigation"
 import { Card, CardContent } from "@/components/ui/card"
@@ -60,40 +57,42 @@ export default function SocialNotificationsPage() {
     const stickTopic = notification.metadata?.stick_topic || "Untitled Stick"
     const padName = notification.metadata?.pad_name || "Unknown Pad"
 
-    let title = "Activity"
-    let message = "You have a new activity"
-
     switch (activityType) {
       case "note_created":
       case "stick_created":
-        title = `New Stick: ${stickTopic}`
-        message = `${userName} created a new stick in ${padName}`
-        break
+        return {
+          title: `New Stick: ${stickTopic}`,
+          message: `${userName} created a new stick in ${padName}`,
+        }
       case "note_replied":
       case "stick_replied":
-        title = `Reply on: ${stickTopic}`
-        message = `${userName} replied in ${padName}`
-        break
+        return {
+          title: `Reply on: ${stickTopic}`,
+          message: `${userName} replied in ${padName}`,
+        }
       case "pad_member_added":
       case "member_added":
-        title = "Added to Pad"
-        message = `${userName} added you to ${padName}`
-        break
+        return {
+          title: "Added to Pad",
+          message: `${userName} added you to ${padName}`,
+        }
       case "note_updated":
       case "stick_updated":
-        title = `Stick Updated: ${stickTopic}`
-        message = `${userName} updated a stick in ${padName}`
-        break
+        return {
+          title: `Stick Updated: ${stickTopic}`,
+          message: `${userName} updated a stick in ${padName}`,
+        }
       case "reaction_added":
-        title = "New Reaction"
-        message = `${userName} reacted to your content in ${padName}`
-        break
+        return {
+          title: "New Reaction",
+          message: `${userName} reacted to your content in ${padName}`,
+        }
       default:
-        title = "Activity"
-        message = `${userName} performed an action in ${padName}`
+        return {
+          title: "Activity",
+          message: `${userName} performed an action in ${padName}`,
+        }
     }
-
-    return { title, message }
   }
 
   const handleNotificationClick = (notification: any) => {
@@ -122,6 +121,7 @@ export default function SocialNotificationsPage() {
   if (!user) return null
 
   const unreadCount = notifications.filter((n: any) => !n.metadata?.read).length
+  const pluralSuffix = unreadCount > 1 ? "s" : ""
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -139,7 +139,7 @@ export default function SocialNotificationsPage() {
             <h1 className="text-4xl font-bold text-gray-900 mb-2">Social Notifications</h1>
             <p className="text-gray-600">
               {unreadCount > 0
-                ? `You have ${unreadCount} unread notification${unreadCount > 1 ? "s" : ""}`
+                ? `You have ${unreadCount} unread notification${pluralSuffix}`
                 : "You're all caught up!"}
             </p>
           </div>
@@ -162,7 +162,7 @@ export default function SocialNotificationsPage() {
             <CardContent>
               <Bell className="h-12 w-12 text-gray-400 mx-auto mb-4" />
               <h3 className="text-lg font-semibold mb-2">No Notifications</h3>
-              <p className="text-gray-600 mb-4">You're all caught up!</p>
+              <p className="text-gray-600 mb-4">You&apos;re all caught up!</p>
               <Button onClick={() => router.push("/social")}>Go to Social Hub</Button>
             </CardContent>
           </Card>

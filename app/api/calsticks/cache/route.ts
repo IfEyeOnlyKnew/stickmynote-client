@@ -1,12 +1,10 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { createSupabaseServer } from "@/lib/supabase-server"
 import { CalstickCache } from "@/lib/calstick-cache"
 import { getCachedAuthUser } from "@/lib/auth/cached-auth"
 
 export async function GET(request: NextRequest) {
   try {
-    const supabase = await createSupabaseServer()
-    const authResult = await getCachedAuthUser(supabase)
+    const authResult = await getCachedAuthUser()
     if (authResult.rateLimited) {
       return NextResponse.json({ error: "Rate limited" }, { status: 429, headers: { "Retry-After": "30" } })
     }
@@ -28,8 +26,7 @@ export async function GET(request: NextRequest) {
 
 export async function DELETE(request: NextRequest) {
   try {
-    const supabase = await createSupabaseServer()
-    const authResult = await getCachedAuthUser(supabase)
+    const authResult = await getCachedAuthUser()
     if (authResult.rateLimited) {
       return NextResponse.json({ error: "Rate limited" }, { status: 429, headers: { "Retry-After": "30" } })
     }

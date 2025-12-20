@@ -68,11 +68,13 @@ export function EmailManagementModal({ open, onOpenChange }: EmailManagementModa
     }
   }
 
+  /* eslint-disable react-hooks/exhaustive-deps */
   useEffect(() => {
     if (open) {
       fetchSavedEmails()
     }
   }, [open])
+  /* eslint-enable react-hooks/exhaustive-deps */
 
   const handleAddEmail = async () => {
     if (!newEmail.trim()) return
@@ -345,9 +347,8 @@ export function EmailManagementModal({ open, onOpenChange }: EmailManagementModa
                   disabled={selectedEmails.length === 0 || isSendingInvites}
                   variant="default"
                 >
-                  {isSendingInvites
-                    ? "Sending..."
-                    : `Send ${selectedEmails.length} Invite${selectedEmails.length !== 1 ? "s" : ""}`}
+                  {isSendingInvites && "Sending..."}
+                  {!isSendingInvites && `Send ${selectedEmails.length} Invite${selectedEmails.length !== 1 ? "s" : ""}`}
                 </Button>
                 <Button variant="outline" size="sm" onClick={exportEmails} disabled={savedEmails.length === 0}>
                   <Download className="h-4 w-4 mr-2" />
@@ -386,11 +387,13 @@ export function EmailManagementModal({ open, onOpenChange }: EmailManagementModa
             </div>
 
             <div className="max-h-60 overflow-y-auto border rounded-lg p-4">
-              {isLoading ? (
+              {isLoading && (
                 <p className="text-center text-gray-500">Loading...</p>
-              ) : savedEmails.length === 0 ? (
+              )}
+              {!isLoading && savedEmails.length === 0 && (
                 <p className="text-center text-gray-500">No saved emails yet</p>
-              ) : (
+              )}
+              {!isLoading && savedEmails.length > 0 && (
                 <div className="space-y-2">
                   {savedEmails.map((email) => (
                     <div key={email.id} className="flex items-center justify-between p-2 border rounded">

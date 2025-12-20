@@ -1,12 +1,12 @@
 import { NextResponse } from "next/server"
-import { createClient } from "@/lib/supabase/server"
+import { createDatabaseClient } from "@/lib/database/database-adapter"
 import { getCachedAuthUser } from "@/lib/auth/cached-auth"
 
 export async function GET() {
   try {
-    const supabase = await createClient()
+    const db = await createDatabaseClient()
 
-    const authResult = await getCachedAuthUser(supabase)
+    const authResult = await getCachedAuthUser()
     if (authResult.rateLimited) {
       return NextResponse.json(
         { error: "Rate limit exceeded. Please try again in a moment." },
@@ -20,7 +20,7 @@ export async function GET() {
 
     let recentSearches: string[] = []
     try {
-      const { data: recentData } = await supabase
+      const { data: recentData } = await db
         .from("search_history")
         .select("query")
         .eq("user_id", user.id)
@@ -30,7 +30,8 @@ export async function GET() {
 
       if (recentData) {
         // Remove duplicates and limit to 5
-        recentSearches = [...new Set(recentData.map((item) => item.query).filter(Boolean))].slice(0, 5)
+        const queries: string[] = recentData.map((item) => String(item.query || '')).filter((q) => q.length > 0)
+        recentSearches = Array.from(new Set(queries)).slice(0, 5) as string[]
       }
     } catch (error) {
       console.log("[v0] search_history table error:", error)
@@ -40,12 +41,12 @@ export async function GET() {
     let availableTags: string[] = []
 
     try {
-      const { data: sharedNotes } = await supabase.from("personal_sticks").select("id").eq("is_shared", true).limit(200)
+      const { data: sharedNotes } = await db.from("personal_sticks").select("id").eq("is_shared", true).limit(200)
 
       const sharedNoteIds = sharedNotes?.map((n) => n.id) || []
 
       if (sharedNoteIds.length > 0) {
-        const { data: tabsData } = await supabase
+        const { data: tabsData } = await db
           .from("personal_sticks_tabs")
           .select("tags, personal_stick_id")
           .in("personal_stick_id", sharedNoteIds)

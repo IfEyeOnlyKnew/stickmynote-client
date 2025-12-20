@@ -60,10 +60,10 @@ export default function AboutPage() {
     { name: "React 18", category: "UI Library" },
     { name: "TypeScript", category: "Language" },
     { name: "Tailwind CSS", category: "Styling" },
-    { name: "Supabase", category: "Backend & Database" },
+    { name: "PostgreSQL", category: "Database" },
+    { name: "LDAP/Active Directory", category: "Authentication" },
     { name: "Shadcn/ui", category: "UI Components" },
     { name: "Lucide React", category: "Icons" },
-    { name: "Vercel", category: "Deployment" },
   ]
 
   return (
@@ -124,9 +124,9 @@ export default function AboutPage() {
           </CardHeader>
           <CardContent>
             <p className="text-gray-700 leading-relaxed">
-              We believe that great ideas shouldn't be lost or forgotten. Stick My Note was created to provide a simple,
+              We believe that great ideas shouldn&apos;t be lost or forgotten. Stick My Note was created to provide a simple,
               intuitive, and powerful platform for capturing thoughts, organizing ideas, and sharing knowledge. Whether
-              you're brainstorming, taking quick notes, or collaborating with others, our platform adapts to your
+              you&apos;re brainstorming, taking quick notes, or collaborating with others, our platform adapts to your
               workflow while keeping your data secure and accessible from anywhere.
             </p>
           </CardContent>
@@ -186,7 +186,7 @@ export default function AboutPage() {
                 <div>
                   <h3 className="font-semibold text-gray-800 mb-1">Start Creating Notes</h3>
                   <p className="text-gray-600">
-                    Click "Add Note" to create your first sticky note. Add a topic, content, and choose a color.
+                    Click &quot;Add Note&quot; to create your first sticky note. Add a topic, content, and choose a color.
                   </p>
                 </div>
               </div>
@@ -247,7 +247,7 @@ export default function AboutPage() {
               Privacy & Security
             </CardTitle>
             <CardDescription>
-              Your data security and privacy are our top priorities. Here's how we protect you.
+              Your data security and privacy are our top priorities. Here&apos;s how we protect you.
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -260,7 +260,7 @@ export default function AboutPage() {
                     </h3>
                     <p className="text-gray-600 text-sm">
                       All data is encrypted in transit using TLS 1.3 and at rest using AES-256 encryption. We use
-                      Supabase's enterprise-grade security infrastructure with automatic security updates.
+                      enterprise-grade security infrastructure with automatic security updates.
                     </p>
                   </div>
                   <div>
@@ -309,8 +309,8 @@ export default function AboutPage() {
                       ☁️ Secure Cloud Infrastructure
                     </h3>
                     <p className="text-gray-600 text-sm">
-                      Hosted on Vercel with automatic HTTPS, DDoS protection, and global CDN. Database hosted on
-                      Supabase with automatic backups and point-in-time recovery.
+                      Hosted on-premise or in the cloud with automatic HTTPS and DDoS protection. Database hosted on
+                      PostgreSQL with automatic backups and point-in-time recovery.
                     </p>
                   </div>
                   <div>
@@ -373,7 +373,7 @@ export default function AboutPage() {
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
-              <p className="text-gray-700">Have questions, feedback, or need help? We'd love to hear from you!</p>
+              <p className="text-gray-700">Have questions, feedback, or need help? We&apos;d love to hear from you!</p>
               <div className="flex flex-wrap gap-4">
                 <Button variant="outline" className="flex items-center gap-2 bg-transparent">
                   <Mail className="w-4 h-4" />
@@ -396,10 +396,10 @@ export default function AboutPage() {
               Join thousands of users who are already organizing their thoughts and ideas with Stick My Note.
             </p>
             <Button
-              onClick={() => router.push("/notes")}
+              onClick={() => router.push("/personal")}
               className="bg-blue-600 hover:bg-blue-700 text-white px-8 py-3"
             >
-              Go to My Notes
+              Go to My Personal Hub
             </Button>
           </CardContent>
         </Card>

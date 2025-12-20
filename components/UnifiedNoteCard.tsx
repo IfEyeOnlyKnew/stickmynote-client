@@ -94,7 +94,7 @@ export const UnifiedNoteCard: React.FC<UnifiedNoteCardProps> = ({ windowSize, dr
   // Container classes for card mode
   const containerClasses = useMemo(() => {
     const baseClasses = "note-card-positioned note-card-width dynamic-position"
-    const stateClasses = []
+    const stateClasses: string[] = []
 
     if (draggedNote === note.id) stateClasses.push("dragging")
     if (isNewNote) stateClasses.push("border-blue-500 border-2")

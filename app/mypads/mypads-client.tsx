@@ -6,8 +6,7 @@ import type { PadWithRole } from "@/lib/data/pads-data"
 import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
-import { Search, Users } from 'lucide-react'
+import { Search } from 'lucide-react'
 import { UserMenu } from "@/components/user-menu"
 import { BreadcrumbNav } from "@/components/breadcrumb-nav"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
@@ -16,7 +15,7 @@ interface MyPadsClientProps {
   initialPads: PadWithRole[]
 }
 
-export function MyPadsClient({ initialPads }: MyPadsClientProps) {
+export function MyPadsClient({ initialPads }: Readonly<MyPadsClientProps>) {
   const router = useRouter()
   const [searchQuery, setSearchQuery] = useState("")
   const [activeTab, setActiveTab] = useState("all")
@@ -30,7 +29,7 @@ export function MyPadsClient({ initialPads }: MyPadsClientProps) {
     return initialPads.filter((pad) => {
       const matchesSearch =
         pad.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        (pad.description && pad.description.toLowerCase().includes(searchQuery.toLowerCase()))
+        pad.description?.toLowerCase().includes(searchQuery.toLowerCase())
 
       const matchesTab =
         activeTab === "all" ||

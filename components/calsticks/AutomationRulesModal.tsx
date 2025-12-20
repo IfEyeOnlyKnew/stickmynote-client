@@ -95,7 +95,7 @@ export function AutomationRulesModal({ isOpen, onClose }: AutomationRulesModalPr
             <div className="space-y-4">
               <div className="flex justify-between items-center">
                 <p className="text-sm text-muted-foreground">
-                  Automate your workflow with simple "If this, then that" rules.
+                  Automate your workflow with simple &quot;If this, then that&quot; rules.
                 </p>
                 <Button onClick={() => setIsCreating(true)} size="sm">
                   <Plus className="h-4 w-4 mr-2" />

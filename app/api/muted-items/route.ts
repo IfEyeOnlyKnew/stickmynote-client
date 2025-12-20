@@ -1,11 +1,11 @@
-import { createClient } from "@/lib/supabase/server"
+import { createDatabaseClient } from "@/lib/database/database-adapter"
 import { NextResponse } from "next/server"
 import { getCachedAuthUser } from "@/lib/auth/cached-auth"
 
 export async function GET() {
-  const supabase = await createClient()
+  const db = await createDatabaseClient()
 
-  const authResult = await getCachedAuthUser(supabase)
+  const authResult = await getCachedAuthUser()
   if (authResult.rateLimited) {
     return NextResponse.json(
       { error: "Rate limit exceeded. Please try again in a moment." },
@@ -17,7 +17,7 @@ export async function GET() {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
   }
 
-  const { data: mutedItems, error } = await supabase
+  const { data: mutedItems, error } = await db
     .from("notification_muted_items")
     .select("*")
     .eq("user_id", user.id)
@@ -32,9 +32,9 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
-  const supabase = await createClient()
+  const db = await createDatabaseClient()
 
-  const authResult = await getCachedAuthUser(supabase)
+  const authResult = await getCachedAuthUser()
   if (authResult.rateLimited) {
     return NextResponse.json(
       { error: "Rate limit exceeded. Please try again in a moment." },
@@ -49,7 +49,7 @@ export async function POST(request: Request) {
   try {
     const body = await request.json()
 
-    const { data: mutedItem, error } = await supabase
+    const { data: mutedItem, error } = await db
       .from("notification_muted_items")
       .upsert(
         {
@@ -79,9 +79,9 @@ export async function POST(request: Request) {
 }
 
 export async function DELETE(request: Request) {
-  const supabase = await createClient()
+  const db = await createDatabaseClient()
 
-  const authResult = await getCachedAuthUser(supabase)
+  const authResult = await getCachedAuthUser()
   if (authResult.rateLimited) {
     return NextResponse.json(
       { error: "Rate limit exceeded. Please try again in a moment." },
@@ -101,7 +101,7 @@ export async function DELETE(request: Request) {
     return NextResponse.json({ error: "entity_type and entity_id are required" }, { status: 400 })
   }
 
-  const { error } = await supabase
+  const { error } = await db
     .from("notification_muted_items")
     .delete()
     .eq("user_id", user.id)

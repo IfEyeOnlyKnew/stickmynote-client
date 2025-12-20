@@ -5,24 +5,72 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { StickyNote, Users, Check, AlertCircle, Info } from "lucide-react"
-import { createClient } from "@/lib/supabase/client"
 import { useRouter } from "next/navigation"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { extractDomain, isPublicEmailDomain } from "@/lib/utils/email-domain"
 
+type HubMode = "personal_only" | "full_access"
+
 interface HubModeSelectorProps {
-  open: boolean
-  onComplete: (mode: "personal_only" | "full_access") => void
-  userId: string
-  userEmail: string
+  readonly open: boolean
+  readonly onComplete: (mode: HubMode) => void
+  readonly userId: string
+  readonly userEmail: string
+}
+
+const PUBLIC_EMAIL_ERROR = "Public email domains (gmail.com, outlook.com, etc.) cannot be used for organization access. Please use your company email address or select Personal Hub Only."
+const PUBLIC_EMAIL_ORG_ERROR = "Public email domains (gmail.com, yahoo.com, etc.) cannot be used for organizations. Please use your company email address."
+
+// Helper: Setup organization for full access mode
+async function setupOrganization(email: string): Promise<{ success: boolean; error?: string }> {
+  try {
+    const response = await fetch("/api/organizations/find-or-create-by-domain", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email }),
+    })
+
+    const data = await response.json()
+
+    if (!response.ok) {
+      if (data.isPublic) {
+        return { success: false, error: PUBLIC_EMAIL_ORG_ERROR }
+      }
+      return { success: false, error: data.error || "Failed to setup organization" }
+    }
+
+    return { success: true }
+  } catch (err) {
+    return { success: false, error: err instanceof Error ? err.message : "Failed to setup organization" }
+  }
+}
+
+// Helper: Update user hub mode preference
+async function updateHubMode(mode: HubMode): Promise<{ success: boolean; error?: string }> {
+  try {
+    const response = await fetch("/api/user/hub-mode", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ hub_mode: mode }),
+    })
+
+    if (!response.ok) {
+      const data = await response.json()
+      return { success: false, error: data.error || "Failed to save preference" }
+    }
+
+    return { success: true }
+  } catch {
+    return { success: false, error: "Failed to save preference. Please try again." }
+  }
 }
 
 export function HubModeSelector({ open, onComplete, userId, userEmail }: HubModeSelectorProps) {
   const domain = extractDomain(userEmail)
   const isPersonalEmail = !domain || isPublicEmailDomain(domain)
-  const suggestedMode = isPersonalEmail ? "personal_only" : "full_access"
+  const suggestedMode: HubMode = isPersonalEmail ? "personal_only" : "full_access"
 
-  const [selectedMode, setSelectedMode] = useState<"personal_only" | "full_access" | null>(suggestedMode)
+  const [selectedMode, setSelectedMode] = useState<HubMode | null>(suggestedMode)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const router = useRouter()
@@ -39,62 +87,33 @@ export function HubModeSelector({ open, onComplete, userId, userEmail }: HubMode
     setSaving(true)
     setError(null)
 
-    try {
-      const supabase = createClient()
-
-      if (selectedMode === "full_access") {
-        if (isPersonalEmail) {
-          setError(
-            "Public email domains (gmail.com, outlook.com, etc.) cannot be used for organization access. Please use your company email address or select Personal Hub Only.",
-          )
-          setSaving(false)
-          return
-        }
-
-        const response = await fetch("/api/organizations/find-or-create-by-domain", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ email: userEmail }),
-        })
-
-        const data = await response.json()
-
-        if (!response.ok) {
-          if (data.isPublic) {
-            setError(
-              "Public email domains (gmail.com, yahoo.com, etc.) cannot be used for organizations. Please use your company email address.",
-            )
-            setSaving(false)
-            return
-          }
-          throw new Error(data.error || "Failed to setup organization")
-        }
-      }
-
-      // Update user's hub_mode preference
-      const { error: updateError } = await supabase.from("users").update({ hub_mode: selectedMode }).eq("id", userId)
-
-      if (updateError) {
-        console.error("Error saving hub mode:", updateError)
-        setError("Failed to save preference. Please try again.")
+    // Handle full_access mode with organization setup
+    if (selectedMode === "full_access") {
+      if (isPersonalEmail) {
+        setError(PUBLIC_EMAIL_ERROR)
         setSaving(false)
         return
       }
 
-      // Call the onComplete callback
-      onComplete(selectedMode)
-
-      // Redirect based on choice
-      if (selectedMode === "personal_only") {
-        router.push("/notes")
-      } else {
-        router.push("/dashboard")
+      const orgResult = await setupOrganization(userEmail)
+      if (!orgResult.success) {
+        setError(orgResult.error || "Failed to setup organization")
+        setSaving(false)
+        return
       }
-    } catch (err) {
-      console.error("Error in handleSave:", err)
-      setError(err instanceof Error ? err.message : "Failed to save preference. Please try again.")
-      setSaving(false)
     }
+
+    // Update user preference
+    const updateResult = await updateHubMode(selectedMode)
+    if (!updateResult.success) {
+      setError(updateResult.error || "Failed to save preference")
+      setSaving(false)
+      return
+    }
+
+    // Success - complete and redirect
+    onComplete(selectedMode)
+    router.push(selectedMode === "personal_only" ? "/personal" : "/dashboard")
   }
 
   return (
@@ -103,7 +122,7 @@ export function HubModeSelector({ open, onComplete, userId, userEmail }: HubMode
         <DialogHeader>
           <DialogTitle className="text-2xl text-center">Welcome to Stick My Note!</DialogTitle>
           <DialogDescription className="text-center text-base">
-            Choose how you'd like to use the application. You can change this anytime in your profile settings.
+            Choose how you&apos;d like to use the application. You can change this anytime in your profile settings.
           </DialogDescription>
         </DialogHeader>
 
@@ -174,13 +193,15 @@ export function HubModeSelector({ open, onComplete, userId, userEmail }: HubMode
 
           {/* Full Access Mode */}
           <Card
-            className={`cursor-pointer transition-all duration-200 ${
-              selectedMode === "full_access"
-                ? "border-blue-500 border-2 shadow-lg bg-blue-50"
-                : isPersonalEmail
-                  ? "opacity-60 cursor-not-allowed"
-                  : "hover:border-blue-300 hover:shadow-md"
-            }`}
+            className={`cursor-pointer transition-all duration-200 ${(() => {
+              if (selectedMode === "full_access") {
+                return "border-blue-500 border-2 shadow-lg bg-blue-50"
+              }
+              if (isPersonalEmail) {
+                return "opacity-60 cursor-not-allowed"
+              }
+              return "hover:border-blue-300 hover:shadow-md"
+            })()}`}
             onClick={() => {
               if (!isPersonalEmail) {
                 setSelectedMode("full_access")
@@ -247,7 +268,11 @@ export function HubModeSelector({ open, onComplete, userId, userEmail }: HubMode
 
         <div className="flex justify-center">
           <Button onClick={handleSave} disabled={!selectedMode || saving} size="lg" className="px-12">
-            {saving ? "Setting up..." : selectedMode ? "Continue" : "Select a mode to continue"}
+            {(() => {
+              if (saving) return "Setting up..."
+              if (selectedMode) return "Continue"
+              return "Select a mode to continue"
+            })()}
           </Button>
         </div>
       </DialogContent>

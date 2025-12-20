@@ -1,4 +1,4 @@
-import { createClient } from "@/lib/supabase/server"
+import { createDatabaseClient } from "@/lib/database/database-adapter"
 import { NextResponse } from "next/server"
 import { GrokService } from "@/lib/ai/grok-service"
 import { getOrgContext } from "@/lib/auth/get-org-context"
@@ -9,9 +9,9 @@ export const maxDuration = 30
 export async function POST(req: Request, { params }: { params: Promise<{ stickId: string }> }) {
   try {
     const { stickId } = await params
-    const supabase = await createClient()
+    const db = await createDatabaseClient()
 
-    const { user, error: authError, rateLimited } = await getCachedAuthUser(supabase)
+    const { user, error: authError, rateLimited } = await getCachedAuthUser()
 
     if (rateLimited) {
       return new NextResponse("Too many requests", { status: 429 })
@@ -26,7 +26,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ stickId
       return new NextResponse("No organization context", { status: 403 })
     }
 
-    const { data: stick, error: stickError } = await supabase
+    const { data: stick, error: stickError } = await db
       .from("social_sticks")
       .select(
         `
@@ -43,7 +43,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ stickId
     }
 
     // Fetch replies
-    const { data: replies } = await supabase
+    const { data: replies } = await db
       .from("social_stick_replies")
       .select(
         `
@@ -84,7 +84,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ stickId
     })
 
     // Update stick with AI data
-    const { error: updateError } = await supabase
+    const { error: updateError } = await db
       .from("social_sticks")
       .update({
         live_summary: summary,

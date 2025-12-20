@@ -8,6 +8,7 @@ export function useMemberPermissions(padId: string, userId?: string) {
   const [loading, setLoading] = useState(true)
   const [isOwner, setIsOwner] = useState(false)
 
+  /* eslint-disable react-hooks/exhaustive-deps */
   useEffect(() => {
     if (!padId || !userId) {
       setLoading(false)
@@ -16,6 +17,7 @@ export function useMemberPermissions(padId: string, userId?: string) {
 
     fetchPermissions()
   }, [padId, userId])
+  /* eslint-enable react-hooks/exhaustive-deps */
 
   const fetchPermissions = async () => {
     try {

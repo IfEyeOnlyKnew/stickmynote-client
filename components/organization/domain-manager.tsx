@@ -44,9 +44,11 @@ export function DomainManager({ orgId, canManage }: DomainManagerProps) {
   const [newDomain, setNewDomain] = useState("")
   const [error, setError] = useState<string | null>(null)
 
+  /* eslint-disable react-hooks/exhaustive-deps */
   useEffect(() => {
     fetchDomains()
   }, [orgId])
+  /* eslint-enable react-hooks/exhaustive-deps */
 
   async function fetchDomains() {
     try {

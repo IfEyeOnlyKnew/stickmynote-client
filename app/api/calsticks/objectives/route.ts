@@ -1,12 +1,12 @@
-import { createServerClient } from "@/lib/supabase/server"
+import { createDatabaseClient } from "@/lib/database/database-adapter"
 import { NextResponse } from "next/server"
 import { getOrgContext } from "@/lib/auth/get-org-context"
 import { getCachedAuthUser } from "@/lib/auth/cached-auth"
 
 export async function GET() {
   try {
-    const supabase = await createServerClient()
-    const authResult = await getCachedAuthUser(supabase)
+    const db = await createDatabaseClient()
+    const authResult = await getCachedAuthUser()
     if (authResult.rateLimited) {
       return NextResponse.json({ error: "Rate limited" }, { status: 429, headers: { "Retry-After": "30" } })
     }
@@ -20,7 +20,7 @@ export async function GET() {
       return NextResponse.json({ error: "No organization context" }, { status: 403 })
     }
 
-    const { data: objectives, error } = await supabase
+    const { data: objectives, error } = await db
       .from("objectives")
       .select(`
         *,
@@ -41,8 +41,8 @@ export async function GET() {
 
 export async function POST(request: Request) {
   try {
-    const supabase = await createServerClient()
-    const authResult = await getCachedAuthUser(supabase)
+    const db = await createDatabaseClient()
+    const authResult = await getCachedAuthUser()
     if (authResult.rateLimited) {
       return NextResponse.json({ error: "Rate limited" }, { status: 429, headers: { "Retry-After": "30" } })
     }
@@ -59,7 +59,7 @@ export async function POST(request: Request) {
     const body = await request.json()
     const { key_results, ...objectiveData } = body
 
-    const { data: objective, error: objError } = await supabase
+    const { data: objective, error: objError } = await db
       .from("objectives")
       .insert({
         ...objectiveData,
@@ -80,7 +80,7 @@ export async function POST(request: Request) {
         progress: Math.round(((kr.current_value - kr.start_value) / (kr.target_value - kr.start_value)) * 100),
       }))
 
-      const { error: krError } = await supabase.from("key_results").insert(keyResultsData)
+      const { error: krError } = await db.from("key_results").insert(keyResultsData)
 
       if (krError) throw krError
     }

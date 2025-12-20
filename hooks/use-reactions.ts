@@ -1,7 +1,7 @@
 "use client"
 
-import { useState, useEffect } from "react"
-import { createSupabaseBrowser } from "@/lib/supabase-browser"
+import { useState, useEffect, useRef } from "react"
+import { useUser } from "@/contexts/user-context"
 
 export interface Reaction {
   id: string
@@ -21,40 +21,27 @@ export interface ReactionCounts {
 }
 
 export function useReactions(targetId: string, targetType: "stick" | "reply" = "stick") {
+  const { user } = useUser()
   const [reactions, setReactions] = useState<Reaction[]>([])
   const [reactionCounts, setReactionCounts] = useState<ReactionCounts>({})
   const [loading, setLoading] = useState(true)
   const [userReactions, setUserReactions] = useState<Set<string>>(new Set())
+  const pollIntervalRef = useRef<NodeJS.Timeout | null>(null)
 
   useEffect(() => {
     if (!targetId) return
 
     fetchReactions()
 
-    // Subscribe to realtime changes
-    const supabase = createSupabaseBrowser()
-    const tableName = targetType === "stick" ? "social_stick_reactions" : "social_stick_reply_reactions"
-    const filterColumn = targetType === "stick" ? "social_stick_id" : "reply_id"
-
-    const channel = supabase
-      .channel(`reactions:${targetType}:${targetId}`)
-      .on(
-        "postgres_changes",
-        {
-          event: "*",
-          schema: "public",
-          table: tableName,
-          filter: `${filterColumn}=eq.${targetId}`,
-        },
-        () => {
-          fetchReactions()
-        },
-      )
-      .subscribe()
+    // Poll for updates every 30 seconds instead of realtime subscription
+    pollIntervalRef.current = setInterval(fetchReactions, 30000)
 
     return () => {
-      channel.unsubscribe()
+      if (pollIntervalRef.current) {
+        clearInterval(pollIntervalRef.current)
+      }
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [targetId, targetType])
 
   const fetchReactions = async () => {
@@ -70,12 +57,7 @@ export function useReactions(targetId: string, targetType: "stick" | "reply" = "
         setReactions(data.reactions || [])
         setReactionCounts(data.reactionCounts || {})
 
-        // Track user's reactions
-        const supabase = createSupabaseBrowser()
-        const {
-          data: { user },
-        } = await supabase.auth.getUser()
-
+        // Track user's reactions using context user
         if (user) {
           const userReactionTypes: string[] =
             data.reactions?.filter((r: Reaction) => r.user_id === user.id).map((r: Reaction) => r.reaction_type) || []

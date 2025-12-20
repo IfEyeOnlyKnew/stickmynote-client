@@ -2,7 +2,7 @@
 
 import type React from "react"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useCallback } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -31,7 +31,7 @@ interface IntakeForm {
   success_message: string
 }
 
-export default function IntakeFormClient({ token }: { token: string }) {
+export default function IntakeFormClient({ token }: Readonly<{ token: string }>) {
   const [form, setForm] = useState<IntakeForm | null>(null)
   const [formData, setFormData] = useState<Record<string, any>>({})
   const [loading, setLoading] = useState(true)
@@ -39,11 +39,7 @@ export default function IntakeFormClient({ token }: { token: string }) {
   const [submitted, setSubmitted] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  useEffect(() => {
-    fetchForm()
-  }, [token])
-
-  const fetchForm = async () => {
+  const fetchForm = useCallback(async () => {
     try {
       setLoading(true)
       const response = await fetch(`/api/intake/${token}`)
@@ -60,7 +56,11 @@ export default function IntakeFormClient({ token }: { token: string }) {
     } finally {
       setLoading(false)
     }
-  }
+  }, [token])
+
+  useEffect(() => {
+    fetchForm()
+  }, [fetchForm])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -244,7 +244,7 @@ export default function IntakeFormClient({ token }: { token: string }) {
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-6">
             {form.fields
-              .sort((a, b) => a.order_index - b.order_index)
+              .toSorted((a, b) => a.order_index - b.order_index)
               .map((field) => (
                 <div key={field.id} className="space-y-2">
                   <Label htmlFor={field.field_name}>

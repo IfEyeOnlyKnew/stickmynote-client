@@ -49,9 +49,17 @@ export function PadSummaryModal({ padId, padName, trigger }: PadSummaryModalProp
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
       <div
+        role="button"
+        tabIndex={0}
         onClick={() => {
           setIsOpen(true)
           if (!summary) handleGenerateSummary()
+        }}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") {
+            setIsOpen(true)
+            if (!summary) handleGenerateSummary()
+          }
         }}
       >
         {trigger}
@@ -66,16 +74,18 @@ export function PadSummaryModal({ padId, padName, trigger }: PadSummaryModalProp
         </DialogHeader>
 
         <div className="mt-4 min-h-[200px] max-h-[60vh] overflow-y-auto">
-          {loading ? (
+          {loading && (
             <div className="flex flex-col items-center justify-center h-[200px] space-y-4">
               <Loader2 className="h-8 w-8 animate-spin text-primary" />
               <p className="text-sm text-muted-foreground">Analyzing pad content...</p>
             </div>
-          ) : summary ? (
+          )}
+          {!loading && summary && (
             <div className="prose prose-sm dark:prose-invert max-w-none">
               <div className="whitespace-pre-wrap">{summary}</div>
             </div>
-          ) : (
+          )}
+          {!loading && !summary && (
             <div className="flex justify-center">
               <Button onClick={handleGenerateSummary}>Generate Summary</Button>
             </div>

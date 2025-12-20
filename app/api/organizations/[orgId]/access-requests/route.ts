@@ -1,12 +1,12 @@
 import { getCachedAuthUser } from "@/lib/auth/cached-auth"
 import { type NextRequest, NextResponse } from "next/server"
-import { createClient } from "@/lib/supabase/server"
+import { createDatabaseClient } from "@/lib/database/database-adapter"
 
 // GET /api/organizations/[orgId]/access-requests - Get pending access requests
 export async function GET(request: NextRequest, { params }: { params: { orgId: string } }) {
   try {
-    const supabase = await createClient()
-    const authResult = await getCachedAuthUser(supabase)
+    const db = await createDatabaseClient()
+    const authResult = await getCachedAuthUser()
 
     if (authResult.rateLimited) {
       return NextResponse.json(
@@ -23,7 +23,7 @@ export async function GET(request: NextRequest, { params }: { params: { orgId: s
     const { orgId } = params
 
     // Verify user is admin/owner of this organization
-    const { data: membership } = await supabase
+    const { data: membership } = await db
       .from("organization_members")
       .select("role")
       .eq("org_id", orgId)
@@ -35,7 +35,7 @@ export async function GET(request: NextRequest, { params }: { params: { orgId: s
     }
 
     // Fetch pending access requests (without join)
-    const { data: requests, error } = await supabase
+    const { data: requests, error } = await db
       .from("organization_access_requests")
       .select("*")
       .eq("org_id", orgId)
@@ -51,7 +51,7 @@ export async function GET(request: NextRequest, { params }: { params: { orgId: s
     const requestsWithUsers = await Promise.all(
       (requests || []).map(async (req) => {
         if (req.user_id) {
-          const { data: userData } = await supabase
+          const { data: userData } = await db
             .from("users")
             .select("id, email, full_name, avatar_url")
             .eq("id", req.user_id)
@@ -81,8 +81,8 @@ export async function GET(request: NextRequest, { params }: { params: { orgId: s
 // POST /api/organizations/[orgId]/access-requests - Create access request
 export async function POST(request: NextRequest, { params }: { params: { orgId: string } }) {
   try {
-    const supabase = await createClient()
-    const authResult = await getCachedAuthUser(supabase)
+    const db = await createDatabaseClient()
+    const authResult = await getCachedAuthUser()
 
     if (authResult.rateLimited) {
       return NextResponse.json(
@@ -101,7 +101,7 @@ export async function POST(request: NextRequest, { params }: { params: { orgId: 
     const { message } = body
 
     // Check if user already has membership
-    const { data: existingMember } = await supabase
+    const { data: existingMember } = await db
       .from("organization_members")
       .select("id, status")
       .eq("org_id", orgId)
@@ -118,7 +118,7 @@ export async function POST(request: NextRequest, { params }: { params: { orgId: 
     }
 
     // Check if user already has a pending request
-    const { data: existingRequest } = await supabase
+    const { data: existingRequest } = await db
       .from("organization_access_requests")
       .select("id, status")
       .eq("org_id", orgId)
@@ -131,10 +131,10 @@ export async function POST(request: NextRequest, { params }: { params: { orgId: 
     }
 
     // Get user profile
-    const { data: profile } = await supabase.from("users").select("email, full_name").eq("id", user.id).maybeSingle()
+    const { data: profile } = await db.from("users").select("email, full_name").eq("id", user.id).maybeSingle()
 
     // Create access request
-    const { data: newRequest, error } = await supabase
+    const { data: newRequest, error } = await db
       .from("organization_access_requests")
       .insert({
         org_id: orgId,

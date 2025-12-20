@@ -66,7 +66,7 @@ export function ListView({
   }
 
   const filterAutoHiddenTasks = (tasks: CalStick[]): CalStick[] => {
-    if (autoArchiveDays === 0) return tasks // 0 means show all
+    if (autoArchiveDays === 0) return tasks
 
     return tasks.filter((task) => {
       if (!task.calstick_completed || !task.calstick_completed_at) return true
@@ -76,28 +76,71 @@ export function ListView({
     })
   }
 
+  const matchesPriorityFilter = (stick: CalStick): boolean => {
+    return !aiFilters.priority || stick.calstick_priority === aiFilters.priority
+  }
+
+  const matchesStatusFilter = (stick: CalStick): boolean => {
+    return !aiFilters.status || stick.calstick_status === aiFilters.status
+  }
+
+  const matchesCompletedFilter = (stick: CalStick): boolean => {
+    return aiFilters.isCompleted === undefined || stick.calstick_completed === aiFilters.isCompleted
+  }
+
+  const matchesSearchFilter = (stick: CalStick): boolean => {
+    if (!aiFilters.search || typeof aiFilters.search !== "string") return true
+    const term = aiFilters.search.toLowerCase()
+    const contentMatch = stick.content.toLowerCase().includes(term)
+    const topicMatch = stick.stick?.topic?.toLowerCase().includes(term) ?? false
+    return contentMatch || topicMatch
+  }
+
+  const matchesTimeFrameFilter = (stick: CalStick): boolean => {
+    if (!aiFilters.timeFrame || !stick.calstick_date) return true
+    const date = parseISO(stick.calstick_date)
+    
+    switch (aiFilters.timeFrame) {
+      case "overdue": return isPast(date) && !isToday(date)
+      case "today": return isToday(date)
+      case "tomorrow": return isTomorrow(date)
+      default: return true
+    }
+  }
+
+  const matchesAiFilters = (stick: CalStick): boolean => {
+    return (
+      matchesPriorityFilter(stick) &&
+      matchesStatusFilter(stick) &&
+      matchesCompletedFilter(stick) &&
+      matchesSearchFilter(stick) &&
+      matchesTimeFrameFilter(stick)
+    )
+  }
+
+  const categorizeStick = (cs: CalStick, grouped: GroupedCalSticks): void => {
+    if (!cs.calstick_date) {
+      grouped["no-date"].push(cs)
+      return
+    }
+    
+    const date = parseISO(cs.calstick_date)
+    if (isPast(date) && !isToday(date) && !cs.calstick_completed) {
+      grouped.overdue.push(cs)
+    } else if (isToday(date)) {
+      grouped.today.push(cs)
+    } else if (isTomorrow(date)) {
+      grouped.tomorrow.push(cs)
+    } else {
+      grouped.upcoming.push(cs)
+    }
+  }
+
   const groupByDate = (calsticks: CalStick[]): GroupedCalSticks => {
     let filteredSticks = filterAutoHiddenTasks([...calsticks])
 
     if (Object.keys(aiFilters).length > 0) {
-      filteredSticks = filteredSticks.filter((stick) => {
-        if (aiFilters.priority && stick.calstick_priority !== aiFilters.priority) return false
-        if (aiFilters.status && stick.calstick_status !== aiFilters.status) return false
-        if (aiFilters.isCompleted !== undefined && stick.calstick_completed !== aiFilters.isCompleted) return false
-        if (aiFilters.search && typeof aiFilters.search === "string") {
-          const term = aiFilters.search.toLowerCase()
-          const contentMatch = stick.content.toLowerCase().includes(term)
-          const topicMatch = stick.stick?.topic?.toLowerCase().includes(term)
-          if (!contentMatch && !topicMatch) return false
-        }
-        if (aiFilters.timeFrame && stick.calstick_date) {
-          const date = parseISO(stick.calstick_date)
-          if (aiFilters.timeFrame === "overdue" && (!isPast(date) || isToday(date))) return false
-          if (aiFilters.timeFrame === "today" && !isToday(date)) return false
-          if (aiFilters.timeFrame === "tomorrow" && !isTomorrow(date)) return false
-        }
-        return true
-      })
+      filteredSticks = filteredSticks.filter(matchesAiFilters)
     }
 
     const grouped: GroupedCalSticks = {
@@ -108,22 +151,7 @@ export function ListView({
       "no-date": [],
     }
 
-    filteredSticks.forEach((cs) => {
-      if (!cs.calstick_date) {
-        grouped["no-date"].push(cs)
-      } else {
-        const date = parseISO(cs.calstick_date)
-        if (isPast(date) && !isToday(date) && !cs.calstick_completed) {
-          grouped.overdue.push(cs)
-        } else if (isToday(date)) {
-          grouped.today.push(cs)
-        } else if (isTomorrow(date)) {
-          grouped.tomorrow.push(cs)
-        } else {
-          grouped.upcoming.push(cs)
-        }
-      }
-    })
+    filteredSticks.forEach((cs) => categorizeStick(cs, grouped))
 
     return grouped
   }
@@ -235,7 +263,7 @@ export function ListView({
             </div>
             <div className="flex items-center gap-2 ml-2">
               {isEditing ? (
-                <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
+                <div className="flex items-center gap-1" role="presentation" onClick={(e) => e.stopPropagation()} onKeyDown={(e) => e.stopPropagation()}>
                   <Popover>
                     <PopoverTrigger asChild>
                       <Button variant="outline" size="sm">

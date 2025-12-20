@@ -1,8 +1,7 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import type { User } from "@supabase/supabase-js"
-import { createClient, resetClient, isRefreshTokenError } from "@/lib/supabase/client"
+import type { User } from "@/types/auth-compat"
 import { useRouter, usePathname } from "next/navigation"
 
 interface AuthState {
@@ -15,67 +14,41 @@ export function useAuth(): AuthState {
   const [user, setUser] = useState<User | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const supabase = createClient()
   const router = useRouter()
   const pathname = usePathname()
 
   useEffect(() => {
-    const handleAuthError = async (err: unknown) => {
-      if (isRefreshTokenError(err)) {
-        resetClient()
-        setUser(null)
-        setError(null)
-        try {
-          const supabase = createClient()
-          await supabase.auth.signOut()
-        } catch {
-          // Ignore
-        }
-        const redirectPath = pathname || "/"
-        router.push(`/auth/login?redirect=${encodeURIComponent(redirectPath)}&session_expired=true`)
-        return true
-      }
-      return false
-    }
-
-    const getInitialSession = async () => {
+    const getUser = async () => {
       try {
-        const {
-          data: { user },
-          error,
-        } = await supabase.auth.getUser()
-        if (error) {
-          const handled = await handleAuthError(error)
-          if (!handled) {
-            setError(error.message)
-          }
-        } else {
-          setUser(user ?? null)
+        const response = await fetch("/api/user/current")
+        
+        if (response.status === 401) {
+          // Not authenticated - redirect to login
+          setUser(null)
+          const redirectPath = pathname || "/"
+          router.push(`/auth/login?redirect=${encodeURIComponent(redirectPath)}`)
+          return
         }
+        
+        if (!response.ok) {
+          const data = await response.json()
+          setError(data.error || "Authentication error")
+          setUser(null)
+          return
+        }
+
+        const data = await response.json()
+        setUser(data.user ?? null)
       } catch (err) {
-        const handled = await handleAuthError(err)
-        if (!handled) {
-          setError(err instanceof Error ? err.message : "Authentication error")
-        }
+        setError(err instanceof Error ? err.message : "Authentication error")
+        setUser(null)
       } finally {
         setLoading(false)
       }
     }
 
-    getInitialSession()
-
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange(async (event: string, session: { user: any } | null) => {
-      setUser(session?.user ?? null)
-      setLoading(false)
-      setError(null)
-    })
-
-    return () => {
-      subscription.unsubscribe()
-    }
-  }, [supabase, router, pathname])
+    getUser()
+  }, [router, pathname])
 
   return { user, loading, error }
 }

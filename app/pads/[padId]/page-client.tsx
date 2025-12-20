@@ -1,8 +1,7 @@
 "use client"
 
 import type React from "react"
-
-import { useState, useEffect } from "react"
+import { useState, useEffect, useCallback } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
@@ -19,255 +18,443 @@ import { PadSettingsDialog } from "@/components/pad-settings-dialog"
 import { PadSummaryModal } from "@/components/ai/PadSummaryModal"
 import type { Pad, Stick } from "@/types/pad"
 
+// ============================================================================
+// Types
+// ============================================================================
+
 interface PadPageClientProps {
   pad: Pad
   sticks: Stick[]
   userRole: string | null
 }
 
+interface TaskCounts {
+  completed: number
+  notCompleted: number
+  total: number
+}
+
 interface StickTaskCounts {
-  [stickId: string]: {
-    completed: number
-    notCompleted: number
-    total: number
+  [stickId: string]: TaskCounts
+}
+
+interface InviteData {
+  userIds?: string[]
+  emails?: string[]
+  role: "admin" | "editor" | "viewer"
+}
+
+interface GanttState {
+  open: boolean
+  stickId: string
+  stickTopic: string
+}
+
+// ============================================================================
+// Constants
+// ============================================================================
+
+const EDITOR_ROLES = ["admin", "editor", "owner"]
+const ADMIN_ROLES = ["admin", "owner"]
+
+const FETCH_HEADERS = {
+  "Cache-Control": "no-cache, no-store, must-revalidate",
+  Pragma: "no-cache",
+}
+
+// ============================================================================
+// Helpers
+// ============================================================================
+
+function hasRole(userRole: string | null, allowedRoles: string[]): boolean {
+  return allowedRoles.includes(userRole || "")
+}
+
+function formatInviteResult(summary: { total?: number; success?: unknown[]; failed?: unknown[] }): string {
+  const total = summary?.total || 0
+  const successCount = summary?.success?.length || 0
+  const failedCount = summary?.failed?.length || 0
+  return `Successfully sent ${total} invite(s)!\nSuccess: ${successCount}, Failed: ${failedCount}`
+}
+
+function buildInvitePayload(padId: string, data: InviteData): object {
+  return {
+    padId,
+    role: data.role,
+    ...(data.userIds && { userIds: data.userIds }),
+    ...(data.emails && { emails: data.emails }),
   }
 }
 
-export function PadPageClient({ pad, sticks, userRole }: PadPageClientProps) {
-  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false)
-  const [selectedStick, setSelectedStick] = useState<Stick | null>(null)
-  const [isFullscreenOpen, setIsFullscreenOpen] = useState(false)
-  const [showInviteModal, setShowInviteModal] = useState(false)
-  const [showSettingsDialog, setShowSettingsDialog] = useState(false)
-  const [localSticks, setLocalSticks] = useState<Stick[]>(sticks)
-  const [ganttModalOpen, setGanttModalOpen] = useState(false)
-  const [ganttStickId, setGanttStickId] = useState<string>("")
-  const [ganttStickTopic, setGanttStickTopic] = useState<string>("")
-  const [taskCounts, setTaskCounts] = useState<StickTaskCounts>({})
-  const router = useRouter()
+async function sendPadInvite(padId: string, data: InviteData): Promise<{ success: true; result: any } | { success: false; error: string }> {
+  const response = await fetch("/api/pad-invites", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(buildInvitePayload(padId, data)),
+  })
 
-  useEffect(() => {
-    setLocalSticks(sticks)
-    fetchAllTaskCounts()
-  }, [sticks])
+  const responseText = await response.text()
 
-  useEffect(() => {
-    const processInvitations = async () => {
-      try {
-        console.log("[v0] Checking for pending pad invitations...")
-        const response = await fetch(`/api/pads/${pad.id}/process-invites`, {
-          method: "POST",
-        })
-
-        if (response.ok) {
-          const data = await response.json()
-          console.log("[v0] Invitation processing result:", data)
-          if (data.processed) {
-            console.log("[v0] Pad invitation processed successfully, reloading page...")
-            window.location.reload()
-          }
-        } else {
-          console.error("[v0] Failed to process invitations:", await response.text())
-        }
-      } catch (error) {
-        console.error("[v0] Error processing invitations:", error)
-      }
-    }
-
-    processInvitations()
-  }, [pad.id])
-
-  const fetchAllTaskCounts = async () => {
-    const counts: StickTaskCounts = {}
-    await Promise.all(
-      sticks.map(async (stick) => {
-        try {
-          const response = await fetch(`/api/sticks/${stick.id}/calsticks`, {
-            cache: "no-store",
-            headers: {
-              "Cache-Control": "no-cache, no-store, must-revalidate",
-              Pragma: "no-cache",
-            },
-          })
-          if (response.ok) {
-            const data = await response.json()
-            counts[stick.id] = data.counts
-          }
-        } catch (error) {
-          console.error(`Error fetching task counts for stick ${stick.id}:`, error)
-        }
-      }),
-    )
-    setTaskCounts(counts)
+  let result: any
+  try {
+    result = JSON.parse(responseText)
+  } catch {
+    return { success: false, error: "Invalid response from server" }
   }
 
-  const refreshStickTaskCounts = async (stickId: string) => {
+  if (!response.ok) {
+    return { success: false, error: result.error || "Failed to send invite" }
+  }
+
+  return { success: true, result }
+}
+
+function updateStickColor(sticks: Stick[], stickId: string, color: string): Stick[] {
+  return sticks.map((stick) =>
+    stick.id === stickId ? { ...stick, color } : stick
+  )
+}
+
+function revertStickColor(sticks: Stick[], stickId: string, originalSticks: Stick[]): Stick[] {
+  const originalColor = originalSticks.find((s) => s.id === stickId)?.color || "#ffffff"
+  return updateStickColor(sticks, stickId, originalColor)
+}
+
+async function fetchSingleStickTaskCounts(
+  stickId: string
+): Promise<{ stickId: string; counts: TaskCounts } | null> {
+  try {
+    const response = await fetch(`/api/sticks/${stickId}/calsticks`, {
+      cache: "no-store",
+      headers: FETCH_HEADERS,
+    })
+    if (response.ok) {
+      const data = await response.json()
+      return { stickId, counts: data.counts }
+    }
+  } catch (error) {
+    console.error(`[PadPageClient] Error fetching task counts for stick ${stickId}:`, error)
+  }
+  return null
+}
+
+async function deleteStickById(stickId: string): Promise<{ success: boolean; error?: string }> {
+  try {
+    const response = await fetch(`/api/sticks/${stickId}`, { method: "DELETE" })
+    if (!response.ok) {
+      return { success: false, error: "Failed to delete stick" }
+    }
+    return { success: true }
+  } catch (error) {
+    console.error("[PadPageClient] Error deleting stick:", error)
+    return { success: false, error: String(error) }
+  }
+}
+
+async function updateStickColorOnServer(
+  stickId: string,
+  color: string
+): Promise<{ success: boolean }> {
+  try {
+    const response = await fetch(`/api/sticks/${stickId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ color }),
+    })
+    return { success: response.ok }
+  } catch (error) {
+    console.error("[PadPageClient] Error updating stick color:", error)
+    return { success: false }
+  }
+}
+
+// ============================================================================
+// StickCard Component
+// ============================================================================
+
+interface StickCardProps {
+  stick: Stick
+  counts: TaskCounts | undefined
+  canEdit: boolean
+  onClick: (stick: Stick) => void
+  onOpenGantt: (e: React.MouseEvent, stick: Stick) => void
+  onColorChange: (stickId: string, color: string) => void
+}
+
+function StickCard({ stick, counts, canEdit, onClick, onOpenGantt, onColorChange }: Readonly<StickCardProps>) {
+  const hasTasks = counts && counts.total > 0
+
+  const handleClick = useCallback(() => {
+    onClick(stick)
+  }, [onClick, stick])
+
+  const handleGanttClick = useCallback((e: React.MouseEvent) => {
+    onOpenGantt(e, stick)
+  }, [onOpenGantt, stick])
+
+  const handleColorChange = useCallback((color: string) => {
+    onColorChange(stick.id, color)
+  }, [onColorChange, stick.id])
+
+  const handleStopPropagation = useCallback((e: React.MouseEvent) => {
+    e.stopPropagation()
+  }, [])
+
+  return (
+    <Card
+      className="cursor-pointer hover:shadow-md transition-shadow"
+      onClick={handleClick}
+      style={{
+        borderColor: stick.color || "#ffffff",
+        borderWidth: "3px",
+        borderStyle: "solid",
+      }}
+    >
+      <CardHeader className="pb-3">
+        {stick.topic && <CardTitle className="text-sm font-medium line-clamp-2">{stick.topic}</CardTitle>}
+      </CardHeader>
+      <CardContent>
+        <p className="text-sm text-muted-foreground line-clamp-3 mb-3">{stick.content}</p>
+
+        {hasTasks && (
+          <div className="flex items-center gap-3 mb-3 text-xs">
+            <div className="flex items-center gap-1 text-green-600">
+              <CheckCircle2 className="h-3 w-3" />
+              <span>{counts.completed} Completed</span>
+            </div>
+            <div className="flex items-center gap-1 text-orange-600">
+              <Circle className="h-3 w-3" />
+              <span>{counts.notCompleted} Not Completed</span>
+            </div>
+          </div>
+        )}
+
+        <div className="flex items-center justify-between">
+          <div className="text-xs text-muted-foreground">
+            {new Date(stick.created_at).toLocaleDateString()}
+          </div>
+          <div className="flex items-center gap-2">
+            {hasTasks && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={handleGanttClick}
+                className="h-8 px-2"
+              >
+                <BarChart3 className="h-4 w-4" />
+              </Button>
+            )}
+            <div role="none" onClick={handleStopPropagation} onKeyDown={(e) => e.stopPropagation()}>
+              <ColorPalette
+                currentColor={stick.color || "#ffffff"}
+                onColorChange={handleColorChange}
+                size="sm"
+                disabled={!canEdit}
+              />
+            </div>
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  )
+}
+
+// ============================================================================
+// Component
+// ============================================================================
+
+export function PadPageClient({ pad, sticks, userRole }: Readonly<PadPageClientProps>) {
+  const router = useRouter()
+
+  // Modal states
+  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false)
+  const [showInviteModal, setShowInviteModal] = useState(false)
+  const [showSettingsDialog, setShowSettingsDialog] = useState(false)
+
+  // Stick states
+  const [localSticks, setLocalSticks] = useState<Stick[]>(sticks)
+  const [selectedStick, setSelectedStick] = useState<Stick | null>(null)
+  const [isFullscreenOpen, setIsFullscreenOpen] = useState(false)
+  const [taskCounts, setTaskCounts] = useState<StickTaskCounts>({})
+
+  // Gantt modal state
+  const [ganttState, setGanttState] = useState<GanttState>({
+    open: false,
+    stickId: "",
+    stickTopic: "",
+  })
+
+  // Permissions
+  const canCreateSticks = hasRole(userRole, EDITOR_ROLES)
+  const canInviteUsers = hasRole(userRole, ADMIN_ROLES)
+
+  // Fetch task counts for a single stick
+  const fetchStickTaskCounts = useCallback(async (stickId: string): Promise<TaskCounts | null> => {
     try {
       const response = await fetch(`/api/sticks/${stickId}/calsticks?t=${Date.now()}`, {
         cache: "no-store",
-        headers: {
-          "Cache-Control": "no-cache, no-store, must-revalidate",
-          Pragma: "no-cache",
-        },
+        headers: FETCH_HEADERS,
       })
       if (response.ok) {
         const data = await response.json()
-        setTaskCounts((prev) => ({
-          ...prev,
-          [stickId]: data.counts,
-        }))
+        return data.counts
       }
     } catch (error) {
-      console.error(`Error refreshing task counts for stick ${stickId}:`, error)
+      console.error(`Error fetching task counts for stick ${stickId}:`, error)
     }
-  }
+    return null
+  }, [])
 
-  const canCreateSticks = ["admin", "editor", "owner"].includes(userRole || "")
-  const canInviteUsers = ["admin", "owner"].includes(userRole || "")
+  // Fetch task counts for all sticks
+  const fetchAllTaskCounts = useCallback(async (sticksToFetch: Stick[]) => {
+    const results = await Promise.all(
+      sticksToFetch.map((stick) => fetchSingleStickTaskCounts(stick.id))
+    )
 
-  const handleStickClick = (stick: Stick) => {
+    const counts: StickTaskCounts = {}
+    for (const result of results) {
+      if (result) {
+        counts[result.stickId] = result.counts
+      }
+    }
+    setTaskCounts(counts)
+  }, [])
+
+  // Refresh task counts for a specific stick
+  const refreshStickTaskCounts = useCallback(async (stickId: string) => {
+    const counts = await fetchStickTaskCounts(stickId)
+    if (counts) {
+      setTaskCounts((prev) => ({ ...prev, [stickId]: counts }))
+    }
+  }, [fetchStickTaskCounts])
+
+  // Process pending invitations
+  const processInvitations = useCallback(async () => {
+    try {
+      const response = await fetch(`/api/pads/${pad.id}/process-invites`, {
+        method: "POST",
+      })
+
+      if (response.ok) {
+        const data = await response.json()
+        if (data.processed) {
+          globalThis.location.reload()
+        }
+      }
+    } catch (error) {
+      console.error("[PadPageClient] Error processing invitations:", error)
+    }
+  }, [pad.id])
+
+  // Update sticks when props change
+  useEffect(() => {
+    setLocalSticks(sticks)
+    fetchAllTaskCounts(sticks)
+  }, [sticks, fetchAllTaskCounts])
+
+  // Process invitations on mount
+  useEffect(() => {
+    processInvitations()
+  }, [processInvitations])
+
+  // Handlers
+  const handleStickClick = useCallback((stick: Stick) => {
     setSelectedStick(stick)
     setIsFullscreenOpen(true)
-  }
+  }, [])
 
-  const handleOpenGantt = (e: React.MouseEvent, stick: Stick) => {
+  const handleOpenGantt = useCallback((e: React.MouseEvent, stick: Stick) => {
     e.stopPropagation()
-    setGanttStickId(stick.id)
-    setGanttStickTopic(stick.topic || "")
-    setGanttModalOpen(true)
-  }
+    setGanttState({
+      open: true,
+      stickId: stick.id,
+      stickTopic: stick.topic || "",
+    })
+  }, [])
 
-  const handleCloseFullscreen = async () => {
-    // Refresh task counts for the stick that was just edited
+  const handleCloseGantt = useCallback((open: boolean) => {
+    setGanttState((prev) => ({ ...prev, open }))
+  }, [])
+
+  const handleOpenCreateModal = useCallback(() => {
+    setIsCreateModalOpen(true)
+  }, [])
+
+  const handleCloseCreateModal = useCallback(() => {
+    setIsCreateModalOpen(false)
+  }, [])
+
+  const handleOpenInviteModal = useCallback(() => {
+    setShowInviteModal(true)
+  }, [])
+
+  const handleOpenSettingsDialog = useCallback(() => {
+    setShowSettingsDialog(true)
+  }, [])
+
+  const handleCloseFullscreen = useCallback(async () => {
     if (selectedStick) {
       await refreshStickTaskCounts(selectedStick.id)
     }
 
     setIsFullscreenOpen(false)
     setSelectedStick(null)
-
-    // Refresh the page to ensure all data is up to date
     router.refresh()
-  }
+  }, [selectedStick, refreshStickTaskCounts, router])
 
-  const handleUpdateStick = async (updatedStick: Stick) => {
-    console.log("[v0] handleUpdateStick called with:", updatedStick)
-
-    // Update the selected stick to keep fullscreen open with latest data
+  const handleUpdateStick = useCallback(async (updatedStick: Stick) => {
     setSelectedStick(updatedStick)
-
-    // Update the local sticks array
-    setLocalSticks((prevSticks) => prevSticks.map((stick) => (stick.id === updatedStick.id ? updatedStick : stick)))
-
+    setLocalSticks((prevSticks) =>
+      prevSticks.map((stick) => (stick.id === updatedStick.id ? updatedStick : stick))
+    )
     await refreshStickTaskCounts(updatedStick.id)
-  }
+  }, [refreshStickTaskCounts])
 
-  const handleDeleteStick = async (stickId: string) => {
-    try {
-      const response = await fetch(`/api/sticks/${stickId}`, {
-        method: "DELETE",
-      })
-      if (!response.ok) throw new Error("Failed to delete stick")
-      handleCloseFullscreen()
+  const handleDeleteStick = useCallback(async (stickId: string) => {
+    const result = await deleteStickById(stickId)
+
+    if (result.success) {
+      setIsFullscreenOpen(false)
+      setSelectedStick(null)
       router.refresh()
-    } catch (error) {
-      console.error("Error deleting stick:", error)
     }
-  }
+  }, [router])
 
-  const submitPadInvite = async (data: {
-    userIds?: string[]
-    emails?: string[]
-    role: "admin" | "editor" | "viewer"
-  }): Promise<void> => {
+  const handleStickColorChange = useCallback(async (stickId: string, color: string) => {
+    // Optimistic update
+    setLocalSticks((prevSticks) => updateStickColor(prevSticks, stickId, color))
+
+    const result = await updateStickColorOnServer(stickId, color)
+
+    if (!result.success) {
+      // Revert on error
+      setLocalSticks((prevSticks) => revertStickColor(prevSticks, stickId, sticks))
+    }
+  }, [sticks])
+
+  const submitPadInvite = useCallback(async (data: InviteData): Promise<void> => {
     try {
-      console.log("[v0] ===== SUBMITTING PAD INVITE =====")
-      console.log("[v0] Data received:", JSON.stringify(data, null, 2))
-      console.log("[v0] Pad ID:", pad.id)
-      console.log("[v0] User role:", userRole)
+      const result = await sendPadInvite(pad.id, data)
 
-      const inviteData = {
-        padId: pad.id,
-        role: data.role,
-        ...(data.userIds ? { userIds: data.userIds } : {}),
-        ...(data.emails ? { emails: data.emails } : {}),
+      if (!result.success) {
+        throw new Error(result.error)
       }
 
-      console.log("[v0] Final invite data being sent:", JSON.stringify(inviteData, null, 2))
-
-      const response = await fetch("/api/pad-invites", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(inviteData),
-      })
-
-      console.log("[v0] API response status:", response.status)
-      console.log("[v0] API response ok:", response.ok)
-      console.log("[v0] API response headers:", Object.fromEntries(response.headers.entries()))
-
-      const responseText = await response.text()
-      console.log("[v0] API response body (raw):", responseText)
-
-      let result
-      try {
-        result = JSON.parse(responseText)
-        console.log("[v0] API response body (parsed):", result)
-      } catch (parseError) {
-        console.error("[v0] Failed to parse response as JSON:", parseError)
-        throw new Error("Invalid response from server")
-      }
-
-      if (!response.ok) {
-        console.error("[v0] API error response:", result)
-        throw new Error(result.error || "Failed to send invite")
-      }
-
-      console.log("[v0] Pad invite successful!")
-      console.log("[v0] Summary:", result.summary)
-
-      alert(
-        `Successfully sent ${result.summary?.total || 0} invite(s)!\nSuccess: ${result.summary?.success?.length || 0}, Failed: ${result.summary?.failed?.length || 0}`,
-      )
+      alert(formatInviteResult(result.result.summary))
       setShowInviteModal(false)
-
-      // Refresh the page to show updated member list
       router.refresh()
     } catch (err) {
-      console.error("[v0] Pad invite error:", err)
+      console.error("[PadPageClient] Pad invite error:", err)
       alert(`Failed to send invite: ${err instanceof Error ? err.message : "Unknown error"}`)
       throw err
     }
-  }
+  }, [pad.id, router])
 
-  const handleStickColorChange = async (stickId: string, color: string) => {
-    console.log("[v0] Updating stick color:", { stickId, color })
-
-    setLocalSticks((prevSticks) => prevSticks.map((stick) => (stick.id === stickId ? { ...stick, color } : stick)))
-
-    try {
-      const response = await fetch(`/api/sticks/${stickId}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ color }),
-      })
-
-      if (!response.ok) {
-        console.error("[v0] Failed to update stick color, reverting local state")
-        setLocalSticks((prevSticks) =>
-          prevSticks.map((stick) =>
-            stick.id === stickId
-              ? { ...stick, color: sticks.find((s) => s.id === stickId)?.color || "#ffffff" }
-              : stick,
-          ),
-        )
-        throw new Error("Failed to update stick color")
-      }
-
-      const result = await response.json()
-      console.log("[v0] Stick color updated successfully:", result)
-    } catch (error) {
-      console.error("Error updating stick color:", error)
-    }
+  // Computed permissions for fullscreen
+  const fullscreenPermissions = {
+    canView: true,
+    canEdit: canCreateSticks,
+    canAdmin: canInviteUsers,
   }
 
   return (
@@ -279,22 +466,10 @@ export function PadPageClient({ pad, sticks, userRole }: PadPageClientProps) {
             <div className="mb-4">
               <BreadcrumbNav
                 items={[
-                  {
-                    label: "Dashboard",
-                    href: "/Dashboard",
-                  },
-                  {
-                    label: "Paks-Hub",
-                    href: "/paks",
-                  },
-                  {
-                    label: "My Pads",
-                    href: "/mypads",
-                  },
-                  {
-                    label: pad.name,
-                    current: true,
-                  },
+                  { label: "Dashboard", href: "/Dashboard" },
+                  { label: "Paks-Hub", href: "/paks" },
+                  { label: "My Pads", href: "/mypads" },
+                  { label: pad.name, current: true },
                 ]}
               />
             </div>
@@ -320,19 +495,19 @@ export function PadPageClient({ pad, sticks, userRole }: PadPageClientProps) {
               }
             />
             {canCreateSticks && (
-              <Button onClick={() => setIsCreateModalOpen(true)}>
+              <Button onClick={handleOpenCreateModal}>
                 <Plus className="h-4 w-4 mr-2" />
                 Create Sticks
               </Button>
             )}
             {canInviteUsers && (
-              <Button variant="outline" onClick={() => setShowInviteModal(true)}>
+              <Button variant="outline" onClick={handleOpenInviteModal}>
                 <UserPlus className="h-4 w-4 mr-2" />
                 Pad Invite
               </Button>
             )}
             {canInviteUsers && (
-              <Button variant="outline" size="icon" onClick={() => setShowSettingsDialog(true)}>
+              <Button variant="outline" size="icon" onClick={handleOpenSettingsDialog}>
                 <Settings className="h-4 w-4" />
               </Button>
             )}
@@ -349,7 +524,7 @@ export function PadPageClient({ pad, sticks, userRole }: PadPageClientProps) {
                   <h3 className="text-lg font-semibold mb-2">No Sticks yet</h3>
                   <p className="text-muted-foreground mb-4">Create your first Stick to get started with this Pad.</p>
                   {canCreateSticks && (
-                    <Button onClick={() => setIsCreateModalOpen(true)}>
+                    <Button onClick={handleOpenCreateModal}>
                       <Plus className="h-4 w-4 mr-2" />
                       Create First Stick
                     </Button>
@@ -360,71 +535,23 @@ export function PadPageClient({ pad, sticks, userRole }: PadPageClientProps) {
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {localSticks.map((stick) => (
-                <Card
+                <StickCard
                   key={stick.id}
-                  className="cursor-pointer hover:shadow-md transition-shadow"
-                  onClick={() => handleStickClick(stick)}
-                  style={{
-                    borderColor: stick.color || "#ffffff",
-                    borderWidth: "3px",
-                    borderStyle: "solid",
-                  }}
-                >
-                  <CardHeader className="pb-3">
-                    {stick.topic && <CardTitle className="text-sm font-medium line-clamp-2">{stick.topic}</CardTitle>}
-                  </CardHeader>
-                  <CardContent>
-                    <p className="text-sm text-muted-foreground line-clamp-3 mb-3">{stick.content}</p>
-
-                    {taskCounts[stick.id] && taskCounts[stick.id].total > 0 && (
-                      <div className="flex items-center gap-3 mb-3 text-xs">
-                        <div className="flex items-center gap-1 text-green-600">
-                          <CheckCircle2 className="h-3 w-3" />
-                          <span>{taskCounts[stick.id].completed} Completed</span>
-                        </div>
-                        <div className="flex items-center gap-1 text-orange-600">
-                          <Circle className="h-3 w-3" />
-                          <span>{taskCounts[stick.id].notCompleted} Not Completed</span>
-                        </div>
-                      </div>
-                    )}
-
-                    <div className="flex items-center justify-between">
-                      <div className="text-xs text-muted-foreground">
-                        {new Date(stick.created_at).toLocaleDateString()}
-                      </div>
-                      <div className="flex items-center gap-2">
-                        {taskCounts[stick.id] && taskCounts[stick.id].total > 0 && (
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={(e) => handleOpenGantt(e, stick)}
-                            className="h-8 px-2"
-                          >
-                            <BarChart3 className="h-4 w-4" />
-                          </Button>
-                        )}
-                        <div onClick={(e) => e.stopPropagation()}>
-                          <ColorPalette
-                            currentColor={stick.color || "#ffffff"}
-                            onColorChange={(color) => handleStickColorChange(stick.id, color)}
-                            size="sm"
-                            disabled={!canCreateSticks}
-                          />
-                        </div>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
+                  stick={stick}
+                  counts={taskCounts[stick.id]}
+                  canEdit={canCreateSticks}
+                  onClick={handleStickClick}
+                  onOpenGantt={handleOpenGantt}
+                  onColorChange={handleStickColorChange}
+                />
               ))}
             </div>
           )}
         </div>
 
-        {/* Create Stick Modal */}
-        <CreateStickModal isOpen={isCreateModalOpen} onClose={() => setIsCreateModalOpen(false)} padId={pad.id} />
+        {/* Modals */}
+        <CreateStickModal isOpen={isCreateModalOpen} onClose={handleCloseCreateModal} padId={pad.id} />
 
-        {/* Pad Invite Modal */}
         <PadInviteModal
           open={showInviteModal}
           onOpenChange={setShowInviteModal}
@@ -433,13 +560,12 @@ export function PadPageClient({ pad, sticks, userRole }: PadPageClientProps) {
         />
 
         <StickGanttModal
-          open={ganttModalOpen}
-          onOpenChange={setGanttModalOpen}
-          stickId={ganttStickId}
-          stickTopic={ganttStickTopic}
+          open={ganttState.open}
+          onOpenChange={handleCloseGantt}
+          stickId={ganttState.stickId}
+          stickTopic={ganttState.stickTopic}
         />
 
-        {/* Pad Settings Dialog */}
         <PadSettingsDialog
           open={showSettingsDialog}
           onOpenChange={setShowSettingsDialog}
@@ -451,11 +577,7 @@ export function PadPageClient({ pad, sticks, userRole }: PadPageClientProps) {
         {selectedStick && isFullscreenOpen && (
           <PermissionBasedStickFullscreen
             stick={selectedStick}
-            permissions={{
-              canView: true,
-              canEdit: ["admin", "editor", "owner"].includes(userRole || ""),
-              canAdmin: ["admin", "owner"].includes(userRole || ""),
-            }}
+            permissions={fullscreenPermissions}
             onClose={handleCloseFullscreen}
             onUpdate={handleUpdateStick}
             onDelete={handleDeleteStick}

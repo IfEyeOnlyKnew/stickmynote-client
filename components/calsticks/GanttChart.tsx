@@ -32,22 +32,31 @@ const truncateText = (text: string, maxLength: number) => {
   return text.slice(0, maxLength) + "..."
 }
 
-function calculateCriticalPath(
-  tasks: Task[],
-  dependencies: Dependency[],
-): {
-  criticalTasks: Set<string>
-  floatTimes: Map<string, number>
-  projectDuration: number
+// Helper to get start date from calstick
+function getCalstickStartDate(cs: CalStick): Date {
+  if (cs.calstick_start_date) return parseISO(cs.calstick_start_date)
+  if (cs.calstick_date) return parseISO(cs.calstick_date)
+  return new Date()
+}
+
+// Helper to get start date or null from calstick
+function getCalstickStartDateOrNull(cs: CalStick): Date | null {
+  if (cs.calstick_start_date) return parseISO(cs.calstick_start_date)
+  if (cs.calstick_date) return parseISO(cs.calstick_date)
+  return null
+}
+
+// Helper to format pending updates message
+function getPendingUpdatesMessage(count: number): string {
+  if (count > 0) return `Saving ${count} change${count > 1 ? "s" : ""}...`
+  return "Updating task..."
+}
+
+// Helper to build dependency adjacency maps
+function buildDependencyMaps(dependencies: Dependency[]): {
+  dependencyMap: Map<string, string[]>
+  reverseDependencyMap: Map<string, string[]>
 } {
-  const criticalTasks = new Set<string>()
-  const floatTimes = new Map<string, number>()
-
-  if (tasks.length === 0) {
-    return { criticalTasks, floatTimes, projectDuration: 0 }
-  }
-
-  // Build adjacency list
   const dependencyMap = new Map<string, string[]>()
   const reverseDependencyMap = new Map<string, string[]>()
 
@@ -63,12 +72,11 @@ function calculateCriticalPath(
     reverseDependencyMap.get(dep.calstick_id)!.push(dep.depends_on_calstick_id)
   }
 
-  // Calculate earliest start times
-  const taskMap = new Map(tasks.map((t) => [t.id, t]))
-  const earliestStart = new Map<string, number>()
-  const earliestFinish = new Map<string, number>()
+  return { dependencyMap, reverseDependencyMap }
+}
 
-  // Topological sort
+// Topological sort helper
+function topologicalSort(tasks: Task[], reverseDependencyMap: Map<string, string[]>): string[] {
   const visited = new Set<string>()
   const sorted: string[] = []
 
@@ -85,6 +93,31 @@ function calculateCriticalPath(
   for (const task of tasks) {
     visit(task.id)
   }
+
+  return sorted
+}
+
+function calculateCriticalPath(
+  tasks: Task[],
+  dependencies: Dependency[],
+): {
+  criticalTasks: Set<string>
+  floatTimes: Map<string, number>
+  projectDuration: number
+} {
+  const criticalTasks = new Set<string>()
+  const floatTimes = new Map<string, number>()
+
+  if (tasks.length === 0) {
+    return { criticalTasks, floatTimes, projectDuration: 0 }
+  }
+
+  const { dependencyMap, reverseDependencyMap } = buildDependencyMaps(dependencies)
+  const taskMap = new Map(tasks.map((t) => [t.id, t]))
+  const earliestStart = new Map<string, number>()
+  const earliestFinish = new Map<string, number>()
+
+  const sorted = topologicalSort(tasks, reverseDependencyMap)
 
   // Forward pass
   for (const id of sorted) {
@@ -105,17 +138,9 @@ function calculateCriticalPath(
   }
 
   // Find project end time
-  let projectEnd = 0
-
-  for (const task of tasks) {
-    const finish = earliestFinish.get(task.id) || 0
-    if (finish > projectEnd) {
-      projectEnd = finish
-    }
-  }
+  const projectEnd = Math.max(...tasks.map((t) => earliestFinish.get(t.id) || 0))
 
   // Backward pass to find critical path
-  const latestFinish = new Map<string, number>()
   const latestStart = new Map<string, number>()
 
   for (const id of [...sorted].reverse()) {
@@ -130,11 +155,6 @@ function calculateCriticalPath(
       minSuccessorStart = Math.min(minSuccessorStart, start)
     }
 
-    if (successors.length === 0) {
-      minSuccessorStart = projectEnd
-    }
-
-    latestFinish.set(id, minSuccessorStart)
     const duration = task.end.getTime() - task.start.getTime()
     latestStart.set(id, minSuccessorStart - duration)
   }
@@ -143,12 +163,11 @@ function calculateCriticalPath(
   for (const task of tasks) {
     const es = earliestStart.get(task.id) || 0
     const ls = latestStart.get(task.id) || 0
-    const float = (ls - es) / (1000 * 60 * 60 * 24) // Convert to days
+    const float = (ls - es) / (1000 * 60 * 60 * 24)
 
     floatTimes.set(task.id, float)
 
     if (Math.abs(float) < 0.01) {
-      // Within 0.01 day tolerance
       criticalTasks.add(task.id)
     }
   }
@@ -169,86 +188,76 @@ interface StorylinePhase {
   isCurrent: boolean
 }
 
+// Helper to create a phase from accumulated tasks
+function createPhase(
+  phaseTasks: Task[],
+  phaseIndex: number,
+  startDate: Date
+): StorylinePhase {
+  const phaseEndDate = new Date(Math.max(...phaseTasks.map((t) => t.end.getTime())))
+  const milestones = phaseTasks.filter((t) => t.type === "milestone")
+  const regularTasks = phaseTasks.filter((t) => t.type !== "milestone")
+  const progress = regularTasks.length > 0
+    ? regularTasks.reduce((sum, t) => sum + (t.progress || 0), 0) / regularTasks.length
+    : 0
+  const now = new Date()
+
+  return {
+    id: `phase-${phaseIndex + 1}`,
+    name: `Phase ${phaseIndex + 1}`,
+    startDate,
+    endDate: phaseEndDate,
+    tasks: regularTasks,
+    milestones,
+    progress,
+    isCurrent: now >= startDate && now <= phaseEndDate,
+  }
+}
+
 function generateStoryline(tasks: Task[], dependencies: Dependency[]): StorylinePhase[] {
   if (tasks.length === 0) return []
 
-  // Sort tasks by start date
   const sortedTasks = [...tasks].sort((a, b) => a.start.getTime() - b.start.getTime())
-
-  // Group tasks into phases based on time clusters
   const phases: StorylinePhase[] = []
   let currentPhase: Task[] = []
   let phaseStartDate = sortedTasks[0]?.start || new Date()
-  const phaseGapDays = 7 // Consider tasks within 7 days as same phase
+  const phaseGapDays = 7
 
   for (const task of sortedTasks) {
     if (currentPhase.length === 0) {
       currentPhase.push(task)
       phaseStartDate = task.start
+      continue
+    }
+
+    const lastTask = currentPhase.at(-1)
+    if (!lastTask) continue
+    const daysDiff = (task.start.getTime() - lastTask.end.getTime()) / (1000 * 60 * 60 * 24)
+
+    if (daysDiff > phaseGapDays) {
+      phases.push(createPhase(currentPhase, phases.length, phaseStartDate))
+      currentPhase = [task]
+      phaseStartDate = task.start
     } else {
-      const lastTask = currentPhase[currentPhase.length - 1]
-      const daysDiff = (task.start.getTime() - lastTask.end.getTime()) / (1000 * 60 * 60 * 24)
-
-      if (daysDiff > phaseGapDays) {
-        // Start new phase
-        const phaseEndDate = new Date(Math.max(...currentPhase.map((t) => t.end.getTime())))
-        const milestones = currentPhase.filter((t) => t.type === "milestone")
-        const regularTasks = currentPhase.filter((t) => t.type !== "milestone")
-        const progress =
-          regularTasks.length > 0
-            ? regularTasks.reduce((sum, t) => sum + (t.progress || 0), 0) / regularTasks.length
-            : 0
-
-        phases.push({
-          id: `phase-${phases.length + 1}`,
-          name: `Phase ${phases.length + 1}`,
-          startDate: phaseStartDate,
-          endDate: phaseEndDate,
-          tasks: regularTasks,
-          milestones,
-          progress,
-          isCurrent: new Date() >= phaseStartDate && new Date() <= phaseEndDate,
-        })
-
-        currentPhase = [task]
-        phaseStartDate = task.start
-      } else {
-        currentPhase.push(task)
-      }
+      currentPhase.push(task)
     }
   }
 
-  // Add final phase
   if (currentPhase.length > 0) {
-    const phaseEndDate = new Date(Math.max(...currentPhase.map((t) => t.end.getTime())))
-    const milestones = currentPhase.filter((t) => t.type === "milestone")
-    const regularTasks = currentPhase.filter((t) => t.type !== "milestone")
-    const progress =
-      regularTasks.length > 0 ? regularTasks.reduce((sum, t) => sum + (t.progress || 0), 0) / regularTasks.length : 0
-
-    phases.push({
-      id: `phase-${phases.length + 1}`,
-      name: `Phase ${phases.length + 1}`,
-      startDate: phaseStartDate,
-      endDate: phaseEndDate,
-      tasks: regularTasks,
-      milestones,
-      progress,
-      isCurrent: new Date() >= phaseStartDate && new Date() <= phaseEndDate,
-    })
+    phases.push(createPhase(currentPhase, phases.length, phaseStartDate))
   }
 
   return phases
 }
 
 interface GanttChartProps {
-  calsticks: CalStick[]
-  dependencies?: Dependency[]
-  onTaskChange?: (taskId: string, startDate: Date, endDate: Date) => Promise<void>
-  onDependencyAdd?: (taskId: string, dependsOnId: string) => Promise<void>
+  readonly calsticks: CalStick[]
+  readonly dependencies?: Dependency[]
+  readonly onTaskChange?: (taskId: string, startDate: Date, endDate: Date) => Promise<void>
+  readonly onDependencyAdd?: (taskId: string, dependsOnId: string) => Promise<void>
 }
 
-export default function GanttChart({ calsticks, dependencies = [], onTaskChange, onDependencyAdd }: GanttChartProps) {
+export default function GanttChart({ calsticks, dependencies = [], onTaskChange, onDependencyAdd: _onDependencyAdd }: GanttChartProps) {
   const [viewMode, setViewMode] = useState<ViewMode>(ViewMode.Day)
   const [isUpdating, setIsUpdating] = useState(false)
   const [showCriticalPath, setShowCriticalPath] = useState(false)
@@ -276,11 +285,7 @@ export default function GanttChart({ calsticks, dependencies = [], onTaskChange,
     return calsticks
       .filter((cs) => cs.calstick_date || cs.calstick_start_date)
       .map((cs) => {
-        const startDate = cs.calstick_start_date
-          ? parseISO(cs.calstick_start_date)
-          : cs.calstick_date
-            ? parseISO(cs.calstick_date)
-            : new Date()
+        const startDate = getCalstickStartDate(cs)
 
         const estimatedDays = cs.calstick_estimated_hours ? Math.max(1, Math.ceil(cs.calstick_estimated_hours / 8)) : 1
         const endDate = addDays(startDate, estimatedDays)
@@ -442,7 +447,7 @@ export default function GanttChart({ calsticks, dependencies = [], onTaskChange,
 
   return (
     <TooltipProvider>
-      <div className="w-full space-y-4" role="region" aria-label="Gantt Chart">
+      <section className="w-full space-y-4" aria-label="Gantt Chart">
         {/* Toolbar */}
         <div className="flex items-center justify-between bg-background border rounded-lg p-3 shadow-sm flex-wrap gap-2">
           <div className="flex items-center gap-2">
@@ -615,9 +620,8 @@ export default function GanttChart({ calsticks, dependencies = [], onTaskChange,
 
         {/* Critical Path Legend */}
         {showCriticalPath && criticalPathData.criticalTasks.size > 0 && (
-          <div
+          <output
             className="flex flex-wrap items-center gap-4 text-sm px-2 bg-muted/50 py-2 rounded-lg"
-            role="status"
             aria-live="polite"
           >
             <div className="flex items-center gap-2">
@@ -633,7 +637,7 @@ export default function GanttChart({ calsticks, dependencies = [], onTaskChange,
               <span>Completed</span>
             </div>
             <Badge variant="outline">Project Duration: {Math.ceil(criticalPathData.projectDuration)} days</Badge>
-          </div>
+          </output>
         )}
 
         {/* Gantt Chart Container with Virtual Scrolling */}
@@ -652,25 +656,12 @@ export default function GanttChart({ calsticks, dependencies = [], onTaskChange,
               </thead>
               <tbody>
                 {sortedCalsticks.map((cs) => {
-                  const startDate = cs.calstick_start_date
-                    ? parseISO(cs.calstick_start_date)
-                    : cs.calstick_date
-                      ? parseISO(cs.calstick_date)
-                      : null
+                  const startDate = getCalstickStartDateOrNull(cs)
 
                   const estimatedDays = cs.calstick_estimated_hours
                     ? Math.max(1, Math.ceil(cs.calstick_estimated_hours / 8))
                     : 1
                   const endDate = startDate ? addDays(startDate, estimatedDays) : null
-
-                  const assigneeInitials =
-                    cs.assignee?.full_name
-                      ?.split(" ")
-                      .map((n) => n[0])
-                      .join("")
-                      .toUpperCase() ||
-                    cs.assignee?.email?.[0]?.toUpperCase() ||
-                    "?"
 
                   console.log(
                     "[v0] Timeline table row - Task:",
@@ -692,6 +683,7 @@ export default function GanttChart({ calsticks, dependencies = [], onTaskChange,
                           <div className="flex items-center gap-2">
                             <Avatar className="h-6 w-6">
                               {cs.assignee?.avatar_url && (
+                                // eslint-disable-next-line @next/next/no-img-element
                                 <img
                                   src={cs.assignee.avatar_url || "/placeholder.svg"}
                                   alt={cs.assignee.full_name || cs.assignee.email || ""}
@@ -754,7 +746,7 @@ export default function GanttChart({ calsticks, dependencies = [], onTaskChange,
               onDateChange={onTaskChange ? handleTaskChange : undefined}
             />
 
-            <style jsx global>{`
+            <style dangerouslySetInnerHTML={{ __html: `
               .gantt-wrapper {
                 background: white;
               }
@@ -781,20 +773,16 @@ export default function GanttChart({ calsticks, dependencies = [], onTaskChange,
               .gantt-wrapper.high-contrast text {
                 font-weight: bold;
               }
-            `}</style>
+            ` }} />
           </div>
         )}
 
         {/* Status Bar */}
         {(isUpdating || pendingUpdates.size > 0) && (
-          <div className="flex items-center gap-2 text-sm text-muted-foreground" role="status" aria-live="polite">
+          <output className="flex items-center gap-2 text-sm text-muted-foreground" aria-live="polite">
             <Loader2 className="h-4 w-4 animate-spin" />
-            <span>
-              {pendingUpdates.size > 0
-                ? `Saving ${pendingUpdates.size} change${pendingUpdates.size > 1 ? "s" : ""}...`
-                : "Updating task..."}
-            </span>
-          </div>
+            <span>{getPendingUpdatesMessage(pendingUpdates.size)}</span>
+          </output>
         )}
 
         {/* Accessibility Help */}
@@ -804,7 +792,7 @@ export default function GanttChart({ calsticks, dependencies = [], onTaskChange,
             chart. Enter to select a task.
           </div>
         )}
-      </div>
+      </section>
     </TooltipProvider>
   )
 }

@@ -552,10 +552,12 @@ export function PermissionBasedStickFullscreen({
           <div className="flex items-center justify-between px-4 py-3 bg-white/80 border-b flex-shrink-0">
             <div className="flex items-center gap-2">
               <Badge variant="outline" className="text-xs">
-                {permissions.canAdmin ? "Admin" : permissions.canEdit ? "Edit" : "View"}
+                {permissions.canAdmin && "Admin"}
+                {!permissions.canAdmin && permissions.canEdit && "Edit"}
+                {!permissions.canAdmin && !permissions.canEdit && "View"}
               </Badge>
               {permissions.canEdit && (
-                <div className="flex items-center gap-2 ml-2" onClick={(e) => e.stopPropagation()}>
+                <div className="flex items-center gap-2 ml-2" role="presentation" onClick={(e) => e.stopPropagation()} onKeyDown={(e) => e.stopPropagation()}>
                   <Checkbox
                     id="quickstick"
                     checked={isQuickStick}

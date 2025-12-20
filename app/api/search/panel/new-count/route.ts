@@ -1,4 +1,4 @@
-import { createServerClient } from "@/lib/supabase/server"
+import { createDatabaseClient } from "@/lib/database/database-adapter"
 import { NextResponse } from "next/server"
 import { Redis } from "@upstash/redis"
 
@@ -32,12 +32,14 @@ export async function GET(request: Request) {
         if (cached !== null) {
           return NextResponse.json({ count: Math.min(cached, 9) })
         }
-      } catch (error) {}
+      } catch (error) {
+        console.error("[new-count] Redis get error:", error)
+      }
     }
 
-    const supabase = await createServerClient()
+    const db = await createDatabaseClient()
 
-    const { count, error } = await supabase
+    const { count, error } = await db
       .from("notes")
       .select("id", { count: "exact", head: true })
       .eq("is_shared", true)
@@ -53,11 +55,14 @@ export async function GET(request: Request) {
     if (redis) {
       try {
         await redis.set(cacheKey, newCount, { ex: 30 })
-      } catch (error) {}
+      } catch (error) {
+        console.error("[new-count] Redis set error:", error)
+      }
     }
 
     return NextResponse.json({ count: newCount })
   } catch (error) {
+    console.error("[new-count] Error:", error)
     return NextResponse.json({ count: 0 })
   }
 }

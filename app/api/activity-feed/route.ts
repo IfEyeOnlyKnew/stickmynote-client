@@ -1,13 +1,12 @@
-import { createServerClient } from "@/lib/supabase/server"
 import { NextResponse } from "next/server"
 import { getOrgContext } from "@/lib/auth/get-org-context"
 import { getCachedAuthUser } from "@/lib/auth/cached-auth"
+import { db } from "@/lib/database/pg-client"
 
 // GET /api/activity-feed - Fetch user's activity feed
 export async function GET(request: Request) {
   try {
-    const supabase = await createServerClient()
-    const authResult = await getCachedAuthUser(supabase)
+    const authResult = await getCachedAuthUser()
 
     if (authResult.rateLimited) {
       return NextResponse.json(
@@ -32,28 +31,30 @@ export async function GET(request: Request) {
     const offset = Number.parseInt(searchParams.get("offset") || "0")
     const activityType = searchParams.get("type")
 
-    const { data: activities, error } = await supabase.rpc("get_user_activity_feed", {
-      p_user_id: user.id,
-      p_limit: limit,
-      p_offset: offset,
-      p_org_id: orgContext.orgId,
-    })
-
-    if (error) {
-      return NextResponse.json({ error: "Failed to fetch activity feed" }, { status: 500 })
-    }
-
-    // Filter by activity type if specified
-    let filteredActivities = activities || []
+    // Fetch activity feed from PostgreSQL
+    let query = `
+      SELECT * FROM user_activity_feed 
+      WHERE user_id = $1 AND org_id = $2
+    `
+    const params: unknown[] = [user.id, orgContext.orgId]
+    
     if (activityType) {
-      filteredActivities = filteredActivities.filter((a: any) => a.activity_type === activityType)
+      query += ` AND activity_type = $3`
+      params.push(activityType)
     }
+    
+    query += ` ORDER BY created_at DESC LIMIT $${params.length + 1} OFFSET $${params.length + 2}`
+    params.push(limit, offset)
+
+    const result = await db.query(query, params)
+    const activities = result.rows || []
 
     return NextResponse.json({
-      activities: filteredActivities,
-      hasMore: filteredActivities.length === limit,
+      activities,
+      hasMore: activities.length === limit,
     })
-  } catch (error) {
+  } catch (error_) {
+    console.error("Activity feed error:", error_)
     return NextResponse.json({ error: "Internal server error" }, { status: 500 })
   }
 }

@@ -20,6 +20,7 @@ export interface OrganizationSettings {
   allow_public_pads?: boolean
   max_members?: number
   features?: string[]
+  disable_manual_hub_creation?: boolean // When true, hides "Create Social Pad" button (automation-only mode)
   branding?: {
     logo_url?: string
     logo_dark_url?: string

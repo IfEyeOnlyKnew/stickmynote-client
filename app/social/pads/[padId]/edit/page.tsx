@@ -87,6 +87,7 @@ export default function EditPadPage() {
       fetchPadData()
       fetchMembers()
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [padId])
 
   const fetchPadData = async () => {
@@ -234,9 +235,8 @@ export default function EditPadPage() {
 
       if (response.ok) {
         const data = await response.json()
-        alert(
-          `Successfully invited ${data.added || 0} members${data.skipped ? ` (${data.skipped} already members)` : ""}`,
-        )
+        const skippedMsg = data.skipped ? ` (${data.skipped} already members)` : ""
+        alert(`Successfully invited ${data.added || 0} members${skippedMsg}`)
         fetchMembers()
       } else {
         const data = await response.json()
@@ -276,9 +276,8 @@ export default function EditPadPage() {
 
       if (response.ok) {
         const data = await response.json()
-        alert(
-          `Successfully invited ${data.added || 0} members${data.skipped ? ` (${data.skipped} already members)` : ""}`,
-        )
+        const skippedMsg = data.skipped ? ` (${data.skipped} already members)` : ""
+        alert(`Successfully invited ${data.added || 0} members${skippedMsg}`)
         setBulkEmails("")
         fetchMembers()
       } else {
@@ -313,21 +312,28 @@ export default function EditPadPage() {
     }
   }
 
+  // Computed values for template simplification
+  const isHubType = pad?.hub_type && pad.hub_type !== "regular"
+  const settingsTitle = isHubType ? "Hub Administration" : "Edit Pad Settings"
+  const settingsDescription = isHubType 
+    ? "Manage your social hub settings, accounts, admins, and members" 
+    : "Manage your social pad settings, members, and permissions"
+  const nameLabel = isHubType ? "Hub Name" : "Pad Name"
+
   const getHubTypeDisplay = () => {
-    if (!pad?.hub_type || pad.hub_type === "regular") return null
+    if (!isHubType) return null
+
+    const isIndividual = pad?.hub_type === "individual"
+    const Icon = isIndividual ? UserIcon : Building2
+    const iconColorClass = isIndividual ? "text-purple-600" : "text-blue-600"
+    const hubTypeLabel = isIndividual ? "Individual Hub" : "Organization Hub"
 
     return (
       <div className="flex items-center gap-2 p-3 bg-gradient-to-r from-purple-50 to-blue-50 rounded-lg border border-purple-200">
-        {pad.hub_type === "individual" ? (
-          <UserIcon className="h-5 w-5 text-purple-600" />
-        ) : (
-          <Building2 className="h-5 w-5 text-blue-600" />
-        )}
+        <Icon className={`h-5 w-5 ${iconColorClass}`} />
         <div>
-          <p className="font-semibold text-sm">
-            {pad.hub_type === "individual" ? "Individual Hub" : "Organization Hub"}
-          </p>
-          {pad.hub_email && <p className="text-xs text-gray-600">{pad.hub_email}</p>}
+          <p className="font-semibold text-sm">{hubTypeLabel}</p>
+          {pad?.hub_email && <p className="text-xs text-gray-600">{pad.hub_email}</p>}
         </div>
       </div>
     )
@@ -367,7 +373,7 @@ export default function EditPadPage() {
               </div>
               <div>
                 <h1 className="text-2xl font-bold bg-gradient-to-r from-purple-600 to-blue-600 bg-clip-text text-transparent">
-                  {pad.hub_type && pad.hub_type !== "regular" ? "Hub Administration" : "Edit Pad Settings"}
+                  {settingsTitle}
                 </h1>
                 <p className="text-sm text-gray-600">{pad.name}</p>
               </div>
@@ -388,13 +394,9 @@ export default function EditPadPage() {
           <CardHeader className="bg-gradient-to-br from-gray-50 to-white border-b">
             <CardTitle className="flex items-center gap-2">
               <Settings className="h-5 w-5" />
-              {pad.hub_type && pad.hub_type !== "regular" ? "Hub Administration" : "Pad Settings"}
+              {settingsTitle}
             </CardTitle>
-            <CardDescription>
-              {pad.hub_type && pad.hub_type !== "regular"
-                ? "Manage your social hub settings, accounts, admins, and members"
-                : "Manage your social pad settings, members, and permissions"}
-            </CardDescription>
+            <CardDescription>{settingsDescription}</CardDescription>
           </CardHeader>
           <CardContent className="p-6">
             <Tabs defaultValue="general" className="w-full">
@@ -410,9 +412,7 @@ export default function EditPadPage() {
                 {getHubTypeDisplay()}
 
                 <div className="space-y-2">
-                  <Label htmlFor="pad-name">
-                    {pad.hub_type && pad.hub_type !== "regular" ? "Hub Name" : "Pad Name"} *
-                  </Label>
+                  <Label htmlFor="pad-name">{nameLabel} *</Label>
                   <Input
                     id="pad-name"
                     value={name}
@@ -526,7 +526,11 @@ export default function EditPadPage() {
                                 </div>
                               </div>
                               <div className="flex items-center gap-3">
-                                {member.role !== "owner" ? (
+                                {member.role === "owner" ? (
+                                  <Badge variant={getRoleBadgeVariant(member.role)} className="px-3 py-1">
+                                    {member.role}
+                                  </Badge>
+                                ) : (
                                   <Select
                                     value={member.role}
                                     onValueChange={(value) => handleUpdateRole(member.id, value)}
@@ -539,10 +543,6 @@ export default function EditPadPage() {
                                       <SelectItem value="member">Member</SelectItem>
                                     </SelectContent>
                                   </Select>
-                                ) : (
-                                  <Badge variant={getRoleBadgeVariant(member.role)} className="px-3 py-1">
-                                    {member.role}
-                                  </Badge>
                                 )}
                                 {member.role !== "owner" && (
                                   <Button
@@ -619,7 +619,7 @@ export default function EditPadPage() {
                           value={inviteEmail}
                           onChange={(e) => setInviteEmail(e.target.value)}
                           type="email"
-                          onKeyPress={(e) => {
+                          onKeyDown={(e) => {
                             if (e.key === "Enter") {
                               handleInviteMember()
                             }

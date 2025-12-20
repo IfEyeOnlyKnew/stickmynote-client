@@ -11,7 +11,6 @@ import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Building2, Mail, CheckCircle2, AlertCircle, Loader2 } from "lucide-react"
-import { createClient } from "@/lib/supabase/client"
 
 interface OrganizationInfo {
   id: string
@@ -33,9 +32,38 @@ export default function RequestAccessPage() {
   const [error, setError] = useState<string | null>(null)
 
   // Extract domain from email
-  const getDomain = (email: string) => {
-    const match = email.match(/@([a-zA-Z0-9.-]+)$/)
+  const getDomain = (emailStr: string) => {
+    const match = /@([a-zA-Z0-9.-]+)$/.exec(emailStr)
     return match ? match[1].toLowerCase() : null
+  }
+
+  // Render organization status alert
+  const renderOrganizationStatus = () => {
+    if (organization) {
+      return (
+        <Alert>
+          <Building2 className="h-4 w-4" />
+          <AlertDescription>
+            <strong>{organization.name}</strong> is registered on Stick My Note. Your request will be sent to the
+            organization administrators.
+          </AlertDescription>
+        </Alert>
+      )
+    }
+
+    if (email && getDomain(email) && !checkingOrg) {
+      return (
+        <Alert variant="destructive">
+          <AlertCircle className="h-4 w-4" />
+          <AlertDescription>
+            No organization found for this domain. Please contact your IT administrator to set up your
+            organization on Stick My Note.
+          </AlertDescription>
+        </Alert>
+      )
+    }
+
+    return null
   }
 
   // Check for organization when email changes
@@ -49,14 +77,13 @@ export default function RequestAccessPage() {
     const checkOrganization = async () => {
       setCheckingOrg(true)
       try {
-        const supabase = createClient()
-        const { data } = await supabase
-          .from("organizations")
-          .select("id, name, domain, primary_contact_email, secondary_contact_email")
-          .eq("domain", domain)
-          .single()
-
-        setOrganization(data as OrganizationInfo | null)
+        const response = await fetch(`/api/organizations/by-domain?domain=${encodeURIComponent(domain)}`)
+        if (response.ok) {
+          const data = await response.json()
+          setOrganization(data as OrganizationInfo | null)
+        } else {
+          setOrganization(null)
+        }
       } catch {
         setOrganization(null)
       } finally {
@@ -153,23 +180,7 @@ export default function RequestAccessPage() {
               )}
             </div>
 
-            {organization ? (
-              <Alert>
-                <Building2 className="h-4 w-4" />
-                <AlertDescription>
-                  <strong>{organization.name}</strong> is registered on Stick My Note. Your request will be sent to the
-                  organization administrators.
-                </AlertDescription>
-              </Alert>
-            ) : email && getDomain(email) && !checkingOrg ? (
-              <Alert variant="destructive">
-                <AlertCircle className="h-4 w-4" />
-                <AlertDescription>
-                  No organization found for this domain. Please contact your IT administrator to set up your
-                  organization on Stick My Note.
-                </AlertDescription>
-              </Alert>
-            ) : null}
+            {renderOrganizationStatus()}
 
             <div className="space-y-2">
               <Label htmlFor="reason">Reason for Access (Optional)</Label>

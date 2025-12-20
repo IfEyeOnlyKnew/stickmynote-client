@@ -70,7 +70,7 @@ export function StickContentEditor({
       {/* Topic Field */}
       <div>
         <div className="flex justify-between items-center mb-1">
-          <label className="block text-sm font-medium">Topic</label>
+          <span className="block text-sm font-medium">Topic</span>
           <span className="text-xs text-gray-500">{topicLength}/75</span>
         </div>
         <textarea
@@ -88,7 +88,7 @@ export function StickContentEditor({
       {/* Content Field */}
       <div>
         <div className="flex justify-between items-center mb-1">
-          <label className="block text-sm font-medium">Content</label>
+          <span className="block text-sm font-medium">Content</span>
           <span className="text-xs text-gray-500">{contentLength}/25000</span>
         </div>
         <textarea
@@ -206,7 +206,7 @@ export function StickContentEditor({
 
       {generatedLinks.length > 0 && (
         <div className="space-y-2">
-          <label className="text-sm font-medium text-gray-700 block">Related Links</label>
+          <span className="text-sm font-medium text-gray-700 block">Related Links</span>
           <div className="space-y-2">
             {generatedLinks.map((link, index) => (
               <div key={index} className="flex items-center gap-2">

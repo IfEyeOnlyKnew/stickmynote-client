@@ -14,17 +14,17 @@ export default function HowToSearchPage() {
         <BreadcrumbNav
           items={[
             { label: "Dashboard", href: "/dashboard" },
-            { label: "Notes", href: "/notes" },
+            { label: "Personal", href: "/personal" },
             { label: "How to Search", current: true },
           ]}
         />
 
         {/* Header */}
         <div className="flex items-center mb-6">
-          <Link href="/notes">
+          <Link href="/personal">
             <Button variant="ghost" size="sm" className="gap-1">
               <ArrowLeft className="h-4 w-4" />
-              Back to Notes
+              Back to Personal
             </Button>
           </Link>
         </div>
@@ -79,7 +79,7 @@ export default function HowToSearchPage() {
                 <Badge variant="outline" className="text-sm">
                   project:
                 </Badge>
-                <p className="text-xs text-gray-600 mt-1">Finds notes where the topic contains "project"</p>
+                <p className="text-xs text-gray-600 mt-1">Finds notes where the topic contains &quot;project&quot;</p>
               </div>
 
               <div className="bg-green-50 p-4 rounded-lg border border-green-200">
@@ -88,7 +88,7 @@ export default function HowToSearchPage() {
                   sharepoint:list:management
                 </Badge>
                 <p className="text-xs text-gray-600 mt-1">
-                  Finds notes where the topic contains ALL three words: "sharepoint", "list", AND "management"
+                  Finds notes where the topic contains ALL three words: &quot;sharepoint&quot;, &quot;list&quot;, AND &quot;management&quot;
                 </p>
               </div>
 
@@ -139,7 +139,7 @@ export default function HowToSearchPage() {
                         <Badge variant="outline" className="text-xs">
                           project:alpha
                         </Badge>
-                        <span className="text-xs text-gray-600">Topics with "project" AND "alpha"</span>
+                        <span className="text-xs text-gray-600">Topics with &quot;project&quot; AND &quot;alpha&quot;</span>
                       </div>
                       <div className="flex items-center gap-2">
                         <Badge variant="outline" className="text-xs">
@@ -166,7 +166,7 @@ export default function HowToSearchPage() {
                   <div>
                     <p className="font-medium">Case Insensitive</p>
                     <p className="text-sm text-gray-600">
-                      Search is not case sensitive. "JavaScript", "javascript", and "JAVASCRIPT" all work the same.
+                      Search is not case sensitive. &quot;JavaScript&quot;, &quot;javascript&quot;, and &quot;JAVASCRIPT&quot; all work the same.
                     </p>
                   </div>
                 </div>
@@ -175,7 +175,7 @@ export default function HowToSearchPage() {
                   <div>
                     <p className="font-medium">Partial Matching</p>
                     <p className="text-sm text-gray-600">
-                      You don't need to type the complete word. "react" will match "React", "reactive", "unreacted",
+                      You don&apos;t need to type the complete word. &quot;react&quot; will match &quot;React&quot;, &quot;reactive&quot;, &quot;unreacted&quot;,
                       etc.
                     </p>
                   </div>
@@ -185,7 +185,7 @@ export default function HowToSearchPage() {
                   <div>
                     <p className="font-medium">Clear Search</p>
                     <p className="text-sm text-gray-600">
-                      Use the green "Clear Search" button at the bottom of the screen to reset your search and see all
+                      Use the green &quot;Clear Search&quot; button at the bottom of the screen to reset your search and see all
                       notes.
                     </p>
                   </div>

@@ -1,13 +1,13 @@
-import { createServerClient } from "@/lib/supabase/server"
+import { createDatabaseClient } from "@/lib/database/database-adapter"
 import { NextResponse } from "next/server"
 import { getCachedAuthUser } from "@/lib/auth/cached-auth"
 
 // DELETE /api/saved-searches/[id] - Delete saved search
 export async function DELETE(request: Request, { params }: { params: { id: string } }) {
   try {
-    const supabase = await createServerClient()
+    const db = await createDatabaseClient()
 
-    const authResult = await getCachedAuthUser(supabase)
+    const authResult = await getCachedAuthUser()
     if (authResult.rateLimited) {
       return NextResponse.json(
         { error: "Rate limit exceeded. Please try again in a moment." },
@@ -21,7 +21,7 @@ export async function DELETE(request: Request, { params }: { params: { id: strin
 
     const { id } = params
 
-    const { error } = await supabase.from("saved_searches").delete().eq("id", id).eq("user_id", user.id)
+    const { error } = await db.from("saved_searches").delete().eq("id", id).eq("user_id", user.id)
 
     if (error) {
       console.error("[v0] Error deleting saved search:", error)

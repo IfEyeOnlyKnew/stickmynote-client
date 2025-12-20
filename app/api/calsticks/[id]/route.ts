@@ -1,13 +1,13 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { createSupabaseServer } from "@/lib/supabase/server"
+import { createDatabaseClient } from "@/lib/database/database-adapter"
 import { getOrgContext } from "@/lib/auth/get-org-context"
 import { CalstickCache } from "@/lib/calstick-cache"
 import { getCachedAuthUser } from "@/lib/auth/cached-auth"
 
 export async function PATCH(request: NextRequest, { params }: { params: { id: string } }) {
   try {
-    const supabase = await createSupabaseServer()
-    const authResult = await getCachedAuthUser(supabase)
+    const db = await createDatabaseClient()
+    const authResult = await getCachedAuthUser()
 
     if (authResult.rateLimited) {
       return NextResponse.json(
@@ -30,7 +30,7 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
     const body = await request.json()
     const { id } = params
 
-    const { data: calstick, error } = await supabase
+    const { data: calstick, error } = await db
       .from("paks_pad_stick_replies")
       .update({
         ...body,
@@ -49,6 +49,7 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
 
     return NextResponse.json(calstick)
   } catch (error) {
+    console.error("[calsticks/id] Error:", error)
     return NextResponse.json({ error: "Internal server error" }, { status: 500 })
   }
 }

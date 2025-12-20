@@ -1,12 +1,12 @@
-import { createServerClient } from "@/lib/supabase/server"
+import { createDatabaseClient } from "@/lib/database/database-adapter"
 import { type NextRequest, NextResponse } from "next/server"
 import { getCachedAuthUser } from "@/lib/auth/cached-auth"
 
 export async function GET(request: NextRequest) {
   try {
-    const supabase = await createServerClient()
+    const db = await createDatabaseClient()
 
-    const authResult = await getCachedAuthUser(supabase)
+    const authResult = await getCachedAuthUser()
     if (authResult.rateLimited) {
       return NextResponse.json(
         { error: "Rate limit exceeded. Please try again in a moment." },
@@ -18,7 +18,7 @@ export async function GET(request: NextRequest) {
     }
     const user = authResult.user
 
-    const { data: accounts, error } = await supabase
+    const { data: accounts, error } = await db
       .from("social_accounts")
       .select("*")
       .eq("owner_id", user.id)
@@ -35,9 +35,9 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const supabase = await createServerClient()
+    const db = await createDatabaseClient()
 
-    const authResult = await getCachedAuthUser(supabase)
+    const authResult = await getCachedAuthUser()
     if (authResult.rateLimited) {
       return NextResponse.json(
         { error: "Rate limit exceeded. Please try again in a moment." },
@@ -56,7 +56,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Email is required" }, { status: 400 })
     }
 
-    const { data: existing } = await supabase
+    const { data: existing } = await db
       .from("social_accounts")
       .select("id")
       .eq("owner_id", user.id)
@@ -67,7 +67,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Account with this email already exists" }, { status: 409 })
     }
 
-    const { data: account, error } = await supabase
+    const { data: account, error } = await db
       .from("social_accounts")
       .insert({
         owner_id: user.id,

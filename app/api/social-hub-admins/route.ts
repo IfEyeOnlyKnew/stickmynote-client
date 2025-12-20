@@ -1,4 +1,4 @@
-import { createClient } from "@/lib/supabase/server"
+import { createDatabaseClient } from "@/lib/database/database-adapter"
 import { NextResponse } from "next/server"
 import { getCachedAuthUser } from "@/lib/auth/cached-auth"
 
@@ -6,9 +6,9 @@ const ADMIN_EMAILS = ["chrisdoran63@outlook.com"]
 
 export async function GET() {
   try {
-    const supabase = await createClient()
+    await createDatabaseClient()
 
-    const authResult = await getCachedAuthUser(supabase)
+    const authResult = await getCachedAuthUser()
     if (authResult.rateLimited) {
       return NextResponse.json(
         { error: "Rate limit exceeded. Please try again in a moment." },
@@ -38,9 +38,9 @@ export async function GET() {
 
 export async function POST(request: Request) {
   try {
-    const supabase = await createClient()
+    const db = await createDatabaseClient()
 
-    const authResult = await getCachedAuthUser(supabase)
+    const authResult = await getCachedAuthUser()
     if (authResult.rateLimited) {
       return NextResponse.json(
         { error: "Rate limit exceeded. Please try again in a moment." },
@@ -60,7 +60,7 @@ export async function POST(request: Request) {
 
     const { userId, role } = await request.json()
 
-    const { data: newAdmin, error } = await supabase
+    const { data: newAdmin, error } = await db
       .from("social_hub_admins")
       .insert({
         user_id: userId,
@@ -81,9 +81,9 @@ export async function POST(request: Request) {
 
 export async function DELETE(request: Request) {
   try {
-    const supabase = await createClient()
+    const db = await createDatabaseClient()
 
-    const authResult = await getCachedAuthUser(supabase)
+    const authResult = await getCachedAuthUser()
     if (authResult.rateLimited) {
       return NextResponse.json(
         { error: "Rate limit exceeded. Please try again in a moment." },
@@ -108,7 +108,7 @@ export async function DELETE(request: Request) {
       return NextResponse.json({ error: "Admin ID required" }, { status: 400 })
     }
 
-    const { error } = await supabase.from("social_hub_admins").delete().eq("id", adminId)
+    const { error } = await db.from("social_hub_admins").delete().eq("id", adminId)
 
     if (error) throw error
 

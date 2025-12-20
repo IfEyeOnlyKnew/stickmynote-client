@@ -39,11 +39,13 @@ export function PadTemplatePicker({ hubType, onTemplateSelect }: PadTemplatePick
   const [open, setOpen] = useState(false)
   const [loading, setLoading] = useState(false)
 
+  /* eslint-disable react-hooks/exhaustive-deps */
   useEffect(() => {
     if (open) {
       fetchTemplates()
     }
   }, [open, hubType])
+  /* eslint-enable react-hooks/exhaustive-deps */
 
   const fetchTemplates = async () => {
     setLoading(true)

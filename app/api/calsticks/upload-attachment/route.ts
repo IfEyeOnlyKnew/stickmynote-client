@@ -1,5 +1,4 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { createSupabaseServer } from "@/lib/supabase-server"
 import { getCachedAuthUser } from "@/lib/auth/cached-auth"
 
 let put: any
@@ -17,9 +16,7 @@ export async function POST(request: NextRequest) {
   await initializeBlobModule()
 
   try {
-    const supabase = await createSupabaseServer()
-
-    const authResult = await getCachedAuthUser(supabase)
+    const authResult = await getCachedAuthUser()
     if (authResult.rateLimited) {
       return NextResponse.json(
         { error: "Rate limit exceeded. Please try again in a moment." },

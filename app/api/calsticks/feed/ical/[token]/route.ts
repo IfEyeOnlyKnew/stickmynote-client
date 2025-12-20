@@ -1,11 +1,9 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { createClient } from "@supabase/supabase-js"
-
-// Use a service role client to fetch data based on token without user session
-const supabaseAdmin = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!)
+import { createServiceDatabaseClient } from "@/lib/database/database-adapter"
 
 export async function GET(request: NextRequest, { params }: { params: { token: string } }) {
   try {
+    const serviceDb = await createServiceDatabaseClient()
     const { token } = params
 
     if (!token) {
@@ -13,7 +11,7 @@ export async function GET(request: NextRequest, { params }: { params: { token: s
     }
 
     // 1. Validate Token & Get User
-    const { data: feed, error: feedError } = await supabaseAdmin
+    const { data: feed, error: feedError } = await serviceDb
       .from("paks_pad_calendar_feeds") // Updated table name to use paks_ prefix
       .select("user_id, filters")
       .eq("token", token)
@@ -27,7 +25,7 @@ export async function GET(request: NextRequest, { params }: { params: { token: s
     // 2. Fetch Tasks for User
     // We fetch CalSticks (stick_replies with is_calstick=true)
     // Filter by user_id (assigned or owned)
-    const { data: tasks, error: tasksError } = await supabaseAdmin
+    const { data: tasks, error: tasksError } = await serviceDb
       .from("paks_pad_stick_replies") // Updated table name to use paks_ prefix
       .select(`
         id,
@@ -55,8 +53,6 @@ export async function GET(request: NextRequest, { params }: { params: { token: s
     }
 
     // 3. Generate iCal String
-    const timestamp = new Date().toISOString().replace(/[-:.]/g, "").slice(0, 15) + "Z"
-
     const icsContent = [
       "BEGIN:VCALENDAR",
       "VERSION:2.0",
@@ -106,7 +102,7 @@ export async function GET(request: NextRequest, { params }: { params: { token: s
     icsContent.push("END:VCALENDAR")
 
     // 4. Update access stats
-    await supabaseAdmin
+    await serviceDb
       .from("paks_pad_calendar_feeds")
       .update({ last_accessed_at: new Date().toISOString() })
       .eq("token", token) // Updated table name to use paks_ prefix

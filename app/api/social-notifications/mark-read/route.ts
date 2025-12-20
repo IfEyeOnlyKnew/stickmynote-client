@@ -1,24 +1,16 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { createClient } from "@/lib/supabase/server"
+import { getSession } from "@/lib/auth/local-auth"
+import { db } from "@/lib/database/pg-client"
 import { getOrgContext } from "@/lib/auth/get-org-context"
-import { getCachedAuthUser } from "@/lib/auth/cached-auth"
 
 // POST /api/social-notifications/mark-read - Mark a social notification as read
 export async function POST(req: NextRequest) {
   try {
-    const supabase = await createClient()
-
-    const authResult = await getCachedAuthUser(supabase)
-    if (authResult.rateLimited) {
-      return NextResponse.json(
-        { error: "Rate limit exceeded. Please try again in a moment." },
-        { status: 429, headers: { "Retry-After": "30" } },
-      )
-    }
-    if (!authResult.user) {
+    const session = await getSession()
+    if (!session) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
-    const user = authResult.user
+    const user = session.user
 
     const orgContext = await getOrgContext(user.id)
     if (!orgContext) {
@@ -32,22 +24,13 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Notification key required" }, { status: 400 })
     }
 
-    const { error: upsertError } = await supabase.from("social_notification_reads").upsert(
-      {
-        user_id: user.id,
-        notification_key: notificationKey,
-        last_read_at: new Date().toISOString(),
-        org_id: orgContext.orgId,
-      },
-      {
-        onConflict: "user_id,notification_key",
-      },
+    await db.query(
+      `INSERT INTO social_notification_reads (user_id, notification_key, last_read_at, org_id)
+       VALUES ($1, $2, NOW(), $3)
+       ON CONFLICT (user_id, notification_key)
+       DO UPDATE SET last_read_at = NOW()`,
+      [user.id, notificationKey, orgContext.orgId]
     )
-
-    if (upsertError) {
-      console.error("[v0] Error marking notification as read:", upsertError)
-      return NextResponse.json({ error: "Failed to mark as read" }, { status: 500 })
-    }
 
     return NextResponse.json({ success: true })
   } catch (error) {

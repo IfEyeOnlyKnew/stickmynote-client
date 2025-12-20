@@ -1,5 +1,5 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { createSupabaseServer } from "@/lib/supabase-server"
+import { createServiceDatabaseClient } from "@/lib/database/database-adapter"
 import { APICache } from "@/lib/api-cache"
 import { getOrgContext } from "@/lib/auth/get-org-context"
 import { getCachedAuthUser } from "@/lib/auth/cached-auth"
@@ -8,8 +8,8 @@ export const dynamic = "force-dynamic"
 
 export async function GET(request: NextRequest) {
   try {
-    const supabase = await createSupabaseServer()
-    const authResult = await getCachedAuthUser(supabase)
+    const db = await createServiceDatabaseClient()
+    const authResult = await getCachedAuthUser()
 
     if (authResult.rateLimited) {
       return NextResponse.json(
@@ -50,7 +50,7 @@ export async function GET(request: NextRequest) {
       })
     }
 
-    let query = supabase
+    let query = db
       .from("paks_pad_sticks")
       .select(
         `

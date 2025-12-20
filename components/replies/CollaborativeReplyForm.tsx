@@ -36,7 +36,9 @@ export const CollaborativeReplyForm: React.FC<CollaborativeReplyFormProps> = ({
     return (
       <div
         className="reply-form-container space-y-3 p-4 bg-white rounded-md border-2 border-blue-300 shadow-lg"
+        role="presentation"
         onClick={(e) => e.stopPropagation()}
+        onKeyDown={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between">
           <h4 className="text-sm font-medium text-gray-900">Add Reply</h4>
@@ -87,7 +89,7 @@ export const CollaborativeReplyForm: React.FC<CollaborativeReplyFormProps> = ({
     return (
       <div className="space-y-3">
         <div className="flex items-center justify-between mb-2">
-          <label className="text-sm font-medium text-gray-700">Reply with Rich Text</label>
+          <span className="text-sm font-medium text-gray-700">Reply with Rich Text</span>
           <Button
             variant="ghost"
             size="sm"
@@ -137,7 +139,7 @@ export const CollaborativeReplyForm: React.FC<CollaborativeReplyFormProps> = ({
   return (
     <div className="space-y-3">
       <div className="flex items-center justify-between">
-        <label className="text-sm font-medium text-gray-700">Add Reply</label>
+        <span className="text-sm font-medium text-gray-700">Add Reply</span>
         <Button
           variant="ghost"
           size="sm"

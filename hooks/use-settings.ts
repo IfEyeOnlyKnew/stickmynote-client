@@ -2,12 +2,52 @@
 
 import { useState, useCallback, useEffect } from "react"
 import { useUser } from "@/contexts/user-context"
-import { createSupabaseBrowser } from "@/lib/supabase-browser"
 import { type UserSettings, initialSettings } from "@/types/settings"
 import { toast } from "@/hooks/use-toast"
 
 type SettingsSection = keyof UserSettings
 type SettingsField<T extends SettingsSection> = keyof UserSettings[T]
+
+// API helper functions - these call server endpoints instead of direct database access
+async function fetchUserProfile(userId: string) {
+  const res = await fetch(`/api/v2/users/${userId}`)
+  if (!res.ok) return null
+  const data = await res.json()
+  return data.user
+}
+
+async function fetchUserPreferences(userId: string) {
+  const res = await fetch(`/api/v2/settings`)
+  if (!res.ok) return null
+  const data = await res.json()
+  return data.settings
+}
+
+async function updateUserProfile(userId: string, updates: Record<string, unknown>) {
+  const res = await fetch(`/api/v2/users/${userId}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(updates),
+  })
+  if (!res.ok) throw new Error('Failed to update profile')
+  return res.json()
+}
+
+async function updateUserPreferences(updates: Record<string, unknown>) {
+  const res = await fetch(`/api/v2/settings`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(updates),
+  })
+  if (!res.ok) throw new Error('Failed to update preferences')
+  return res.json()
+}
+
+async function fetchExportData() {
+  const res = await fetch(`/api/v2/users/export`)
+  if (!res.ok) throw new Error('Failed to export data')
+  return res.json()
+}
 
 export function useSettings() {
   const { user } = useUser()
@@ -24,21 +64,11 @@ export function useSettings() {
       }
 
       try {
-        const supabase = createSupabaseBrowser()
+        // Fetch user profile via API
+        const userProfile = await fetchUserProfile(user.id)
 
-        // Fetch user profile
-        const { data: userProfile } = await supabase
-          .from("users")
-          .select("email, display_name, avatar_url, bio")
-          .eq("id", user.id)
-          .maybeSingle()
-
-        // Fetch user preferences (if stored in a separate table)
-        const { data: userPrefs } = await supabase
-          .from("user_preferences")
-          .select("*")
-          .eq("user_id", user.id)
-          .maybeSingle()
+        // Fetch user preferences via API
+        const userPrefs = await fetchUserPreferences(user.id)
 
         if (userProfile || userPrefs) {
           setSettings((prev) => ({
@@ -98,24 +128,16 @@ export function useSettings() {
 
     setIsLoading(true)
     try {
-      const supabase = createSupabaseBrowser()
+      // Update user profile via API
+      await updateUserProfile(user.id, {
+        display_name: settings.profile.name,
+        bio: settings.profile.bio,
+        avatar_url: settings.profile.avatar,
+      })
 
-      // Update user profile
-      const { error: profileError } = await supabase
-        .from("users")
-        .update({
-          display_name: settings.profile.name,
-          bio: settings.profile.bio,
-          avatar_url: settings.profile.avatar,
-        })
-        .eq("id", user.id)
-
-      if (profileError) throw profileError
-
-      // Upsert user preferences
-      const { error: prefsError } = await supabase.from("user_preferences").upsert(
-        {
-          user_id: user.id,
+      // Upsert user preferences via API
+      try {
+        await updateUserPreferences({
           theme: settings.preferences.theme,
           language: settings.preferences.language,
           default_note_color: settings.preferences.defaultNoteColor,
@@ -128,12 +150,8 @@ export function useSettings() {
           profile_visibility: settings.privacy.profileVisibility,
           show_email: settings.privacy.showEmail,
           allow_tagging: settings.privacy.allowTagging,
-          updated_at: new Date().toISOString(),
-        },
-        { onConflict: "user_id" },
-      )
-
-      if (prefsError) {
+        })
+      } catch (prefsError) {
         console.error("Error saving preferences:", prefsError)
         // Don't throw - preferences table might not exist yet
       }
@@ -158,25 +176,8 @@ export function useSettings() {
     if (!user) return
 
     try {
-      const supabase = createSupabaseBrowser()
-
-      // Fetch all user data
-      const { data: notes } = await supabase.from("personal_sticks").select("*").eq("user_id", user.id)
-
-      const { data: replies } = await supabase.from("personal_sticks_replies").select("*").eq("user_id", user.id)
-
-      const { data: tags } = await supabase.from("personal_sticks_tags").select("*").eq("user_id", user.id)
-
-      const exportData = {
-        exportedAt: new Date().toISOString(),
-        user: {
-          id: user.id,
-          email: user.email,
-        },
-        notes: notes || [],
-        replies: replies || [],
-        tags: tags || [],
-      }
+      // Fetch all user data via API
+      const exportData = await fetchExportData()
 
       // Download as JSON
       const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: "application/json" })
@@ -186,7 +187,7 @@ export function useSettings() {
       a.download = `stickymynote-export-${new Date().toISOString().split("T")[0]}.json`
       document.body.appendChild(a)
       a.click()
-      document.body.removeChild(a)
+      a.remove()
       URL.revokeObjectURL(url)
 
       toast({

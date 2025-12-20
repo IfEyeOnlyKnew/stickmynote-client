@@ -6,12 +6,12 @@ import { Download, ExternalLink, FileText } from "lucide-react"
 import type { Attachment } from "@/types/calstick-attachment"
 
 interface AttachmentPreviewModalProps {
-  attachment: Attachment
-  open: boolean
-  onClose: () => void
+  readonly attachment: Attachment
+  readonly open: boolean
+  readonly onClose: () => void
 }
 
-export function AttachmentPreviewModal({ attachment, open, onClose }: AttachmentPreviewModalProps) {
+export function AttachmentPreviewModal({ attachment, open, onClose }: Readonly<AttachmentPreviewModalProps>) {
   const canPreview = ["pdf", "txt", "csv"].includes(attachment.type)
 
   return (

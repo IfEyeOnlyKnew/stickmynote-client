@@ -137,8 +137,11 @@ export function ImageCard({
   return (
     <Card className={`overflow-hidden cursor-pointer hover:shadow-md transition-shadow group ${className}`}>
       <div
+        role="button"
+        tabIndex={0}
         className={`${fullWidth ? "w-full" : "aspect-square"} bg-gray-100 relative overflow-hidden`}
         onClick={onClick}
+        onKeyDown={(e) => e.key === "Enter" && onClick?.()}
       >
         <Image
           src={image.url || "/placeholder.svg?height=600&width=600&query=note-image-placeholder"}

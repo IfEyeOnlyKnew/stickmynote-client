@@ -1,13 +1,13 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { createClient } from "@/lib/supabase/server"
+import { createDatabaseClient } from "@/lib/database/database-adapter"
 import { getCachedAuthUser } from "@/lib/auth/cached-auth"
 
 export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await params
-    const supabase = await createClient()
+    const db = await createDatabaseClient()
 
-    const { user, error: authError, rateLimited } = await getCachedAuthUser(supabase)
+    const { user, error: authError, rateLimited } = await getCachedAuthUser()
 
     if (rateLimited) {
       return NextResponse.json({ error: "Too many requests" }, { status: 429 })
@@ -17,7 +17,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
-    const { data: entry, error: fetchError } = await supabase
+    const { data: entry, error: fetchError } = await db
       .from("time_entries")
       .select("started_at, user_id, task_id")
       .eq("id", id)
@@ -37,7 +37,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     const startedAt = new Date(entry.started_at)
     const durationSeconds = Math.floor((endedAt.getTime() - startedAt.getTime()) / 1000)
 
-    const { data, error } = await supabase
+    const { data, error } = await db
       .from("time_entries")
       .update({
         ended_at: endedAt.toISOString(),
@@ -51,14 +51,14 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     if (error) throw error
 
     const hours = durationSeconds / 3600
-    const { data: taskData } = await supabase
+    const { data: taskData } = await db
       .from("paks_pad_stick_replies")
       .select("calstick_actual_hours")
       .eq("id", entry.task_id)
       .maybeSingle()
 
     const currentHours = taskData?.calstick_actual_hours || 0
-    await supabase
+    await db
       .from("paks_pad_stick_replies")
       .update({
         calstick_actual_hours: currentHours + hours,

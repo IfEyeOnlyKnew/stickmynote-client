@@ -8,36 +8,37 @@ export async function GET() {
 
   try {
     const config = {
-      supabaseUrl: !!process.env.SUPABASE_URL,
-      supabaseAnonKey: !!process.env.SUPABASE_ANON_KEY,
-      supabaseServiceRoleKey: !!process.env.SUPABASE_SERVICE_ROLE_KEY,
+      databaseUrl: !!process.env.DATABASE_URL,
+      ldapUrl: !!process.env.LDAP_URL,
+      jwtSecret: !!process.env.JWT_SECRET,
       resendApiKey: !!process.env.RESEND_API_KEY,
       nextPublicSiteUrl: process.env.NEXT_PUBLIC_SITE_URL || "Not set",
       environment: process.env.NODE_ENV || "unknown",
     }
 
-    const issues = []
+    const issues: string[] = []
 
-    if (!config.supabaseUrl) issues.push("SUPABASE_URL is missing")
-    if (!config.supabaseAnonKey) issues.push("SUPABASE_ANON_KEY is missing")
-    if (!config.supabaseServiceRoleKey) issues.push("SUPABASE_SERVICE_ROLE_KEY is missing")
-    if (!config.resendApiKey) issues.push("RESEND_API_KEY is missing")
+    if (!config.databaseUrl) issues.push("DATABASE_URL is missing")
+    if (!config.ldapUrl) issues.push("LDAP_URL is missing")
+    if (!config.jwtSecret) issues.push("JWT_SECRET is missing")
+    if (!config.resendApiKey) issues.push("RESEND_API_KEY is missing (optional for email features)")
     if (config.nextPublicSiteUrl === "Not set") issues.push("NEXT_PUBLIC_SITE_URL is not set")
 
     return NextResponse.json({
-      success: issues.length === 0,
+      success: issues.filter(i => !i.includes("optional")).length === 0,
       config,
       issues,
       recommendations:
         issues.length > 0
           ? [
-              "Add missing environment variables to your Vercel project settings",
-              "For local development, add them to your .env.local file",
+              "Add missing environment variables to your .env.local file",
+              "Ensure DATABASE_URL points to your PostgreSQL instance",
+              "Configure LDAP_URL for Active Directory authentication",
               "Restart your application after adding environment variables",
             ]
           : [
               "All required environment variables are configured",
-              "You can now test email functionality and user management",
+              "Database and authentication are ready",
             ],
     })
   } catch (error) {

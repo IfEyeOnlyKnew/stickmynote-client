@@ -1,12 +1,12 @@
 import { NextResponse } from "next/server"
-import { createServerClient } from "@/lib/supabase/server"
+import { createDatabaseClient } from "@/lib/database/database-adapter"
 
 export async function POST(request: Request, { params }: { params: { orgId: string } }) {
   try {
-    const supabase = createServerClient()
+    const db = await createDatabaseClient()
     const {
       data: { user },
-    } = await supabase.auth.getUser()
+    } = await db.auth.getUser()
 
     if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })

@@ -85,7 +85,7 @@ export function NoteContentEditor({
   return (
     <div className="space-y-4">
       <div>
-        <label className="text-sm font-medium text-gray-700 mb-2 block">Topic</label>
+        <span className="text-sm font-medium text-gray-700 mb-2 block">Topic</span>
         <Input
           value={safeTopic === "Untitled Note" ? "" : safeTopic}
           onChange={(e) => handleTopicChange(e.target.value)}
@@ -99,7 +99,7 @@ export function NoteContentEditor({
       </div>
 
       <div>
-        <label className="text-sm font-medium text-gray-700 mb-2 block">Content</label>
+        <span className="text-sm font-medium text-gray-700 mb-2 block">Content</span>
         <Textarea
           value={safeContent}
           onChange={(e) => handleContentChange(e.target.value)}

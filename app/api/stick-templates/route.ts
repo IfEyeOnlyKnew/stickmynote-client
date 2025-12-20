@@ -1,14 +1,14 @@
-import { createClient } from "@/lib/supabase/server"
+import { createDatabaseClient } from "@/lib/database/database-adapter"
 import { NextResponse } from "next/server"
 import { getCachedAuthUser } from "@/lib/auth/cached-auth"
 
 export async function GET(request: Request) {
   try {
-    const supabase = await createClient()
+    const db = await createDatabaseClient()
     const { searchParams } = new URL(request.url)
     const category = searchParams.get("category")
 
-    let query = supabase.from("paks_pad_stick_templates").select("*").order("category").order("name")
+    let query = db.from("paks_pad_stick_templates").select("*").order("category").order("name")
 
     if (category) {
       query = query.eq("category", category)
@@ -36,9 +36,9 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   try {
-    const supabase = await createClient()
+    const db = await createDatabaseClient()
 
-    const { user, error: authError, rateLimited } = await getCachedAuthUser(supabase)
+    const { user, error: authError, rateLimited } = await getCachedAuthUser()
 
     if (rateLimited) {
       return NextResponse.json({ error: "Too many requests" }, { status: 429 })
@@ -55,7 +55,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Missing required fields" }, { status: 400 })
     }
 
-    const { data: template, error } = await supabase
+    const { data: template, error } = await db
       .from("paks_pad_stick_templates")
       .insert({
         name,

@@ -37,11 +37,13 @@ export default function VideoPage() {
   const [isCreating, setIsCreating] = useState(false)
   const [activeRoomUrl, setActiveRoomUrl] = useState<string | null>(null)
 
+  /* eslint-disable react-hooks/exhaustive-deps */
   useEffect(() => {
     if (!guardLoading && isAuthorized) {
       fetchRooms()
     }
   }, [guardLoading, isAuthorized])
+  /* eslint-enable react-hooks/exhaustive-deps */
 
   if (guardLoading || !isAuthorized) {
     return (
@@ -284,11 +286,12 @@ export default function VideoPage() {
       {/* Active Rooms */}
       <div className="mb-6">
         <h2 className="text-xl font-semibold mb-4">Your Video Rooms</h2>
-        {isLoading ? (
+        {isLoading && (
           <div className="text-center py-8">
             <p className="text-gray-500">Loading rooms...</p>
           </div>
-        ) : rooms.length > 0 ? (
+        )}
+        {!isLoading && rooms.length > 0 && (
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
             {rooms.map((room) => (
               <Card key={room.id} className="hover:shadow-lg transition-shadow">
@@ -324,7 +327,8 @@ export default function VideoPage() {
               </Card>
             ))}
           </div>
-        ) : (
+        )}
+        {!isLoading && rooms.length === 0 && (
           <Card>
             <CardContent className="text-center py-8">
               <Video className="h-12 w-12 text-gray-400 mx-auto mb-4" />

@@ -1,4 +1,4 @@
-import { createClient } from "@/lib/supabase/server"
+import { createDatabaseClient } from "@/lib/database/database-adapter"
 import { redirect } from "next/navigation"
 import { CleanupPolicySettings } from "@/components/social/cleanup-policy-settings"
 import { BreadcrumbNav } from "@/components/breadcrumb-nav"
@@ -10,17 +10,17 @@ export default async function PadSettingsPage({
   params: Promise<{ padId: string }>
 }) {
   const { padId } = await params
-  const supabase = await createClient()
+  const db = await createDatabaseClient()
 
   const {
     data: { user },
-  } = await supabase.auth.getUser()
+  } = await db.auth.getUser()
   if (!user) {
     redirect("/auth")
   }
 
   // Get pad and verify ownership
-  const { data: pad } = await supabase.from("social_pads").select("id, name, owner_id").eq("id", padId).single()
+  const { data: pad } = await db.from("social_pads").select("id, name, owner_id").eq("id", padId).single()
 
   if (!pad) {
     redirect("/social")
@@ -29,7 +29,7 @@ export default async function PadSettingsPage({
   // Check if user is owner or admin
   const isOwner = pad.owner_id === user.id
 
-  const { data: membership } = await supabase
+  const { data: membership } = await db
     .from("social_pad_members")
     .select("role")
     .eq("social_pad_id", padId)

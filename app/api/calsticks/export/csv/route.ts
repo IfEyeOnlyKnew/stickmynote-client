@@ -1,11 +1,11 @@
 import { NextResponse } from "next/server"
-import { createSupabaseServer } from "@/lib/supabase-server"
+import { createServiceDatabaseClient } from "@/lib/database/database-adapter"
 import { getCachedAuthUser } from "@/lib/auth/cached-auth"
 
 export async function GET() {
   try {
-    const supabase = await createSupabaseServer()
-    const authResult = await getCachedAuthUser(supabase)
+    const db = await createServiceDatabaseClient()
+    const authResult = await getCachedAuthUser()
     if (authResult.rateLimited) {
       return NextResponse.json({ error: "Rate limited" }, { status: 429, headers: { "Retry-After": "30" } })
     }
@@ -15,7 +15,7 @@ export async function GET() {
     const user = { id: authResult.userId }
 
     // Fetch all CalSticks for the user
-    const { data: tasks, error } = await supabase
+    const { data: tasks, error } = await db
       .from("paks_pad_stick_replies")
       .select(`
         id,

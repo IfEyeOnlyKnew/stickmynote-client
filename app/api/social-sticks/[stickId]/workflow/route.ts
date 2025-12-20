@@ -1,4 +1,4 @@
-import { createClient } from "@/lib/supabase/server"
+import { createDatabaseClient } from "@/lib/database/database-adapter"
 import { NextResponse } from "next/server"
 import { getOrgContext } from "@/lib/auth/get-org-context"
 import type { WorkflowStatus } from "@/types/social-workflow"
@@ -7,9 +7,9 @@ import { getCachedAuthUser } from "@/lib/auth/cached-auth"
 export async function GET(request: Request, { params }: { params: Promise<{ stickId: string }> }) {
   try {
     const { stickId } = await params
-    const supabase = await createClient()
+    const db = await createDatabaseClient()
 
-    const { user, error: authError, rateLimited } = await getCachedAuthUser(supabase)
+    const { user, error: authError, rateLimited } = await getCachedAuthUser()
 
     if (rateLimited) {
       return NextResponse.json({ error: "Too many requests" }, { status: 429 })
@@ -19,7 +19,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ stic
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
-    const { data: stick, error } = await supabase
+    const { data: stick, error } = await db
       .from("social_sticks")
       .select(`
         id,
@@ -47,9 +47,9 @@ export async function GET(request: Request, { params }: { params: Promise<{ stic
     }
 
     // Fetch linked CalStick if exists
-    let calstick = null
+    let calstick: any = null
     if (stick.calstick_id) {
-      const { data: cs } = await supabase
+      const { data: cs } = await db
         .from("paks_pad_stick_replies")
         .select(`
           id,
@@ -75,9 +75,9 @@ export async function GET(request: Request, { params }: { params: Promise<{ stic
 export async function PATCH(request: Request, { params }: { params: Promise<{ stickId: string }> }) {
   try {
     const { stickId } = await params
-    const supabase = await createClient()
+    const db = await createDatabaseClient()
 
-    const { user, error: authError, rateLimited } = await getCachedAuthUser(supabase)
+    const { user, error: authError, rateLimited } = await getCachedAuthUser()
 
     if (rateLimited) {
       return NextResponse.json({ error: "Too many requests" }, { status: 429 })
@@ -113,7 +113,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ st
       updateData.workflow_due_date = dueDate
     }
 
-    const { data: stick, error } = await supabase
+    const { data: stick, error } = await db
       .from("social_sticks")
       .update(updateData)
       .eq("id", stickId)
@@ -140,7 +140,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ st
     // Sync with linked CalStick if exists
     if (stick.calstick_id && status) {
       const calstickStatus = mapWorkflowToCalstickStatus(status)
-      await supabase
+      await db
         .from("paks_pad_stick_replies")
         .update({
           calstick_status: calstickStatus,

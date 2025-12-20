@@ -1,5 +1,4 @@
 import bundleAnalyzer from '@next/bundle-analyzer'
-import { withSentryConfig } from '@sentry/nextjs'
 
 const withBundleAnalyzer = bundleAnalyzer({
   enabled: process.env.ANALYZE === 'true' && !process.env.VERCEL,
@@ -194,7 +193,7 @@ const nextConfig = {
   },
 
   webpack: (config, { isServer, dev }) => {
-    // Fix for the Supabase Realtime client in the browser
+    // Browser compatibility fallbacks
     if (!isServer) {
       config.resolve.fallback = {
         ...config.resolve.fallback,
@@ -223,21 +222,9 @@ const nextConfig = {
             name: "vendors",
             chunks: "all",
           },
-          supabase: {
-            test: /[\\/]node_modules[\\/]@supabase[\\/]/,
-            name: "supabase",
-            chunks: "all",
-            priority: 10,
-          },
           lucide: {
             test: /[\\/]node_modules[\\/]lucide-react[\\/]/,
             name: "lucide",
-            chunks: "all",
-            priority: 10,
-          },
-          sentry: {
-            test: /[\\/]node_modules[\\/]@sentry[\\/]/,
-            name: "sentry",
             chunks: "all",
             priority: 10,
           },
@@ -259,41 +246,4 @@ const nextConfig = {
   },
 };
 
-const sentryWebpackPluginOptions = {
-  // Suppresses source map uploading logs during build
-  silent: true,
-  
-  // Organization and project from environment variables
-  org: process.env.SENTRY_ORG,
-  project: process.env.SENTRY_PROJECT,
-  
-  // Auth token for uploading source maps
-  authToken: process.env.SENTRY_AUTH_TOKEN,
-  
-  // Release tracking
-  release: {
-    name: process.env.VERCEL_GIT_COMMIT_SHA || 'development',
-    deploy: {
-      env: process.env.NODE_ENV || 'development',
-    },
-  },
-  
-  // Source maps configuration
-  widenClientFileUpload: true,
-  hideSourceMaps: true,
-  disableLogger: true,
-  
-  // Automatically tree-shake Sentry logger statements
-  automaticVercelMonitors: true,
-}
-
-// Only enable Sentry in production builds with proper configuration
-const shouldEnableSentry = 
-  process.env.NODE_ENV === 'production' && 
-  process.env.SENTRY_AUTH_TOKEN &&
-  process.env.SENTRY_ORG &&
-  process.env.SENTRY_PROJECT
-
-export default shouldEnableSentry
-  ? withSentryConfig(withBundleAnalyzer(nextConfig), sentryWebpackPluginOptions)
-  : withBundleAnalyzer(nextConfig)
+export default withBundleAnalyzer(nextConfig)

@@ -30,6 +30,20 @@ import { Progress } from "@/components/ui/progress"
 import { cn } from "@/lib/utils"
 import { WORKFLOW_STATUSES, type WorkflowStatus } from "@/types/social-workflow"
 
+// Helper function to get badge variant based on health score
+function getHealthScoreBadgeVariant(score: number): "default" | "secondary" | "destructive" {
+  if (score >= 70) return "default"
+  if (score >= 40) return "secondary"
+  return "destructive"
+}
+
+// Helper function to get progress bar color class based on health score
+function getHealthScoreProgressColor(score: number): string {
+  if (score >= 70) return "[&>div]:bg-green-500"
+  if (score >= 40) return "[&>div]:bg-yellow-500"
+  return "[&>div]:bg-red-500"
+}
+
 interface WorkflowMetrics {
   byStatus: Record<WorkflowStatus, number>
   avgTimeToResolution: number
@@ -63,6 +77,56 @@ interface AttentionItems {
   overdue: number
 }
 
+// Extracted component for attention item buttons to reduce cognitive complexity
+interface AttentionButtonProps {
+  filterId: string
+  activeFilter: string | null
+  count: number
+  title: string
+  description: string
+  icon: React.ReactNode
+  iconBgColor: string
+  onClick: (filter: string) => void
+}
+
+function AttentionButton({ 
+  filterId, 
+  activeFilter, 
+  count, 
+  title, 
+  description, 
+  icon, 
+  iconBgColor, 
+  onClick 
+}: Readonly<AttentionButtonProps>) {
+  const isActive = activeFilter === filterId
+  return (
+    <button
+      onClick={() => onClick(filterId)}
+      className={cn(
+        "w-full flex items-center justify-between p-3 rounded-lg border hover:bg-muted/50 transition-colors",
+        isActive && "ring-2 ring-purple-500 bg-purple-50",
+      )}
+    >
+      <div className="flex items-center gap-3">
+        <div className={cn("p-2 rounded-full", iconBgColor)}>
+          {icon}
+        </div>
+        <div className="text-left">
+          <p className="text-sm font-medium">{title}</p>
+          <p className="text-xs text-muted-foreground">{description}</p>
+        </div>
+      </div>
+      <div className="flex items-center gap-2">
+        {isActive && <CheckCircle2 className="h-4 w-4 text-purple-600" />}
+        <Badge variant={count > 0 ? "destructive" : "secondary"}>
+          {count}
+        </Badge>
+      </div>
+    </button>
+  )
+}
+
 interface DecisionCockpitData {
   metrics: WorkflowMetrics
   trends: TrendData[]
@@ -72,12 +136,12 @@ interface DecisionCockpitData {
 }
 
 interface DecisionCockpitSidebarProps {
-  isOpen: boolean
-  onClose: () => void
-  onFilterSelect?: (filter: string) => void
+  readonly isOpen: boolean
+  readonly onClose: () => void
+  readonly onFilterSelect?: (filter: string) => void
 }
 
-export function DecisionCockpitSidebar({ isOpen, onClose, onFilterSelect }: DecisionCockpitSidebarProps) {
+export function DecisionCockpitSidebar({ isOpen, onClose, onFilterSelect }: Readonly<DecisionCockpitSidebarProps>) {
   const [data, setData] = useState<DecisionCockpitData | null>(null)
   const [loading, setLoading] = useState(true)
   const [activeTab, setActiveTab] = useState("trends")
@@ -130,19 +194,24 @@ export function DecisionCockpitSidebar({ isOpen, onClose, onFilterSelect }: Deci
   }
 
   return (
+    /* eslint-disable jsx-a11y/no-noninteractive-element-interactions, jsx-a11y/click-events-have-key-events */
     <div
+      aria-hidden="true"
       className="fixed inset-0 z-[9998] bg-black/50 transition-opacity duration-300"
       onClick={(e) => {
         if (e.target === e.currentTarget) {
           onClose()
         }
       }}
+      onKeyDown={(e) => e.key === "Escape" && onClose()}
     >
-      <div
-        className={`fixed top-0 right-0 h-full w-[420px] bg-background shadow-2xl transform transition-transform duration-300 ease-in-out ${
+      <dialog
+        open={isOpen}
+        className={`fixed top-0 right-0 h-full w-[420px] bg-background shadow-2xl transform transition-transform duration-300 ease-in-out border-0 p-0 m-0 max-w-none max-h-none ${
           isOpen ? "translate-x-0" : "translate-x-full"
         }`}
         onClick={(e) => e.stopPropagation()}
+        onKeyDown={(e) => e.stopPropagation()}
       >
         {/* Header */}
         <div className="flex items-center justify-between p-4 border-b bg-gradient-to-r from-purple-50 to-blue-50">
@@ -164,11 +233,12 @@ export function DecisionCockpitSidebar({ isOpen, onClose, onFilterSelect }: Deci
         </div>
 
         <div className="overflow-y-auto h-[calc(100vh-64px)]">
-          {loading ? (
+          {loading && (
             <div className="flex items-center justify-center py-12">
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600" />
             </div>
-          ) : data ? (
+          )}
+          {!loading && (data ? (
             <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
               <TabsList className="w-full grid grid-cols-4 sticky top-0 bg-background z-10 border-b rounded-none">
                 <TabsTrigger value="trends" className="text-xs">
@@ -312,9 +382,7 @@ export function DecisionCockpitSidebar({ isOpen, onClose, onFilterSelect }: Deci
                           <div className="flex items-center justify-between">
                             <span className="font-medium text-sm truncate">{pad.padName}</span>
                             <Badge
-                              variant={
-                                pad.healthScore >= 70 ? "default" : pad.healthScore >= 40 ? "secondary" : "destructive"
-                              }
+                              variant={getHealthScoreBadgeVariant(pad.healthScore)}
                               className="text-xs"
                             >
                               {pad.healthScore}%
@@ -324,11 +392,7 @@ export function DecisionCockpitSidebar({ isOpen, onClose, onFilterSelect }: Deci
                             value={pad.healthScore}
                             className={cn(
                               "h-2",
-                              pad.healthScore >= 70
-                                ? "[&>div]:bg-green-500"
-                                : pad.healthScore >= 40
-                                  ? "[&>div]:bg-yellow-500"
-                                  : "[&>div]:bg-red-500",
+                              getHealthScoreProgressColor(pad.healthScore),
                             )}
                           />
                           <div className="flex gap-2 text-xs text-muted-foreground">
@@ -359,101 +423,49 @@ export function DecisionCockpitSidebar({ isOpen, onClose, onFilterSelect }: Deci
                     Items Needing Attention
                   </h3>
 
-                  <button
-                    onClick={() => handleFilterClick("unanswered48h")}
-                    className={cn(
-                      "w-full flex items-center justify-between p-3 rounded-lg border hover:bg-muted/50 transition-colors",
-                      activeFilter === "unanswered48h" && "ring-2 ring-purple-500 bg-purple-50",
-                    )}
-                  >
-                    <div className="flex items-center gap-3">
-                      <div className="p-2 rounded-full bg-orange-100">
-                        <Clock className="h-4 w-4 text-orange-600" />
-                      </div>
-                      <div className="text-left">
-                        <p className="text-sm font-medium">Unanswered {"> "}48h</p>
-                        <p className="text-xs text-muted-foreground">No replies in 2+ days</p>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      {activeFilter === "unanswered48h" && <CheckCircle2 className="h-4 w-4 text-purple-600" />}
-                      <Badge variant={data.attentionItems.unanswered48h > 0 ? "destructive" : "secondary"}>
-                        {data.attentionItems.unanswered48h}
-                      </Badge>
-                    </div>
-                  </button>
+                  <AttentionButton
+                    filterId="unanswered48h"
+                    activeFilter={activeFilter}
+                    count={data.attentionItems.unanswered48h}
+                    title="Unanswered > 48h"
+                    description="No replies in 2+ days"
+                    icon={<Clock className="h-4 w-4 text-orange-600" />}
+                    iconBgColor="bg-orange-100"
+                    onClick={handleFilterClick}
+                  />
 
-                  <button
-                    onClick={() => handleFilterClick("needsOwner")}
-                    className={cn(
-                      "w-full flex items-center justify-between p-3 rounded-lg border hover:bg-muted/50 transition-colors",
-                      activeFilter === "needsOwner" && "ring-2 ring-purple-500 bg-purple-50",
-                    )}
-                  >
-                    <div className="flex items-center gap-3">
-                      <div className="p-2 rounded-full bg-purple-100">
-                        <UserX className="h-4 w-4 text-purple-600" />
-                      </div>
-                      <div className="text-left">
-                        <p className="text-sm font-medium">Needs Owner</p>
-                        <p className="text-xs text-muted-foreground">No one assigned</p>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      {activeFilter === "needsOwner" && <CheckCircle2 className="h-4 w-4 text-purple-600" />}
-                      <Badge variant={data.attentionItems.needsOwner > 0 ? "destructive" : "secondary"}>
-                        {data.attentionItems.needsOwner}
-                      </Badge>
-                    </div>
-                  </button>
+                  <AttentionButton
+                    filterId="needsOwner"
+                    activeFilter={activeFilter}
+                    count={data.attentionItems.needsOwner}
+                    title="Needs Owner"
+                    description="No one assigned"
+                    icon={<UserX className="h-4 w-4 text-purple-600" />}
+                    iconBgColor="bg-purple-100"
+                    onClick={handleFilterClick}
+                  />
 
-                  <button
-                    onClick={() => handleFilterClick("criticalUnresolved")}
-                    className={cn(
-                      "w-full flex items-center justify-between p-3 rounded-lg border hover:bg-muted/50 transition-colors",
-                      activeFilter === "criticalUnresolved" && "ring-2 ring-purple-500 bg-purple-50",
-                    )}
-                  >
-                    <div className="flex items-center gap-3">
-                      <div className="p-2 rounded-full bg-red-100">
-                        <AlertCircle className="h-4 w-4 text-red-600" />
-                      </div>
-                      <div className="text-left">
-                        <p className="text-sm font-medium">Critical Unresolved</p>
-                        <p className="text-xs text-muted-foreground">In progress {">"} 7 days</p>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      {activeFilter === "criticalUnresolved" && <CheckCircle2 className="h-4 w-4 text-purple-600" />}
-                      <Badge variant={data.attentionItems.criticalUnresolved > 0 ? "destructive" : "secondary"}>
-                        {data.attentionItems.criticalUnresolved}
-                      </Badge>
-                    </div>
-                  </button>
+                  <AttentionButton
+                    filterId="criticalUnresolved"
+                    activeFilter={activeFilter}
+                    count={data.attentionItems.criticalUnresolved}
+                    title="Critical Unresolved"
+                    description="In progress > 7 days"
+                    icon={<AlertCircle className="h-4 w-4 text-red-600" />}
+                    iconBgColor="bg-red-100"
+                    onClick={handleFilterClick}
+                  />
 
-                  <button
-                    onClick={() => handleFilterClick("overdue")}
-                    className={cn(
-                      "w-full flex items-center justify-between p-3 rounded-lg border hover:bg-muted/50 transition-colors",
-                      activeFilter === "overdue" && "ring-2 ring-purple-500 bg-purple-50",
-                    )}
-                  >
-                    <div className="flex items-center gap-3">
-                      <div className="p-2 rounded-full bg-amber-100">
-                        <CalendarClock className="h-4 w-4 text-amber-600" />
-                      </div>
-                      <div className="text-left">
-                        <p className="text-sm font-medium">Overdue</p>
-                        <p className="text-xs text-muted-foreground">Past due date</p>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      {activeFilter === "overdue" && <CheckCircle2 className="h-4 w-4 text-purple-600" />}
-                      <Badge variant={data.attentionItems.overdue > 0 ? "destructive" : "secondary"}>
-                        {data.attentionItems.overdue}
-                      </Badge>
-                    </div>
-                  </button>
+                  <AttentionButton
+                    filterId="overdue"
+                    activeFilter={activeFilter}
+                    count={data.attentionItems.overdue}
+                    title="Overdue"
+                    description="Past due date"
+                    icon={<CalendarClock className="h-4 w-4 text-amber-600" />}
+                    iconBgColor="bg-amber-100"
+                    onClick={handleFilterClick}
+                  />
                 </Card>
               </TabsContent>
 
@@ -539,9 +551,9 @@ export function DecisionCockpitSidebar({ isOpen, onClose, onFilterSelect }: Deci
                 No workflow data available yet. Start creating and managing social sticks to see analytics.
               </p>
             </div>
-          )}
+          ))}
         </div>
-      </div>
+      </dialog>
     </div>
   )
 }

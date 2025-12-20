@@ -1,0 +1,49 @@
+// v2 User Settings API: production-quality, get/update user settings
+import { NextRequest } from 'next/server'
+import { requireADSession } from '@/lib/auth/ad-session'
+import { querySingle } from '@/lib/database/pg-helpers'
+import { handleApiError } from '@/lib/api/handle-api-error'
+import { requireOptionalString } from '@/lib/api/validate'
+
+// GET /api/v2/users/[userId]/settings - Get user settings
+export async function GET(request: NextRequest, { params }: { params: { userId: string } }) {
+  try {
+    const session = await requireADSession(request)
+    const userId = params.userId
+    if (session.user.id !== userId && !session.user.is_admin) {
+      return new Response(JSON.stringify({ error: 'Access denied' }), { status: 403 })
+    }
+    const settings = await querySingle(
+      'SELECT * FROM user_settings WHERE user_id = $1',
+      [userId]
+    )
+    return new Response(JSON.stringify({ settings }), { status: 200 })
+  } catch (error) {
+    return handleApiError(error)
+  }
+}
+
+// PUT /api/v2/users/[userId]/settings - Update user settings
+export async function PUT(request: NextRequest, { params }: { params: { userId: string } }) {
+  try {
+    const session = await requireADSession(request)
+    const userId = params.userId
+    if (session.user.id !== userId && !session.user.is_admin) {
+      return new Response(JSON.stringify({ error: 'Access denied' }), { status: 403 })
+    }
+    const body = await request.json()
+    const theme = requireOptionalString(body.theme)
+    const notifications = typeof body.notifications === 'boolean' ? body.notifications : undefined
+    const settings = await querySingle(
+      `UPDATE user_settings SET
+        theme = COALESCE($1, theme),
+        notifications = COALESCE($2, notifications)
+       WHERE user_id = $3
+       RETURNING *`,
+      [theme, notifications, userId]
+    )
+    return new Response(JSON.stringify({ settings }), { status: 200 })
+  } catch (error) {
+    return handleApiError(error)
+  }
+}

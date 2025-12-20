@@ -1,12 +1,12 @@
-import { createServerClient } from "@/lib/supabase/server"
+import { createDatabaseClient } from "@/lib/database/database-adapter"
 import { NextResponse } from "next/server"
 import { getCachedAuthUser } from "@/lib/auth/cached-auth"
 
 export async function GET() {
   try {
-    const supabase = await createServerClient()
+    const db = await createDatabaseClient()
 
-    const authResult = await getCachedAuthUser(supabase)
+    const authResult = await getCachedAuthUser()
     if (authResult.rateLimited) {
       return NextResponse.json(
         { error: "Rate limit exceeded. Please try again in a moment." },
@@ -18,7 +18,7 @@ export async function GET() {
     }
     const user = authResult.user
 
-    const { data: categories, error } = await supabase
+    const { data: categories, error } = await db
       .from("social_pad_categories")
       .select("*")
       .eq("owner_id", user.id)
@@ -41,9 +41,9 @@ export async function GET() {
 
 export async function POST(request: Request) {
   try {
-    const supabase = await createServerClient()
+    const db = await createDatabaseClient()
 
-    const authResult = await getCachedAuthUser(supabase)
+    const authResult = await getCachedAuthUser()
     if (authResult.rateLimited) {
       return NextResponse.json(
         { error: "Rate limit exceeded. Please try again in a moment." },
@@ -63,7 +63,7 @@ export async function POST(request: Request) {
     }
 
     // Get the highest display_order
-    const { data: existingCategories } = await supabase
+    const { data: existingCategories } = await db
       .from("social_pad_categories")
       .select("display_order")
       .eq("owner_id", user.id)
@@ -72,7 +72,7 @@ export async function POST(request: Request) {
 
     const nextOrder = existingCategories && existingCategories.length > 0 ? existingCategories[0].display_order + 1 : 0
 
-    const { data: category, error } = await supabase
+    const { data: category, error } = await db
       .from("social_pad_categories")
       .insert({
         name: name.trim(),

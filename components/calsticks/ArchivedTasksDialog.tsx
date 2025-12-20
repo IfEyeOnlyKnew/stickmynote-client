@@ -17,12 +17,12 @@ import { useToast } from "@/hooks/use-toast"
 import type { CalStick } from "@/types/calstick"
 
 interface ArchivedTasksDialogProps {
-  open: boolean
-  onOpenChange: (open: boolean) => void
-  onUnarchive: (taskId: string) => Promise<void>
+  readonly open: boolean
+  readonly onOpenChange: (open: boolean) => void
+  readonly onUnarchive: (taskId: string) => Promise<void>
 }
 
-export function ArchivedTasksDialog({ open, onOpenChange, onUnarchive }: ArchivedTasksDialogProps) {
+export function ArchivedTasksDialog({ open, onOpenChange, onUnarchive }: Readonly<ArchivedTasksDialogProps>) {
   const [archivedTasks, setArchivedTasks] = useState<CalStick[]>([])
   const [loading, setLoading] = useState(false)
   const [unarchiving, setUnarchiving] = useState<string | null>(null)
@@ -35,6 +35,7 @@ export function ArchivedTasksDialog({ open, onOpenChange, onUnarchive }: Archive
     if (open) {
       fetchArchivedTasks()
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, page])
 
   const fetchArchivedTasks = async () => {
@@ -69,6 +70,7 @@ export function ArchivedTasksDialog({ open, onOpenChange, onUnarchive }: Archive
         description: "The task has been moved back to the Done column",
       })
     } catch (error) {
+      console.error("Failed to restore task:", error)
       toast({
         title: "Error",
         description: "Failed to restore task",
@@ -88,15 +90,16 @@ export function ArchivedTasksDialog({ open, onOpenChange, onUnarchive }: Archive
             Archived Tasks
           </DialogTitle>
           <DialogDescription>
-            {total} archived task{total !== 1 ? "s" : ""}. Restore tasks to move them back to the board.
+            {total} archived task{total === 1 ? "" : "s"}. Restore tasks to move them back to the board.
           </DialogDescription>
         </DialogHeader>
         <div className="flex-1 overflow-y-auto space-y-3 pr-2">
-          {loading && page === 1 ? (
+          {loading && page === 1 && (
             <div className="flex items-center justify-center py-8">
               <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
             </div>
-          ) : archivedTasks.length === 0 ? (
+          )}
+          {!(loading && page === 1) && archivedTasks.length === 0 && (
             <div className="flex flex-col items-center justify-center py-8 text-center">
               <Archive className="h-12 w-12 text-muted-foreground mb-3" />
               <p className="text-muted-foreground">No archived tasks</p>
@@ -104,7 +107,8 @@ export function ArchivedTasksDialog({ open, onOpenChange, onUnarchive }: Archive
                 Completed tasks will appear here when archived
               </p>
             </div>
-          ) : (
+          )}
+          {!(loading && page === 1) && archivedTasks.length > 0 && (
             <>
               {archivedTasks.map((task) => (
                 <Card key={task.id} className="border-l-4 border-l-gray-300">

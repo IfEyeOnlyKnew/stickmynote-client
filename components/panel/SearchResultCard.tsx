@@ -96,7 +96,7 @@ export function SearchResultCard({ note, searchTerm, onOpen, currentUserId }: Se
                 className="h-8 w-8 p-0 bg-white/80 hover:bg-white shadow-sm"
                 onClick={(e) => {
                   e.stopPropagation()
-                  const noteUrl = `${window.location.origin}/notes/${note.id}`
+                  const noteUrl = `${window.location.origin}/personal/${note.id}`
                   navigator.clipboard.writeText(noteUrl)
                 }}
                 title="Copy link to clipboard"

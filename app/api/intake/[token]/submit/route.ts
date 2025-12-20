@@ -1,15 +1,15 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { createServerClient } from "@/lib/supabase/server"
+import { createDatabaseClient } from "@/lib/database/database-adapter"
 
 export async function POST(request: NextRequest, { params }: { params: { token: string } }) {
   try {
-    const supabase = await createServerClient()
+    const db = await createDatabaseClient()
     const { token } = params
     const body = await request.json()
     const { data: submissionData } = body
 
     // Fetch form configuration
-    const { data: form, error: formError } = await supabase
+    const { data: form, error: formError } = await db
       .from("intake_forms")
       .select("id, pad_id, default_priority, default_status, auto_assign_to")
       .eq("share_token", token)
@@ -21,7 +21,7 @@ export async function POST(request: NextRequest, { params }: { params: { token: 
     }
 
     // Get a stick from this pad to attach the task to
-    const { data: sticks, error: sticksError } = await supabase
+    const { data: sticks, error: sticksError } = await db
       .from("paks_pad_sticks")
       .select("id")
       .eq("pad_id", form.pad_id)
@@ -34,10 +34,9 @@ export async function POST(request: NextRequest, { params }: { params: { token: 
     const stickId = sticks[0].id
 
     // Create task from submission
-    const taskTitle = submissionData.title || submissionData.subject || "New Request"
     const taskContent = submissionData.description || submissionData.message || JSON.stringify(submissionData, null, 2)
 
-    const { data: task, error: taskError } = await supabase
+    const { data: task, error: taskError } = await db
       .from("paks_pad_stick_replies")
       .insert({
         stick_id: stickId,
@@ -58,7 +57,7 @@ export async function POST(request: NextRequest, { params }: { params: { token: 
     }
 
     // Record submission
-    const { error: submissionError } = await supabase.from("intake_form_submissions").insert({
+    const { error: submissionError } = await db.from("intake_form_submissions").insert({
       form_id: form.id,
       task_id: task.id,
       submission_data: submissionData,

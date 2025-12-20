@@ -21,8 +21,8 @@ export function Header() {
         <nav className="hidden md:flex items-center space-x-6">
           {user && (
             <>
-              <Link href="/notes" className="text-gray-600 hover:text-gray-900">
-                Notes
+              <Link href="/personal" className="text-gray-600 hover:text-gray-900">
+                Personal
               </Link>
               <Link href="/mypads" className="text-gray-600 hover:text-gray-900">
                 Pads

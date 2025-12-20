@@ -77,7 +77,6 @@ export default function CleanupPoliciesDashboard() {
   const [stats, setStats] = useState<CleanupStats | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState("")
-  const [selectedPadId, setSelectedPadId] = useState<string | null>(null)
   const [isRunningCleanup, setIsRunningCleanup] = useState(false)
 
   const isAdmin = user?.email === "chrisdoran63@outlook.com"
@@ -163,6 +162,7 @@ export default function CleanupPoliciesDashboard() {
       toast.success(`Cleanup complete: ${data.archived || 0} archived, ${data.deleted || 0} deleted`)
       fetchData()
     } catch (error) {
+      console.error("Failed to run cleanup:", error)
       toast.error("Failed to run cleanup")
     } finally {
       setIsRunningCleanup(false)
@@ -196,6 +196,7 @@ export default function CleanupPoliciesDashboard() {
       fetchData()
       toast.success("Policy updated")
     } catch (error) {
+      console.error("Failed to update policy:", error)
       toast.error("Failed to update policy")
     }
   }
@@ -409,7 +410,7 @@ export default function CleanupPoliciesDashboard() {
                       <TableCell className="text-right">
                         <Dialog>
                           <DialogTrigger asChild>
-                            <Button variant="ghost" size="sm" onClick={() => setSelectedPadId(pad.id)}>
+                            <Button variant="ghost" size="sm">
                               <Settings className="h-4 w-4 mr-1" />
                               Configure
                             </Button>
@@ -467,7 +468,7 @@ export default function CleanupPoliciesDashboard() {
                 <h4 className="font-semibold">Auto-Close</h4>
               </div>
               <p className="text-sm text-muted-foreground">
-                Archives workflow sticks marked as "Resolved" after specified days of inactivity.
+                Archives workflow sticks marked as &quot;Resolved&quot; after specified days of inactivity.
               </p>
             </div>
           </div>

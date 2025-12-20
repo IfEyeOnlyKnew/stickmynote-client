@@ -1,4 +1,4 @@
-import { createSupabaseServer } from "@/lib/supabase-server"
+import { createDatabaseClient } from "@/lib/database/database-adapter"
 
 export interface StickWithRole {
   id: string
@@ -15,14 +15,11 @@ export interface StickWithRole {
 }
 
 export async function fetchUserSticks(userId: string): Promise<StickWithRole[]> {
-  const supabase = await createSupabaseServer()
+  const db = await createDatabaseClient()
 
-  const {
-    data: { user },
-    error: authError,
-  } = await supabase.auth.getUser()
+  await db.auth.getUser()
 
-  const { data: ownedSticks, error: ownedError } = await supabase
+  const { data: ownedSticks, error: ownedError } = await db
     .from("paks_pad_sticks")
     .select(`
       id, topic, content, color, user_id, pad_id, created_at, updated_at,
@@ -31,13 +28,13 @@ export async function fetchUserSticks(userId: string): Promise<StickWithRole[]> 
     .eq("user_id", userId)
     .order("updated_at", { ascending: false })
 
-  const { data: padMemberships, error: padMemberError } = await supabase
+  const { data: padMemberships, error: padMemberError } = await db
     .from("paks_pad_members")
     .select("role, accepted, pad_id, paks_pads(id, name)")
     .eq("user_id", userId)
     .eq("accepted", true)
 
-  const { data: stickMemberships, error: stickMemberError } = await supabase
+  const { data: stickMemberships, error: stickMemberError } = await db
     .from("paks_pad_stick_members")
     .select(`
       role,
@@ -59,7 +56,7 @@ export async function fetchUserSticks(userId: string): Promise<StickWithRole[]> 
   // Fetch sticks from member pads
   let memberSticks: any[] = []
   if (memberPadIds.length > 0) {
-    const { data: memberSticksData, error: memberSticksError } = await supabase
+    const { data: memberSticksData, error: memberSticksError } = await db
       .from("paks_pad_sticks")
       .select(`
         id, topic, content, color, user_id, pad_id, created_at, updated_at,

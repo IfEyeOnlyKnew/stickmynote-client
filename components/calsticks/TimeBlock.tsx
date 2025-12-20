@@ -70,8 +70,11 @@ function DraggableTask({
     <div
       ref={setNodeRef}
       style={style}
+      role="button"
+      tabIndex={0}
       className="group relative rounded p-1.5 cursor-pointer hover:shadow-md transition-all border-l-3"
       onClick={() => onStickClick(task)}
+      onKeyDown={(e) => e.key === "Enter" && onStickClick(task)}
     >
       <div
         className="absolute inset-0 rounded"

@@ -128,6 +128,8 @@ export function MediaUploadModal({ open, onClose, onUploadComplete, acceptedType
         <div className="space-y-4">
           {/* Drop Zone */}
           <div
+            role="button"
+            tabIndex={0}
             onDragEnter={handleDrag}
             onDragLeave={handleDrag}
             onDragOver={handleDrag}
@@ -138,6 +140,7 @@ export function MediaUploadModal({ open, onClose, onUploadComplete, acceptedType
               selectedFile && "bg-gray-50",
             )}
             onClick={() => !selectedFile && document.getElementById("file-input")?.click()}
+            onKeyDown={(e) => e.key === "Enter" && !selectedFile && document.getElementById("file-input")?.click()}
           >
             {selectedFile ? (
               <div className="space-y-4">

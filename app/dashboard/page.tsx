@@ -11,23 +11,14 @@ import { useUser } from "@/contexts/user-context"
 import { useOrganization } from "@/contexts/organization-context"
 import { HubSetupModal } from "@/components/social/hub-setup-modal"
 import { BreadcrumbNav } from "@/components/breadcrumb-nav"
-import { createClient } from "@/lib/supabase/client"
 import { OrgBrandedHeader } from "@/components/organization/org-branded-header"
-import { HubModeSelector } from "@/components/onboarding/hub-mode-selector"
 
 export default function DashboardPage() {
   const router = useRouter()
-  const { user, profile, loading, refreshProfile } = useUser()
-  const { currentOrg, currentOrgRole, loading: orgLoading } = useOrganization()
+  const { user, loading } = useUser()
+  const { loading: orgLoading } = useOrganization()
   const [setupModalOpen, setSetupModalOpen] = useState(false)
   const [openCalSticksCount, setOpenCalSticksCount] = useState(0)
-  const [showHubModeSelector, setShowHubModeSelector] = useState(false)
-  const [hubMode, setHubMode] = useState<"personal_only" | "full_access" | null>(null)
-
-  const userEmail = profile?.email || user?.email || ""
-  const isOwner = currentOrgRole === "owner"
-  const isSupportContact =
-    currentOrg?.support_contact_1_email === userEmail || currentOrg?.support_contact_2_email === userEmail
 
   useEffect(() => {
     if (!loading && !user) {
@@ -36,43 +27,21 @@ export default function DashboardPage() {
   }, [user, loading, router])
 
   useEffect(() => {
-    if (user && profile && !profile.hub_mode) {
-      setShowHubModeSelector(true)
-    } else if (profile?.hub_mode) {
-      setHubMode(profile.hub_mode)
-    }
-  }, [user, profile])
-
-  useEffect(() => {
     const fetchCalSticksCount = async () => {
       if (!user) return
 
       try {
-        const supabase = createClient()
-        const { count, error } = await supabase
-          .from("paks_pad_stick_replies")
-          .select("*", { count: "exact", head: true })
-          .eq("is_calstick", true)
-          .eq("calstick_completed", false)
-
-        if (!error && count !== null) {
-          setOpenCalSticksCount(count)
-        } else {
-          setOpenCalSticksCount(0)
-        }
+        const response = await fetch("/api/calsticks/count")
+        const data = await response.json()
+        setOpenCalSticksCount(data.count ?? 0)
       } catch (err) {
+        console.error("[Dashboard] CalSticks fetch error:", err)
         setOpenCalSticksCount(0)
       }
     }
 
     fetchCalSticksCount()
   }, [user])
-
-  const handleHubModeComplete = async (mode: "personal_only" | "full_access") => {
-    setHubMode(mode)
-    setShowHubModeSelector(false)
-    await refreshProfile()
-  }
 
   if (loading || orgLoading) {
     return (
@@ -83,26 +52,6 @@ export default function DashboardPage() {
   }
 
   if (!user) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-      </div>
-    )
-  }
-
-  if (showHubModeSelector && user && profile) {
-    return (
-      <HubModeSelector
-        open={showHubModeSelector}
-        onComplete={handleHubModeComplete}
-        userId={user.id}
-        userEmail={profile.email}
-      />
-    )
-  }
-
-  if (hubMode === "personal_only") {
-    router.push("/notes")
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
@@ -161,7 +110,7 @@ export default function DashboardPage() {
                 </div>
               </div>
               <Button
-                onClick={() => router.push("/notes")}
+                onClick={() => router.push("/personal")}
                 className="w-full bg-yellow-600 hover:bg-yellow-700 text-white font-semibold py-3 text-lg"
                 size="lg"
               >

@@ -1,14 +1,14 @@
-import { createClient } from "@/lib/supabase/server"
+import { createDatabaseClient } from "@/lib/database/database-adapter"
 import { NextResponse } from "next/server"
 import { getCachedAuthUser, createRateLimitResponse, createUnauthorizedResponse } from "@/lib/auth/cached-auth"
 
 export async function GET(request: Request, { params }: { params: { stickId: string } }) {
   try {
-    const supabase = await createClient()
+    const db = await createDatabaseClient()
     const { stickId } = params
 
     // Get all reactions for this stick with user data
-    const { data: reactions, error } = await supabase
+    const { data: reactions, error } = await db
       .from("social_stick_reactions")
       .select(`
         *,
@@ -37,8 +37,8 @@ export async function GET(request: Request, { params }: { params: { stickId: str
 
 export async function POST(request: Request, { params }: { params: { stickId: string } }) {
   try {
-    const supabase = await createClient()
-    const authResult = await getCachedAuthUser(supabase)
+    const db = await createDatabaseClient()
+    const authResult = await getCachedAuthUser()
 
     if (authResult.rateLimited) {
       return createRateLimitResponse()
@@ -53,7 +53,7 @@ export async function POST(request: Request, { params }: { params: { stickId: st
     const { reaction_type } = await request.json()
 
     // Check if user already reacted with this type
-    const { data: existing } = await supabase
+    const { data: existing } = await db
       .from("social_stick_reactions")
       .select("id")
       .eq("social_stick_id", stickId)
@@ -63,14 +63,14 @@ export async function POST(request: Request, { params }: { params: { stickId: st
 
     if (existing) {
       // Remove the reaction if it already exists (toggle behavior)
-      const { error } = await supabase.from("social_stick_reactions").delete().eq("id", existing.id)
+      const { error } = await db.from("social_stick_reactions").delete().eq("id", existing.id)
 
       if (error) throw error
 
       return NextResponse.json({ removed: true, reactionType: reaction_type })
     } else {
       // Add the new reaction
-      const { data: reaction, error } = await supabase
+      const { data: reaction, error } = await db
         .from("social_stick_reactions")
         .insert({
           social_stick_id: stickId,
@@ -92,8 +92,8 @@ export async function POST(request: Request, { params }: { params: { stickId: st
 
 export async function DELETE(request: Request, { params }: { params: { stickId: string } }) {
   try {
-    const supabase = await createClient()
-    const authResult = await getCachedAuthUser(supabase)
+    const db = await createDatabaseClient()
+    const authResult = await getCachedAuthUser()
 
     if (authResult.rateLimited) {
       return createRateLimitResponse()
@@ -113,7 +113,7 @@ export async function DELETE(request: Request, { params }: { params: { stickId: 
     }
 
     // Remove user's reaction
-    const { error } = await supabase
+    const { error } = await db
       .from("social_stick_reactions")
       .delete()
       .eq("social_stick_id", stickId)

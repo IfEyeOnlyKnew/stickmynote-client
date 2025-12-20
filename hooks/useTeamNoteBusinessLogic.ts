@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect, useCallback } from "react"
-import { createClient } from "@/lib/supabase/client"
+import { useUser } from "@/contexts/UserContext"
 
 interface TeamNote {
   id: string
@@ -51,6 +51,8 @@ export function useTeamNoteBusinessLogic({
   onCancelNewNote,
   onStickNewNote,
 }: UseTeamNoteBusinessLogicProps) {
+  const { user } = useUser()
+  
   const safeNote: TeamNote = {
     id: note?.id || "",
     team_id: note?.team_id || teamId,
@@ -85,7 +87,6 @@ export function useTeamNoteBusinessLogic({
   const [originalContent, setOriginalContent] = useState<string>("")
   const [originalDetails, setOriginalDetails] = useState<string>("")
 
-  const supabase = createClient()
   const canEdit = role !== "viewer"
   const replyCount = replies.length
 
@@ -116,16 +117,12 @@ export function useTeamNoteBusinessLogic({
       if (safeNote.isNew || safeNote.id.startsWith("temp-")) return
 
       try {
-        const { data, error } = await (supabase as any)
-          .from("team_note_replies")
-          .select(`
-            *,
-            user:users(username, email)
-          `)
-          .eq("team_note_id", safeNote.id)
-          .order("created_at", { ascending: true })
-
-        if (error) throw error
+        const response = await fetch(`/api/team-notes/${safeNote.id}/replies`)
+        if (!response.ok) {
+          const errorData = await response.json()
+          throw new Error(errorData.error || "Failed to fetch replies")
+        }
+        const data = await response.json()
         setReplies(data || [])
       } catch (err) {
         setError(`Error fetching replies: ${(err as Error).message}`)
@@ -329,35 +326,36 @@ export function useTeamNoteBusinessLogic({
 
   const handleSubmitReply = async () => {
     if (!newReply.trim() || safeNote.isNew || isSubmittingReply) return
+    if (!user) {
+      setError("You must be logged in to submit a reply")
+      return
+    }
 
     setIsSubmittingReply(true)
     try {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser()
-      if (!user) return
-
-      const { error } = await (supabase as any).from("team_note_replies").insert({
-        team_note_id: safeNote.id,
-        content: newReply.trim(),
-        user_id: user.id,
-        color: "#f3f4f6",
+      const response = await fetch(`/api/team-notes/${safeNote.id}/replies`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          content: newReply.trim(),
+          color: "#f3f4f6",
+        }),
       })
 
-      if (error) throw error
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.error || "Failed to create reply")
+      }
 
       setNewReply("")
 
-      const { data: updatedReplies } = await supabase
-        .from("team_note_replies")
-        .select(`
-          *,
-          user:users(username, email)
-        `)
-        .eq("team_note_id", safeNote.id)
-        .order("created_at", { ascending: true })
+      // Refetch replies
+      const repliesResponse = await fetch(`/api/team-notes/${safeNote.id}/replies`)
+      if (repliesResponse.ok) {
+        const updatedReplies = await repliesResponse.json()
+        setReplies(updatedReplies || [])
+      }
 
-      setReplies(updatedReplies || [])
     } catch (err) {
       setError(`Error submitting reply: ${(err as Error).message}`)
     } finally {

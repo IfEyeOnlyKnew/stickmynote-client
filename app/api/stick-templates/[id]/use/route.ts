@@ -1,12 +1,12 @@
-import { createClient } from "@/lib/supabase/server"
+import { createDatabaseClient } from "@/lib/database/database-adapter"
 import { NextResponse } from "next/server"
 
 export async function POST(request: Request, { params }: { params: { id: string } }) {
   try {
-    const supabase = await createClient()
+    const db = await createDatabaseClient()
     const { id } = params
 
-    const { data: existingTemplate, error: fetchError } = await supabase
+    const { data: existingTemplate, error: fetchError } = await db
       .from("paks_pad_stick_templates")
       .select("id, use_count")
       .eq("id", id)
@@ -21,7 +21,7 @@ export async function POST(request: Request, { params }: { params: { id: string 
       return NextResponse.json({ error: "Template not found" }, { status: 404 })
     }
 
-    const { error: updateError } = await supabase
+    const { error: updateError } = await db
       .from("paks_pad_stick_templates")
       .update({ use_count: (existingTemplate.use_count || 0) + 1 })
       .eq("id", id)

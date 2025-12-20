@@ -32,6 +32,7 @@ export function VideoRoomModal({ roomUrl, onClose }: VideoRoomModalProps) {
         }, 100)
       }
     },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     [roomUrl],
   )
 
@@ -101,6 +102,7 @@ export function VideoRoomModal({ roomUrl, onClose }: VideoRoomModalProps) {
 
     window.addEventListener("keydown", handleEscape)
     return () => window.removeEventListener("keydown", handleEscape)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   useEffect(() => {

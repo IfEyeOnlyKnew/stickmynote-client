@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server"
-import { createServiceClient } from "@/lib/supabase/server"
+import { createServiceDatabaseClient } from "@/lib/database/database-adapter"
 import { getOrgContext, hasMinRole } from "@/lib/auth/get-org-context"
 
 async function safeGetOrgContext(orgId: string) {
@@ -36,9 +36,9 @@ export async function GET(req: Request, { params }: { params: Promise<{ orgId: s
       return NextResponse.json({ error: "Permission denied" }, { status: 403 })
     }
 
-    const serviceClient = createServiceClient()
+    const serviceDb = await createServiceDatabaseClient()
 
-    const { data: invites, error } = await serviceClient
+    const { data: invites, error } = await serviceDb
       .from("organization_invites")
       .select("id, org_id, email, role, invited_by, invited_at, expires_at, status")
       .eq("org_id", orgId)
@@ -85,9 +85,9 @@ export async function DELETE(req: Request, { params }: { params: Promise<{ orgId
       return NextResponse.json({ error: "Permission denied" }, { status: 403 })
     }
 
-    const serviceClient = createServiceClient()
+    const serviceDb = await createServiceDatabaseClient()
 
-    const { error } = await serviceClient
+    const { error } = await serviceDb
       .from("organization_invites")
       .update({ status: "cancelled" })
       .eq("id", inviteId)

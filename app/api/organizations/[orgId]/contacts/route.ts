@@ -1,13 +1,12 @@
 import { getCachedAuthUser } from "@/lib/auth/cached-auth"
 import { type NextRequest, NextResponse } from "next/server"
-import { createClient } from "@/lib/supabase/server"
-import { createServiceClient } from "@/lib/supabase/service"
+import { createDatabaseClient, createServiceDatabaseClient } from "@/lib/database/database-adapter"
 
 // GET /api/organizations/[orgId]/contacts - Get support contacts
 export async function GET(request: NextRequest, { params }: { params: { orgId: string } }) {
   try {
-    const supabase = await createClient()
-    const authResult = await getCachedAuthUser(supabase)
+    const db = await createDatabaseClient()
+    const authResult = await getCachedAuthUser()
 
     if (authResult.rateLimited) {
       return NextResponse.json(
@@ -23,7 +22,7 @@ export async function GET(request: NextRequest, { params }: { params: { orgId: s
     const { orgId } = params
 
     // Anyone can view contact info if they need to request access
-    const { data: org, error } = await supabase
+    const { data: org, error } = await db
       .from("organizations")
       .select(`
         id,
@@ -61,9 +60,9 @@ export async function GET(request: NextRequest, { params }: { params: { orgId: s
 // PATCH /api/organizations/[orgId]/contacts - Update support contacts
 export async function PATCH(request: NextRequest, { params }: { params: { orgId: string } }) {
   try {
-    const supabase = await createClient()
-    const serviceClient = createServiceClient()
-    const authResult = await getCachedAuthUser(supabase)
+    const db = await createDatabaseClient()
+    const serviceDb = await createServiceDatabaseClient()
+    const authResult = await getCachedAuthUser()
 
     if (authResult.rateLimited) {
       return NextResponse.json(
@@ -82,7 +81,7 @@ export async function PATCH(request: NextRequest, { params }: { params: { orgId:
     const { contact1, contact2 } = body
 
     // Verify user is owner of this organization
-    const { data: membership } = await supabase
+    const { data: membership } = await db
       .from("organization_members")
       .select("role")
       .eq("org_id", orgId)
@@ -90,7 +89,7 @@ export async function PATCH(request: NextRequest, { params }: { params: { orgId:
       .maybeSingle()
 
     // Also check if user is the org owner
-    const { data: org } = await supabase.from("organizations").select("owner_id").eq("id", orgId).maybeSingle()
+    const { data: org } = await db.from("organizations").select("owner_id").eq("id", orgId).maybeSingle()
 
     const isOwner = org?.owner_id === user.id || membership?.role === "owner"
 
@@ -98,7 +97,8 @@ export async function PATCH(request: NextRequest, { params }: { params: { orgId:
       return NextResponse.json({ error: "Only the organization owner can update support contacts" }, { status: 403 })
     }
 
-    const { error: updateError } = await (serviceClient.from("organizations") as any)
+    const { error: updateError } = await serviceDb
+      .from("organizations")
       .update({
         support_contact_1_email: contact1?.email || null,
         support_contact_1_name: contact1?.name || null,

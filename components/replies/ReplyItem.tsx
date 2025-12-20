@@ -143,6 +143,7 @@ export const ReplyItem: React.FC<ReplyItemProps> = ({
               onChange={(e) => setEditContent(e.target.value)}
               className="text-sm text-gray-900 min-h-[60px] resize-none"
               maxLength={1000}
+              // eslint-disable-next-line jsx-a11y/no-autofocus
               autoFocus
             />
             <div className="flex items-center justify-between">

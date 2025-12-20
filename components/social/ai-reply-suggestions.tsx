@@ -17,11 +17,13 @@ export function AIReplySuggestions({ stickContent, stickTopic, onSelectSuggestio
   const [suggestions, setSuggestions] = useState<string[]>([])
   const [isExpanded, setIsExpanded] = useState(false)
 
+  /* eslint-disable react-hooks/exhaustive-deps */
   useEffect(() => {
     if (isExpanded && suggestions.length === 0 && !isGenerating) {
       loadSuggestions()
     }
   }, [isExpanded])
+  /* eslint-enable react-hooks/exhaustive-deps */
 
   const loadSuggestions = async () => {
     const results = await suggestReplies(stickContent, stickTopic)
@@ -49,16 +51,17 @@ export function AIReplySuggestions({ stickContent, stickTopic, onSelectSuggestio
         </Button>
       </div>
 
-      {isGenerating ? (
+      {isGenerating && (
         <div className="flex items-center justify-center py-4">
           <Loader2 className="h-5 w-5 animate-spin" />
           <span className="ml-2 text-sm text-muted-foreground">Generating suggestions...</span>
         </div>
-      ) : suggestions.length > 0 ? (
+      )}
+      {!isGenerating && suggestions.length > 0 && (
         <div className="space-y-2">
-          {suggestions.map((suggestion, index) => (
+          {suggestions.map((suggestion) => (
             <Button
-              key={index}
+              key={suggestion}
               variant="outline"
               className="w-full justify-start text-left h-auto py-3 bg-transparent"
               onClick={() => {
@@ -70,7 +73,8 @@ export function AIReplySuggestions({ stickContent, stickTopic, onSelectSuggestio
             </Button>
           ))}
         </div>
-      ) : (
+      )}
+      {!isGenerating && suggestions.length === 0 && (
         <p className="text-sm text-muted-foreground text-center py-2">No suggestions available</p>
       )}
     </Card>

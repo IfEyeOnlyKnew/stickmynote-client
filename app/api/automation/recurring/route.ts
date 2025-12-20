@@ -1,5 +1,5 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { createClient } from "@/lib/supabase/server"
+import { createDatabaseClient } from "@/lib/database/database-adapter"
 import { recurringTaskSchema } from "@/types/automation"
 import { getOrgContext } from "@/lib/auth/get-org-context"
 import { getCachedAuthUser } from "@/lib/auth/cached-auth"
@@ -33,8 +33,8 @@ function calculateNextRun(start: Date, frequency: string, interval: number, days
 
 export async function POST(req: NextRequest) {
   try {
-    const supabase = await createClient()
-    const authResult = await getCachedAuthUser(supabase)
+    const db = await createDatabaseClient()
+    const authResult = await getCachedAuthUser()
 
     if (authResult.rateLimited) {
       return NextResponse.json(
@@ -65,7 +65,7 @@ export async function POST(req: NextRequest) {
 
     const nextRun = calculateNextRun(new Date(), config.frequency, config.interval)
 
-    const { data: recurring, error } = await supabase
+    const { data: recurring, error } = await db
       .from("recurring_tasks")
       .insert({
         original_task_id: taskId,
@@ -82,6 +82,7 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ recurring })
   } catch (error) {
+    console.error("[recurring] Error:", error)
     return NextResponse.json({ error: "Internal Server Error" }, { status: 500 })
   }
 }

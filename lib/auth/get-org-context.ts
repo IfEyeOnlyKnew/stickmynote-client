@@ -1,11 +1,12 @@
-import { createClient } from "@/lib/supabase/server"
-import { createServiceClient } from "@/lib/supabase/server"
+import { db as pgClient } from "@/lib/database/pg-client"
+import { getCachedAuthUser } from "@/lib/auth/cached-auth"
 import { cookies } from "next/headers"
 
+// Types
 export interface OrgContext {
   userId: string
   orgId: string
-  role: "owner" | "admin" | "member" | "viewer"
+  role: OrgRole
   isPersonalOrg: boolean
 }
 
@@ -14,36 +15,93 @@ export interface OrgContextError {
   message: string
 }
 
+type OrgRole = "owner" | "admin" | "member" | "viewer"
+
+interface OrgMembership {
+  org_id: string
+  role: string
+  organizations: { id: string; type: string } | null
+}
+
+// Constants
 const CURRENT_ORG_COOKIE = "current_org_id"
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
-interface CacheEntry {
-  userId: string
-  timestamp: number
+const ROLE_HIERARCHY: Record<OrgRole, number> = {
+  viewer: 0,
+  member: 1,
+  admin: 2,
+  owner: 3,
 }
 
-const authCache = new Map<string, CacheEntry>()
-const CACHE_TTL = 30000 // 30 seconds cache TTL
-const MAX_CACHE_SIZE = 1000
-
-function getCacheKey(cookieHeader: string | null): string {
-  // Use a hash of relevant auth cookies as cache key
-  return cookieHeader ? `auth:${cookieHeader.slice(0, 100)}` : "auth:anonymous"
-}
-
-function cleanupCache() {
-  const now = Date.now()
-  if (authCache.size > MAX_CACHE_SIZE) {
-    // Remove oldest entries if cache is too large
-    const entries = Array.from(authCache.entries())
-    entries.sort((a, b) => a[1].timestamp - b[1].timestamp)
-    const toRemove = entries.slice(0, Math.floor(MAX_CACHE_SIZE / 2))
-    toRemove.forEach(([key]) => authCache.delete(key))
+// Helper functions
+function isRateLimitError(error: unknown): boolean {
+  if (!error) return false
+  if (error instanceof Error) {
+    return error.message.includes("Too Many") || error.message.includes("429")
   }
-  // Remove expired entries
-  for (const [key, entry] of authCache.entries()) {
-    if (now - entry.timestamp > CACHE_TTL) {
-      authCache.delete(key)
+  if (typeof error === "string") {
+    return error.includes("Too Many") || error.includes("429")
+  }
+  return false
+}
+
+function isValidUuid(value: string): boolean {
+  return UUID_REGEX.test(value)
+}
+
+function getOrgFromMembership(membership: OrgMembership): { id: string; type: string } | null {
+  return membership.organizations as { id: string; type: string } | null
+}
+
+function buildOrgContext(userId: string, membership: OrgMembership): OrgContext {
+  const org = getOrgFromMembership(membership)
+  return {
+    userId,
+    orgId: membership.org_id,
+    role: membership.role as OrgRole,
+    isPersonalOrg: org?.type === "personal",
+  }
+}
+
+function findMembershipByOrgId(memberships: OrgMembership[], orgId: string): OrgMembership | undefined {
+  return memberships.find((m) => m.org_id === orgId)
+}
+
+function findPersonalMembership(memberships: OrgMembership[]): OrgMembership | undefined {
+  return memberships.find((m) => {
+    const org = getOrgFromMembership(m)
+    return org?.type === "personal"
+  })
+}
+
+function selectBestMembership(memberships: OrgMembership[]): OrgMembership {
+  // Prefer personal org, then first available
+  return findPersonalMembership(memberships) || memberships[0]
+}
+
+async function fetchUserMemberships(
+  userId: string,
+): Promise<OrgMembership[] | null> {
+  try {
+    const result = await pgClient.query(
+      `SELECT 
+        m.org_id,
+        m.role,
+        json_build_object('id', o.id, 'type', o.type) as organizations
+       FROM organization_members m
+       JOIN organizations o ON o.id = m.org_id
+       WHERE m.user_id = $1`,
+      [userId]
+    )
+    return result.rows as OrgMembership[]
+  } catch (error) {
+    if (isRateLimitError(error)) {
+      console.error("[SERVER] getOrgContext: Rate limited during membership fetch")
+      throw new Error("RATE_LIMITED")
     }
+    console.error("getOrgContext: Error fetching memberships:", error)
+    return null
   }
 }
 
@@ -51,7 +109,7 @@ function cleanupCache() {
  * Get the user's currently selected org_id from cookie or default to personal org
  */
 export async function getCurrentOrgId(): Promise<string | undefined> {
-  const cookieStore = await cookies()
+  const cookieStore = cookies()
   return cookieStore.get(CURRENT_ORG_COOKIE)?.value ?? undefined
 }
 
@@ -62,126 +120,52 @@ export async function getCurrentOrgId(): Promise<string | undefined> {
  */
 export async function getOrgContext(requestedOrgId?: string): Promise<OrgContext | null> {
   try {
-    const cookieStore = await cookies()
-    const cacheKey = getCacheKey(cookieStore.toString())
+    // Authenticate user
+    const authResult = await getCachedAuthUser()
 
-    const cached = authCache.get(cacheKey)
-    const now = Date.now()
-
-    let userId: string
-
-    if (cached && now - cached.timestamp < CACHE_TTL) {
-      // Use cached user ID
-      userId = cached.userId
-    } else {
-      // Cache miss or expired - fetch from Supabase
-      const supabase = await createClient()
-
-      let authResult
-      try {
-        authResult = await supabase.auth.getUser()
-      } catch (fetchError) {
-        const errorMessage = fetchError instanceof Error ? fetchError.message : String(fetchError)
-        if (errorMessage.includes("Too Many") || errorMessage.includes("429")) {
-          console.error("[SERVER] getOrgContext: Rate limited during auth")
-          throw new Error("RATE_LIMITED")
-        }
-        console.error("getOrgContext: Fetch error during auth:", errorMessage)
-        return null
-      }
-
-      const {
-        data: { user },
-        error: authError,
-      } = authResult
-
-      if (authError) {
-        const errorMessage = authError.message || String(authError)
-        if (errorMessage.includes("Too Many") || errorMessage.includes("429")) {
-          console.error("[SERVER] getOrgContext: Rate limited")
-          throw new Error("RATE_LIMITED")
-        }
-        return null
-      }
-
-      if (!user) {
-        return null
-      }
-
-      userId = user.id
-
-      cleanupCache()
-      authCache.set(cacheKey, { userId, timestamp: now })
+    if (authResult.rateLimited) {
+      console.error("[SERVER] getOrgContext: Rate limited during auth")
+      throw new Error("RATE_LIMITED")
     }
 
-    const serviceClient = createServiceClient()
-
-    let targetOrgId = requestedOrgId
-    if (!targetOrgId) {
-      targetOrgId = await getCurrentOrgId()
+    if (!authResult.user) {
+      return null
     }
 
-    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
-    if (targetOrgId && !uuidRegex.test(targetOrgId)) {
+    const userId = authResult.user.id
+
+    // Determine target org
+    let targetOrgId = requestedOrgId || (await getCurrentOrgId())
+    if (targetOrgId && !isValidUuid(targetOrgId)) {
       targetOrgId = undefined
     }
 
-    const { data: allMemberships, error: allMemberError } = await serviceClient
-      .from("organization_members")
-      .select(`
-        org_id,
-        role,
-        organizations!organization_members_org_id_fkey (
-          id,
-          type
-        )
-      `)
-      .eq("user_id", userId)
-
-    if (allMemberError) {
-      const errorMessage = allMemberError.message || String(allMemberError)
-      if (errorMessage.includes("Too Many") || errorMessage.includes("429")) {
-        console.error("[SERVER] getOrgContext: Rate limited during membership fetch")
-        throw new Error("RATE_LIMITED")
+    // Fetch user's memberships
+    const memberships = await fetchUserMemberships(userId)
+    
+    // If no memberships, return a fallback personal context
+    // This handles users who signed up before org system was in place
+    if (!memberships?.length) {
+      console.log("[SERVER] getOrgContext: No memberships found for user, returning fallback context")
+      return {
+        userId,
+        orgId: userId, // Use userId as a pseudo-org for personal context
+        role: "owner" as OrgRole,
+        isPersonalOrg: true,
       }
-      console.error("getOrgContext: Error fetching memberships:", allMemberError)
-      return null
     }
 
-    if (!allMemberships || allMemberships.length === 0) {
-      return null
-    }
-
-    // If we have a target org, check if user is a member
+    // If target org specified, try to use it
     if (targetOrgId) {
-      const membership = allMemberships.find((m) => m.org_id === targetOrgId)
-
-      if (membership) {
-        const org = membership.organizations as unknown as { id: string; type: string }
-        return {
-          userId,
-          orgId: membership.org_id,
-          role: membership.role as OrgContext["role"],
-          isPersonalOrg: org?.type === "personal",
-        }
+      const targetMembership = findMembershipByOrgId(memberships, targetOrgId)
+      if (targetMembership) {
+        return buildOrgContext(userId, targetMembership)
       }
     }
 
-    // Prefer personal org, then team org
-    const personalMembership = allMemberships.find((m) => {
-      const org = m.organizations as unknown as { id: string; type: string }
-      return org?.type === "personal"
-    })
-
-    const selectedMembership = personalMembership || allMemberships[0]
-    const org = selectedMembership.organizations as unknown as { id: string; type: string }
-
-    return {
-      userId,
-      orgId: selectedMembership.org_id,
-      role: selectedMembership.role as OrgContext["role"],
-      isPersonalOrg: org?.type === "personal",
-    }
+    // Fall back to best available membership
+    const selectedMembership = selectBestMembership(memberships)
+    return buildOrgContext(userId, selectedMembership)
   } catch (err) {
     if (err instanceof Error && err.message === "RATE_LIMITED") {
       throw err
@@ -192,7 +176,7 @@ export async function getOrgContext(requestedOrgId?: string): Promise<OrgContext
 }
 
 /**
- * Require organization context - returns error response if not authenticated
+ * Require organization context - throws error if not authenticated
  */
 export async function requireOrgContext(requestedOrgId?: string): Promise<OrgContext> {
   const context = await getOrgContext(requestedOrgId)
@@ -207,13 +191,6 @@ export async function requireOrgContext(requestedOrgId?: string): Promise<OrgCon
 /**
  * Check if user has at least the specified role in the organization
  */
-export function hasMinRole(currentRole: OrgContext["role"], requiredRole: OrgContext["role"]): boolean {
-  const roleHierarchy: Record<OrgContext["role"], number> = {
-    viewer: 0,
-    member: 1,
-    admin: 2,
-    owner: 3,
-  }
-
-  return roleHierarchy[currentRole] >= roleHierarchy[requiredRole]
+export function hasMinRole(currentRole: OrgRole, requiredRole: OrgRole): boolean {
+  return ROLE_HIERARCHY[currentRole] >= ROLE_HIERARCHY[requiredRole]
 }

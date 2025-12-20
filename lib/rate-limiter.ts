@@ -1,28 +1,9 @@
-import { createClient } from "@supabase/supabase-js"
-import type { Database } from "@/types/database"
-
-// Create a singleton server client with service role for rate limiting
-let serverClient: ReturnType<typeof createClient<Database>> | null = null
-
-function getServerClient() {
-  if (serverClient) return serverClient
-
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
-  const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!
-
-  if (!supabaseUrl || !supabaseServiceKey) {
-    throw new Error("Missing Supabase environment variables for rate limiter")
-  }
-
-  serverClient = createClient<Database>(supabaseUrl, supabaseServiceKey, {
-    auth: {
-      autoRefreshToken: false,
-      persistSession: false,
-    },
-  })
-
-  return serverClient
-}
+/**
+ * Rate Limiter using local PostgreSQL
+ * 
+ * Uses the database queries module to track rate limits
+ */
+import { getRateLimitCount, createRateLimit, cleanupOldRateLimits } from "@/lib/database/queries"
 
 interface RateLimitConfig {
   windowMs: number // Time window in milliseconds
@@ -42,37 +23,18 @@ export async function checkRateLimit(
   action: string,
   ip?: string,
 ): Promise<{ allowed: boolean; remaining: number; resetTime: number }> {
-  const supabase = getServerClient()
   const config = rateLimitConfigs[action] || rateLimitConfigs.general
   const now = Date.now()
   const windowStart = now - config.windowMs
 
-  // Use userId as primary identifier, IP as fallback
-  const identifier = userId || ip || "anonymous"
-  const key = `${action}:${identifier}`
-
   try {
     // Clean up old entries
-    await supabase.from("rate_limits").delete().lt("created_at", new Date(windowStart).toISOString())
+    await cleanupOldRateLimits(windowStart)
 
     // Count current requests in window
-    const { data: requests, error } = await supabase
-      .from("rate_limits")
-      .select("*")
-      .eq("key", key)
-      .gte("created_at", new Date(windowStart).toISOString())
-
-    if (error) {
-      console.error("Rate limit check error:", error)
-      // Allow request if we can't check (fail open)
-      return {
-        allowed: true,
-        remaining: config.maxRequests - 1,
-        resetTime: now + config.windowMs,
-      }
-    }
-
-    const currentCount = requests?.length || 0
+    const identifier = userId || ip || "anonymous"
+    const endpoint = action
+    const currentCount = await getRateLimitCount(identifier, endpoint, windowStart)
 
     if (currentCount >= config.maxRequests) {
       return {
@@ -83,13 +45,7 @@ export async function checkRateLimit(
     }
 
     // Record this request
-    await supabase.from("rate_limits").insert({
-      key,
-      user_id: userId,
-      ip_address: ip,
-      action,
-      created_at: new Date().toISOString(),
-    } as any)
+    await createRateLimit(identifier, endpoint)
 
     return {
       allowed: true,

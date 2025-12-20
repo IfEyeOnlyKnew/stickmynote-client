@@ -1,9 +1,59 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { createServiceClient } from "@/lib/supabase/server"
+import { createServiceDatabaseClient, type DatabaseClient } from "@/lib/database/database-adapter"
 import { getCachedAuthUser, createRateLimitResponse, createUnauthorizedResponse } from "@/lib/auth/cached-auth"
 import { getOrgContext } from "@/lib/auth/get-org-context"
 
-async function safeGetOrgContext(userId: string) {
+// Types
+interface OrgContext {
+  orgId: string
+}
+
+interface AuthResult {
+  user: { id: string; email?: string } | null
+  orgContext: OrgContext | null
+  rateLimited?: boolean
+}
+
+interface ReplyInput {
+  content: string
+  color?: string
+  is_calstick?: boolean
+  calstick_date?: string | null
+  calstick_status?: string | null
+  calstick_priority?: string | null
+  calstick_parent_id?: string | null
+  calstick_assignee_id?: string | null
+}
+
+interface UpdateReplyInput {
+  replyId: string
+  content: string
+  color?: string
+}
+
+interface DeleteReplyInput {
+  replyId: string
+}
+
+// Constants
+const DEFAULT_REPLY_COLOR = "#fef3c7"
+
+const REPLY_SELECT_FIELDS = `
+  id,
+  content,
+  color,
+  created_at,
+  updated_at,
+  user_id,
+  is_calstick,
+  calstick_date,
+  calstick_completed,
+  calstick_completed_at,
+  user:users(username, email, full_name)
+`
+
+// Helper functions
+async function safeGetOrgContext(userId: string): Promise<OrgContext | { rateLimited: true } | null> {
   try {
     return await getOrgContext(userId)
   } catch (error) {
@@ -14,81 +64,162 @@ async function safeGetOrgContext(userId: string) {
   }
 }
 
+async function getAuthenticatedContext(request?: NextRequest): Promise<AuthResult & { response?: NextResponse }> {
+  const { user, error: authError } = await getCachedAuthUser()
+
+  if (authError === "rate_limited") {
+    return { user: null, orgContext: null, rateLimited: true, response: createRateLimitResponse() }
+  }
+
+  if (!user) {
+    return { user: null, orgContext: null, response: createUnauthorizedResponse() }
+  }
+
+  const orgContextResult = await safeGetOrgContext(user.id)
+  if (orgContextResult && "rateLimited" in orgContextResult) {
+    return { user: null, orgContext: null, rateLimited: true, response: createRateLimitResponse() }
+  }
+
+  if (!orgContextResult) {
+    return {
+      user: null,
+      orgContext: null,
+      response: NextResponse.json({ error: "No organization context" }, { status: 403 }),
+    }
+  }
+
+  return { user, orgContext: orgContextResult }
+}
+
+async function fetchStick(
+  db: DatabaseClient,
+  stickId: string,
+  orgId: string,
+): Promise<{ padId: string } | null> {
+  const { data: stick, error } = await db
+    .from("paks_pad_sticks")
+    .select("pad_id")
+    .eq("id", stickId)
+    .eq("org_id", orgId)
+    .maybeSingle()
+
+  if (error || !stick) return null
+  return { padId: stick.pad_id }
+}
+
+async function checkPadAccess(
+  db: DatabaseClient,
+  padId: string,
+  userId: string,
+  orgId: string,
+): Promise<{ isOwner: boolean; isMember: boolean }> {
+  const [padResult, memberResult] = await Promise.all([
+    db
+      .from("paks_pads")
+      .select("owner_id")
+      .eq("id", padId)
+      .eq("org_id", orgId)
+      .maybeSingle(),
+    db
+      .from("paks_pad_members")
+      .select("role")
+      .eq("pad_id", padId)
+      .eq("user_id", userId)
+      .maybeSingle(),
+  ])
+
+  return {
+    isOwner: padResult.data?.owner_id === userId,
+    isMember: !!memberResult.data,
+  }
+}
+
+function hasAccess(access: { isOwner: boolean; isMember: boolean }): boolean {
+  return access.isOwner || access.isMember
+}
+
+async function fetchReply(
+  db: DatabaseClient,
+  replyId: string,
+  orgId: string,
+): Promise<{ userId: string; stickId?: string } | null> {
+  const { data: reply, error } = await db
+    .from("paks_pad_stick_replies")
+    .select("user_id, stick_id")
+    .eq("id", replyId)
+    .eq("org_id", orgId)
+    .maybeSingle()
+
+  if (error || !reply) return null
+  return { userId: reply.user_id, stickId: reply.stick_id }
+}
+
+async function deleteReply(db: DatabaseClient, replyId: string, orgId: string): Promise<void> {
+  const { error } = await db
+    .from("paks_pad_stick_replies")
+    .delete()
+    .eq("id", replyId)
+    .eq("org_id", orgId)
+
+  if (error) throw error
+}
+
+async function canDeleteReply(
+  db: DatabaseClient,
+  reply: { userId: string; stickId?: string },
+  userId: string,
+  stickId: string,
+  orgId: string,
+): Promise<boolean> {
+  // User owns the reply
+  if (reply.userId === userId) return true
+
+  // Check if user is pad owner
+  const stick = await fetchStick(db, stickId, orgId)
+  if (!stick) return false
+
+  const { data: pad } = await db
+    .from("paks_pads")
+    .select("owner_id")
+    .eq("id", stick.padId)
+    .eq("org_id", orgId)
+    .maybeSingle()
+
+  return pad?.owner_id === userId
+}
+
+function handleRateLimitError(error: unknown): NextResponse | null {
+  if (error instanceof Error && error.message === "RATE_LIMITED") {
+    return createRateLimitResponse()
+  }
+  return null
+}
+
+// Route handlers
 export async function GET(request: NextRequest, { params }: { params: { id: string } }) {
   try {
-    const { user, error: authError } = await getCachedAuthUser()
+    const auth = await getAuthenticatedContext()
+    if (auth.response) return auth.response
 
-    if (authError === "rate_limited") {
-      return createRateLimitResponse()
-    }
-
-    if (!user) {
-      return createUnauthorizedResponse()
-    }
-
-    const orgContextResult = await safeGetOrgContext(user.id)
-    if (orgContextResult && "rateLimited" in orgContextResult) {
-      return createRateLimitResponse()
-    }
-    if (!orgContextResult) {
-      return NextResponse.json({ error: "No organization context" }, { status: 403 })
-    }
-    const orgContext = orgContextResult
-
+    const { user, orgContext } = auth
     const stickId = params.id
-    const adminClient = createServiceClient()
+    const db = await createServiceDatabaseClient()
 
-    const { data: stick, error: stickError } = await adminClient
-      .from("paks_pad_sticks")
-      .select("pad_id")
-      .eq("id", stickId)
-      .eq("org_id", orgContext.orgId)
-      .maybeSingle()
-
-    if (stickError || !stick) {
+    const stick = await fetchStick(db, stickId, orgContext!.orgId)
+    if (!stick) {
       return NextResponse.json({ error: "Stick not found" }, { status: 404 })
     }
 
-    // 2. Check if user has access to the pad (Owner or Member)
-    const [padResult, memberResult] = await Promise.all([
-      adminClient
-        .from("paks_pads")
-        .select("owner_id")
-        .eq("id", stick.pad_id)
-        .eq("org_id", orgContext.orgId)
-        .maybeSingle(),
-      adminClient
-        .from("paks_pad_members")
-        .select("role")
-        .eq("pad_id", stick.pad_id)
-        .eq("user_id", user.id)
-        .maybeSingle(),
-    ])
-
-    const isOwner = padResult.data?.owner_id === user.id
-    const isMember = !!memberResult.data
-
-    if (!isOwner && !isMember) {
+    const access = await checkPadAccess(db, stick.padId, user!.id, orgContext!.orgId)
+    if (!hasAccess(access)) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 })
     }
 
-    const { data: replies, error } = await adminClient
+    const { data: replies, error } = await db
       .from("paks_pad_stick_replies")
-      .select(`
-        id,
-        content,
-        color,
-        created_at,
-        updated_at,
-        user_id,
-        is_calstick,
-        calstick_date,
-        calstick_completed,
-        calstick_completed_at,
-        user:users(username, email, full_name)
-      `)
+      .select(REPLY_SELECT_FIELDS)
       .eq("stick_id", stickId)
-      .eq("org_id", orgContext.orgId)
+      .eq("org_id", orgContext!.orgId)
       .order("created_at", { ascending: true })
 
     if (error) {
@@ -98,9 +229,9 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
 
     return NextResponse.json({ replies: replies || [] })
   } catch (error) {
-    if (error instanceof Error && error.message === "RATE_LIMITED") {
-      return createRateLimitResponse()
-    }
+    const rateLimitResponse = handleRateLimitError(error)
+    if (rateLimitResponse) return rateLimitResponse
+
     console.error("Error in stick replies GET:", error)
     return NextResponse.json({ error: "Internal server error" }, { status: 500 })
   }
@@ -108,83 +239,46 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
 
 export async function POST(request: NextRequest, { params }: { params: { id: string } }) {
   try {
-    const { user, error: authError } = await getCachedAuthUser()
+    const auth = await getAuthenticatedContext()
+    if (auth.response) return auth.response
 
-    if (authError === "rate_limited") {
-      return createRateLimitResponse()
-    }
-
-    if (!user) {
-      return createUnauthorizedResponse()
-    }
-
-    const orgContextResult = await safeGetOrgContext(user.id)
-    if (orgContextResult && "rateLimited" in orgContextResult) {
-      return createRateLimitResponse()
-    }
-    if (!orgContextResult) {
-      return NextResponse.json({ error: "No organization context" }, { status: 403 })
-    }
-    const orgContext = orgContextResult
-
+    const { user, orgContext } = auth
     const stickId = params.id
+
+    const body: ReplyInput = await request.json()
     const {
       content,
-      color = "#fef3c7",
+      color = DEFAULT_REPLY_COLOR,
       is_calstick = false,
       calstick_date = null,
       calstick_status = null,
       calstick_priority = null,
       calstick_parent_id = null,
       calstick_assignee_id = null,
-    } = await request.json()
+    } = body
 
     if (!content?.trim()) {
       return NextResponse.json({ error: "Content is required" }, { status: 400 })
     }
 
-    const adminClient = createServiceClient()
+    const db = await createServiceDatabaseClient()
 
-    const { data: stick, error: stickError } = await adminClient
-      .from("paks_pad_sticks")
-      .select("pad_id")
-      .eq("id", stickId)
-      .eq("org_id", orgContext.orgId)
-      .maybeSingle()
-
-    if (stickError || !stick) {
+    const stick = await fetchStick(db, stickId, orgContext!.orgId)
+    if (!stick) {
       return NextResponse.json({ error: "Stick not found" }, { status: 404 })
     }
 
-    // 2. Check permissions
-    const [padResult, memberResult] = await Promise.all([
-      adminClient
-        .from("paks_pads")
-        .select("owner_id")
-        .eq("id", stick.pad_id)
-        .eq("org_id", orgContext.orgId)
-        .maybeSingle(),
-      adminClient
-        .from("paks_pad_members")
-        .select("role")
-        .eq("pad_id", stick.pad_id)
-        .eq("user_id", user.id)
-        .maybeSingle(),
-    ])
-
-    const isOwner = padResult.data?.owner_id === user.id
-    const isMember = !!memberResult.data
-
-    if (!isOwner && !isMember) {
+    const access = await checkPadAccess(db, stick.padId, user!.id, orgContext!.orgId)
+    if (!hasAccess(access)) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 })
     }
 
-    const { data: reply, error } = await adminClient
+    const { data: reply, error } = await db
       .from("paks_pad_stick_replies")
       .insert({
         stick_id: stickId,
-        user_id: user.id,
-        org_id: orgContext.orgId,
+        user_id: user!.id,
+        org_id: orgContext!.orgId,
         content: content.trim(),
         color,
         is_calstick,
@@ -194,19 +288,7 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
         calstick_parent_id,
         calstick_assignee_id,
       })
-      .select(`
-        id,
-        content,
-        color,
-        created_at,
-        updated_at,
-        user_id,
-        is_calstick,
-        calstick_date,
-        calstick_completed,
-        calstick_completed_at,
-        user:users(username, email, full_name)
-      `)
+      .select(REPLY_SELECT_FIELDS)
       .single()
 
     if (error) {
@@ -216,9 +298,9 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
 
     return NextResponse.json({ reply })
   } catch (error) {
-    if (error instanceof Error && error.message === "RATE_LIMITED") {
-      return createRateLimitResponse()
-    }
+    const rateLimitResponse = handleRateLimitError(error)
+    if (rateLimitResponse) return rateLimitResponse
+
     console.error("Error in stick replies POST:", error)
     return NextResponse.json({ error: "Internal server error" }, { status: 500 })
   }
@@ -226,26 +308,13 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
 
 export async function PUT(request: NextRequest, { params }: { params: { id: string } }) {
   try {
-    const { user, error: authError } = await getCachedAuthUser()
+    const auth = await getAuthenticatedContext()
+    if (auth.response) return auth.response
 
-    if (authError === "rate_limited") {
-      return createRateLimitResponse()
-    }
+    const { user, orgContext } = auth
 
-    if (!user) {
-      return createUnauthorizedResponse()
-    }
-
-    const orgContextResult = await safeGetOrgContext(user.id)
-    if (orgContextResult && "rateLimited" in orgContextResult) {
-      return createRateLimitResponse()
-    }
-    if (!orgContextResult) {
-      return NextResponse.json({ error: "No organization context" }, { status: 403 })
-    }
-    const orgContext = orgContextResult
-
-    const { replyId, content, color } = await request.json()
+    const body: UpdateReplyInput = await request.json()
+    const { replyId, content, color } = body
 
     if (!replyId) {
       return NextResponse.json({ error: "Reply ID is required" }, { status: 400 })
@@ -255,26 +324,17 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
       return NextResponse.json({ error: "Content is required" }, { status: 400 })
     }
 
-    const adminClient = createServiceClient()
+    const db = await createServiceDatabaseClient()
 
-    // Fetch the existing reply to verify ownership
-    const { data: existingReply, error: replyError } = await adminClient
-      .from("paks_pad_stick_replies")
-      .select("user_id, org_id")
-      .eq("id", replyId)
-      .eq("org_id", orgContext.orgId)
-      .maybeSingle()
-
-    if (replyError || !existingReply) {
+    const existingReply = await fetchReply(db, replyId, orgContext!.orgId)
+    if (!existingReply) {
       return NextResponse.json({ error: "Reply not found" }, { status: 404 })
     }
 
-    // Only the reply author can edit their reply
-    if (existingReply.user_id !== user.id) {
+    if (existingReply.userId !== user!.id) {
       return NextResponse.json({ error: "You can only edit your own replies" }, { status: 403 })
     }
 
-    // Build update data
     const updateData: Record<string, string> = {
       content: content.trim(),
       updated_at: new Date().toISOString(),
@@ -283,24 +343,12 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
       updateData.color = color
     }
 
-    const { data: reply, error } = await adminClient
+    const { data: reply, error } = await db
       .from("paks_pad_stick_replies")
       .update(updateData)
       .eq("id", replyId)
-      .eq("org_id", orgContext.orgId)
-      .select(`
-        id,
-        content,
-        color,
-        created_at,
-        updated_at,
-        user_id,
-        is_calstick,
-        calstick_date,
-        calstick_completed,
-        calstick_completed_at,
-        user:users(username, email, full_name)
-      `)
+      .eq("org_id", orgContext!.orgId)
+      .select(REPLY_SELECT_FIELDS)
       .single()
 
     if (error) {
@@ -310,9 +358,9 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
 
     return NextResponse.json({ reply })
   } catch (error) {
-    if (error instanceof Error && error.message === "RATE_LIMITED") {
-      return createRateLimitResponse()
-    }
+    const rateLimitResponse = handleRateLimitError(error)
+    if (rateLimitResponse) return rateLimitResponse
+
     console.error("Error in stick replies PUT:", error)
     return NextResponse.json({ error: "Internal server error" }, { status: 500 })
   }
@@ -320,89 +368,37 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
 
 export async function DELETE(request: NextRequest, { params }: { params: { id: string } }) {
   try {
-    const { user, error: authError } = await getCachedAuthUser()
+    const auth = await getAuthenticatedContext()
+    if (auth.response) return auth.response
 
-    if (authError === "rate_limited") {
-      return createRateLimitResponse()
-    }
-
-    if (!user) {
-      return createUnauthorizedResponse()
-    }
-
-    const orgContextResult = await safeGetOrgContext(user.id)
-    if (orgContextResult && "rateLimited" in orgContextResult) {
-      return createRateLimitResponse()
-    }
-    if (!orgContextResult) {
-      return NextResponse.json({ error: "No organization context" }, { status: 403 })
-    }
-    const orgContext = orgContextResult
-
+    const { user, orgContext } = auth
     const stickId = params.id
-    const { replyId } = await request.json()
+
+    const body: DeleteReplyInput = await request.json()
+    const { replyId } = body
 
     if (!replyId) {
       return NextResponse.json({ error: "Reply ID is required" }, { status: 400 })
     }
 
-    const adminClient = createServiceClient()
+    const db = await createServiceDatabaseClient()
 
-    const { data: reply, error: replyError } = await adminClient
-      .from("paks_pad_stick_replies")
-      .select("user_id, stick_id")
-      .eq("id", replyId)
-      .eq("org_id", orgContext.orgId)
-      .maybeSingle()
-
-    if (replyError || !reply) {
+    const reply = await fetchReply(db, replyId, orgContext!.orgId)
+    if (!reply) {
       return NextResponse.json({ error: "Reply not found" }, { status: 404 })
     }
 
-    if (reply.user_id === user.id) {
-      // User owns the reply, allow delete
-      const { error } = await adminClient
-        .from("paks_pad_stick_replies")
-        .delete()
-        .eq("id", replyId)
-        .eq("org_id", orgContext.orgId)
-      if (error) throw error
-      return NextResponse.json({ success: true })
+    const canDelete = await canDeleteReply(db, reply, user!.id, stickId, orgContext!.orgId)
+    if (!canDelete) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 })
     }
 
-    // Check if user is pad owner
-    const { data: stick } = await adminClient
-      .from("paks_pad_sticks")
-      .select("pad_id")
-      .eq("id", stickId)
-      .eq("org_id", orgContext.orgId)
-      .maybeSingle()
-
-    if (stick) {
-      const { data: pad } = await adminClient
-        .from("paks_pads")
-        .select("owner_id")
-        .eq("id", stick.pad_id)
-        .eq("org_id", orgContext.orgId)
-        .maybeSingle()
-
-      if (pad && pad.owner_id === user.id) {
-        // User is pad owner, allow delete
-        const { error } = await adminClient
-          .from("paks_pad_stick_replies")
-          .delete()
-          .eq("id", replyId)
-          .eq("org_id", orgContext.orgId)
-        if (error) throw error
-        return NextResponse.json({ success: true })
-      }
-    }
-
-    return NextResponse.json({ error: "Forbidden" }, { status: 403 })
+    await deleteReply(db, replyId, orgContext!.orgId)
+    return NextResponse.json({ success: true })
   } catch (error) {
-    if (error instanceof Error && error.message === "RATE_LIMITED") {
-      return createRateLimitResponse()
-    }
+    const rateLimitResponse = handleRateLimitError(error)
+    if (rateLimitResponse) return rateLimitResponse
+
     console.error("Error in stick replies DELETE:", error)
     return NextResponse.json({ error: "Internal server error" }, { status: 500 })
   }

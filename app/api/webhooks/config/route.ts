@@ -1,12 +1,12 @@
-import { createClient } from "@/lib/supabase/server"
+import { createDatabaseClient } from "@/lib/database/database-adapter"
 import { NextResponse } from "next/server"
-import crypto from "crypto"
+import crypto from "node:crypto"
 import { getCachedAuthUser } from "@/lib/auth/cached-auth"
 
 export async function GET() {
-  const supabase = await createClient()
+  const db = await createDatabaseClient()
 
-  const { user, rateLimited } = await getCachedAuthUser(supabase)
+  const { user, rateLimited } = await getCachedAuthUser()
 
   if (rateLimited) {
     return NextResponse.json({ error: "Too many requests" }, { status: 429 })
@@ -16,7 +16,7 @@ export async function GET() {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
   }
 
-  const { data: webhooks, error } = await supabase
+  const { data: webhooks, error } = await db
     .from("webhook_configurations")
     .select(
       "id, name, description, url, event_types, pad_ids, is_active, total_deliveries, successful_deliveries, failed_deliveries, last_triggered_at, last_success_at, last_failure_at, created_at",
@@ -33,9 +33,9 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
-  const supabase = await createClient()
+  const db = await createDatabaseClient()
 
-  const { user, rateLimited } = await getCachedAuthUser(supabase)
+  const { user, rateLimited } = await getCachedAuthUser()
 
   if (rateLimited) {
     return NextResponse.json({ error: "Too many requests" }, { status: 429 })
@@ -51,7 +51,7 @@ export async function POST(request: Request) {
     // Generate signing secret
     const signingSecret = crypto.randomBytes(32).toString("hex")
 
-    const { data: webhook, error } = await supabase
+    const { data: webhook, error } = await db
       .from("webhook_configurations")
       .insert({
         user_id: user.id,

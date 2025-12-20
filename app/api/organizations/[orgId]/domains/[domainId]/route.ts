@@ -1,5 +1,5 @@
 import { getCachedAuthUser } from "@/lib/auth/cached-auth"
-import { createClient } from "@/lib/supabase/server"
+import { createDatabaseClient } from "@/lib/database/database-adapter"
 import { type NextRequest, NextResponse } from "next/server"
 
 interface RouteContext {
@@ -10,9 +10,9 @@ interface RouteContext {
 export async function PATCH(request: NextRequest, context: RouteContext) {
   try {
     const { orgId, domainId } = await context.params
-    const supabase = await createClient()
+    const db = await createDatabaseClient()
 
-    const authResult = await getCachedAuthUser(supabase)
+    const authResult = await getCachedAuthUser()
 
     if (authResult.rateLimited) {
       return NextResponse.json(
@@ -28,7 +28,7 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
     const user = authResult.user
 
     // Check permissions
-    const { data: org } = await supabase
+    const { data: org } = await db
       .from("organizations")
       .select("owner_id, metadata")
       .eq("id", orgId)
@@ -38,7 +38,7 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
       return NextResponse.json({ error: "Organization not found" }, { status: 404 })
     }
 
-    const { data: userProfile } = await supabase.from("users").select("email").eq("id", user.id).maybeSingle()
+    const { data: userProfile } = await db.from("users").select("email").eq("id", user.id).maybeSingle()
 
     const isOwner = org.owner_id === user.id
     const metadata = org.metadata as Record<string, string> | null
@@ -64,7 +64,7 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
       }
     }
 
-    const { data: domain, error } = await supabase
+    const { data: domain, error } = await db
       .from("organization_domains")
       .update(updates)
       .eq("id", domainId)
@@ -88,9 +88,9 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
 export async function DELETE(request: NextRequest, context: RouteContext) {
   try {
     const { orgId, domainId } = await context.params
-    const supabase = await createClient()
+    const db = await createDatabaseClient()
 
-    const authResult = await getCachedAuthUser(supabase)
+    const authResult = await getCachedAuthUser()
 
     if (authResult.rateLimited) {
       return NextResponse.json(
@@ -106,7 +106,7 @@ export async function DELETE(request: NextRequest, context: RouteContext) {
     const user = authResult.user
 
     // Check permissions
-    const { data: org } = await supabase
+    const { data: org } = await db
       .from("organizations")
       .select("owner_id, metadata")
       .eq("id", orgId)
@@ -116,7 +116,7 @@ export async function DELETE(request: NextRequest, context: RouteContext) {
       return NextResponse.json({ error: "Organization not found" }, { status: 404 })
     }
 
-    const { data: userProfile } = await supabase.from("users").select("email").eq("id", user.id).maybeSingle()
+    const { data: userProfile } = await db.from("users").select("email").eq("id", user.id).maybeSingle()
 
     const isOwner = org.owner_id === user.id
     const metadata = org.metadata as Record<string, string> | null
@@ -128,7 +128,7 @@ export async function DELETE(request: NextRequest, context: RouteContext) {
     }
 
     // Check if this is the last domain
-    const { count } = await supabase
+    const { count } = await db
       .from("organization_domains")
       .select("*", { count: "exact", head: true })
       .eq("org_id", orgId)
@@ -137,7 +137,7 @@ export async function DELETE(request: NextRequest, context: RouteContext) {
       return NextResponse.json({ error: "Cannot remove the last domain" }, { status: 400 })
     }
 
-    const { error: deleteError } = await supabase
+    const { error: deleteError } = await db
       .from("organization_domains")
       .delete()
       .eq("id", domainId)

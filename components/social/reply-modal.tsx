@@ -71,7 +71,7 @@ export function ReplyModal({ open, onOpenChange, onSubmit, parentReplyContent, t
           )}
 
           <div className="space-y-2">
-            <label className="text-sm font-medium text-gray-700">Category</label>
+            <span className="text-sm font-medium text-gray-700">Category</span>
             <Select value={category} onValueChange={setCategory}>
               <SelectTrigger>
                 <SelectValue placeholder="Select a category" />

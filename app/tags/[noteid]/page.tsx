@@ -8,7 +8,6 @@ import { Card } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { useUser } from "@/contexts/user-context"
 import { useToast } from "@/hooks/use-toast"
-import { createSupabaseBrowser } from "@/lib/supabase-browser"
 import type { Note, Tag } from "@/types/note"
 
 // Helper function to get relative time
@@ -61,58 +60,39 @@ export default function TagsPage() {
 
       setLoading(true)
       try {
-        // Get the note
-        const supabase = createSupabaseBrowser()
-        const { data: noteData, error: noteError } = await supabase
-          .from("notes")
-          .select("*")
-          .eq("id", noteId)
-          .eq("user_id", user.id)
-          .single()
-
-        if (noteError) {
-          throw new Error(`Failed to fetch note: ${noteError.message}`)
+        // Use API endpoint for data fetching
+        const response = await fetch(`/api/notes/${noteId}/tags`)
+        
+        if (!response.ok) {
+          const data = await response.json()
+          throw new Error(data.error || "Failed to fetch note and tags")
         }
 
-        // Get the tags
-        const { data: tagsData, error: tagsError } = await supabase
-          .from("tags")
-          .select("*")
-          .eq("note_id", noteId)
-          .eq("user_id", user.id)
-          .order("tag_order", { ascending: true })
+        const { note: noteData, tags: tagsData } = await response.json()
 
-        if (tagsError) {
-          console.error("Error fetching tags:", tagsError)
-          // Don't throw error for tags, just log it
-        }
-
-        // Type noteData as Partial<Note> for safe property access
-        const safeNoteData = noteData as Partial<Note> | null
-        if (!safeNoteData) {
+        if (!noteData) {
           throw new Error("Note data is missing or invalid.")
         }
 
         // Safely construct the Note object
         const transformedNote: Note = {
-          id: safeNoteData.id || "",
-          user_id: safeNoteData.user_id || user.id,
-          title: safeNoteData.title || safeNoteData.topic || "Untitled",
-          topic: safeNoteData.topic || "Untitled",
-          content: safeNoteData.content || "",
-          color: safeNoteData.color || "#fef3c7",
-          position_x: typeof safeNoteData.position_x === "number" ? safeNoteData.position_x : 0,
-          position_y: typeof safeNoteData.position_y === "number" ? safeNoteData.position_y : 0,
-          is_shared: typeof safeNoteData.is_shared === "boolean" ? safeNoteData.is_shared : true,
+          id: noteData.id || "",
+          user_id: noteData.user_id || user.id,
+          title: noteData.title || noteData.topic || "Untitled",
+          topic: noteData.topic || "Untitled",
+          content: noteData.content || "",
+          color: noteData.color || "#fef3c7",
+          position_x: typeof noteData.position_x === "number" ? noteData.position_x : 0,
+          position_y: typeof noteData.position_y === "number" ? noteData.position_y : 0,
+          is_shared: typeof noteData.is_shared === "boolean" ? noteData.is_shared : true,
           tags: Array.isArray(tagsData) ? tagsData : [],
-          videos: Array.isArray(safeNoteData.videos) ? safeNoteData.videos : [],
-          images: Array.isArray(safeNoteData.images) ? safeNoteData.images : [],
-          tabs: Array.isArray(safeNoteData.tabs) ? safeNoteData.tabs : [],
-          replies: Array.isArray(safeNoteData.replies) ? safeNoteData.replies : [],
-          created_at: safeNoteData.created_at || new Date().toISOString(),
-          updated_at: safeNoteData.updated_at || new Date().toISOString(),
-          z_index: typeof safeNoteData.z_index === "number" ? safeNoteData.z_index : 0,
-          // Add position as an object if needed elsewhere
+          videos: Array.isArray(noteData.videos) ? noteData.videos : [],
+          images: Array.isArray(noteData.images) ? noteData.images : [],
+          tabs: Array.isArray(noteData.tabs) ? noteData.tabs : [],
+          replies: Array.isArray(noteData.replies) ? noteData.replies : [],
+          created_at: noteData.created_at || new Date().toISOString(),
+          updated_at: noteData.updated_at || new Date().toISOString(),
+          z_index: typeof noteData.z_index === "number" ? noteData.z_index : 0,
         }
 
         setNote(transformedNote)
@@ -157,9 +137,9 @@ export default function TagsPage() {
         <div className="flex flex-col items-center gap-4">
           <h2 className="text-xl font-semibold text-red-600">Error</h2>
           <p className="text-gray-600">{error || "Note not found"}</p>
-          <Button onClick={() => router.push("/notes")} className="flex items-center gap-2">
+          <Button onClick={() => router.push("/personal")} className="flex items-center gap-2">
             <ArrowLeft className="w-4 h-4" />
-            Back to Notes
+            Back to Personal
           </Button>
         </div>
       </div>
@@ -171,9 +151,9 @@ export default function TagsPage() {
       {/* Header */}
       <div className="max-w-6xl mx-auto mb-6">
         <div className="flex items-center justify-between">
-          <Button variant="outline" onClick={() => router.push("/notes")} className="flex items-center gap-2">
+          <Button variant="outline" onClick={() => router.push("/personal")} className="flex items-center gap-2">
             <ArrowLeft className="w-4 h-4" />
-            Back to Notes
+            Back to Personal
           </Button>
           <div className="flex items-center gap-2">
             <TagIcon className="w-5 h-5 text-blue-600" />
@@ -207,13 +187,13 @@ export default function TagsPage() {
 
             {/* Topic */}
             <div className="mb-4">
-              <label className="text-sm font-medium text-gray-700 mb-1 block">Topic</label>
+              <span className="text-sm font-medium text-gray-700 mb-1 block">Topic</span>
               <div className="p-2 bg-white/30 border border-black/20 rounded font-medium">{note.topic}</div>
             </div>
 
             {/* Content */}
             <div className="mb-4">
-              <label className="text-sm font-medium text-gray-700 mb-1 block">Content</label>
+              <span className="text-sm font-medium text-gray-700 mb-1 block">Content</span>
               <div className="p-2 bg-white/30 border border-black/20 rounded min-h-[100px] whitespace-pre-wrap">
                 {hasNoteContent(note) ? note.content : "No content"}
               </div>
@@ -243,11 +223,11 @@ export default function TagsPage() {
               <TagIcon className="w-12 h-12 text-gray-400 mx-auto mb-4" />
               <h3 className="text-lg font-semibold text-gray-600 mb-2">No Tags Generated</h3>
               <p className="text-gray-500 mb-4">
-                Tags haven't been generated for this note yet. Go back to the note and click "Generate Tags" to create
+                Tags haven&apos;t been generated for this note yet. Go back to the note and click &quot;Generate Tags&quot; to create
                 AI-powered content tags.
               </p>
-              <Button onClick={() => router.push("/notes")} variant="outline">
-                Back to Notes
+              <Button onClick={() => router.push("/personal")} variant="outline">
+                Back to Personal
               </Button>
             </Card>
           ) : (

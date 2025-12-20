@@ -1,12 +1,12 @@
-import { createClient } from "@/lib/supabase/server"
+import { createDatabaseClient } from "@/lib/database/database-adapter"
 import { NextResponse } from "next/server"
 import { getOrgContext } from "@/lib/auth/get-org-context"
 import { getCachedAuthUser, createRateLimitResponse, createUnauthorizedResponse } from "@/lib/auth/cached-auth"
 
 export async function POST(request: Request, { params }: { params: { stickId: string } }) {
   try {
-    const supabase = await createClient()
-    const authResult = await getCachedAuthUser(supabase)
+    const db = await createDatabaseClient()
+    const authResult = await getCachedAuthUser()
 
     if (authResult.rateLimited) {
       return createRateLimitResponse()
@@ -24,7 +24,7 @@ export async function POST(request: Request, { params }: { params: { stickId: st
 
     const { stickId } = params
 
-    const { data: stick } = await supabase
+    const { data: stick } = await db
       .from("social_sticks")
       .select("social_pad_id, is_pinned, social_pads(owner_id)")
       .eq("id", stickId)
@@ -38,7 +38,7 @@ export async function POST(request: Request, { params }: { params: { stickId: st
     const padInfo = Array.isArray(stick.social_pads) ? stick.social_pads[0] : stick.social_pads
     const padOwnerId = padInfo?.owner_id
 
-    const { data: membership } = await supabase
+    const { data: membership } = await db
       .from("social_pad_members")
       .select("role")
       .eq("social_pad_id", stick.social_pad_id)
@@ -53,7 +53,7 @@ export async function POST(request: Request, { params }: { params: { stickId: st
       return NextResponse.json({ error: "Only pad owners and admins can pin sticks" }, { status: 403 })
     }
 
-    const { data: pinnedSticks } = await supabase
+    const { data: pinnedSticks } = await db
       .from("social_sticks")
       .select("pin_order")
       .eq("social_pad_id", stick.social_pad_id)
@@ -64,7 +64,7 @@ export async function POST(request: Request, { params }: { params: { stickId: st
 
     const nextPinOrder = pinnedSticks && pinnedSticks.length > 0 ? (pinnedSticks[0].pin_order || 0) + 1 : 1
 
-    const { data: updatedStick, error } = await supabase
+    const { data: updatedStick, error } = await db
       .from("social_sticks")
       .update({
         is_pinned: !stick.is_pinned,
@@ -88,8 +88,8 @@ export async function POST(request: Request, { params }: { params: { stickId: st
 
 export async function PUT(request: Request, { params }: { params: { stickId: string } }) {
   try {
-    const supabase = await createClient()
-    const authResult = await getCachedAuthUser(supabase)
+    const db = await createDatabaseClient()
+    const authResult = await getCachedAuthUser()
 
     if (authResult.rateLimited) {
       return createRateLimitResponse()
@@ -108,7 +108,7 @@ export async function PUT(request: Request, { params }: { params: { stickId: str
     const { stickId } = params
     const { pin_order } = await request.json()
 
-    const { data: stick } = await supabase
+    const { data: stick } = await db
       .from("social_sticks")
       .select("social_pad_id, is_pinned, social_pads(owner_id)")
       .eq("id", stickId)
@@ -122,7 +122,7 @@ export async function PUT(request: Request, { params }: { params: { stickId: str
     const padInfo = Array.isArray(stick.social_pads) ? stick.social_pads[0] : stick.social_pads
     const padOwnerId = padInfo?.owner_id
 
-    const { data: membership } = await supabase
+    const { data: membership } = await db
       .from("social_pad_members")
       .select("role")
       .eq("social_pad_id", stick.social_pad_id)
@@ -137,7 +137,7 @@ export async function PUT(request: Request, { params }: { params: { stickId: str
       return NextResponse.json({ error: "Only pad owners and admins can reorder pinned sticks" }, { status: 403 })
     }
 
-    const { data: updatedStick, error } = await supabase
+    const { data: updatedStick, error } = await db
       .from("social_sticks")
       .update({ pin_order })
       .eq("id", stickId)

@@ -1,12 +1,12 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { createServerClient } from "@/lib/supabase/server"
+import { createDatabaseClient } from "@/lib/database/database-adapter"
 import { getOrgContext } from "@/lib/auth/get-org-context"
 import { getCachedAuthUser } from "@/lib/auth/cached-auth"
 
 export async function GET(request: NextRequest) {
   try {
-    const supabase = await createServerClient()
-    const authResult = await getCachedAuthUser(supabase)
+    const db = await createDatabaseClient()
+    const authResult = await getCachedAuthUser()
     if (authResult.rateLimited) {
       return NextResponse.json({ error: "Rate limited" }, { status: 429, headers: { "Retry-After": "30" } })
     }
@@ -14,13 +14,10 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
-    let orgId = null
     try {
-      const orgContext = await getOrgContext()
-      if (orgContext) {
-        orgId = orgContext.orgId
-      }
-    } catch {
+      await getOrgContext()
+    } catch (error) {
+      console.error("[custom-fields/values GET] Org context error:", error)
       // No org context - continue without org filtering
     }
 
@@ -31,7 +28,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "Missing taskId" }, { status: 400 })
     }
 
-    const { data, error } = await supabase
+    const { data, error } = await db
       .from("custom_field_values")
       .select(`
         *,
@@ -52,14 +49,15 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({ values: data })
   } catch (error) {
+    console.error("[custom-fields/values GET] Error:", error)
     return NextResponse.json({ error: "Internal server error" }, { status: 500 })
   }
 }
 
 export async function POST(request: NextRequest) {
   try {
-    const supabase = await createServerClient()
-    const authResult = await getCachedAuthUser(supabase)
+    const db = await createDatabaseClient()
+    const authResult = await getCachedAuthUser()
     if (authResult.rateLimited) {
       return NextResponse.json({ error: "Rate limited" }, { status: 429, headers: { "Retry-After": "30" } })
     }
@@ -67,13 +65,10 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
-    let orgId = null
     try {
-      const orgContext = await getOrgContext()
-      if (orgContext) {
-        orgId = orgContext.orgId
-      }
-    } catch {
+      await getOrgContext()
+    } catch (error) {
+      console.error("[custom-fields/values POST] Org context error:", error)
       // No org context - continue without it
     }
 
@@ -99,7 +94,7 @@ export async function POST(request: NextRequest) {
       valueData.value_text = value
     }
 
-    const { data, error } = await supabase
+    const { data, error } = await db
       .from("custom_field_values")
       .upsert(valueData, { onConflict: "task_id, field_id" })
       .select()
@@ -120,6 +115,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ value: data })
   } catch (error) {
+    console.error("[custom-fields/values POST] Error:", error)
     return NextResponse.json({ error: "Internal server error" }, { status: 500 })
   }
 }

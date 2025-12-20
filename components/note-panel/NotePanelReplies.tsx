@@ -25,7 +25,7 @@ export const NotePanelReplies: React.FC<NotePanelRepliesProps> = ({ note, onRepl
       {...props}
       noteId={note.id}
       context="panel"
-      replies={[]}
+      replies={note.replies || []}
       setReplyContent={onReplyContentChange}
       enableFullscreenButton={true}
     />

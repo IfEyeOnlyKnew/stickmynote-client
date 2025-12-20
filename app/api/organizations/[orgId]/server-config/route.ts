@@ -1,19 +1,19 @@
 import { NextResponse } from "next/server"
-import { createServerClient } from "@/lib/supabase/server"
+import { createDatabaseClient } from "@/lib/database/database-adapter"
 
 export async function GET(request: Request, { params }: { params: { orgId: string } }) {
   try {
-    const supabase = createServerClient()
+    const db = await createDatabaseClient()
     const {
       data: { user },
-    } = await supabase.auth.getUser()
+    } = await db.auth.getUser()
 
     if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
     // Check if user is owner of the organization
-    const { data: member } = await supabase
+    const { data: member } = await db
       .from("organization_members")
       .select("role")
       .eq("organization_id", params.orgId)
@@ -25,7 +25,7 @@ export async function GET(request: Request, { params }: { params: { orgId: strin
     }
 
     // Fetch server configuration
-    const { data: config, error } = await supabase
+    const { data: config, error } = await db
       .from("server_configurations")
       .select("*")
       .eq("org_id", params.orgId)
@@ -44,17 +44,17 @@ export async function GET(request: Request, { params }: { params: { orgId: strin
 
 export async function POST(request: Request, { params }: { params: { orgId: string } }) {
   try {
-    const supabase = createServerClient()
+    const db = await createDatabaseClient()
     const {
       data: { user },
-    } = await supabase.auth.getUser()
+    } = await db.auth.getUser()
 
     if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
     // Check if user is owner
-    const { data: member } = await supabase
+    const { data: member } = await db
       .from("organization_members")
       .select("role")
       .eq("organization_id", params.orgId)
@@ -85,7 +85,7 @@ export async function POST(request: Request, { params }: { params: { orgId: stri
     delete configToSave.redis_password
 
     // Upsert configuration
-    const { error } = await supabase.from("server_configurations").upsert(configToSave, { onConflict: "org_id" })
+    const { error } = await db.from("server_configurations").upsert(configToSave, { onConflict: "org_id" })
 
     if (error) throw error
 

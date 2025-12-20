@@ -1,12 +1,12 @@
-import { createServerClient, createServiceClient } from "@/lib/supabase/server"
+import { createDatabaseClient, createServiceDatabaseClient } from "@/lib/database/database-adapter"
 import { NextResponse } from "next/server"
 import { getCachedAuthUser } from "@/lib/auth/cached-auth"
 
 export async function POST(request: Request, { params }: { params: { padId: string } }) {
   try {
-    const supabase = await createServerClient()
+    const db = await createDatabaseClient()
 
-    const authResult = await getCachedAuthUser(supabase)
+    const authResult = await getCachedAuthUser()
     if (authResult.rateLimited) {
       return NextResponse.json(
         { error: "Rate limit exceeded. Please try again in a moment." },
@@ -25,7 +25,7 @@ export async function POST(request: Request, { params }: { params: { padId: stri
 
     const { padId } = params
 
-    const { data: pendingInvites, error: fetchError } = await supabase
+    const { data: pendingInvites, error: fetchError } = await db
       .from("paks_pad_pending_invites")
       .select("*")
       .eq("pad_id", padId)
@@ -44,10 +44,10 @@ export async function POST(request: Request, { params }: { params: { padId: stri
       })
     }
 
-    const supabaseAdmin = createServiceClient()
+    const serviceDb = await createServiceDatabaseClient()
 
     for (const invite of pendingInvites) {
-      const { data: existingMember } = await supabase
+      const { data: existingMember } = await db
         .from("paks_pad_members")
         .select("id")
         .eq("pad_id", invite.pad_id)
@@ -55,11 +55,11 @@ export async function POST(request: Request, { params }: { params: { padId: stri
         .maybeSingle()
 
       if (existingMember) {
-        await supabaseAdmin.from("paks_pad_pending_invites").delete().eq("id", invite.id)
+        await serviceDb.from("paks_pad_pending_invites").delete().eq("id", invite.id)
         continue
       }
 
-      const { error: memberError } = await supabaseAdmin.from("paks_pad_members").insert({
+      const { error: memberError } = await serviceDb.from("paks_pad_members").insert({
         pad_id: invite.pad_id,
         user_id: user.id,
         role: invite.role,
@@ -79,7 +79,7 @@ export async function POST(request: Request, { params }: { params: { padId: stri
         )
       }
 
-      const { error: deleteError } = await supabaseAdmin.from("paks_pad_pending_invites").delete().eq("id", invite.id)
+      const { error: deleteError } = await serviceDb.from("paks_pad_pending_invites").delete().eq("id", invite.id)
 
       if (deleteError) {
         console.error("[v0] Error deleting pending invite:", deleteError)

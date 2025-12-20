@@ -8,13 +8,13 @@ const createStickAction = createSafeAction(
     input: createStickSchema,
     rateLimit: "sticks_create",
   },
-  async (input, { user, supabase }) => {
+  async (input, { user, db }) => {
     const orgContext = await getOrgContext()
     if (!orgContext) {
       return error("No organization context", 403)
     }
 
-    const { data: pad } = await supabase
+    const { data: pad } = await db
       .from("paks_pads")
       .select("owner_id, org_id")
       .eq("id", input.pad_id)
@@ -25,11 +25,15 @@ const createStickAction = createSafeAction(
       return error("Pad not found", 404)
     }
 
+    if (!user) {
+      return error("Unauthorized", 401)
+    }
+
     const isOwner = pad.owner_id === user.id
 
     let canCreate = isOwner
     if (!isOwner) {
-      const { data: membership } = await supabase
+      const { data: membership } = await db
         .from("paks_pad_members")
         .select("role")
         .eq("pad_id", input.pad_id)
@@ -45,7 +49,7 @@ const createStickAction = createSafeAction(
       return error("Insufficient permissions to create Sticks", 403)
     }
 
-    const { data: newStick, error: dbError } = await supabase
+    const { data: newStick, error: dbError } = await db
       .from("paks_pad_sticks")
       .insert({
         pad_id: input.pad_id,

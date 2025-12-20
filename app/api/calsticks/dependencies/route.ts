@@ -1,11 +1,11 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { createClient } from "@/lib/supabase/server"
+import { createDatabaseClient } from "@/lib/database/database-adapter"
 import { getCachedAuthUser } from "@/lib/auth/cached-auth"
 
 export async function POST(req: NextRequest) {
   try {
-    const supabase = await createClient()
-    const authResult = await getCachedAuthUser(supabase)
+    const db = await createDatabaseClient()
+    const authResult = await getCachedAuthUser()
     if (authResult.rateLimited) {
       return NextResponse.json({ error: "Rate limited" }, { status: 429, headers: { "Retry-After": "30" } })
     }
@@ -18,6 +18,7 @@ export async function POST(req: NextRequest) {
       const body = await req.json()
       taskIds = body.taskIds
     } catch (parseError) {
+      console.error("[dependencies] Parse error:", parseError)
       return NextResponse.json({ error: "Invalid request body" }, { status: 400 })
     }
 
@@ -25,7 +26,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ dependencies: [] })
     }
 
-    const { data: dependencies, error } = await supabase
+    const { data: dependencies, error } = await db
       .from("calstick_dependencies")
       .select("*")
       .in("task_id", taskIds)
@@ -36,6 +37,7 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ dependencies: dependencies || [] })
   } catch (error) {
+    console.error("[dependencies] Error:", error)
     return NextResponse.json(
       {
         error: "Internal server error",

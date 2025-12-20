@@ -69,11 +69,13 @@ export function KnowledgeBaseDrawer({ open, onOpenChange, padId, onSelectArticle
   const [formCategory, setFormCategory] = useState("general")
   const [formTags, setFormTags] = useState("")
 
+  /* eslint-disable react-hooks/exhaustive-deps */
   useEffect(() => {
     if (open && padId) {
       fetchArticles()
     }
   }, [open, padId])
+  /* eslint-enable react-hooks/exhaustive-deps */
 
   const fetchArticles = async () => {
     try {
@@ -272,7 +274,7 @@ export function KnowledgeBaseDrawer({ open, onOpenChange, padId, onSelectArticle
                   </CardHeader>
                   <CardContent className="space-y-4">
                     <div>
-                      <label className="text-sm font-medium mb-2 block">Title</label>
+                      <span className="text-sm font-medium mb-2 block">Title</span>
                       <Input
                         placeholder="Article title..."
                         value={formTitle}
@@ -282,7 +284,7 @@ export function KnowledgeBaseDrawer({ open, onOpenChange, padId, onSelectArticle
                     </div>
 
                     <div>
-                      <label className="text-sm font-medium mb-2 block">Category</label>
+                      <span className="text-sm font-medium mb-2 block">Category</span>
                       <Select value={formCategory} onValueChange={setFormCategory}>
                         <SelectTrigger>
                           <SelectValue />
@@ -298,7 +300,7 @@ export function KnowledgeBaseDrawer({ open, onOpenChange, padId, onSelectArticle
                     </div>
 
                     <div>
-                      <label className="text-sm font-medium mb-2 block">Content</label>
+                      <span className="text-sm font-medium mb-2 block">Content</span>
                       <Textarea
                         placeholder="Article content..."
                         value={formContent}
@@ -310,7 +312,7 @@ export function KnowledgeBaseDrawer({ open, onOpenChange, padId, onSelectArticle
                     </div>
 
                     <div>
-                      <label className="text-sm font-medium mb-2 block">Tags (comma-separated)</label>
+                      <span className="text-sm font-medium mb-2 block">Tags (comma-separated)</span>
                       <Input
                         placeholder="api, authentication, setup..."
                         value={formTags}
@@ -341,11 +343,12 @@ export function KnowledgeBaseDrawer({ open, onOpenChange, padId, onSelectArticle
                 </Card>
               )}
 
-              {loading ? (
+              {loading && (
                 <div className="flex items-center justify-center py-12">
                   <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600" />
                 </div>
-              ) : filteredArticles.length === 0 ? (
+              )}
+              {!loading && filteredArticles.length === 0 && (
                 <Card>
                   <CardContent className="py-12 text-center text-gray-500">
                     {searchQuery || selectedCategory !== "all"
@@ -353,7 +356,8 @@ export function KnowledgeBaseDrawer({ open, onOpenChange, padId, onSelectArticle
                       : "No articles yet. Create the first one!"}
                   </CardContent>
                 </Card>
-              ) : (
+              )}
+              {!loading && filteredArticles.length > 0 && (
                 filteredArticles.map((article) => (
                   <Card key={article.id} className="hover:shadow-md transition-shadow">
                     <CardHeader>

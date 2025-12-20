@@ -1,5 +1,5 @@
 import { getCachedAuthUser } from "@/lib/auth/cached-auth"
-import { createClient } from "@/lib/supabase/server"
+import { createDatabaseClient } from "@/lib/database/database-adapter"
 import { NextResponse } from "next/server"
 
 interface ChannelPreferences {
@@ -10,8 +10,8 @@ interface ChannelPreferences {
 
 export async function GET(request: Request) {
   try {
-    const supabase = await createClient()
-    const authResult = await getCachedAuthUser(supabase)
+    const db = await createDatabaseClient()
+    const authResult = await getCachedAuthUser()
     if (authResult.rateLimited) {
       return NextResponse.json(
         { error: "Rate limit exceeded. Please try again in a moment." },
@@ -27,7 +27,7 @@ export async function GET(request: Request) {
     const entityType = searchParams.get("entityType")
     const entityId = searchParams.get("entityId")
 
-    let query = supabase.from("notification_subscriptions").select("*").eq("user_id", user.id)
+    let query = db.from("notification_subscriptions").select("*").eq("user_id", user.id)
 
     if (entityType) {
       query = query.eq("entity_type", entityType)
@@ -66,8 +66,8 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   try {
-    const supabase = await createClient()
-    const authResult = await getCachedAuthUser(supabase)
+    const db = await createDatabaseClient()
+    const authResult = await getCachedAuthUser()
     if (authResult.rateLimited) {
       return NextResponse.json(
         { error: "Rate limit exceeded. Please try again in a moment." },
@@ -92,7 +92,7 @@ export async function POST(request: Request) {
       webhook: channels?.webhook ?? false,
     }
 
-    const { data, error } = await supabase
+    const { data, error } = await db
       .from("notification_subscriptions")
       .upsert(
         {
@@ -141,8 +141,8 @@ export async function POST(request: Request) {
 
 export async function DELETE(request: Request) {
   try {
-    const supabase = await createClient()
-    const authResult = await getCachedAuthUser(supabase)
+    const db = await createDatabaseClient()
+    const authResult = await getCachedAuthUser()
     if (authResult.rateLimited) {
       return NextResponse.json(
         { error: "Rate limit exceeded. Please try again in a moment." },
@@ -162,7 +162,7 @@ export async function DELETE(request: Request) {
       return NextResponse.json({ error: "entityType and entityId required" }, { status: 400 })
     }
 
-    const { error } = await supabase
+    const { error } = await db
       .from("notification_subscriptions")
       .delete()
       .eq("user_id", user.id)

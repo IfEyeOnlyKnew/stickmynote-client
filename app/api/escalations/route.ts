@@ -1,10 +1,10 @@
-import { createClient } from "@/lib/supabase/server"
+import { createDatabaseClient } from "@/lib/database/database-adapter"
 import { NextResponse } from "next/server"
 import { getCachedAuthUser } from "@/lib/auth/cached-auth"
 
 export async function GET(request: Request) {
-  const supabase = await createClient()
-  const authResult = await getCachedAuthUser(supabase)
+  const db = await createDatabaseClient()
+  const authResult = await getCachedAuthUser()
   if (authResult.rateLimited) {
     return NextResponse.json(
       { error: "Rate limit exceeded. Please try again in a moment." },
@@ -19,7 +19,7 @@ export async function GET(request: Request) {
   const { searchParams } = new URL(request.url)
   const status = searchParams.get("status")
 
-  let query = supabase
+  let query = db
     .from("notification_escalations")
     .select(`
       *,

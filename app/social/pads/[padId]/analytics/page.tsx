@@ -29,6 +29,7 @@ export default function PadAnalyticsPage() {
     if (user && padId) {
       fetchAnalytics()
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user, loading, padId])
 
   const fetchAnalytics = async () => {

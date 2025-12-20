@@ -172,7 +172,7 @@ export function AskAIModal({ open, onOpenChange, stickId, stickType, onAnswerKep
           {!hasAsked && (
             <>
               <div className="space-y-2">
-                <label className="text-sm font-medium">Your question (max 200 characters)</label>
+                <span className="text-sm font-medium">Your question (max 200 characters)</span>
                 <Textarea
                   placeholder="Ask any question..."
                   value={question}
@@ -180,6 +180,7 @@ export function AskAIModal({ open, onOpenChange, stickId, stickType, onAnswerKep
                   className="resize-none"
                   rows={3}
                   disabled={!isTextareaEnabled}
+                  aria-label="Your question"
                 />
                 <div className="text-xs text-muted-foreground text-right">{question.length}/200</div>
               </div>
@@ -214,12 +215,12 @@ export function AskAIModal({ open, onOpenChange, stickId, stickType, onAnswerKep
           {hasAsked && answer && (
             <>
               <div className="space-y-2">
-                <label className="text-sm font-medium text-muted-foreground">Your question:</label>
+                <span className="text-sm font-medium text-muted-foreground">Your question:</span>
                 <p className="text-sm bg-muted p-3 rounded-md">{question}</p>
               </div>
 
               <div className="space-y-2">
-                <label className="text-sm font-medium">AI Answer:</label>
+                <span className="text-sm font-medium">AI Answer:</span>
                 <div className="bg-purple-50 dark:bg-purple-950 border border-purple-200 dark:border-purple-800 p-4 rounded-md max-h-60 overflow-y-auto">
                   <p className="text-sm whitespace-pre-wrap">{answer}</p>
                 </div>

@@ -2,12 +2,46 @@
 
 import { useEffect, useState } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
-import { createClient } from "@/lib/supabase/client"
+import { useUser } from "@/contexts/UserContext"
 import { Loader2 } from "lucide-react"
+
+type InviteStatus = "checking" | "processing" | "error" | "email_mismatch" | "expired"
+
+interface ProcessTokenResult {
+  success: boolean
+  status?: InviteStatus
+  orgId?: string
+  inviteEmail?: string
+  userEmail?: string
+  error?: string
+}
+
+async function processTokenInvite(token: string): Promise<ProcessTokenResult> {
+  const response = await fetch("/api/invites/accept-by-token", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ token }),
+  })
+
+  const data = await response.json()
+
+  if (!response.ok) {
+    if (data.code === "EMAIL_MISMATCH") {
+      return { success: false, status: "email_mismatch", inviteEmail: data.inviteEmail, userEmail: data.userEmail }
+    }
+    if (data.code === "EXPIRED") {
+      return { success: false, status: "expired" }
+    }
+    return { success: false, error: data.error || "Failed to process invitation" }
+  }
+
+  return { success: true, orgId: data.orgId }
+}
 
 export default function AcceptInvitePage() {
   const router = useRouter()
   const searchParams = useSearchParams()
+  const { user, loading: userLoading } = useUser()
   const [status, setStatus] = useState<"checking" | "processing" | "error" | "email_mismatch" | "expired">("checking")
   const [errorMessage, setErrorMessage] = useState<string>("")
   const [inviteDetails, setInviteDetails] = useState<{
@@ -17,15 +51,11 @@ export default function AcceptInvitePage() {
   }>({})
 
   useEffect(() => {
+    if (userLoading) return
+    
     const handleInvitation = async () => {
-      const supabase = createClient()
       const token = searchParams.get("token")
       const redirectTo = searchParams.get("redirectTo") || "/"
-
-      // Check if user is logged in
-      const {
-        data: { user },
-      } = await supabase.auth.getUser()
 
       if (!user) {
         // Not logged in - redirect to login with return URL and token
@@ -41,32 +71,23 @@ export default function AcceptInvitePage() {
 
       try {
         if (token) {
-          const response = await fetch("/api/invites/accept-by-token", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ token }),
-          })
+          const result = await processTokenInvite(token)
 
-          const data = await response.json()
-
-          if (!response.ok) {
-            if (data.code === "EMAIL_MISMATCH") {
-              setStatus("email_mismatch")
-              setInviteDetails({
-                email: data.inviteEmail,
-                userEmail: data.userEmail,
-              })
-              return
-            }
-            if (data.code === "EXPIRED") {
-              setStatus("expired")
-              return
-            }
-            throw new Error(data.error || "Failed to process invitation")
+          if (result.status === "email_mismatch") {
+            setStatus("email_mismatch")
+            setInviteDetails({ email: result.inviteEmail, userEmail: result.userEmail })
+            return
+          }
+          if (result.status === "expired") {
+            setStatus("expired")
+            return
+          }
+          if (!result.success) {
+            throw new Error(result.error)
           }
 
           // Redirect to organization dashboard
-          router.push(`/dashboard?org=${data.orgId}&welcome=true`)
+          router.push(`/dashboard?org=${result.orgId}&welcome=true`)
           return
         }
 
@@ -92,7 +113,7 @@ export default function AcceptInvitePage() {
     }
 
     handleInvitation()
-  }, [router, searchParams])
+  }, [router, searchParams, user, userLoading])
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-background">

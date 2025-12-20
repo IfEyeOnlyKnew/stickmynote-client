@@ -1,6 +1,5 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { createClient } from "@/lib/supabase/server"
-import { createServiceClient } from "@/lib/supabase/service"
+import { createDatabaseClient, createServiceDatabaseClient } from "@/lib/database/database-adapter"
 import { getCachedAuthUser } from "@/lib/auth/cached-auth"
 
 interface OrganizationMemberInsert {
@@ -24,9 +23,9 @@ interface AccessRequestUpdate {
 // PATCH /api/organizations/[orgId]/access-requests/[requestId] - Approve/Reject request
 export async function PATCH(request: NextRequest, { params }: { params: { orgId: string; requestId: string } }) {
   try {
-    const supabase = await createClient()
-    const serviceClient = createServiceClient()
-    const authResult = await getCachedAuthUser(supabase)
+    const db = await createDatabaseClient()
+    const serviceDb = await createServiceDatabaseClient()
+    const authResult = await getCachedAuthUser()
 
     if (authResult.rateLimited) {
       return NextResponse.json(
@@ -49,7 +48,7 @@ export async function PATCH(request: NextRequest, { params }: { params: { orgId:
     }
 
     // Verify user is admin/owner of this organization
-    const { data: membership } = await supabase
+    const { data: membership } = await db
       .from("organization_members")
       .select("role")
       .eq("org_id", orgId)
@@ -61,7 +60,7 @@ export async function PATCH(request: NextRequest, { params }: { params: { orgId:
     }
 
     // Get the access request
-    const { data: accessRequest, error: fetchError } = await supabase
+    const { data: accessRequest, error: fetchError } = await db
       .from("organization_access_requests")
       .select("*")
       .eq("id", requestId)
@@ -87,7 +86,7 @@ export async function PATCH(request: NextRequest, { params }: { params: { orgId:
         joined_at: new Date().toISOString(),
       }
 
-      const { error: memberError } = await (serviceClient.from("organization_members") as any).insert(memberData)
+      const { error: memberError } = await serviceDb.from("organization_members").insert(memberData)
 
       if (memberError) {
         console.error("Error adding member:", memberError)
@@ -101,7 +100,7 @@ export async function PATCH(request: NextRequest, { params }: { params: { orgId:
         updated_at: new Date().toISOString(),
       }
 
-      await (serviceClient.from("organization_access_requests") as any).update(approveUpdate).eq("id", requestId)
+      await serviceDb.from("organization_access_requests").update(approveUpdate).eq("id", requestId)
 
       return NextResponse.json({ success: true, message: "Access request approved" })
     } else {
@@ -113,7 +112,7 @@ export async function PATCH(request: NextRequest, { params }: { params: { orgId:
         updated_at: new Date().toISOString(),
       }
 
-      await (serviceClient.from("organization_access_requests") as any).update(rejectUpdate).eq("id", requestId)
+      await serviceDb.from("organization_access_requests").update(rejectUpdate).eq("id", requestId)
 
       return NextResponse.json({ success: true, message: "Access request rejected" })
     }

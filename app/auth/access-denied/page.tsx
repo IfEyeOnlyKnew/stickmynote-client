@@ -58,7 +58,7 @@ export default function AccessDeniedPage() {
               </Link>
             </Button>
             <Button asChild variant="ghost">
-              <Link href="/notes">Continue to Personal Notes</Link>
+              <Link href="/personal">Continue to Personal Hub</Link>
             </Button>
           </div>
         </CardContent>

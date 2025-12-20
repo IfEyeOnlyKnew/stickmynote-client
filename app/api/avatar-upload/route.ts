@@ -1,25 +1,45 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { createSupabaseServer } from "@/lib/supabase-server"
+import { createServiceDatabaseClient } from "@/lib/database/database-adapter"
 import { validateCSRFMiddleware } from "@/lib/csrf"
 import { getCachedAuthUser } from "@/lib/auth/cached-auth"
+import { writeFile, mkdir } from "node:fs/promises"
+import path from "node:path"
 
-let put: any
 let sharp: any
 
 const initializeModules = async () => {
   try {
-    const blobModule = await import("@vercel/blob")
-    put = blobModule.put
-  } catch (error) {
-    put = async () => ({ url: "", pathname: "" })
-  }
-
-  try {
     const sharpModule = await import("sharp")
     sharp = sharpModule.default
-  } catch (error) {
+  } catch (error_) {
+    console.warn("Sharp module not available:", error_)
     sharp = null
   }
+}
+
+// Helper to save avatar file locally or to Vercel Blob
+async function saveAvatarFile(buffer: Buffer, filename: string, contentType: string): Promise<{ url: string; pathname: string }> {
+  // Check if Vercel Blob is available
+  if (process.env.BLOB_READ_WRITE_TOKEN) {
+    const { put } = await import("@vercel/blob")
+    const blob = await put(filename, new Blob([new Uint8Array(buffer)], { type: contentType }), {
+      access: "public",
+    })
+    return { url: blob.url, pathname: blob.pathname }
+  }
+
+  // Fall back to local file storage
+  const uploadDir = path.join(process.cwd(), "public", "uploads", "avatars")
+  await mkdir(uploadDir, { recursive: true })
+
+  const localFilename = filename.replaceAll("/", "-")
+  const filePath = path.join(uploadDir, localFilename)
+  
+  await writeFile(filePath, buffer)
+
+  // Return URL path for local file
+  const url = `/uploads/avatars/${localFilename}`
+  return { url, pathname: localFilename }
 }
 
 async function optimizeAvatar(file: File): Promise<Buffer> {
@@ -61,7 +81,8 @@ async function optimizeAvatar(file: File): Promise<Buffer> {
     image = image.rotate()
 
     return await image.toBuffer()
-  } catch (error) {
+  } catch (error_) {
+    console.warn("Avatar optimization failed, using original:", error_)
     return buffer
   }
 }
@@ -76,8 +97,8 @@ export async function POST(request: NextRequest) {
   await initializeModules()
 
   try {
-    const supabase = await createSupabaseServer()
-    const authResult = await getCachedAuthUser(supabase)
+    const db = await createServiceDatabaseClient()
+    const authResult = await getCachedAuthUser()
 
     if (authResult.rateLimited) {
       return NextResponse.json(
@@ -116,26 +137,24 @@ export async function POST(request: NextRequest) {
     const timestamp = Date.now()
     const randomId = Math.random().toString(36).substring(2, 8)
     const extension = file.name.split(".").pop() || "jpg"
-    const filename = `avatars/${user.id}/${timestamp}-${randomId}.${extension}`
+    const filename = `${user.id}-${timestamp}-${randomId}.${extension}`
 
-    const blob = await put(filename, new Blob([new Uint8Array(optimizedBuffer)], { type: file.type }), {
-      access: "public",
-    })
+    const result = await saveAvatarFile(optimizedBuffer, filename, file.type)
 
-    const { error: updateError } = await supabase
+    const { error: updateError } = await db
       .from("users")
       .update({
-        avatar_url: blob.url,
+        avatar_url: result.url,
       })
       .eq("id", user.id)
 
     if (updateError) {
-      // Don't fail the request if database update fails - the blob is already uploaded
+      // Don't fail the request if database update fails - the file is already uploaded
     }
 
     return NextResponse.json({
-      url: blob.url,
-      filename: blob.pathname,
+      url: result.url,
+      filename: result.pathname,
       size: optimizedBuffer.length,
       originalSize: file.size,
       type: file.type,

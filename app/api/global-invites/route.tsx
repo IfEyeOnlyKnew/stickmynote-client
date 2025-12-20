@@ -1,11 +1,11 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { createSupabaseServer } from "@/lib/supabase-server"
+import { getCachedAuthUser } from "@/lib/auth/cached-auth"
 
 export async function POST(request: NextRequest) {
   try {
     console.log("[v0] Global invite API - Processing global invite request")
 
-    const supabase = await createSupabaseServer()
+    const authResult = await getCachedAuthUser()
     const { emails, role = "viewer" } = await request.json()
 
     console.log("[v0] Global invite API - Request data:", {
@@ -19,15 +19,16 @@ export async function POST(request: NextRequest) {
     }
 
     // Get current user
-    const {
-      data: { user },
-      error: authError,
-    } = await supabase.auth.getUser()
+    if (authResult.rateLimited) {
+      return NextResponse.json({ error: "Rate limit exceeded" }, { status: 429, headers: { "Retry-After": "30" } })
+    }
 
-    if (authError || !user) {
-      console.log("[v0] Global invite API - Authentication failed:", authError?.message)
+    if (!authResult.user) {
+      console.log("[v0] Global invite API - Authentication failed")
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
+
+    const user = authResult.user
 
     console.log("[v0] Global invite API - Authenticated user:", user.email)
 

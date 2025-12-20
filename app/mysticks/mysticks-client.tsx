@@ -14,7 +14,7 @@ import { PermissionBasedStickFullscreen } from "@/components/permission-based/Pe
 import type { Stick } from "@/types/pad"
 
 interface MySticksClientProps {
-  initialSticks: StickWithRole[]
+  readonly initialSticks: StickWithRole[]
 }
 
 export function MySticksClient({ initialSticks }: MySticksClientProps) {
@@ -35,7 +35,7 @@ export function MySticksClient({ initialSticks }: MySticksClientProps) {
       const matchesSearch =
         stick.topic.toLowerCase().includes(searchQuery.toLowerCase()) ||
         stick.content.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        (stick.pad_name && stick.pad_name.toLowerCase().includes(searchQuery.toLowerCase()))
+        stick.pad_name?.toLowerCase().includes(searchQuery.toLowerCase())
 
       const matchesTab =
         activeTab === "all" ||
@@ -73,7 +73,7 @@ export function MySticksClient({ initialSticks }: MySticksClientProps) {
       setSelectedStick(stick)
       setIsFullscreenOpen(true)
     } else {
-      router.push("/notes")
+      router.push("/personal")
     }
   }
 

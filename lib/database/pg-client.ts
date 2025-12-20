@@ -1,4 +1,5 @@
-import { Pool, type PoolClient, type QueryResult } from "pg"
+import "server-only"
+import { Pool, type PoolClient, type QueryResult, type QueryResultRow } from "pg"
 
 interface DatabaseConfig {
   host: string
@@ -6,7 +7,7 @@ interface DatabaseConfig {
   database: string
   user: string
   password: string
-  ssl?: boolean
+  ssl?: boolean | { rejectUnauthorized: boolean }
   max?: number
   idleTimeoutMillis?: number
   connectionTimeoutMillis?: number
@@ -14,16 +15,23 @@ interface DatabaseConfig {
 
 class PostgresDatabase {
   private pool: Pool | null = null
-  private config: DatabaseConfig
+  private readonly config: DatabaseConfig
 
   constructor() {
+    // Configure SSL
+    let sslConfig: boolean | { rejectUnauthorized: boolean } = false
+    if (process.env.POSTGRES_SSL === "true") {
+      // For self-signed certificates, set rejectUnauthorized to false
+      sslConfig = { rejectUnauthorized: process.env.POSTGRES_SSL_REJECT_UNAUTHORIZED !== "false" }
+    }
+
     this.config = {
       host: process.env.POSTGRES_HOST || "localhost",
       port: Number.parseInt(process.env.POSTGRES_PORT || "5432"),
       database: process.env.POSTGRES_DATABASE || "stickmynote",
       user: process.env.POSTGRES_USER || "stickmynote_user",
       password: process.env.POSTGRES_PASSWORD || "",
-      ssl: process.env.POSTGRES_SSL === "true",
+      ssl: sslConfig,
       max: 20, // Maximum pool size
       idleTimeoutMillis: 30000,
       connectionTimeoutMillis: 10000,
@@ -45,7 +53,7 @@ class PostgresDatabase {
     return this.pool
   }
 
-  async query<T = any>(text: string, params?: any[]): Promise<QueryResult<T>> {
+  async query<T extends QueryResultRow = any>(text: string, params?: any[]): Promise<QueryResult<T>> {
     const pool = this.getPool()
     try {
       const start = Date.now()
@@ -81,7 +89,7 @@ class PostgresDatabase {
 
   async healthCheck(): Promise<{ healthy: boolean; message: string }> {
     try {
-      const result = await this.query("SELECT NOW()")
+      await this.query("SELECT NOW()")
       return {
         healthy: true,
         message: `Connected to PostgreSQL at ${this.config.host}:${this.config.port}`,
@@ -107,12 +115,12 @@ class PostgresDatabase {
 export const db = new PostgresDatabase()
 
 // Helper functions for common operations
-export async function queryOne<T = any>(text: string, params?: any[]): Promise<T | null> {
+export async function queryOne<T extends QueryResultRow = any>(text: string, params?: any[]): Promise<T | null> {
   const result = await db.query<T>(text, params)
   return result.rows[0] || null
 }
 
-export async function queryMany<T = any>(text: string, params?: any[]): Promise<T[]> {
+export async function queryMany<T extends QueryResultRow = any>(text: string, params?: any[]): Promise<T[]> {
   const result = await db.query<T>(text, params)
   return result.rows
 }

@@ -1,4 +1,4 @@
-import { SupabaseConfigCheck } from "@/components/supabase-config-check"
+import { SystemConfigCheck } from "@/components/system-config-check"
 import { isDiagnosticAccessible } from "@/lib/is-production"
 import { notFound } from "next/navigation"
 import { BreadcrumbNav } from "@/components/breadcrumb-nav"
@@ -18,7 +18,7 @@ export default function ConfigCheckPage() {
           ]}
         />
 
-        <SupabaseConfigCheck />
+        <SystemConfigCheck />
       </div>
     </div>
   )

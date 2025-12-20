@@ -1,5 +1,5 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { createSupabaseServer } from "@/lib/supabase-server"
+import { createServiceDatabaseClient } from "@/lib/database/database-adapter"
 import { validateUUID } from "@/lib/input-validation-enhanced"
 import { applyRateLimit } from "@/lib/rate-limiter-enhanced"
 import { getOrgContext } from "@/lib/auth/get-org-context"
@@ -27,7 +27,7 @@ export async function DELETE(request: NextRequest, context: { params: Promise<{ 
       return createUnauthorizedResponse()
     }
 
-    const supabase = await createSupabaseServer()
+    const db = await createServiceDatabaseClient()
 
     const orgContext = await getOrgContext(user.id)
     if (!orgContext) {
@@ -42,7 +42,7 @@ export async function DELETE(request: NextRequest, context: { params: Promise<{ 
       return NextResponse.json({ error: "Rate limit exceeded" }, { status: 429, headers: { "Retry-After": "60" } })
     }
 
-    const { data: pad, error: fetchError } = await supabase
+    const { data: pad, error: fetchError } = await db
       .from("paks_pads")
       .select("id, owner_id, multi_pak_id, org_id")
       .eq("id", padId)
@@ -60,7 +60,7 @@ export async function DELETE(request: NextRequest, context: { params: Promise<{ 
 
     const isPadOwner = pad.owner_id === user.id
 
-    const { data: multiPak } = await supabase
+    const { data: multiPak } = await db
       .from("multi_paks")
       .select("owner_id")
       .eq("id", pad.multi_pak_id)
@@ -69,7 +69,7 @@ export async function DELETE(request: NextRequest, context: { params: Promise<{ 
 
     const isMultiPakOwner = multiPak?.owner_id === user.id
 
-    const { data: membership } = await supabase
+    const { data: membership } = await db
       .from("multi_pak_members")
       .select("role")
       .eq("multi_pak_id", pad.multi_pak_id)
@@ -83,7 +83,7 @@ export async function DELETE(request: NextRequest, context: { params: Promise<{ 
       return NextResponse.json({ error: "Permission denied" }, { status: 403 })
     }
 
-    const { error } = await supabase.from("paks_pads").delete().eq("id", padId).eq("org_id", orgContext.orgId)
+    const { error } = await db.from("paks_pads").delete().eq("id", padId).eq("org_id", orgContext.orgId)
 
     if (error) {
       console.error("Error deleting Pad:", error)
@@ -109,7 +109,7 @@ export async function POST(request: NextRequest, context: { params: Promise<{ pa
       return createUnauthorizedResponse()
     }
 
-    const supabase = await createSupabaseServer()
+    const db = await createServiceDatabaseClient()
 
     const orgContext = await getOrgContext(user.id)
     if (!orgContext) {
@@ -126,7 +126,7 @@ export async function POST(request: NextRequest, context: { params: Promise<{ pa
 
     const body = await request.json()
 
-    const { data: restoredPad, error } = await supabase
+    const { data: restoredPad, error } = await db
       .from("paks_pads")
       .insert({
         id: padId,

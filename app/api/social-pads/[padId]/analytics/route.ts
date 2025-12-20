@@ -1,13 +1,13 @@
-import { createClient } from "@/lib/supabase/server"
+import { createDatabaseClient } from "@/lib/database/database-adapter"
 import { NextResponse } from "next/server"
 import { getOrgContext } from "@/lib/auth/get-org-context"
 import { getCachedAuthUser } from "@/lib/auth/cached-auth"
 
 export async function GET(request: Request, { params }: { params: { padId: string } }) {
   try {
-    const supabase = await createClient()
+    const db = await createDatabaseClient()
 
-    const authResult = await getCachedAuthUser(supabase)
+    const authResult = await getCachedAuthUser()
     if (authResult.rateLimited) {
       return NextResponse.json(
         { error: "Rate limit exceeded. Please try again in a moment." },
@@ -26,7 +26,7 @@ export async function GET(request: Request, { params }: { params: { padId: strin
 
     const { padId } = params
 
-    const { data: membership } = await supabase
+    const { data: membership } = await db
       .from("social_pad_members")
       .select("role, admin_level")
       .eq("social_pad_id", padId)
@@ -35,7 +35,7 @@ export async function GET(request: Request, { params }: { params: { padId: strin
       .eq("org_id", orgContext.orgId)
       .maybeSingle()
 
-    const { data: pad } = await supabase
+    const { data: pad } = await db
       .from("social_pads")
       .select("owner_id, name")
       .eq("id", padId)
@@ -46,13 +46,13 @@ export async function GET(request: Request, { params }: { params: { padId: strin
       return NextResponse.json({ error: "Access denied" }, { status: 403 })
     }
 
-    const { count: totalSticks } = await supabase
+    const { count: totalSticks } = await db
       .from("social_sticks")
       .select("*", { count: "exact", head: true })
       .eq("social_pad_id", padId)
       .eq("org_id", orgContext.orgId)
 
-    const { data: stickIds } = await supabase
+    const { data: stickIds } = await db
       .from("social_sticks")
       .select("id")
       .eq("social_pad_id", padId)
@@ -60,7 +60,7 @@ export async function GET(request: Request, { params }: { params: { padId: strin
 
     let totalReplies = 0
     if (stickIds && stickIds.length > 0) {
-      const { count: replyCount } = await supabase
+      const { count: replyCount } = await db
         .from("social_stick_replies")
         .select("*", { count: "exact", head: true })
         .in(
@@ -73,7 +73,7 @@ export async function GET(request: Request, { params }: { params: { padId: strin
 
     let totalReactions = 0
     if (stickIds && stickIds.length > 0) {
-      const { count: reactionCount } = await supabase
+      const { count: reactionCount } = await db
         .from("stick_reactions")
         .select("*", { count: "exact", head: true })
         .in(
@@ -83,7 +83,7 @@ export async function GET(request: Request, { params }: { params: { padId: strin
       totalReactions = reactionCount || 0
     }
 
-    const { count: totalMembers } = await supabase
+    const { count: totalMembers } = await db
       .from("social_pad_members")
       .select("*", { count: "exact", head: true })
       .eq("social_pad_id", padId)
@@ -93,7 +93,7 @@ export async function GET(request: Request, { params }: { params: { padId: strin
     const oneWeekAgo = new Date()
     oneWeekAgo.setDate(oneWeekAgo.getDate() - 7)
 
-    const { count: sticksThisWeek } = await supabase
+    const { count: sticksThisWeek } = await db
       .from("social_sticks")
       .select("*", { count: "exact", head: true })
       .eq("social_pad_id", padId)
@@ -103,14 +103,14 @@ export async function GET(request: Request, { params }: { params: { padId: strin
     const oneMonthAgo = new Date()
     oneMonthAgo.setMonth(oneMonthAgo.getMonth() - 1)
 
-    const { count: sticksThisMonth } = await supabase
+    const { count: sticksThisMonth } = await db
       .from("social_sticks")
       .select("*", { count: "exact", head: true })
       .eq("social_pad_id", padId)
       .eq("org_id", orgContext.orgId)
       .gte("created_at", oneMonthAgo.toISOString())
 
-    const { data: sticks } = await supabase
+    const { data: sticks } = await db
       .from("social_sticks")
       .select("user_id, users:user_id(id, full_name, email)")
       .eq("social_pad_id", padId)
@@ -135,7 +135,7 @@ export async function GET(request: Request, { params }: { params: { padId: strin
     })
 
     if (stickIds && stickIds.length > 0) {
-      const { data: replies } = await supabase
+      const { data: replies } = await db
         .from("social_stick_replies")
         .select("user_id")
         .in(

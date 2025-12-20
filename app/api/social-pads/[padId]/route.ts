@@ -1,16 +1,16 @@
-import { createClient } from "@/lib/supabase/server"
+import { createDatabaseClient } from "@/lib/database/database-adapter"
 import { type NextRequest, NextResponse } from "next/server"
 import { getOrgContext } from "@/lib/auth/get-org-context"
 import { getCachedAuthUser } from "@/lib/auth/cached-auth"
 
 export async function GET(request: NextRequest, { params }: { params: { padId: string } }) {
   try {
-    const supabase = await createClient()
+    const db = await createDatabaseClient()
     const { padId } = params
 
     const orgContext = await getOrgContext()
 
-    const padQuery = supabase.from("social_pads").select("*, social_pad_members(count)").eq("id", padId)
+    const padQuery = db.from("social_pads").select("*, social_pad_members(count)").eq("id", padId)
 
     // Filter by org_id if user is authenticated
     if (orgContext) {
@@ -23,10 +23,10 @@ export async function GET(request: NextRequest, { params }: { params: { padId: s
       return NextResponse.json({ error: "Pad not found" }, { status: 404 })
     }
 
-    const { data: owner } = await supabase.from("users").select("email, full_name").eq("id", pad.owner_id).maybeSingle()
+    const { data: owner } = await db.from("users").select("email, full_name").eq("id", pad.owner_id).maybeSingle()
 
     // Check if user has access (public pads are accessible to everyone)
-    const authResult = await getCachedAuthUser(supabase)
+    const authResult = await getCachedAuthUser()
 
     if (authResult.rateLimited) {
       return NextResponse.json(
@@ -42,7 +42,7 @@ export async function GET(request: NextRequest, { params }: { params: { padId: s
         return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
       }
 
-      const { data: membership } = await supabase
+      const { data: membership } = await db
         .from("social_pad_members")
         .select("*")
         .eq("social_pad_id", padId)
@@ -55,7 +55,7 @@ export async function GET(request: NextRequest, { params }: { params: { padId: s
       }
     }
 
-    const sticksQuery = supabase
+    const sticksQuery = db
       .from("social_sticks")
       .select("*, social_stick_replies(count)")
       .eq("social_pad_id", padId)
@@ -73,7 +73,7 @@ export async function GET(request: NextRequest, { params }: { params: { padId: s
 
     const sticksWithUsers = await Promise.all(
       (sticks || []).map(async (stick) => {
-        const { data: stickUser } = await supabase
+        const { data: stickUser } = await db
           .from("users")
           .select("email, full_name")
           .eq("id", stick.user_id)
@@ -101,8 +101,8 @@ export async function GET(request: NextRequest, { params }: { params: { padId: s
 
 export async function PATCH(request: NextRequest, { params }: { params: { padId: string } }) {
   try {
-    const supabase = await createClient()
-    const authResult = await getCachedAuthUser(supabase)
+    const db = await createDatabaseClient()
+    const authResult = await getCachedAuthUser()
 
     if (authResult.rateLimited) {
       return NextResponse.json(
@@ -125,7 +125,7 @@ export async function PATCH(request: NextRequest, { params }: { params: { padId:
     const { name, description, is_public } = await request.json()
     const { padId } = params
 
-    const { data: pad } = await supabase
+    const { data: pad } = await db
       .from("social_pads")
       .select("owner_id")
       .eq("id", padId)
@@ -136,7 +136,7 @@ export async function PATCH(request: NextRequest, { params }: { params: { padId:
       return NextResponse.json({ error: "Unauthorized" }, { status: 403 })
     }
 
-    const { data: updatedPad, error } = await supabase
+    const { data: updatedPad, error } = await db
       .from("social_pads")
       .update({
         name,

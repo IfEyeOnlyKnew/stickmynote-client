@@ -44,8 +44,8 @@ export default function TermsPage() {
             <section>
               <h2 className="text-xl font-semibold mb-3">Agreement to Terms</h2>
               <p className="text-muted-foreground">
-                By accessing or using Stick My Note ("Service"), you agree to be bound by these Terms of Service
-                ("Terms"). If you disagree with any part of these terms, you may not access the Service.
+                By accessing or using Stick My Note (&quot;Service&quot;), you agree to be bound by these Terms of Service
+                (&quot;Terms&quot;). If you disagree with any part of these terms, you may not access the Service.
               </p>
             </section>
 
@@ -150,7 +150,7 @@ export default function TermsPage() {
                 Disclaimer of Warranties
               </h2>
               <p className="text-muted-foreground">
-                THE SERVICE IS PROVIDED "AS IS" AND "AS AVAILABLE" WITHOUT WARRANTIES OF ANY KIND, EITHER EXPRESS OR
+                THE SERVICE IS PROVIDED &quot;AS IS&quot; AND &quot;AS AVAILABLE&quot; WITHOUT WARRANTIES OF ANY KIND, EITHER EXPRESS OR
                 IMPLIED. WE DO NOT WARRANT THAT THE SERVICE WILL BE UNINTERRUPTED, SECURE, OR ERROR-FREE.
               </p>
             </section>
@@ -176,7 +176,7 @@ export default function TermsPage() {
               <h2 className="text-xl font-semibold mb-3">Changes to Terms</h2>
               <p className="text-muted-foreground">
                 We reserve the right to modify these Terms at any time. We will notify users of any material changes by
-                posting the new Terms on this page and updating the "Last updated" date. Your continued use of the
+                posting the new Terms on this page and updating the &quot;Last updated&quot; date. Your continued use of the
                 Service after changes constitutes acceptance of the new Terms.
               </p>
             </section>

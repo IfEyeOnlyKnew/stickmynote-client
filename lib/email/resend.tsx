@@ -1,6 +1,16 @@
 import { Resend } from "resend"
 
-const resend = new Resend(process.env.RESEND_API_KEY)
+let resendInstance: Resend | null = null
+
+function getResend(): Resend | null {
+  if (!process.env.RESEND_API_KEY) {
+    return null
+  }
+  if (!resendInstance) {
+    resendInstance = new Resend(process.env.RESEND_API_KEY)
+  }
+  return resendInstance
+}
 
 const FROM_EMAIL = process.env.RESEND_FROM_EMAIL || "noreply@stickmynote.com"
 
@@ -12,30 +22,9 @@ export interface SendEmailOptions {
 }
 
 export async function sendEmail({ to, subject, html, text }: SendEmailOptions) {
-  if (!process.env.RESEND_API_KEY) {
-    console.warn("[v0] RESEND_API_KEY not configured, skipping email")
-    return { success: false, error: "Email service not configured" }
-  }
-
-  try {
-    const { data, error } = await resend.emails.send({
-      from: FROM_EMAIL,
-      to,
-      subject,
-      html,
-      text: text || html.replace(/<[^>]*>/g, ""),
-    })
-
-    if (error) {
-      console.error("[v0] Resend error:", error)
-      return { success: false, error: error.message }
-    }
-
-    return { success: true, id: data?.id }
-  } catch (err) {
-    console.error("[v0] Error sending email:", err)
-    return { success: false, error: "Failed to send email" }
-  }
+  // Resend is deprecated - will be replaced by Exchange server
+  console.warn("[v0] Resend email service is deprecated. Use Exchange server instead.")
+  return { success: false, error: "Email service disabled - migrating to Exchange", id: undefined }
 }
 
 export async function sendOrganizationInviteEmail({

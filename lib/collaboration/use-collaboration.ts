@@ -2,8 +2,16 @@
 
 import { useEffect, useState, useRef } from "react"
 import * as Y from "yjs"
-import { SupabaseYjsProvider } from "./supabase-yjs-provider"
-import { createClient } from "@/lib/supabase/client"
+import { useUser } from "@/contexts/UserContext"
+
+/**
+ * useCollaboration - Collaborative editing hook
+ * 
+ * Provides local-only Yjs document support. For true realtime collaboration, implement:
+ * - WebSocket server with y-websocket
+ * - WebRTC with y-webrtc
+ * - Custom signaling server
+ */
 
 export interface CollaborationOptions {
   documentId: string
@@ -25,109 +33,43 @@ const USER_COLORS = [
 
 export function useCollaboration(options: CollaborationOptions) {
   const { documentId, enabled = true, onConnectionChange, onUsersChange } = options
+  const { user } = useUser()
 
   const [isConnected, setIsConnected] = useState(false)
   const [activeUsers, setActiveUsers] = useState<Array<{ id: string; name: string; color: string }>>([])
   const [error, setError] = useState<string | null>(null)
 
   const docRef = useRef<Y.Doc | null>(null)
-  const providerRef = useRef<SupabaseYjsProvider | null>(null)
-  const supabaseRef = useRef(createClient())
 
   useEffect(() => {
     if (!enabled || !documentId) {
       return
     }
 
-    let mounted = true
-    let cleanupFn: (() => void) | undefined
+    // Create local Yjs document (local-only mode)
+    const doc = new Y.Doc()
+    docRef.current = doc
 
-    async function initCollaboration() {
-      try {
-        const supabase = supabaseRef.current
+    // Mark as "connected" for local editing
+    setIsConnected(true)
+    setError(null)
+    onConnectionChange?.(true)
 
-        const {
-          data: { user },
-        } = await supabase.auth.getUser()
-        if (!user) {
-          if (mounted) {
-            setIsConnected(false)
-            setError(null)
-          }
-          return
-        }
-
-        const { data: profile } = await (supabase as any)
-          .from("users")
-          .select("full_name, email")
-          .eq("id", user.id)
-          .single()
-
-        const userName = profile?.full_name || profile?.email || "Anonymous"
-        const userColor = USER_COLORS[Math.floor(Math.random() * USER_COLORS.length)]
-
-        const doc = new Y.Doc()
-        docRef.current = doc
-
-        const provider = new SupabaseYjsProvider(documentId, doc)
-        providerRef.current = provider
-
-        await provider.connect(user.id, userName, userColor)
-
-        if (mounted) {
-          setIsConnected(true)
-          setError(null)
-          onConnectionChange?.(true)
-        }
-
-        const awareness = provider.getAwareness()
-        const awarenessChangeHandler = () => {
-          const states = awareness.getStates()
-          const users: Array<{ id: string; name: string; color: string }> = []
-
-          states.forEach((state) => {
-            if (state.user && state.user.id !== user.id) {
-              users.push({
-                id: state.user.id,
-                name: state.user.name,
-                color: state.user.color,
-              })
-            }
-          })
-
-          if (mounted) {
-            setActiveUsers(users)
-            onUsersChange?.(users)
-          }
-        }
-
-        awareness.on("change", awarenessChangeHandler)
-
-        cleanupFn = () => {
-          awareness.off("change", awarenessChangeHandler)
-          provider.disconnect()
-        }
-      } catch (err) {
-        console.error("Collaboration initialization error:", err)
-        if (mounted) {
-          setError(err instanceof Error ? err.message : "Failed to initialize collaboration")
-          setIsConnected(false)
-          onConnectionChange?.(false)
-        }
-      }
-    }
-
-    initCollaboration()
+    // No active users without realtime
+    setActiveUsers([])
+    onUsersChange?.([])
 
     return () => {
-      mounted = false
-      cleanupFn?.()
+      doc.destroy()
+      docRef.current = null
+      setIsConnected(false)
+      onConnectionChange?.(false)
     }
   }, [documentId, enabled, onConnectionChange, onUsersChange])
 
   return {
     doc: docRef.current,
-    provider: providerRef.current,
+    provider: null, // No provider without realtime
     isConnected,
     activeUsers,
     error,

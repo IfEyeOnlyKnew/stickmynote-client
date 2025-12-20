@@ -1,11 +1,7 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { createClient } from "@supabase/supabase-js"
+import { db } from "@/lib/database/pg-client"
 
 export const dynamic = "force-dynamic"
-
-function getServiceClient() {
-  return createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!)
-}
 
 export async function POST(request: NextRequest) {
   try {
@@ -15,7 +11,6 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Email required" }, { status: 400 })
     }
 
-    const supabase = getServiceClient()
     const normalizedEmail = email.toLowerCase().trim()
 
     // Get organization settings for lockout config
@@ -23,36 +18,42 @@ export async function POST(request: NextRequest) {
     let maxAttempts = 5
     let lockoutMinutes = 15
 
-    const { data: user } = await supabase.from("users").select("id").eq("email", normalizedEmail).maybeSingle()
+    const userResult = await db.query(
+      `SELECT id FROM users WHERE email = $1`,
+      [normalizedEmail]
+    )
+    const user = userResult.rows[0]
 
     if (user) {
-      const { data: membership } = await supabase
-        .from("organization_members")
-        .select("org_id, organizations(max_failed_attempts, lockout_duration_minutes)")
-        .eq("user_id", user.id)
-        .eq("status", "active")
-        .maybeSingle()
+      const membershipResult = await db.query(
+        `SELECT om.org_id, o.max_failed_attempts, o.lockout_duration_minutes
+         FROM organization_members om
+         JOIN organizations o ON o.id = om.org_id
+         WHERE om.user_id = $1 AND om.status = 'active'
+         LIMIT 1`,
+        [user.id]
+      )
 
-      if (membership?.organizations) {
-        const org = membership.organizations as { max_failed_attempts?: number; lockout_duration_minutes?: number }
-        maxAttempts = org.max_failed_attempts ?? 5
-        lockoutMinutes = org.lockout_duration_minutes ?? 15
+      const membership = membershipResult.rows[0]
+      if (membership) {
+        maxAttempts = membership.max_failed_attempts ?? 5
+        lockoutMinutes = membership.lockout_duration_minutes ?? 15
       }
     }
 
     if (success) {
       // Clear lockout on successful login
-      await supabase.from("account_lockouts").delete().eq("email", normalizedEmail)
+      await db.query(`DELETE FROM account_lockouts WHERE email = $1`, [normalizedEmail])
 
       return NextResponse.json({ success: true, cleared: true })
     }
 
     // Failed attempt - increment counter
-    const { data: existing } = await supabase
-      .from("account_lockouts")
-      .select("*")
-      .eq("email", normalizedEmail)
-      .maybeSingle()
+    const existingResult = await db.query(
+      `SELECT * FROM account_lockouts WHERE email = $1`,
+      [normalizedEmail]
+    )
+    const existing = existingResult.rows[0]
 
     const now = new Date()
     let newAttempts = 1
@@ -61,8 +62,7 @@ export async function POST(request: NextRequest) {
     if (existing) {
       // Check if previous lockout has expired
       if (existing.locked_until && new Date(existing.locked_until) < now) {
-        // Reset counter if lockout expired
-        newAttempts = 1
+        // Reset counter if lockout expired (newAttempts already initialized to 1)
       } else {
         newAttempts = (existing.failed_attempts || 0) + 1
       }
@@ -74,24 +74,24 @@ export async function POST(request: NextRequest) {
       lockedUntil = lockUntilDate.toISOString()
     }
 
-    // Upsert the lockout record
-    const { error } = await supabase.from("account_lockouts").upsert(
-      {
-        email: normalizedEmail,
-        ip_address: ipAddress || null,
-        failed_attempts: newAttempts,
-        last_failed_at: now.toISOString(),
-        locked_until: lockedUntil,
-        updated_at: now.toISOString(),
-      },
-      {
-        onConflict: "email",
-      },
-    )
-
-    if (error) {
-      console.error("Error recording attempt:", error)
-      return NextResponse.json({ error: "Failed to record attempt" }, { status: 500 })
+    // Update or insert the lockout record
+    if (existing) {
+      await db.query(
+        `UPDATE account_lockouts 
+         SET ip_address = $1,
+             failed_attempts = $2,
+             last_failed_at = $3,
+             locked_until = $4,
+             updated_at = $5
+         WHERE email = $6`,
+        [ipAddress || null, newAttempts, now.toISOString(), lockedUntil, now.toISOString(), normalizedEmail]
+      )
+    } else {
+      await db.query(
+        `INSERT INTO account_lockouts (email, ip_address, failed_attempts, last_failed_at, locked_until, created_at, updated_at)
+         VALUES ($1, $2, $3, $4, $5, $6, $6)`,
+        [normalizedEmail, ipAddress || null, newAttempts, now.toISOString(), lockedUntil, now.toISOString()]
+      )
     }
 
     return NextResponse.json({

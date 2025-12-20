@@ -1,13 +1,13 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { createClient } from "@/lib/supabase/server"
+import { createDatabaseClient } from "@/lib/database/database-adapter"
 import { getCachedAuthUser } from "@/lib/auth/cached-auth"
 
 export async function POST(request: NextRequest, { params }: { params: { id: string } }) {
   try {
-    const supabase = await createClient()
+    const db = await createDatabaseClient()
     const replyId = params.id
 
-    const authResult = await getCachedAuthUser(supabase)
+    const authResult = await getCachedAuthUser()
     if (authResult.rateLimited) {
       return NextResponse.json(
         { error: "Rate limit exceeded. Please try again in a moment." },
@@ -19,7 +19,7 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
     }
     const user = authResult.user
 
-    const { data: existingReaction } = await supabase
+    const { data: existingReaction } = await db
       .from("reply_reactions")
       .select("id")
       .eq("reply_id", replyId)
@@ -29,14 +29,14 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
 
     if (existingReaction) {
       // Unlike - delete the reaction
-      const { error } = await supabase.from("reply_reactions").delete().eq("id", existingReaction.id)
+      const { error } = await db.from("reply_reactions").delete().eq("id", existingReaction.id)
 
       if (error) throw error
 
       return NextResponse.json({ success: true, liked: false })
     } else {
       // Like - insert a reaction
-      const { error } = await supabase.from("reply_reactions").insert({
+      const { error } = await db.from("reply_reactions").insert({
         reply_id: replyId,
         user_id: user.id,
         reaction_type: "like",
@@ -55,11 +55,11 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
 
 export async function GET(request: NextRequest, { params }: { params: { id: string } }) {
   try {
-    const supabase = await createClient()
+    const db = await createDatabaseClient()
     const replyId = params.id
 
     // Get total like count
-    const { count, error } = await supabase
+    const { count, error } = await db
       .from("reply_reactions")
       .select("*", { count: "exact", head: true })
       .eq("reply_id", replyId)
@@ -67,11 +67,11 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
 
     if (error) throw error
 
-    const authResult = await getCachedAuthUser(supabase)
+    const authResult = await getCachedAuthUser()
     let isLiked = false
 
     if (authResult.user && !authResult.rateLimited) {
-      const { data: userReaction } = await supabase
+      const { data: userReaction } = await db
         .from("reply_reactions")
         .select("id")
         .eq("reply_id", replyId)

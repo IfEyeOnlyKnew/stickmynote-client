@@ -1,12 +1,12 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { createSupabaseServer } from "@/lib/supabase-server"
+import { createServiceDatabaseClient } from "@/lib/database/database-adapter"
 import { getOrgContext } from "@/lib/auth/get-org-context"
 import { getCachedAuthUser } from "@/lib/auth/cached-auth"
 
 export async function GET(request: NextRequest, { params }: { params: { id: string } }) {
   try {
-    const supabase = await createSupabaseServer()
-    const authResult = await getCachedAuthUser(supabase)
+    const db = await createServiceDatabaseClient()
+    const authResult = await getCachedAuthUser()
 
     if (authResult.rateLimited) {
       return NextResponse.json(
@@ -26,7 +26,7 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
       return NextResponse.json({ error: "No organization context" }, { status: 403 })
     }
 
-    const { data: calstick } = await supabase
+    const { data: calstick } = await db
       .from("calsticks")
       .select("user_id, org_id")
       .eq("id", params.id)
@@ -37,7 +37,7 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
       return NextResponse.json({ error: "Forbidden" }, { status: 403 })
     }
 
-    const { data: attachments, error } = await supabase
+    const { data: attachments, error } = await db
       .from("calstick_attachments")
       .select("*")
       .eq("calstick_id", params.id)
@@ -56,8 +56,8 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
 
 export async function POST(request: NextRequest, { params }: { params: { id: string } }) {
   try {
-    const supabase = await createSupabaseServer()
-    const authResult = await getCachedAuthUser(supabase)
+    const db = await createServiceDatabaseClient()
+    const authResult = await getCachedAuthUser()
 
     if (authResult.rateLimited) {
       return NextResponse.json(
@@ -77,7 +77,7 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
       return NextResponse.json({ error: "No organization context" }, { status: 403 })
     }
 
-    const { data: calstick } = await supabase
+    const { data: calstick } = await db
       .from("calsticks")
       .select("user_id, org_id")
       .eq("id", params.id)
@@ -91,7 +91,7 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
     const body = await request.json()
     const { name, url, size, type, provider = "local", provider_id, thumbnail_url } = body
 
-    const { data: attachment, error } = await supabase
+    const { data: attachment, error } = await db
       .from("calstick_attachments")
       .insert({
         calstick_id: params.id,
@@ -120,8 +120,8 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
 
 export async function DELETE(request: NextRequest, { params }: { params: { id: string } }) {
   try {
-    const supabase = await createSupabaseServer()
-    const authResult = await getCachedAuthUser(supabase)
+    const db = await createServiceDatabaseClient()
+    const authResult = await getCachedAuthUser()
 
     if (authResult.rateLimited) {
       return NextResponse.json(
@@ -148,7 +148,7 @@ export async function DELETE(request: NextRequest, { params }: { params: { id: s
       return NextResponse.json({ error: "Attachment ID required" }, { status: 400 })
     }
 
-    const { error } = await supabase
+    const { error } = await db
       .from("calstick_attachments")
       .delete()
       .eq("id", attachmentId)

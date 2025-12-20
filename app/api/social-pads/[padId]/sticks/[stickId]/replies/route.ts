@@ -1,10 +1,9 @@
-import { createServerClient } from "@/lib/supabase/server"
-import { getServiceClient } from "@/lib/supabase/service-client"
+import { createDatabaseClient, createServiceDatabaseClient } from "@/lib/database/database-adapter"
 import { getOrgContext } from "@/lib/auth/get-org-context"
 import { NextResponse } from "next/server"
 import { getCachedAuthUser } from "@/lib/auth/cached-auth"
 
-type User = {
+interface User {
   id: string
   email: string | null
   full_name: string | null
@@ -12,13 +11,15 @@ type User = {
   username: string | null
 }
 
+const USER_SELECT_FIELDS = "id, email, full_name, avatar_url, username"
+
 export async function GET(request: Request, { params }: { params: Promise<{ padId: string; stickId: string }> }) {
   try {
     const { stickId } = await params
-    const supabase = await createServerClient()
-    const serviceSupabase = getServiceClient()
+    const db = await createDatabaseClient()
+    const serviceDb = await createServiceDatabaseClient()
 
-    const authResult = await getCachedAuthUser(supabase)
+    const authResult = await getCachedAuthUser()
     // Note: This route allows unauthenticated access for public content
     const user = authResult.user
 
@@ -28,7 +29,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ padI
       orgId = orgContext?.orgId || null
     }
 
-    let query = supabase
+    let query = db
       .from("social_stick_replies")
       .select("*")
       .eq("stick_id", stickId)
@@ -44,19 +45,18 @@ export async function GET(request: Request, { params }: { params: Promise<{ padI
 
     const userIds = [...new Set(replies?.map((r) => r.user_id).filter(Boolean) || [])]
 
-    const { data: users } = await serviceSupabase
+    const { data: users } = await serviceDb
       .from("users")
-      .select("id, email, full_name, avatar_url, username")
+      .select(USER_SELECT_FIELDS)
       .in("id", userIds.length > 0 ? userIds : ["00000000-0000-0000-0000-000000000000"])
-      .returns<User[]>()
 
-    const usersMap = new Map(users?.map((u) => [u.id, u]) || [])
+    const usersMap = new Map((users as User[])?.map((u) => [u.id, u]) || [])
 
     const repliesWithUsers = replies?.map((reply) => {
-      const user = usersMap.get(reply.user_id)
+      const replyUser = usersMap.get(reply.user_id)
       return {
         ...reply,
-        user: user || {
+        user: replyUser || {
           id: reply.user_id,
           email: null,
           full_name: null,

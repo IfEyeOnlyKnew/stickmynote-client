@@ -107,7 +107,7 @@ export default function MySocialPadsPage() {
             <CardContent className="py-12 text-center">
               <Users className="h-12 w-12 text-gray-400 mx-auto mb-4" />
               <h3 className="text-lg font-semibold mb-2">No Social Pads</h3>
-              <p className="text-gray-600 mb-4">You haven't created or joined any social pads yet</p>
+              <p className="text-gray-600 mb-4">You haven&apos;t created or joined any social pads yet</p>
               <Button onClick={() => router.push("/social")}>Go to Social Hub</Button>
             </CardContent>
           </Card>
@@ -129,7 +129,7 @@ export default function MySocialPadsPage() {
                 <CardContent>
                   <div className="flex items-center justify-between">
                     <div className="text-sm text-gray-500">
-                      {pad.social_pad_members?.length || 0} member{pad.social_pad_members?.length !== 1 ? "s" : ""}
+                      {pad.social_pad_members?.length || 0} member{pad.social_pad_members?.length === 1 ? "" : "s"}
                     </div>
                     <div className="flex gap-2">
                       <Button variant="outline" size="sm" onClick={() => router.push(`/social?pad=${pad.id}`)}>

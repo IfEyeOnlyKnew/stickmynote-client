@@ -27,11 +27,13 @@ export function DraftPicker({ padId, onDraftSelect }: DraftPickerProps) {
   const [drafts, setDrafts] = useState<StickDraft[]>([])
   const [open, setOpen] = useState(false)
 
+  /* eslint-disable react-hooks/exhaustive-deps */
   useEffect(() => {
     if (open) {
       loadDrafts()
     }
   }, [open, padId])
+  /* eslint-enable react-hooks/exhaustive-deps */
 
   const loadDrafts = () => {
     const padDrafts = DraftStorage.getDraftsForPad(padId)

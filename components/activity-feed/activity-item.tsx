@@ -4,13 +4,12 @@ import { StickyNote, MessageSquare, Edit, Share2, Tag, Users } from "lucide-reac
 import { formatDistanceToNow } from "date-fns"
 import type { Activity } from "@/types/activity"
 import { useRouter } from "next/navigation"
-import { cn } from "@/lib/utils"
 
 interface ActivityItemProps {
-  activity: Activity
+  readonly activity: Activity
 }
 
-export function ActivityItem({ activity }: ActivityItemProps) {
+export function ActivityItem({ activity }: Readonly<ActivityItemProps>) {
   const router = useRouter()
 
   const getActivityIcon = () => {
@@ -41,11 +40,11 @@ export function ActivityItem({ activity }: ActivityItemProps) {
         return (
           <>
             <span className="font-medium">{userName}</span> created a note{" "}
-            <span className="font-medium">"{noteTopic}"</span>
+            <span className="font-medium">&quot;{noteTopic}&quot;</span>
           </>
         )
-      case "note_updated":
-        const changes = []
+      case "note_updated": {
+        const changes: string[] = []
         if (activity.metadata?.topic_changed) changes.push("topic")
         if (activity.metadata?.sharing_changed) changes.push("sharing")
         if (activity.metadata?.color_changed) changes.push("color")
@@ -53,27 +52,28 @@ export function ActivityItem({ activity }: ActivityItemProps) {
         return (
           <>
             <span className="font-medium">{userName}</span> updated {changes.length > 0 && `${changes.join(", ")} of `}
-            <span className="font-medium">"{noteTopic}"</span>
+            <span className="font-medium">&quot;{noteTopic}&quot;</span>
           </>
         )
+      }
       case "reply_added":
         return (
           <>
             <span className="font-medium">{userName}</span> replied to{" "}
-            <span className="font-medium">"{noteTopic}"</span>
+            <span className="font-medium">&quot;{noteTopic}&quot;</span>
           </>
         )
       case "note_shared":
         return (
           <>
-            <span className="font-medium">{userName}</span> shared <span className="font-medium">"{noteTopic}"</span>
+            <span className="font-medium">{userName}</span> shared <span className="font-medium">&quot;{noteTopic}&quot;</span>
           </>
         )
       case "tag_added":
         return (
           <>
             <span className="font-medium">{userName}</span> added tags to{" "}
-            <span className="font-medium">"{noteTopic}"</span>
+            <span className="font-medium">&quot;{noteTopic}&quot;</span>
           </>
         )
       case "pad_joined":
@@ -93,18 +93,12 @@ export function ActivityItem({ activity }: ActivityItemProps) {
 
   const handleClick = () => {
     if (activity.note_id) {
-      router.push(`/notes?note=${activity.note_id}`)
+      router.push(`/personal?note=${activity.note_id}`)
     }
   }
 
-  return (
-    <div
-      className={cn(
-        "flex items-start gap-3 p-3 rounded-lg hover:bg-muted/50 transition-colors",
-        activity.note_id && "cursor-pointer",
-      )}
-      onClick={handleClick}
-    >
+  const content = (
+    <>
       <div className="p-2 rounded-full bg-muted flex-shrink-0">{getActivityIcon()}</div>
       <div className="flex-1 min-w-0">
         <p className="text-sm text-foreground leading-relaxed">{getActivityMessage()}</p>
@@ -112,6 +106,24 @@ export function ActivityItem({ activity }: ActivityItemProps) {
           {formatDistanceToNow(new Date(activity.created_at), { addSuffix: true })}
         </p>
       </div>
+    </>
+  )
+
+  if (activity.note_id) {
+    return (
+      <button
+        type="button"
+        className="flex items-start gap-3 p-3 rounded-lg hover:bg-muted/50 transition-colors cursor-pointer w-full text-left"
+        onClick={handleClick}
+      >
+        {content}
+      </button>
+    )
+  }
+
+  return (
+    <div className="flex items-start gap-3 p-3 rounded-lg hover:bg-muted/50 transition-colors">
+      {content}
     </div>
   )
 }

@@ -1,4 +1,4 @@
-import { createClient } from "@/lib/supabase/server"
+import { createDatabaseClient } from "@/lib/database/database-adapter"
 import { NextResponse } from "next/server"
 import { getOrgContext } from "@/lib/auth/get-org-context"
 import { getCachedAuthUser, createRateLimitResponse, createUnauthorizedResponse } from "@/lib/auth/cached-auth"
@@ -6,8 +6,8 @@ import { getCachedAuthUser, createRateLimitResponse, createUnauthorizedResponse 
 export async function POST(request: Request, { params }: { params: Promise<{ stickId: string }> }) {
   try {
     const { stickId } = await params
-    const supabase = await createClient()
-    const authResult = await getCachedAuthUser(supabase)
+    const db = await createDatabaseClient()
+    const authResult = await getCachedAuthUser()
 
     if (authResult.rateLimited) {
       return createRateLimitResponse()
@@ -31,7 +31,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ sti
     }
 
     // Get the social stick details (without nested join)
-    const { data: stick, error: stickError } = await supabase
+    const { data: stick, error: stickError } = await db
       .from("social_sticks")
       .select("id, topic, content, color, social_pad_id, user_id, org_id, calstick_id")
       .eq("id", stickId)
@@ -53,7 +53,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ sti
     }
 
     // Find the parent stick for this social pad to link the CalStick
-    const { data: parentStick } = await supabase
+    const { data: parentStick } = await db
       .from("paks_pad_sticks")
       .select("id, pad_id")
       .eq("pad_id", stick.social_pad_id)
@@ -64,7 +64,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ sti
 
     // If no parent stick exists, create one
     if (!stickIdForCalstick) {
-      const { data: newStick, error: newStickError } = await supabase
+      const { data: newStick, error: newStickError } = await db
         .from("paks_pad_sticks")
         .insert({
           topic: stick.topic,
@@ -102,7 +102,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ sti
       calstickData.calstick_assignee_id = assigneeId
     }
 
-    const { data: calstick, error: calstickError } = await supabase
+    const { data: calstick, error: calstickError } = await db
       .from("paks_pad_stick_replies")
       .insert(calstickData)
       .select("id")
@@ -114,7 +114,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ sti
     }
 
     // Update the social stick with the CalStick reference
-    const { error: updateError } = await supabase
+    const { error: updateError } = await db
       .from("social_sticks")
       .update({
         calstick_id: calstick.id,

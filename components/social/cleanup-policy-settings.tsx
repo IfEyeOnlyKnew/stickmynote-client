@@ -37,9 +37,11 @@ export function CleanupPolicySettings({ padId, padName }: CleanupPolicySettingsP
   const [isSaving, setIsSaving] = useState(false)
   const [hasChanges, setHasChanges] = useState(false)
 
+  /* eslint-disable react-hooks/exhaustive-deps */
   useEffect(() => {
     fetchPolicy()
   }, [padId])
+  /* eslint-enable react-hooks/exhaustive-deps */
 
   const fetchPolicy = async () => {
     try {

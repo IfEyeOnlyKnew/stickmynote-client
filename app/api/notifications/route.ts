@@ -1,4 +1,4 @@
-import { createServerClient } from "@/lib/supabase/server"
+import { createDatabaseClient } from "@/lib/database/database-adapter"
 import { NextResponse } from "next/server"
 import { getOrgContext } from "@/lib/auth/get-org-context"
 import { getCachedAuthUser } from "@/lib/auth/cached-auth"
@@ -6,8 +6,8 @@ import { getCachedAuthUser } from "@/lib/auth/cached-auth"
 // GET /api/notifications - Fetch user notifications
 export async function GET(request: Request) {
   try {
-    const supabase = await createServerClient()
-    const authResult = await getCachedAuthUser(supabase)
+    const db = await createDatabaseClient()
+    const authResult = await getCachedAuthUser()
 
     if (authResult.rateLimited) {
       return NextResponse.json(
@@ -31,7 +31,7 @@ export async function GET(request: Request) {
     const limit = Number.parseInt(searchParams.get("limit") || "50")
     const unreadOnly = searchParams.get("unread") === "true"
 
-    let query = supabase
+    let query = db
       .from("notifications")
       .select("*")
       .eq("user_id", user.id)
@@ -60,8 +60,8 @@ export async function GET(request: Request) {
 // POST /api/notifications - Create a notification (system use)
 export async function POST(request: Request) {
   try {
-    const supabase = await createServerClient()
-    const authResult = await getCachedAuthUser(supabase)
+    const db = await createDatabaseClient()
+    const authResult = await getCachedAuthUser()
 
     if (authResult.rateLimited) {
       return NextResponse.json(
@@ -88,7 +88,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Missing required fields" }, { status: 400 })
     }
 
-    const { data, error } = await supabase
+    const { data, error } = await db
       .from("notifications")
       .insert({
         user_id,

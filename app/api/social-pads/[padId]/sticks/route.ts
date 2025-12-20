@@ -1,9 +1,8 @@
-import { createServerClient } from "@/lib/supabase/server"
-import { getServiceClient } from "@/lib/supabase/service-client"
+import { createDatabaseClient, createServiceDatabaseClient } from "@/lib/database/database-adapter"
 import { NextResponse } from "next/server"
 import { getCachedAuthUser } from "@/lib/auth/cached-auth"
 
-type User = {
+interface User {
   id: string
   email: string | null
   full_name: string | null
@@ -11,45 +10,49 @@ type User = {
   username: string | null
 }
 
+const USER_SELECT_FIELDS = "id, email, full_name, avatar_url, username"
+const RATE_LIMIT_HEADERS = { "Retry-After": "30" }
+
 export async function GET(request: Request, { params }: { params: Promise<{ padId: string }> }) {
   try {
     const { padId } = await params
-    const supabase = await createServerClient()
-    const serviceSupabase = getServiceClient()
+    const db = await createDatabaseClient()
+    const serviceDb = await createServiceDatabaseClient()
 
-    const authResult = await getCachedAuthUser(supabase)
+    const authResult = await getCachedAuthUser()
     if (authResult.rateLimited) {
       return NextResponse.json(
         { error: "Too many requests. Please try again later." },
-        { status: 429, headers: { "Retry-After": "30" } },
+        { status: 429, headers: RATE_LIMIT_HEADERS },
       )
     }
 
-    const sticksQuery = supabase
+    const { data: sticks, error: sticksError } = await db
       .from("social_sticks")
       .select("*")
       .eq("social_pad_id", padId)
       .order("created_at", { ascending: false })
 
-    const { data: sticks, error: sticksError } = await sticksQuery
-
     if (sticksError) throw sticksError
 
     const userIds = [...new Set(sticks?.map((s) => s.user_id).filter(Boolean) || [])]
 
-    const { data: users } = await serviceSupabase
-      .from("users")
-      .select("id, email, full_name, avatar_url, username")
-      .in("id", userIds)
-      .returns<User[]>()
+    if (!userIds.length) {
+      return NextResponse.json(sticks || [])
+    }
 
-    const usersMap = new Map(users?.map((u) => [u.id, u]) || [])
+    const { data: users } = await serviceDb
+      .from("users")
+      .select(USER_SELECT_FIELDS)
+      .in("id", userIds)
+
+    const usersMap = new Map((users as User[])?.map((u) => [u.id, u]) || [])
 
     const sticksWithUsers = sticks?.map((stick) => {
-      const user = usersMap.get(stick.user_id)
+      const stickUser = usersMap.get(stick.user_id)
       return {
         ...stick,
-        user: user || {
+        user: stickUser || {
           id: stick.user_id,
           email: null,
           full_name: null,

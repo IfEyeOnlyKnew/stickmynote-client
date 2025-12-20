@@ -1,11 +1,11 @@
-import { createClient } from "@/lib/supabase/server"
+import { createDatabaseClient } from "@/lib/database/database-adapter"
 import { NextResponse } from "next/server"
 import { getCachedAuthUser } from "@/lib/auth/cached-auth"
 
 export async function PATCH(request: Request, { params }: { params: { padId: string; memberId: string } }) {
   try {
-    const supabase = await createClient()
-    const authResult = await getCachedAuthUser(supabase)
+    const db = await createDatabaseClient()
+    const authResult = await getCachedAuthUser()
     if (authResult.rateLimited) {
       return NextResponse.json({ error: "Rate limited" }, { status: 429, headers: { "Retry-After": "30" } })
     }
@@ -18,7 +18,7 @@ export async function PATCH(request: Request, { params }: { params: { padId: str
     const permissions = await request.json()
 
     // Check if current user is owner or admin
-    const { data: currentMembership } = await supabase
+    const { data: currentMembership } = await db
       .from("social_pad_members")
       .select("admin_level")
       .eq("social_pad_id", padId)
@@ -27,7 +27,7 @@ export async function PATCH(request: Request, { params }: { params: { padId: str
       .maybeSingle()
 
     // Get pad owner
-    const { data: pad } = await supabase.from("social_pads").select("owner_id").eq("id", padId).maybeSingle()
+    const { data: pad } = await db.from("social_pads").select("owner_id").eq("id", padId).maybeSingle()
 
     const isOwner = pad?.owner_id === user.id
     const isAdmin = currentMembership?.admin_level === "admin"
@@ -47,7 +47,7 @@ export async function PATCH(request: Request, { params }: { params: { padId: str
     }
 
     // Update permissions
-    const { data: updatedMember, error } = await supabase
+    const { data: updatedMember, error } = await db
       .from("social_pad_members")
       .update(validPermissions)
       .eq("id", memberId)

@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server"
-import { createClient } from "@/lib/supabase/server"
+import { createDatabaseClient } from "@/lib/database/database-adapter"
 import { getCachedAuthUser } from "@/lib/auth/cached-auth"
 import { sendEmail } from "@/lib/email/resend"
 import {
@@ -11,9 +11,9 @@ import {
 } from "@/lib/email/digest-templates"
 
 export async function POST(request: Request) {
-  const supabase = await createClient()
+  const db = await createDatabaseClient()
 
-  const authResult = await getCachedAuthUser(supabase)
+  const authResult = await getCachedAuthUser()
   if (authResult.rateLimited) {
     return NextResponse.json(
       { error: "Rate limit exceeded. Please try again in a moment." },
@@ -38,7 +38,7 @@ export async function POST(request: Request) {
     }
 
     // Fetch recent notifications
-    const { data: notifications } = await supabase
+    const { data: notifications } = await db
       .from("notifications")
       .select("*")
       .eq("user_id", user.id)
@@ -47,7 +47,7 @@ export async function POST(request: Request) {
       .limit(50)
 
     // Fetch user profile
-    const { data: profile } = await supabase.from("users").select("full_name, email").eq("id", user.id).single()
+    const { data: profile } = await db.from("users").select("full_name, email").eq("id", user.id).single()
 
     if (!profile?.email) {
       return NextResponse.json({ error: "No email address found" }, { status: 400 })

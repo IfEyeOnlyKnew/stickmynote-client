@@ -1,7 +1,7 @@
 "use client"
 
-import { useEffect, useState, useCallback } from "react"
-import { createSupabaseBrowser } from "@/lib/supabase-browser"
+import { useEffect, useState, useCallback, useRef } from "react"
+import { useUser } from "@/contexts/user-context"
 
 interface SocialNotification {
   id: string
@@ -30,11 +30,12 @@ interface Subscription {
 }
 
 export function useSocialNotifications() {
+  const { user } = useUser()
   const [notifications, setNotifications] = useState<SocialNotification[]>([])
   const [unreadCount, setUnreadCount] = useState(0)
   const [loading, setLoading] = useState(true)
   const [subscriptions, setSubscriptions] = useState<Subscription[]>([])
-  const supabase = createSupabaseBrowser()
+  const pollIntervalRef = useRef<NodeJS.Timeout | null>(null)
 
   const fetchSubscriptions = useCallback(async () => {
     try {
@@ -50,9 +51,6 @@ export function useSocialNotifications() {
 
   const fetchNotifications = useCallback(async () => {
     try {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser()
       if (!user) return
 
       const response = await fetch("/api/social-notifications")
@@ -82,7 +80,7 @@ export function useSocialNotifications() {
     } finally {
       setLoading(false)
     }
-  }, [subscriptions])
+  }, [user, subscriptions])
 
   useEffect(() => {
     fetchSubscriptions()
@@ -91,34 +89,15 @@ export function useSocialNotifications() {
   useEffect(() => {
     fetchNotifications()
 
-    const channel = supabase
-      .channel("social-notifications")
-      .on(
-        "postgres_changes",
-        {
-          event: "*",
-          schema: "public",
-          table: "social_sticks",
-        },
-        () => {
-          fetchNotifications()
-        },
-      )
-      .on(
-        "postgres_changes",
-        {
-          event: "*",
-          schema: "public",
-          table: "social_stick_replies",
-        },
-        () => {
-          fetchNotifications()
-        },
-      )
-      .subscribe()
+    // Poll every 30 seconds for new notifications
+    pollIntervalRef.current = setInterval(() => {
+      fetchNotifications()
+    }, 30000)
 
     return () => {
-      supabase.removeChannel(channel)
+      if (pollIntervalRef.current) {
+        clearInterval(pollIntervalRef.current)
+      }
     }
   }, [fetchNotifications])
 

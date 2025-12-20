@@ -1,27 +1,216 @@
-import { createServerClient } from "@/lib/supabase/server"
 import { NextResponse } from "next/server"
 import { SearchCache } from "@/lib/search-cache"
 import { SearchAnalytics } from "@/lib/search-analytics"
 import { getCachedAuthUser, createRateLimitResponse } from "@/lib/auth/cached-auth"
+import { createServiceDatabaseClient, type DatabaseClient } from "@/lib/database/database-adapter"
 
+// Types
 interface SearchFilters {
   tags?: string[]
-  timeframe?: "day" | "week" | "month" | "all"
+  timeframe?: Timeframe
   shared?: "all" | "shared" | "personal"
   colors?: string[]
-  sortBy?: "relevance" | "newest" | "oldest" | "most_replies"
+  sortBy?: SortOption
 }
 
-// POST /api/search/panel - Enhanced panel search with full-text search and filters
+interface SearchInput {
+  query?: string
+  filters?: SearchFilters
+  page?: number
+  limit?: number
+}
+
+interface SearchResult {
+  notes: EnrichedNote[]
+  totalCount: number
+  page: number
+  hasMore: boolean
+  searchDuration: number
+  cached?: boolean
+  rateLimited?: boolean
+}
+
+interface EnrichedNote {
+  user: UserInfo | null
+  reply_count: number
+  view_count: number
+  like_count: number
+  tags: string[]
+  [key: string]: any
+}
+
+interface UserInfo {
+  id: string
+  username: string
+  full_name: string
+  avatar_url: string
+}
+
+interface Suggestions {
+  recent: string[]
+  trending: string[]
+  tags: string[]
+}
+
+type Timeframe = "day" | "week" | "month" | "all"
+type SortOption = "relevance" | "newest" | "oldest" | "most_replies"
+
+// Constants
+const DEFAULT_PAGE = 1
+const DEFAULT_LIMIT = 20
+const DEFAULT_SORT: SortOption = "newest"
+const MIN_USER_SEARCH_LENGTH = 3
+const USER_SEARCH_LIMIT = 10
+const RECENT_SEARCH_LIMIT = 5
+const TRENDING_TAGS_LIMIT = 20
+const ALL_TAGS_LIMIT = 50
+
+const TIMEFRAME_MS: Record<Exclude<Timeframe, "all">, number> = {
+  day: 24 * 60 * 60 * 1000,
+  week: 7 * 24 * 60 * 60 * 1000,
+  month: 30 * 24 * 60 * 60 * 1000,
+}
+
+const NOTES_SELECT_QUERY = `
+  *,
+  personal_sticks_replies (id),
+  personal_sticks_tags (id, tag_title)
+`
+
+// Helper functions
+function escapeSearchTerm(term: string): string {
+  return term.replace(/[%_\\]/g, "\\$&")
+}
+
+function buildCacheKey(query: string | undefined, filters: SearchFilters, page: number): string {
+  return `panel_search:${query || ""}:${JSON.stringify(filters)}:${page}`
+}
+
+function calculateTimeframeDate(timeframe: Timeframe): Date | null {
+  if (timeframe === "all") return null
+  const ms = TIMEFRAME_MS[timeframe]
+  return ms ? new Date(Date.now() - ms) : null
+}
+
+function createEmptyResult(page: number, startTime: number, rateLimited = false): SearchResult {
+  return {
+    notes: [],
+    totalCount: 0,
+    page,
+    hasMore: false,
+    searchDuration: Date.now() - startTime,
+    rateLimited,
+  }
+}
+
+function buildUsersMap(users: UserInfo[] | null): Record<string, UserInfo> {
+  return (users || []).reduce(
+    (acc, user) => {
+      acc[user.id] = user
+      return acc
+    },
+    {} as Record<string, UserInfo>,
+  )
+}
+
+function filterNotesByTags(notes: any[], tags: string[]): any[] {
+  const lowerTags = tags.map((t) => t.toLowerCase())
+  return notes.filter((note) => {
+    const noteTags = note.personal_sticks_tags?.map((t: any) => t.tag_title.toLowerCase()) || []
+    return lowerTags.some((tag) => noteTags.includes(tag))
+  })
+}
+
+function enrichNotes(notes: any[], usersMap: Record<string, UserInfo>): EnrichedNote[] {
+  return notes.map((note) => ({
+    ...note,
+    user: usersMap[note.user_id] || null,
+    reply_count: note.personal_sticks_replies?.length || 0,
+    view_count: Math.floor(Math.random() * 100) + 10,
+    like_count: Math.floor(Math.random() * 50),
+    tags: note.personal_sticks_tags?.map((t: any) => t.tag_title) || [],
+  }))
+}
+
+async function findMatchingUserIds(db: DatabaseClient, searchTerm: string): Promise<string[]> {
+  if (searchTerm.length < MIN_USER_SEARCH_LENGTH) return []
+
+  try {
+    const escaped = escapeSearchTerm(searchTerm)
+    const { data: users } = await db
+      .from("users")
+      .select("id")
+      .or(`username.ilike.%${escaped}%,full_name.ilike.%${escaped}%`)
+      .limit(USER_SEARCH_LIMIT)
+    return users?.map((u) => u.id) || []
+  } catch {
+    console.warn("User search failed, continuing without user filter")
+    return []
+  }
+}
+
+async function fetchUsersForNotes(db: DatabaseClient, notes: any[]): Promise<Record<string, UserInfo>> {
+  const userIds = [...new Set(notes?.map((note) => note.user_id).filter(Boolean))]
+  if (userIds.length === 0) return {}
+
+  try {
+    const { data: users } = await db
+      .from("users")
+      .select("id, username, full_name, avatar_url")
+      .in("id", userIds)
+    return buildUsersMap(users as UserInfo[] | null)
+  } catch {
+    console.warn("Failed to fetch users, continuing without user data")
+    return {}
+  }
+}
+
+function applySearchFilter(query: any, searchTerm: string, matchingUserIds: string[]): any {
+  const escaped = escapeSearchTerm(searchTerm)
+  const baseFilter = `topic.ilike.%${escaped}%,content.ilike.%${escaped}%`
+
+  if (matchingUserIds.length > 0) {
+    return query.or(`${baseFilter},user_id.in.(${matchingUserIds.join(",")})`)
+  }
+  return query.or(baseFilter)
+}
+
+function applySortOrder(query: any, sortBy: SortOption): any {
+  const ascending = sortBy === "oldest"
+  return query.order("created_at", { ascending })
+}
+
+async function trackSearchAnalytics(
+  userId: string,
+  query: string,
+  filters: SearchFilters,
+  notes: EnrichedNote[],
+  totalCount: number,
+  page: number,
+): Promise<void> {
+  try {
+    await SearchAnalytics.trackSearch({
+      user_id: userId,
+      query,
+      filters,
+      results_count: notes.length,
+    })
+
+    await SearchCache.set(query, { notes, totalCount }, page)
+  } catch {
+    // Ignore analytics errors
+  }
+}
+
+// Route handlers
 export async function POST(request: Request) {
   const startTime = Date.now()
 
   try {
-    let body: any
+    let body: SearchInput
     try {
       body = await request.json()
-    } catch (parseError) {
-      console.error("Failed to parse request body:", parseError)
+    } catch {
       return NextResponse.json({ error: "Invalid request body" }, { status: 400 })
     }
 
@@ -29,31 +218,17 @@ export async function POST(request: Request) {
 
     if (authError === "rate_limited") {
       return NextResponse.json(
-        {
-          error: "Rate limit exceeded",
-          notes: [],
-          totalCount: 0,
-          page: 1,
-          hasMore: false,
-          searchDuration: Date.now() - startTime,
-          rateLimited: true,
-        },
+        { error: "Rate limit exceeded", ...createEmptyResult(1, startTime, true) },
         { status: 429, headers: { "Retry-After": "30" } },
       )
     }
 
-    const { createClient } = await import("@supabase/supabase-js")
-    const supabaseAdmin = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!, {
-      auth: {
-        autoRefreshToken: false,
-        persistSession: false,
-      },
-    })
+    const db = await createServiceDatabaseClient()
+    const { query, filters = {}, page = DEFAULT_PAGE, limit = DEFAULT_LIMIT } = body
+    const { tags, timeframe, colors, sortBy = DEFAULT_SORT } = filters
 
-    const { query, filters = {}, page = 1, limit = 20 } = body
-    const { tags, timeframe, colors, sortBy = "newest" } = filters as SearchFilters
-
-    const cacheKey = `panel_search:${query || ""}:${JSON.stringify(filters)}:${page}`
+    // Check cache
+    const cacheKey = buildCacheKey(query, filters, page)
     const cachedResult = await SearchCache.get(cacheKey)
     if (cachedResult) {
       return NextResponse.json({
@@ -63,182 +238,70 @@ export async function POST(request: Request) {
       })
     }
 
-    let notesQuery = supabaseAdmin.from("personal_sticks").select(
-      `
-        *,
-        personal_sticks_replies (
-          id
-        ),
-        personal_sticks_tags (
-          id,
-          tag_title
-        )
-      `,
-      { count: "exact" },
-    )
+    // Build base query
+    let notesQuery = db
+      .from("personal_sticks")
+      .select(NOTES_SELECT_QUERY, { count: "exact" })
+      .eq("is_shared", true)
 
-    notesQuery = notesQuery.eq("is_shared", true)
-
-    // Apply full-text search if query provided
-    if (query && query.trim()) {
+    // Apply full-text search
+    if (query?.trim()) {
       const searchTerm = query.trim()
-      const escapedSearchTerm = searchTerm.replace(/[%_\\]/g, "\\$&")
-
-      let matchingUserIds: string[] = []
-      if (searchTerm.length >= 3) {
-        try {
-          const { data: matchingUsers } = await supabaseAdmin
-            .from("users")
-            .select("id")
-            .or(`username.ilike.%${escapedSearchTerm}%,full_name.ilike.%${escapedSearchTerm}%`)
-            .limit(10)
-          matchingUserIds = matchingUsers?.map((u) => u.id) || []
-        } catch (userSearchError) {
-          // Ignore user search errors, continue with topic/content search only
-          console.warn("User search failed, continuing without user filter")
-        }
-      }
-
-      if (matchingUserIds.length > 0) {
-        notesQuery = notesQuery.or(
-          `topic.ilike.%${escapedSearchTerm}%,content.ilike.%${escapedSearchTerm}%,user_id.in.(${matchingUserIds.join(",")})`,
-        )
-      } else {
-        notesQuery = notesQuery.or(`topic.ilike.%${escapedSearchTerm}%,content.ilike.%${escapedSearchTerm}%`)
-      }
+      const matchingUserIds = await findMatchingUserIds(db, searchTerm)
+      notesQuery = applySearchFilter(notesQuery, searchTerm, matchingUserIds)
     }
 
     // Apply timeframe filter
-    if (timeframe && timeframe !== "all") {
-      const now = new Date()
-      let startDate: Date
-
-      switch (timeframe) {
-        case "day":
-          startDate = new Date(now.getTime() - 24 * 60 * 60 * 1000)
-          break
-        case "week":
-          startDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000)
-          break
-        case "month":
-          startDate = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000)
-          break
-        default:
-          startDate = new Date(0)
-      }
-
+    const startDate = timeframe ? calculateTimeframeDate(timeframe) : null
+    if (startDate) {
       notesQuery = notesQuery.gte("created_at", startDate.toISOString())
     }
 
     // Apply color filter
-    if (colors && colors.length > 0) {
+    if (colors?.length) {
       notesQuery = notesQuery.in("color", colors)
     }
 
-    switch (sortBy) {
-      case "newest":
-        notesQuery = notesQuery.order("created_at", { ascending: false })
-        break
-      case "oldest":
-        notesQuery = notesQuery.order("created_at", { ascending: true })
-        break
-      case "relevance":
-      default:
-        notesQuery = notesQuery.order("created_at", { ascending: false })
-    }
-
-    // Apply pagination
+    // Apply sort and pagination
+    notesQuery = applySortOrder(notesQuery, sortBy)
     const offset = (page - 1) * limit
     notesQuery = notesQuery.range(offset, offset + limit - 1)
 
+    // Execute query
     const { data: notes, error: notesError, count } = await notesQuery
 
     if (notesError) {
       console.error("Error in panel search:", notesError.message)
       if (notesError.message?.includes("Too Many") || notesError.code === "PGRST") {
-        return NextResponse.json({
-          notes: [],
-          totalCount: 0,
-          page,
-          hasMore: false,
-          searchDuration: Date.now() - startTime,
-          rateLimited: true,
-        })
+        return NextResponse.json(createEmptyResult(page, startTime, true))
       }
       return NextResponse.json({ error: "Search failed", details: notesError.message }, { status: 500 })
     }
 
-    const userIds = [...new Set(notes?.map((note: any) => note.user_id).filter(Boolean))]
-    let usersMap: Record<string, any> = {}
-
-    if (userIds.length > 0) {
-      try {
-        const { data: users } = await supabaseAdmin
-          .from("users")
-          .select("id, username, full_name, avatar_url")
-          .in("id", userIds)
-
-        usersMap = (users || []).reduce(
-          (acc, user) => {
-            acc[user.id] = user
-            return acc
-          },
-          {} as Record<string, any>,
-        )
-      } catch (usersError) {
-        console.warn("Failed to fetch users, continuing without user data")
-      }
-    }
-
+    // Fetch user data and enrich notes
+    const usersMap = await fetchUsersForNotes(db, notes || [])
     let filteredNotes = notes || []
-    if (tags && tags.length > 0) {
-      filteredNotes = filteredNotes.filter((note: any) => {
-        const noteTags = note.personal_sticks_tags?.map((t: any) => t.tag_title.toLowerCase()) || []
-        return tags.some((filterTag) => noteTags.includes(filterTag.toLowerCase()))
-      })
+
+    // Apply tag filter (client-side for joined data)
+    if (tags?.length) {
+      filteredNotes = filterNotesByTags(filteredNotes, tags)
     }
 
-    const notesWithCounts = filteredNotes.map((note: any) => ({
-      ...note,
-      user: usersMap[note.user_id] || null,
-      reply_count: note.personal_sticks_replies?.length || 0,
-      view_count: Math.floor(Math.random() * 100) + 10,
-      like_count: Math.floor(Math.random() * 50),
-      tags: note.personal_sticks_tags?.map((t: any) => t.tag_title) || [],
-    }))
+    const enrichedNotes = enrichNotes(filteredNotes, usersMap)
+    const totalCount = count || 0
+    const hasMore = totalCount > offset + enrichedNotes.length
 
-    const searchDuration = Date.now() - startTime
-    const itemsShownSoFar = offset + (notesWithCounts.length || 0)
-    const hasMoreValue = (count || 0) > itemsShownSoFar
-
-    if (user && query && query.trim()) {
-      try {
-        await SearchAnalytics.trackSearch({
-          user_id: user.id,
-          query: query.trim(),
-          filters,
-          results_count: notesWithCounts.length,
-        })
-
-        await SearchCache.set(
-          query,
-          {
-            notes: notesWithCounts,
-            totalCount: count || 0,
-          },
-          page,
-        )
-      } catch (analyticsError) {
-        // Ignore analytics errors
-      }
+    // Track analytics for authenticated users
+    if (user && query?.trim()) {
+      await trackSearchAnalytics(user.id, query.trim(), filters, enrichedNotes, totalCount, page)
     }
 
     return NextResponse.json({
-      notes: notesWithCounts,
-      totalCount: count || 0,
+      notes: enrichedNotes,
+      totalCount,
       page,
-      hasMore: hasMoreValue,
-      searchDuration,
+      hasMore,
+      searchDuration: Date.now() - startTime,
     })
   } catch (error) {
     console.error("Error in panel search:", error)
@@ -246,7 +309,6 @@ export async function POST(request: Request) {
   }
 }
 
-// GET /api/search/panel/suggestions - Get search suggestions
 export async function GET(request: Request) {
   try {
     const { user, error: authError } = await getCachedAuthUser()
@@ -259,41 +321,49 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
-    const supabase = await createServerClient()
-
+    const db = await createServiceDatabaseClient()
     const { searchParams } = new URL(request.url)
     const type = searchParams.get("type") || "all"
 
-    const suggestions: any = {}
+    const suggestions: Suggestions = {
+      recent: [],
+      trending: [],
+      tags: [],
+    }
 
     // Get recent searches
     if (type === "all" || type === "recent") {
-      const { data: recentSearches } = await supabase
+      const { data: recentSearches } = await db
         .from("search_history")
         .select("query")
         .eq("user_id", user.id)
         .order("created_at", { ascending: false })
-        .limit(5)
+        .limit(RECENT_SEARCH_LIMIT)
 
-      suggestions.recent = [...new Set(recentSearches?.map((s: any) => s.query) || [])]
+      const queries = recentSearches?.map((s: any) => s.query as string) || []
+      suggestions.recent = Array.from(new Set(queries))
     }
 
     // Get trending tags from materialized view
     if (type === "all" || type === "trending") {
-      const { data: trendingTags } = await supabase.from("trending_tags").select("tag, usage_count").limit(20)
+      const { data: trendingTags } = await db
+        .from("trending_tags")
+        .select("tag, usage_count")
+        .limit(TRENDING_TAGS_LIMIT)
 
-      suggestions.trending = trendingTags?.map((t: any) => t.tag) || []
+      suggestions.trending = trendingTags?.map((t: any) => t.tag as string) || []
     }
 
     // Get all available tags for filtering
     if (type === "all" || type === "tags") {
-      const { data: allTags } = await supabase
+      const { data: allTags } = await db
         .from("personal_sticks_tags")
         .select("tag_title")
         .order("created_at", { ascending: false })
-        .limit(50)
+        .limit(ALL_TAGS_LIMIT)
 
-      suggestions.tags = [...new Set(allTags?.map((t: any) => t.tag_title) || [])]
+      const tagTitles = allTags?.map((t: any) => t.tag_title as string) || []
+      suggestions.tags = Array.from(new Set(tagTitles))
     }
 
     return NextResponse.json(suggestions)

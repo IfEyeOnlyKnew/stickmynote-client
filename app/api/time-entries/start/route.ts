@@ -1,12 +1,12 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { createClient } from "@/lib/supabase/server"
+import { createDatabaseClient } from "@/lib/database/database-adapter"
 import { getCachedAuthUser } from "@/lib/auth/cached-auth"
 
 export async function POST(request: NextRequest) {
   try {
-    const supabase = await createClient()
+    const db = await createDatabaseClient()
 
-    const { user, error: authError, rateLimited } = await getCachedAuthUser(supabase)
+    const { user, error: authError, rateLimited } = await getCachedAuthUser()
 
     if (rateLimited) {
       return NextResponse.json({ error: "Too many requests" }, { status: 429 })
@@ -23,7 +23,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Check if there's already an active timer for this user
-    const { data: activeEntries } = await supabase
+    const { data: activeEntries } = await db
       .from("time_entries")
       .select("id")
       .eq("user_id", user.id)
@@ -34,7 +34,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Create new time entry
-    const { data, error } = await supabase
+    const { data, error } = await db
       .from("time_entries")
       .insert({
         task_id: taskId,

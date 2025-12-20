@@ -45,11 +45,13 @@ export function PadQADialog({ padId, padName, trigger }: PadQADialogProps) {
   const [loadingHistory, setLoadingHistory] = useState(false)
   const [currentQAId, setCurrentQAId] = useState<string | null>(null)
 
+  /* eslint-disable react-hooks/exhaustive-deps */
   useEffect(() => {
     if (open && activeTab === "history") {
       fetchHistory()
     }
   }, [open, activeTab, padId])
+  /* eslint-enable react-hooks/exhaustive-deps */
 
   const fetchHistory = async () => {
     setLoadingHistory(true)
@@ -232,16 +234,18 @@ export function PadQADialog({ padId, padName, trigger }: PadQADialogProps) {
           </TabsContent>
 
           <TabsContent value="history" className="mt-4">
-            {loadingHistory ? (
+            {loadingHistory && (
               <div className="flex items-center justify-center py-8">
                 <Loader2 className="h-6 w-6 animate-spin text-gray-400" />
               </div>
-            ) : history.length === 0 ? (
+            )}
+            {!loadingHistory && history.length === 0 && (
               <div className="text-center py-8 text-gray-500">
                 <History className="h-8 w-8 mx-auto mb-2 text-gray-400" />
                 <p className="text-sm">No questions asked yet</p>
               </div>
-            ) : (
+            )}
+            {!loadingHistory && history.length > 0 && (
               <ScrollArea className="h-[400px] pr-4">
                 <div className="space-y-4">
                   {history.map((item) => (
@@ -267,7 +271,7 @@ export function PadQADialog({ padId, padName, trigger }: PadQADialogProps) {
                         )}
                         {item.citations?.length > 0 && (
                           <span>
-                            {item.citations.length} citation{item.citations.length !== 1 ? "s" : ""}
+                            {item.citations.length} citation{item.citations.length === 1 ? "" : "s"}
                           </span>
                         )}
                       </div>

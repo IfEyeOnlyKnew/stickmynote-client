@@ -1,12 +1,12 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { createClient } from "@/lib/supabase/server"
+import { createDatabaseClient } from "@/lib/database/database-adapter"
 
 export async function GET(request: NextRequest, { params }: { params: { id: string } }) {
   try {
-    const supabase = await createClient()
+    const db = await createDatabaseClient()
     const noteId = params.id
 
-    const { data, error, count } = await supabase
+    const { data, error } = await db
       .from("personal_sticks_activities")
       .select("user_id", { count: "exact", head: false })
       .eq("personal_stick_id", noteId)
@@ -25,6 +25,7 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
 
     return NextResponse.json({ count: uniqueUsers.size })
   } catch (error) {
+    console.error("[view-count] Error:", error)
     return NextResponse.json({ count: 0 })
   }
 }

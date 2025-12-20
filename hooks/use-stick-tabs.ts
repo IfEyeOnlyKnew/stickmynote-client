@@ -9,6 +9,7 @@ export function useStickTabs(stickId: string, resetKey: number | undefined, conf
   const [stickTabs, setStickTabs] = useState<StickTab[]>([])
   const [loading, setLoading] = useState(true)
 
+  /* eslint-disable react-hooks/exhaustive-deps */
   const loadTabs = useCallback(async () => {
     try {
       setLoading(true)
@@ -25,7 +26,9 @@ export function useStickTabs(stickId: string, resetKey: number | undefined, conf
       setLoading(false)
     }
   }, [stickId, config.getStickTabs])
+  /* eslint-enable react-hooks/exhaustive-deps */
 
+  /* eslint-disable react-hooks/exhaustive-deps */
   const refreshTabs = useCallback(async () => {
     try {
       const tabs = await config.getStickTabs(stickId)
@@ -34,6 +37,7 @@ export function useStickTabs(stickId: string, resetKey: number | undefined, conf
       console.error("Error refreshing stick tabs:", error)
     }
   }, [stickId, config.getStickTabs])
+  /* eslint-enable react-hooks/exhaustive-deps */
 
   useEffect(() => {
     if (stickId) {

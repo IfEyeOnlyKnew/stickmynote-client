@@ -1,8 +1,7 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { SearchEngine } from "@/lib/search-engine"
-import { createClient } from "@/lib/supabase/server"
+import { getSession } from "@/lib/auth/local-auth"
 import { getOrgContext } from "@/lib/auth/get-org-context"
-import { getCachedAuthUser } from "@/lib/auth/cached-auth"
 
 export const dynamic = "force-dynamic"
 
@@ -14,21 +13,13 @@ export async function GET(request: NextRequest) {
     const offset = Math.max(Number.parseInt(searchParams.get("offset") || "0"), 0)
     const fuzzy = searchParams.get("fuzzy") !== "false"
 
-    const supabase = await createClient()
-    const authResult = await getCachedAuthUser(supabase)
+    const session = await getSession()
 
-    if (authResult.rateLimited) {
-      return NextResponse.json(
-        { error: "Rate limit exceeded. Please try again in a moment." },
-        { status: 429, headers: { "Retry-After": "30" } },
-      )
-    }
-
-    if (!authResult.user) {
+    if (!session) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
-    const user = authResult.user
+    const user = session.user
 
     const orgContext = await getOrgContext(user.id)
     if (!orgContext) {

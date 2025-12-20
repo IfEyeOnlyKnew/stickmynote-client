@@ -37,11 +37,13 @@ export function PadSettingsDialog({ open, onOpenChange, padId, padName, userRole
 
   const canManageMembers = ["admin", "owner"].includes(userRole || "")
 
+  /* eslint-disable react-hooks/exhaustive-deps */
   useEffect(() => {
     if (open && padId) {
       fetchMembers()
     }
   }, [open, padId])
+  /* eslint-enable react-hooks/exhaustive-deps */
 
   const fetchMembers = async () => {
     try {
@@ -189,13 +191,15 @@ export function PadSettingsDialog({ open, onOpenChange, padId, padName, userRole
             )}
           </div>
 
-          {loading ? (
+          {loading && (
             <div className="text-center py-8">
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto" />
             </div>
-          ) : members.length === 0 ? (
+          )}
+          {!loading && members.length === 0 && (
             <div className="text-center py-8 text-gray-500">No members yet</div>
-          ) : (
+          )}
+          {!loading && members.length > 0 && (
             <div className="space-y-3">
               {members.map((member) => (
                 <div key={member.id} className="flex items-center justify-between p-3 border rounded-lg hover:bg-gray-50">

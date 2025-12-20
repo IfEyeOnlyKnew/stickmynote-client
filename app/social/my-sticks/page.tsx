@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useCallback } from "react"
 import { useUser } from "@/contexts/user-context"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
@@ -31,13 +31,7 @@ export default function MySocialSticksPage() {
     }
   }, [user, loading, router])
 
-  useEffect(() => {
-    if (user) {
-      fetchSticks()
-    }
-  }, [user])
-
-  const fetchSticks = async () => {
+  const fetchSticks = useCallback(async () => {
     try {
       setLoadingSticks(true)
       const response = await fetch("/api/social-sticks")
@@ -52,7 +46,13 @@ export default function MySocialSticksPage() {
     } finally {
       setLoadingSticks(false)
     }
-  }
+  }, [user?.id])
+
+  useEffect(() => {
+    if (user) {
+      fetchSticks()
+    }
+  }, [user, fetchSticks])
 
   if (loading || loadingSticks) {
     return (
@@ -95,7 +95,7 @@ export default function MySocialSticksPage() {
             <CardContent className="py-12 text-center">
               <FileText className="h-12 w-12 text-gray-400 mx-auto mb-4" />
               <h3 className="text-lg font-semibold mb-2">No Social Sticks</h3>
-              <p className="text-gray-600 mb-4">You haven't created any social sticks yet</p>
+              <p className="text-gray-600 mb-4">You haven&apos;t created any social sticks yet</p>
               <Button onClick={() => router.push("/social")}>Go to Social Hub</Button>
             </CardContent>
           </Card>

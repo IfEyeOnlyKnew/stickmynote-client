@@ -6,92 +6,92 @@ import { Card } from "@/components/ui/card"
 import { X, Cookie, Settings } from "lucide-react"
 import Link from "next/link"
 
+interface CookiePreferences {
+  necessary: boolean
+  analytics: boolean
+  marketing: boolean
+}
+
+const DEFAULT_PREFERENCES: CookiePreferences = {
+  necessary: true,
+  analytics: false,
+  marketing: false,
+}
+
+const ALL_ACCEPTED: CookiePreferences = {
+  necessary: true,
+  analytics: true,
+  marketing: true,
+}
+
+// Helper: Update gtag consent
+function updateGtagConsent(consentType: string, value: "granted" | "denied") {
+  if (globalThis.window === undefined) return
+  const gtag = (globalThis as any).gtag
+  if (!gtag) return
+  gtag("consent", "update", { [consentType]: value })
+}
+
+// Helper: Apply analytics consent
+function applyAnalyticsConsent(enabled: boolean) {
+  updateGtagConsent("analytics_storage", enabled ? "granted" : "denied")
+}
+
+// Helper: Apply marketing consent
+function applyMarketingConsent(enabled: boolean) {
+  if (globalThis.window === undefined) return
+  const gtag = (globalThis as any).gtag
+  if (!gtag) return
+  const value = enabled ? "granted" : "denied"
+  gtag("consent", "update", {
+    ad_storage: value,
+    ad_user_data: value,
+    ad_personalization: value,
+  })
+}
+
+// Helper: Apply all consent preferences
+function applyConsent(prefs: CookiePreferences) {
+  applyAnalyticsConsent(prefs.analytics)
+  applyMarketingConsent(prefs.marketing)
+}
+
+// Helper: Save preferences to localStorage
+function savePreferences(prefs: CookiePreferences) {
+  localStorage.setItem("cookie-consent", JSON.stringify(prefs))
+  applyConsent(prefs)
+}
+
 export function CookieConsentBanner() {
   const [showBanner, setShowBanner] = useState(false)
   const [showSettings, setShowSettings] = useState(false)
-  const [preferences, setPreferences] = useState({
-    necessary: true, // Always true, cannot be disabled
-    analytics: false,
-    marketing: false,
-  })
+  const [preferences, setPreferences] = useState<CookiePreferences>(DEFAULT_PREFERENCES)
 
   useEffect(() => {
-    // Check if user has already made a choice
     const consent = localStorage.getItem("cookie-consent")
     if (!consent) {
       setShowBanner(true)
-    } else {
-      const savedPreferences = JSON.parse(consent)
-      setPreferences(savedPreferences)
-      applyConsent(savedPreferences)
+      return
     }
+    const savedPreferences = JSON.parse(consent)
+    setPreferences(savedPreferences)
+    applyConsent(savedPreferences)
   }, [])
 
-  const applyConsent = (prefs: typeof preferences) => {
-    // Apply analytics consent
-    if (prefs.analytics) {
-      // Enable analytics tracking
-      if (typeof window !== "undefined" && (window as any).gtag) {
-        ;(window as any).gtag("consent", "update", {
-          analytics_storage: "granted",
-        })
-      }
-    } else {
-      // Disable analytics tracking
-      if (typeof window !== "undefined" && (window as any).gtag) {
-        ;(window as any).gtag("consent", "update", {
-          analytics_storage: "denied",
-        })
-      }
-    }
-
-    // Apply marketing consent
-    if (prefs.marketing) {
-      if (typeof window !== "undefined" && (window as any).gtag) {
-        ;(window as any).gtag("consent", "update", {
-          ad_storage: "granted",
-          ad_user_data: "granted",
-          ad_personalization: "granted",
-        })
-      }
-    } else {
-      if (typeof window !== "undefined" && (window as any).gtag) {
-        ;(window as any).gtag("consent", "update", {
-          ad_storage: "denied",
-          ad_user_data: "denied",
-          ad_personalization: "denied",
-        })
-      }
-    }
-  }
-
   const handleAcceptAll = () => {
-    const newPreferences = {
-      necessary: true,
-      analytics: true,
-      marketing: true,
-    }
-    setPreferences(newPreferences)
-    localStorage.setItem("cookie-consent", JSON.stringify(newPreferences))
-    applyConsent(newPreferences)
+    setPreferences(ALL_ACCEPTED)
+    savePreferences(ALL_ACCEPTED)
     setShowBanner(false)
   }
 
   const handleRejectAll = () => {
-    const newPreferences = {
-      necessary: true,
-      analytics: false,
-      marketing: false,
-    }
-    setPreferences(newPreferences)
-    localStorage.setItem("cookie-consent", JSON.stringify(newPreferences))
-    applyConsent(newPreferences)
+    setPreferences(DEFAULT_PREFERENCES)
+    savePreferences(DEFAULT_PREFERENCES)
     setShowBanner(false)
   }
 
   const handleSavePreferences = () => {
-    localStorage.setItem("cookie-consent", JSON.stringify(preferences))
-    applyConsent(preferences)
+    savePreferences(preferences)
     setShowBanner(false)
     setShowSettings(false)
   }
@@ -106,15 +106,7 @@ export function CookieConsentBanner() {
             <Cookie className="h-6 w-6 text-blue-600 flex-shrink-0 mt-1" />
             <div className="space-y-2">
               <h3 className="font-semibold text-lg">Cookie Preferences</h3>
-              {!showSettings ? (
-                <p className="text-sm text-muted-foreground">
-                  We use cookies to enhance your experience, analyze site traffic, and personalize content. By clicking
-                  "Accept All", you consent to our use of cookies.{" "}
-                  <Link href="/privacy" className="text-blue-600 hover:underline">
-                    Learn more
-                  </Link>
-                </p>
-              ) : (
+              {showSettings ? (
                 <div className="space-y-4">
                   <div className="space-y-3">
                     <div className="flex items-center justify-between">
@@ -150,6 +142,14 @@ export function CookieConsentBanner() {
                     </div>
                   </div>
                 </div>
+              ) : (
+                <p className="text-sm text-muted-foreground">
+                  We use cookies to enhance your experience, analyze site traffic, and personalize content. By clicking
+                  &quot;Accept All&quot;, you consent to our use of cookies.{" "}
+                  <Link href="/privacy" className="text-blue-600 hover:underline">
+                    Learn more
+                  </Link>
+                </p>
               )}
             </div>
           </div>
@@ -158,7 +158,16 @@ export function CookieConsentBanner() {
           </Button>
         </div>
         <div className="flex flex-wrap gap-2 mt-4">
-          {!showSettings ? (
+          {showSettings ? (
+            <>
+              <Button onClick={handleSavePreferences} className="flex-1 sm:flex-none">
+                Save Preferences
+              </Button>
+              <Button onClick={() => setShowSettings(false)} variant="outline" className="flex-1 sm:flex-none">
+                Back
+              </Button>
+            </>
+          ) : (
             <>
               <Button onClick={handleAcceptAll} className="flex-1 sm:flex-none">
                 Accept All
@@ -173,15 +182,6 @@ export function CookieConsentBanner() {
               >
                 <Settings className="h-4 w-4" />
                 Customize
-              </Button>
-            </>
-          ) : (
-            <>
-              <Button onClick={handleSavePreferences} className="flex-1 sm:flex-none">
-                Save Preferences
-              </Button>
-              <Button onClick={() => setShowSettings(false)} variant="outline" className="flex-1 sm:flex-none">
-                Back
               </Button>
             </>
           )}

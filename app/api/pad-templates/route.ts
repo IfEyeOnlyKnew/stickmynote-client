@@ -1,15 +1,15 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { createClient } from "@/lib/supabase/server"
+import { createDatabaseClient } from "@/lib/database/database-adapter"
 import { getCachedAuthUser } from "@/lib/auth/cached-auth"
 
 export async function GET(req: NextRequest) {
   try {
-    const supabase = await createClient()
+    const db = await createDatabaseClient()
     const { searchParams } = new URL(req.url)
     const category = searchParams.get("category")
     const hubType = searchParams.get("hub_type")
 
-    let query = supabase.from("paks_pad_templates").select("*").order("use_count", { ascending: false }).order("name")
+    let query = db.from("paks_pad_templates").select("*").order("use_count", { ascending: false }).order("name")
 
     if (category) {
       query = query.eq("category", category)
@@ -44,9 +44,9 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   try {
-    const supabase = await createClient()
+    const db = await createDatabaseClient()
 
-    const authResult = await getCachedAuthUser(supabase)
+    const authResult = await getCachedAuthUser()
     if (authResult.rateLimited) {
       return NextResponse.json(
         { error: "Rate limit exceeded. Please try again in a moment." },
@@ -66,7 +66,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Name and category are required" }, { status: 400 })
     }
 
-    const { data: template, error } = await supabase
+    const { data: template, error } = await db
       .from("paks_pad_templates")
       .insert({
         name,

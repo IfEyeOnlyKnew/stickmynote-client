@@ -30,7 +30,7 @@ export function VirtualizedTable<T extends { id: string }>({
   isLoadingMore,
   emptyState,
   className = "",
-}: VirtualizedTableProps<T>) {
+}: Readonly<VirtualizedTableProps<T>>) {
   const containerRef = useRef<HTMLDivElement>(null)
   const observerRef = useRef<IntersectionObserver | null>(null)
   const loadMoreTriggerRef = useRef<HTMLDivElement>(null)
@@ -120,7 +120,7 @@ export function VirtualizedTable<T extends { id: string }>({
   )
 }
 
-export function TableSkeleton({ rows = 5 }: { rows?: number }) {
+export function TableSkeleton({ rows = 5 }: Readonly<{ rows?: number }>) {
   return (
     <div className="space-y-3">
       {Array.from({ length: rows }).map((_, i) => (

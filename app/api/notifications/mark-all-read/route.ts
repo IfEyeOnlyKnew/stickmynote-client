@@ -1,12 +1,12 @@
-import { createServerClient } from "@/lib/supabase/server"
+import { createDatabaseClient } from "@/lib/database/database-adapter"
 import { getCachedAuthUser } from "@/lib/auth/cached-auth"
 import { NextResponse } from "next/server"
 
 // POST /api/notifications/mark-all-read - Mark all activities as read
 export async function POST(request: Request) {
   try {
-    const supabase = await createServerClient()
-    const authResult = await getCachedAuthUser(supabase)
+    const db = await createDatabaseClient()
+    const authResult = await getCachedAuthUser()
 
     if (authResult.rateLimited) {
       return NextResponse.json(
@@ -19,7 +19,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
-    const { data: activities, error: fetchError } = await supabase
+    const { data: activities, error: fetchError } = await db
       .from("personal_sticks_activities")
       .select("id, metadata")
       .or("metadata->read.is.null,metadata->read.eq.false")
@@ -33,7 +33,7 @@ export async function POST(request: Request) {
     const updates = activities.map((activity: { id: string; metadata: Record<string, unknown> | null }) => {
       const metadata = activity.metadata || {}
       metadata.read = true
-      return supabase.from("personal_sticks_activities").update({ metadata }).eq("id", activity.id)
+      return db.from("personal_sticks_activities").update({ metadata }).eq("id", activity.id)
     })
 
     await Promise.all(updates)

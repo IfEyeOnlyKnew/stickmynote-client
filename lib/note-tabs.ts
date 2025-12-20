@@ -1,155 +1,766 @@
-import type { NoteTab } from "@/types/note"
+import { queryOne, queryMany, execute } from "@/lib/database/pg-client"
+import { createDatabaseClient } from "@/lib/database/database-adapter"
+import type { Note as BaseNote, Reply, VideoItem, ImageItem, NoteTab } from "@/types/note"
+
+// Extend Note type to include 'tags', 'images', 'videos', and 'replies' if not present
+export interface Note extends BaseNote {
+  tags: string[]
+  images: ImageItem[]
+  videos: VideoItem[]
+  replies: Reply[]
+}
+
+// ============================================================================
+// TYPES
+// ============================================================================
+
+export interface CreateNoteData {
+  topic?: string
+  content: string
+  color?: string
+  position_x?: number
+  position_y?: number
+  is_shared?: boolean
+  tags?: string[]
+  images?: string[]
+  videos?: string[]
+}
+
+export interface UpdateNoteData extends Partial<CreateNoteData> {
+  id: string
+}
+
+export interface CreateReplyData {
+  note_id: string
+  content: string
+  color?: string
+}
+
+export interface NotesResponse {
+  notes: Note[]
+  hasMore: boolean
+  total: number
+}
+
+interface DatabaseNoteRow {
+  id: string
+  user_id: string
+  title: string | null
+  topic: string | null
+  content: string
+  color: string
+  position_x: number
+  position_y: number
+  is_shared: boolean
+  z_index: number | null
+  is_pinned: boolean | null
+  created_at: string
+  updated_at: string
+}
+
+interface DatabaseReplyRow {
+  id: string
+  personal_stick_id: string // Renamed from note_id
+  user_id: string
+  content: string
+  color: string
+  created_at: string
+  updated_at: string
+}
+
+interface ReplyInsertPayload {
+  personal_stick_id: string // Renamed from note_id
+  content: string
+  color: string
+  created_at: string
+  updated_at: string
+  user_id: string
+}
+
+interface PartialNoteData {
+  id?: unknown
+  topic?: unknown
+  title?: unknown
+  content?: unknown
+  color?: unknown
+  position_x?: unknown
+  position_y?: unknown
+  is_shared?: unknown
+  z_index?: unknown
+  is_pinned?: unknown
+  created_at?: unknown
+  updated_at?: unknown
+  user_id?: unknown
+}
+
+interface NoteUpdatePayload {
+  title?: string
+  topic?: string
+  content?: string
+  color?: string
+  position_x?: number
+  position_y?: number
+  is_shared?: boolean
+  z_index?: number
+  is_pinned?: boolean
+  updated_at: string
+}
+
+// ============================================================================
+// HELPER FUNCTIONS
+// ============================================================================
 
 /**
- * DB row returned by /api/note-tabs
+ * Resolves the updated_at timestamp with fallback to created_at or current time
  */
-type DBNoteTabRow = {
-  id: string
-  note_id: string
-  tab_name: string | null
-  tab_type: "content" | "video" | "videos" | "images" | "details"
-  tab_content?: string | null
-  tab_data?: unknown
-  tab_order?: number | null
-  created_at?: string
-  updated_at?: string
+function resolveUpdatedAt(updatedAt: unknown, createdAt: unknown): string {
+  if (typeof updatedAt === "string" && updatedAt) {
+    return updatedAt
+  }
+  if (typeof createdAt === "string" && createdAt) {
+    return createdAt
+  }
+  return new Date().toISOString()
 }
 
 /**
- * Safely parse possible stringified JSON (or base64-wrapped) into an object
+ * Resolves a string field with a fallback value
  */
-function safeParseTabData(val: unknown): Record<string, any> {
-  try {
-    if (!val) return {}
-    if (typeof val === "string") {
-      const raw = val.startsWith("base64-") ? atob(val.slice(7)) : val
-      return JSON.parse(raw)
+function resolveStringField(value: unknown, fallback: string): string {
+  return typeof value === "string" && value ? value : fallback
+}
+
+/**
+ * Resolves a timestamp field or returns current time
+ */
+function resolveTimestamp(value: unknown): string {
+  return typeof value === "string" && value ? value : new Date().toISOString()
+}
+
+interface ExtractedTabData {
+  tags: string[]
+  images: ImageItem[]
+  videos: VideoItem[]
+}
+
+/**
+ * Extracts tags, images, and videos from note tabs
+ */
+function extractTabData(noteTabs: unknown[] | null): ExtractedTabData {
+  const result: ExtractedTabData = { tags: [], images: [], videos: [] }
+  if (!noteTabs) {
+    return result
+  }
+  for (const tab of noteTabs as any[]) {
+    if (!tab.tab_data) {
+      continue
     }
-    if (typeof val === "object") return val as Record<string, any>
-    return {}
-  } catch {
-    return {}
+    const tabData = typeof tab.tab_data === "string" ? JSON.parse(tab.tab_data) : tab.tab_data
+    if (tabData.tags && Array.isArray(tabData.tags)) {
+      result.tags = [...result.tags, ...tabData.tags]
+    }
+    if (tabData.images && Array.isArray(tabData.images)) {
+      result.images = [...result.images, ...tabData.images]
+    }
+    if (tabData.videos && Array.isArray(tabData.videos)) {
+      result.videos = [...result.videos, ...tabData.videos]
+    }
+  }
+  return result
+}
+
+/**
+ * Transforms a raw reply into a Reply object
+ */
+function transformReply(reply: unknown): Reply {
+  const r = reply as any
+  return {
+    id: resolveStringField(r.id, "unknown-reply-id"),
+    content: r.content || "",
+    color: r.color || "#ffffff",
+    created_at: resolveTimestamp(r.created_at),
+    updated_at: resolveUpdatedAt(r.updated_at, r.created_at),
+    user_id: resolveStringField(r.user_id, "unknown-user"),
+    note_id: resolveStringField(r.personal_stick_id, "unknown-note-id"),
   }
 }
 
 /**
- * Normalize DB tab_type into UI tab_type used by the app
- * - "content" -> "main"
- * - "video"   -> "videos"
- * - "images"  -> "images"
- * - "details" -> "details"
+ * Builds the update payload from update data
  */
-function fromDbType(dbType: DBNoteTabRow["tab_type"]): NoteTab["tab_type"] {
-  if (dbType === "content") return "main"
-  if (dbType === "video" || dbType === "videos") return "videos"
-  if (dbType === "images") return "images"
-  return "details"
+function buildUpdatePayload(updateData: Partial<CreateNoteData>): NoteUpdatePayload {
+  const payload: NoteUpdatePayload = {
+    updated_at: new Date().toISOString(),
+  }
+
+  if (updateData.topic !== undefined) {
+    payload.topic = updateData.topic
+    payload.title = updateData.topic || "Untitled Note"
+  }
+  if (updateData.content !== undefined) {
+    payload.content = updateData.content
+  }
+  if (updateData.color !== undefined) {
+    payload.color = updateData.color
+  }
+  if (updateData.position_x !== undefined) {
+    payload.position_x = updateData.position_x
+  }
+  if (updateData.position_y !== undefined) {
+    payload.position_y = updateData.position_y
+  }
+  if (updateData.is_shared !== undefined) {
+    payload.is_shared = Boolean(updateData.is_shared)
+  }
+
+  return payload
 }
 
 /**
- * Map a DB row into the application's NoteTab shape.
- * Ensures tab_data.videos/images arrays are always defined.
+ * Transforms partial note data into a complete Note object
  */
-function mapRowToAppTab(row: DBNoteTabRow): NoteTab {
-  const data = safeParseTabData(row.tab_data)
-  const videos = Array.isArray(data?.videos) ? data.videos : []
-  const images = Array.isArray(data?.images) ? data.images : []
+function buildTransformedNote(noteData: PartialNoteData, tabData: ExtractedTabData, replies: unknown[]): Note {
   return {
-    id: row.id,
-    note_id: row.note_id,
-    tab_type: fromDbType(row.tab_type),
-    tab_name: row.tab_name || undefined,
-    tab_data: data,
-    videos,
-    images,
-    created_at: row.created_at || "",
-    updated_at: row.updated_at || "",
-  } as NoteTab
+    id: resolveStringField(noteData.id, "unknown-id"),
+    topic: (noteData.topic as string) || "",
+    title: (noteData.title as string) || (noteData.topic as string) || "Untitled Note",
+    content: (noteData.content as string) || "",
+    color: (noteData.color as string) || "#fef3c7",
+    position_x: (noteData.position_x as number) || 0,
+    position_y: (noteData.position_y as number) || 0,
+    is_shared: Boolean(noteData.is_shared),
+    z_index: (noteData.z_index as number) || undefined,
+    is_pinned: (noteData.is_pinned as boolean) || undefined,
+    tags: tabData.tags,
+    images: tabData.images,
+    videos: tabData.videos,
+    created_at: resolveTimestamp(noteData.created_at),
+    updated_at: resolveTimestamp(noteData.updated_at),
+    user_id: resolveStringField(noteData.user_id, "unknown-user"),
+    replies: replies.map(transformReply),
+  }
+}
+
+// ============================================================================
+// NOTES FUNCTIONS
+// ============================================================================
+
+/**
+ * Get all personal sticks (notes) for the current user
+ */
+export async function getNotes(
+  limit = 20,
+  offset = 0,
+  filter: "all" | "personal" | "shared" = "all",
+): Promise<NotesResponse> {
+  try {
+    // Use database adapter for auth
+    const db = await createDatabaseClient()
+    const {
+      data: { user },
+      error: authError,
+    } = await db.auth.getUser()
+    if (authError || !user) {
+      console.error("Authentication error:", authError)
+      throw new Error("User not authenticated")
+    }
+
+    // Build query based on filter
+    let whereClause = "user_id = $1"
+    
+    if (filter === "personal") {
+      whereClause += " AND is_shared = false"
+    } else if (filter === "shared") {
+      whereClause += " AND is_shared = true"
+    }
+
+    const notes = await queryMany<DatabaseNoteRow>(
+      `SELECT id, title, topic, content, color, position_x, position_y, 
+              is_shared, z_index, is_pinned, created_at, updated_at, user_id
+       FROM personal_sticks 
+       WHERE ${whereClause}
+       ORDER BY updated_at DESC
+       LIMIT $2 OFFSET $3`,
+      [user.id, limit, offset]
+    )
+
+    const notesWithReplies: Note[] = []
+
+    for (const note of (notes || [])) {
+      const replies = await queryMany<DatabaseReplyRow>(
+        `SELECT id, content, color, created_at, updated_at, user_id, personal_stick_id
+         FROM personal_sticks_replies
+         WHERE personal_stick_id = $1
+         ORDER BY created_at ASC`,
+        [note.id]
+      )
+
+      const typedReplies = replies || []
+
+      // Fetch tabs from PostgreSQL
+      const noteTabs = await queryMany(
+        `SELECT * FROM personal_sticks_tabs
+         WHERE personal_stick_id = $1 AND user_id = $2`,
+        [note.id, user.id]
+      )
+
+      const { tags, images, videos } = extractTabData(noteTabs)
+
+      const transformedNote: Note = {
+        id: note.id,
+        title: note.title || note.topic || "Untitled Note",
+        topic: note.topic || "",
+        content: note.content || "",
+        color: note.color || "#fef3c7",
+        position_x: note.position_x || 0,
+        position_y: note.position_y || 0,
+        is_shared: Boolean(note.is_shared),
+        z_index: note.z_index || undefined,
+        is_pinned: note.is_pinned || undefined,
+        tags,
+        images,
+        videos,
+        created_at: note.created_at,
+        updated_at: note.updated_at,
+        user_id: note.user_id,
+        replies: typedReplies.map((reply) => ({
+          id: reply.id,
+          content: reply.content || "",
+          color: reply.color || "#ffffff",
+          created_at: reply.created_at,
+          updated_at: reply.updated_at || reply.created_at,
+          user_id: reply.user_id,
+          note_id: reply.personal_stick_id, // Keep note_id for backwards compatibility
+        })),
+      }
+
+      notesWithReplies.push(transformedNote)
+    }
+
+    const countResult = await queryOne<{ count: string }>(
+      `SELECT COUNT(*) as count FROM personal_sticks WHERE user_id = $1`,
+      [user.id]
+    )
+    const totalCount = countResult ? Number.parseInt(countResult.count) : 0
+
+    return {
+      notes: notesWithReplies,
+      hasMore: (notes?.length || 0) === limit,
+      total: totalCount || 0,
+    }
+  } catch (error) {
+    console.error("Error in getNotes:", error)
+    throw error
+  }
 }
 
 /**
- * Load tabs for a note and normalize them for the UI.
- * Used by components/note-tabs.tsx
+ * Create a new personal stick (note)
+ */
+export async function createNote(noteData: CreateNoteData): Promise<Note> {
+  try {
+    // Use database adapter for auth
+    const db = await createDatabaseClient()
+    const {
+      data: { user },
+      error: authError,
+    } = await db.auth.getUser()
+    if (authError || !user) {
+      console.error("Authentication error:", authError)
+      throw new Error("User not authenticated")
+    }
+
+    interface NotesInsertPayload {
+      user_id: string
+      title: string
+      topic: string
+      content: string
+      color: string
+      position_x: number
+      position_y: number
+      is_shared: boolean
+      z_index?: number
+      is_pinned?: boolean
+    }
+
+    const noteToCreate: NotesInsertPayload = {
+      user_id: user.id,
+      title: noteData.topic || "Untitled Note",
+      topic: noteData.topic || "",
+      content: noteData.content || "",
+      color: noteData.color || "#fef3c7",
+      position_x: noteData.position_x || 0,
+      position_y: noteData.position_y || 0,
+      is_shared: Boolean(noteData.is_shared),
+      z_index: 1,
+      is_pinned: false,
+    }
+
+    const note = await queryOne<DatabaseNoteRow>(
+      `INSERT INTO personal_sticks 
+       (user_id, title, topic, content, color, position_x, position_y, is_shared, z_index, is_pinned)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+       RETURNING id, title, topic, content, color, position_x, position_y, 
+                 is_shared, z_index, is_pinned, created_at, updated_at, user_id`,
+      [
+        noteToCreate.user_id,
+        noteToCreate.title,
+        noteToCreate.topic,
+        noteToCreate.content,
+        noteToCreate.color,
+        noteToCreate.position_x,
+        noteToCreate.position_y,
+        noteToCreate.is_shared,
+        noteToCreate.z_index,
+        noteToCreate.is_pinned,
+      ]
+    )
+
+    if (!note) {
+      throw new Error("Note was not created")
+    }
+
+    if (noteData.tags || noteData.images || noteData.videos) {
+      const tabData = {
+        tags: noteData.tags || [],
+        images: noteData.images || [],
+        videos: noteData.videos || [],
+      }
+
+      await execute(
+        `INSERT INTO personal_sticks_tabs 
+         (personal_stick_id, user_id, tab_type, tab_name, tab_content, tab_data, tab_order)
+         VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+        [note.id, user.id, "main", "Main", "", JSON.stringify(tabData), 1]
+      )
+    }
+
+    const transformedNote: Note = {
+      id: note.id,
+      title: note.title || note.topic || "Untitled Note",
+      topic: note.topic || "",
+      content: note.content || "",
+      color: note.color || "#fef3c7",
+      position_x: note.position_x || 0,
+      position_y: note.position_y || 0,
+      is_shared: Boolean(note.is_shared),
+      z_index: note.z_index || undefined,
+      is_pinned: note.is_pinned || undefined,
+      tags: noteData.tags || [],
+      images: [],
+      videos: [],
+      created_at: note.created_at,
+      updated_at: note.updated_at,
+      user_id: note.user_id,
+      replies: [],
+    }
+
+    return transformedNote
+  } catch (error) {
+    console.error("Error in createNote:", error)
+    throw error
+  }
+}
+
+/**
+ * Update an existing personal stick (note)
+ */
+export async function updateNote(noteData: UpdateNoteData): Promise<Note> {
+  try {
+    // Use database adapter for auth
+    const db = await createDatabaseClient()
+    const {
+      data: { user },
+      error: authError,
+    } = await db.auth.getUser()
+    if (authError || !user) {
+      console.error("Authentication error:", authError)
+      throw new Error("User not authenticated")
+    }
+
+    const { id, ...updateData } = noteData
+    const updatePayload = buildUpdatePayload(updateData)
+
+    // Build dynamic UPDATE query
+    const fields = Object.keys(updatePayload).filter(k => k !== 'updated_at')
+    const setClause = fields.map((f, i) => `${f} = $${i + 1}`).join(', ')
+    const values = fields.map(f => (updatePayload as any)[f])
+    values.push(id, user.id)
+
+    const note = await queryOne<DatabaseNoteRow>(
+      `UPDATE personal_sticks
+       SET ${setClause}, updated_at = NOW()
+       WHERE id = $${fields.length + 1} AND user_id = $${fields.length + 2}
+       RETURNING id, title, topic, content, color, position_x, position_y,
+                 is_shared, z_index, is_pinned, created_at, updated_at, user_id`,
+      values
+    )
+
+    if (!note) {
+      throw new Error("Note not found or you don't have permission to update it")
+    }
+
+    if (updateData.tags || updateData.images || updateData.videos) {
+      const tabData = {
+        tags: updateData.tags || [],
+        images: updateData.images || [],
+        videos: updateData.videos || [],
+      }
+
+      const existingTab = await queryOne<{ id: string }>(
+        `SELECT id FROM personal_sticks_tabs
+         WHERE personal_stick_id = $1 AND user_id = $2 AND tab_type = $3`,
+        [id, user.id, "main"]
+      )
+
+      if (existingTab?.id) {
+        await execute(
+          `UPDATE personal_sticks_tabs
+           SET tab_data = $1, updated_at = NOW()
+           WHERE id = $2`,
+          [JSON.stringify(tabData), existingTab.id]
+        )
+      } else {
+        await execute(
+          `INSERT INTO personal_sticks_tabs
+           (personal_stick_id, user_id, tab_type, tab_name, tab_content, tab_data, tab_order)
+           VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+          [id, user.id, "main", "Main", "", JSON.stringify(tabData), 1]
+        )
+      }
+    }
+
+    const replies = await queryMany(
+      `SELECT id, content, color, created_at, updated_at, user_id, personal_stick_id
+       FROM personal_sticks_replies
+       WHERE personal_stick_id = $1
+       ORDER BY created_at ASC`,
+      [id]
+    )
+
+    const noteTabs = await queryMany(
+      `SELECT * FROM personal_sticks_tabs
+       WHERE personal_stick_id = $1 AND user_id = $2`,
+      [id, user.id]
+    )
+
+    const tabData = extractTabData(noteTabs)
+    const transformedNote = buildTransformedNote(note, tabData, replies)
+
+    return transformedNote
+  } catch (error) {
+    console.error("Error in updateNote:", error)
+    throw error
+  }
+}
+
+/**
+ * Update personal stick (note) position
+ */
+export async function updateNotePosition(noteId: string, x: number, y: number): Promise<Note> {
+  try {
+    // Use database adapter for auth
+    const db = await createDatabaseClient()
+    const {
+      data: { user },
+      error: authError,
+    } = await db.auth.getUser()
+    if (authError || !user) {
+      console.error("Authentication error:", authError)
+      throw new Error("User not authenticated")
+    }
+
+    const note = await queryOne<DatabaseNoteRow>(
+      `UPDATE personal_sticks
+       SET position_x = $1, position_y = $2, updated_at = NOW()
+       WHERE id = $3 AND user_id = $4
+       RETURNING id, title, topic, content, color, position_x, position_y,
+                 is_shared, z_index, is_pinned, created_at, updated_at, user_id`,
+      [x, y, noteId, user.id]
+    )
+
+    if (!note) {
+      throw new Error("Note not found or you don't have permission to update it")
+    }
+
+    const repliesArray = await queryMany(
+      `SELECT id, content, color, created_at, updated_at, user_id, personal_stick_id
+       FROM personal_sticks_replies
+       WHERE personal_stick_id = $1
+       ORDER BY created_at ASC`,
+      [noteId]
+    )
+
+    const noteTabs = await queryMany(
+      `SELECT * FROM personal_sticks_tabs
+       WHERE personal_stick_id = $1 AND user_id = $2`,
+      [noteId, user.id]
+    )
+
+    const tabData = extractTabData(noteTabs)
+    const transformedNote = buildTransformedNote(note, tabData, repliesArray)
+
+    return transformedNote
+  } catch (error) {
+    console.error("Error in updateNotePosition:", error)
+    throw error
+  }
+}
+
+/**
+ * Delete a personal stick (note)
+ */
+export async function deleteNote(noteId: string): Promise<void> {
+  try {
+    // Use database adapter for auth
+    const db = await createDatabaseClient()
+    const {
+      data: { user },
+      error: authError,
+    } = await db.auth.getUser()
+    if (authError || !user) {
+      console.error("Authentication error:", authError)
+      throw new Error("User not authenticated")
+    }
+
+    await execute(
+      `DELETE FROM personal_sticks WHERE id = $1 AND user_id = $2`,
+      [noteId, user.id]
+    )
+  } catch (error) {
+    console.error("Error in deleteNote:", error)
+    throw error
+  }
+}
+
+/**
+ * Create a reply on a personal stick (note)
+ */
+export async function createReply(replyData: CreateReplyData): Promise<Reply> {
+  try {
+    // Use database adapter for auth
+    const db = await createDatabaseClient()
+    const {
+      data: { user },
+      error: authError,
+    } = await db.auth.getUser()
+    if (authError || !user) {
+      console.error("Authentication error:", authError)
+      throw new Error("User not authenticated")
+    }
+
+    const reply = await queryOne<DatabaseReplyRow>(
+      `INSERT INTO personal_sticks_replies
+       (personal_stick_id, user_id, content, color)
+       VALUES ($1, $2, $3, $4)
+       RETURNING id, content, color, created_at, updated_at, user_id, personal_stick_id`,
+      [
+        replyData.note_id,
+        user.id,
+        replyData.content || "",
+        replyData.color || "#ffffff",
+      ]
+    )
+
+    if (!reply) {
+      throw new Error("Reply was not created")
+    }
+
+    return {
+      id: reply.id,
+      content: reply.content || "",
+      color: reply.color || "#ffffff",
+      created_at: reply.created_at,
+      updated_at: reply.updated_at || reply.created_at,
+      user_id: reply.user_id,
+      note_id: reply.personal_stick_id,
+    }
+  } catch (error) {
+    console.error("Error in createReply:", error)
+    throw error
+  }
+}
+
+/**
+ * Get all tabs for a note
  */
 export async function getNoteTabs(noteId: string): Promise<NoteTab[]> {
-  if (!noteId) {
+  try {
+    console.log("[v0] getNoteTabs called for noteId:", noteId)
+    const response = await fetch(`/api/note-tabs?noteId=${noteId}`)
+    console.log("[v0] getNoteTabs response status:", response.status)
+
+    if (!response.ok) {
+      const errorText = await response.text()
+      console.error("[v0] getNoteTabs error response:", errorText)
+      throw new Error(`Failed to fetch note tabs: ${response.status}`)
+    }
+
+    const data = await response.json()
+    console.log("[v0] getNoteTabs data:", data)
+
+    return (data.tabs || []).map((tab: any) => ({
+      id: tab.id,
+      note_id: tab.personal_stick_id || noteId,
+      tab_type: tab.tab_type as "main" | "videos" | "images" | "details",
+      tab_data: tab.tab_data || {},
+      created_at: tab.created_at,
+      updated_at: tab.updated_at,
+    }))
+  } catch (error) {
+    console.error("[v0] Error fetching note tabs:", error)
     return []
   }
+}
 
+/**
+ * Save a tab for a note
+ */
+export async function saveNoteTab(noteId: string, tabType: string, data: any): Promise<any> {
   try {
-    const res = await fetch(`/api/note-tabs?noteId=${encodeURIComponent(noteId)}`, {
-      method: "GET",
-      credentials: "include",
-      headers: { Accept: "application/json" },
-      cache: "no-store",
+    console.log("[v0] saveNoteTab called:", { noteId, tabType, data })
+    const response = await fetch(`/api/note-tabs`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ noteId, tab_type: tabType, tab_data: data }),
     })
 
-    if (res.status === 404 || res.status === 401) {
-      return []
+    console.log("[v0] saveNoteTab response status:", response.status)
+
+    if (!response.ok) {
+      const errorText = await response.text()
+      console.error("[v0] saveNoteTab error response:", errorText)
+      throw new Error(`Failed to save note tab: ${response.status}`)
     }
 
-    if (res.status === 429) {
-      return []
-    }
-
-    if (!res.ok) {
-      return []
-    }
-
-    let json: any
-    try {
-      json = await res.json()
-    } catch (e) {
-      return []
-    }
-
-    const rows = Array.isArray(json?.tabs) ? (json.tabs as DBNoteTabRow[]) : []
-    return rows.map(mapRowToAppTab)
+    return await response.json()
   } catch (error) {
-    return []
+    console.error("[v0] Error saving note tab:", error)
+    throw error
   }
 }
 
 /**
- * Persist media items into note_tabs.
- * uiTabType: "videos" | "images"
- * data: either an array or an object with { videos } / { images }
+ * Delete a tab item for a note
  */
-export async function saveNoteTab(
-  noteId: string,
-  uiTabType: "video" | "videos" | "images",
-  data: any[] | { videos?: any[]; images?: any[] },
-) {
-  const tabType = uiTabType === "images" ? "images" : "videos"
-  const items = Array.isArray(data) ? data : (data as any)[tabType] || []
+export async function deleteNoteTabItem(noteId: string, tabType: string, itemId: string): Promise<void> {
+  try {
+    console.log("[v0] deleteNoteTabItem called:", { noteId, tabType, itemId })
+    const response = await fetch(`/api/note-tabs`, {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ noteId, tab_type: tabType, item_id: itemId }),
+    })
 
-  const res = await fetch("/api/note-tabs", {
-    method: "POST",
-    credentials: "include",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ noteId, tabType, items }),
-  })
-  if (!res.ok) {
-    const text = await res.text().catch(() => "")
-    throw new Error(text || `Failed to save ${tabType} (${res.status})`)
-  }
-  return res.json()
-}
+    console.log("[v0] deleteNoteTabItem response status:", response.status)
 
-/**
- * Delete a single media item from note_tabs by id.
- */
-export async function deleteNoteTabItem(noteId: string, uiTabType: "video" | "videos" | "images", itemId: string) {
-  const tabType = uiTabType === "images" ? "images" : "videos"
-  const res = await fetch("/api/note-tabs", {
-    method: "DELETE",
-    credentials: "include",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ noteId, tabType, itemId }),
-  })
-  if (!res.ok) {
-    const text = await res.text().catch(() => "")
-    throw new Error(text || `Failed to delete ${tabType} item (${res.status})`)
+    if (!response.ok) {
+      const errorText = await response.text()
+      console.error("[v0] deleteNoteTabItem error response:", errorText)
+      throw new Error(`Failed to delete note tab item: ${response.status}`)
+    }
+  } catch (error) {
+    console.error("[v0] Error deleting note tab item:", error)
+    throw error
   }
-  return res.json()
 }

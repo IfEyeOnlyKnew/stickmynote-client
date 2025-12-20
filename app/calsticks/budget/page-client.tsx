@@ -97,7 +97,11 @@ export default function BudgetClient() {
   }
 
   const selectedProjectData = projects.find((p) => p.padId === selectedProject)
-  const displayProjects = selectedProject === "all" ? projects : selectedProjectData ? [selectedProjectData] : []
+  const getDisplayProjects = (): ProjectBudget[] => {
+    if (selectedProject === "all") return projects
+    return selectedProjectData ? [selectedProjectData] : []
+  }
+  const displayProjects = getDisplayProjects()
 
   const totalBudget = projects.reduce((sum, p) => sum + p.budgetCents, 0)
   const totalSpent = projects.reduce((sum, p) => sum + p.totalActualCost, 0)
@@ -321,7 +325,7 @@ export default function BudgetClient() {
                     dataKey="value"
                   >
                     {budgetPieData.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                      <Cell key={entry.name} fill={COLORS[index % COLORS.length]} />
                     ))}
                   </Pie>
                   <Tooltip formatter={(value: number) => formatCurrency(value * 100)} />

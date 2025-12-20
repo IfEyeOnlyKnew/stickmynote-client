@@ -17,11 +17,13 @@ export function StickGanttModal({ open, onOpenChange, stickId, stickTopic }: Sti
   const [calsticks, setCalsticks] = useState<CalStick[]>([])
   const [loading, setLoading] = useState(false)
 
+  /* eslint-disable react-hooks/exhaustive-deps */
   useEffect(() => {
     if (open && stickId) {
       fetchCalSticks()
     }
   }, [open, stickId])
+  /* eslint-enable react-hooks/exhaustive-deps */
 
   const fetchCalSticks = async () => {
     setLoading(true)

@@ -1,12 +1,12 @@
-import { createClient } from "@/lib/supabase/server"
+import { createDatabaseClient } from "@/lib/database/database-adapter"
 import { NextResponse } from "next/server"
 import { getOrgContext } from "@/lib/auth/get-org-context"
 import { getCachedAuthUser } from "@/lib/auth/cached-auth"
 
 export async function GET(request: Request, { params }: { params: { padId: string } }) {
   try {
-    const supabase = await createClient()
-    const authResult = await getCachedAuthUser(supabase)
+    const db = await createDatabaseClient()
+    const authResult = await getCachedAuthUser()
     if (authResult.rateLimited) {
       return NextResponse.json({ error: "Rate limited" }, { status: 429, headers: { "Retry-After": "30" } })
     }
@@ -22,7 +22,7 @@ export async function GET(request: Request, { params }: { params: { padId: strin
 
     const { padId } = params
 
-    const { data: pad } = await supabase
+    const { data: pad } = await db
       .from("social_pads")
       .select("owner_id")
       .eq("id", padId)
@@ -33,7 +33,7 @@ export async function GET(request: Request, { params }: { params: { padId: strin
       return NextResponse.json({ error: "Pad not found" }, { status: 404 })
     }
 
-    const { data: membership } = await supabase
+    const { data: membership } = await db
       .from("social_pad_members")
       .select("role")
       .eq("social_pad_id", padId)
@@ -48,7 +48,7 @@ export async function GET(request: Request, { params }: { params: { padId: strin
       return NextResponse.json({ error: "Permission denied" }, { status: 403 })
     }
 
-    const { data: pendingInvites, error } = await supabase
+    const { data: pendingInvites, error } = await db
       .from("social_pad_pending_invites")
       .select("*")
       .eq("social_pad_id", padId)
@@ -73,8 +73,8 @@ export async function GET(request: Request, { params }: { params: { padId: strin
 
 export async function DELETE(request: Request, { params }: { params: { padId: string } }) {
   try {
-    const supabase = await createClient()
-    const authResult = await getCachedAuthUser(supabase)
+    const db = await createDatabaseClient()
+    const authResult = await getCachedAuthUser()
     if (authResult.rateLimited) {
       return NextResponse.json({ error: "Rate limited" }, { status: 429, headers: { "Retry-After": "30" } })
     }
@@ -96,7 +96,7 @@ export async function DELETE(request: Request, { params }: { params: { padId: st
       return NextResponse.json({ error: "Invite ID is required" }, { status: 400 })
     }
 
-    const { data: pad } = await supabase
+    const { data: pad } = await db
       .from("social_pads")
       .select("owner_id")
       .eq("id", padId)
@@ -107,7 +107,7 @@ export async function DELETE(request: Request, { params }: { params: { padId: st
       return NextResponse.json({ error: "Pad not found" }, { status: 404 })
     }
 
-    const { data: membership } = await supabase
+    const { data: membership } = await db
       .from("social_pad_members")
       .select("role")
       .eq("social_pad_id", padId)
@@ -122,7 +122,7 @@ export async function DELETE(request: Request, { params }: { params: { padId: st
       return NextResponse.json({ error: "Permission denied" }, { status: 403 })
     }
 
-    const { error } = await supabase
+    const { error } = await db
       .from("social_pad_pending_invites")
       .delete()
       .eq("id", inviteId)

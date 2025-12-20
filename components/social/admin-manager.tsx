@@ -31,9 +31,11 @@ export function AdminManager({ padId, currentUserId, isOwner }: AdminManagerProp
   const [loading, setLoading] = useState(true)
   const [updating, setUpdating] = useState<string | null>(null)
 
+  /* eslint-disable react-hooks/exhaustive-deps */
   useEffect(() => {
     fetchMembers()
   }, [padId])
+  /* eslint-enable react-hooks/exhaustive-deps */
 
   const fetchMembers = async () => {
     try {

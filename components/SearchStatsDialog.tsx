@@ -1,7 +1,6 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { createSupabaseBrowser } from "@/lib/supabase-browser"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { TrendingUp, Search, Heart, Eye, Tag, Clock, BarChart3, Users, MessageSquare } from "lucide-react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -27,29 +26,83 @@ interface Stats {
   topContributors: Array<{ full_name: string; note_count: number }>
 }
 
-interface SearchHistoryRecord {
-  query: string
-  results_count: number
-  created_at: string
+// Extracted components to reduce nesting depth
+function PopularQueryItem({ item, index }: Readonly<{ item: { query: string; count: number }; index: number }>) {
+  return (
+    <div className="flex items-center justify-between">
+      <div className="flex items-center gap-2">
+        <span className="flex items-center justify-center w-6 h-6 rounded-full bg-indigo-100 dark:bg-indigo-900/50 text-indigo-600 text-xs font-bold">
+          {index + 1}
+        </span>
+        <span className="text-sm font-medium truncate max-w-[200px]">{item.query}</span>
+      </div>
+      <Badge variant="secondary" className="text-xs">
+        {item.count} {item.count === 1 ? "search" : "searches"}
+      </Badge>
+    </div>
+  )
 }
 
-interface NoteRecord {
-  id: string
-  view_count: number | null
-  user_id: string
+function TrendingTagItem({ item }: Readonly<{ item: { tag: string; count: number } }>) {
+  return (
+    <Badge
+      variant="outline"
+      className="border-purple-300 text-purple-700 dark:border-purple-700 dark:text-purple-400 hover:bg-purple-50 dark:hover:bg-purple-950/50"
+    >
+      #{item.tag}
+      <span className="ml-1 text-xs text-muted-foreground">({item.count})</span>
+    </Badge>
+  )
 }
 
-interface TagRecord {
-  tag_title: string | null
-  tag_content: string | null
+function ContributorItem({ contributor, index }: Readonly<{ contributor: { full_name: string; note_count: number }; index: number }>) {
+  return (
+    <div className="flex items-center justify-between">
+      <div className="flex items-center gap-2">
+        <span className="flex items-center justify-center w-6 h-6 rounded-full bg-cyan-100 dark:bg-cyan-900/50 text-cyan-600 text-xs font-bold">
+          {index + 1}
+        </span>
+        <span className="text-sm font-medium truncate max-w-[180px]">{contributor.full_name}</span>
+      </div>
+      <Badge variant="secondary" className="text-xs">
+        {contributor.note_count} {contributor.note_count === 1 ? "stick" : "sticks"}
+      </Badge>
+    </div>
+  )
 }
 
-interface UserNoteCount {
-  user_id: string
-  full_name: string | null
+function RecentActivityItem({ item }: Readonly<{ item: { query: string; created_at: string; results_count: number } }>) {
+  return (
+    <div className="flex items-center justify-between py-2 px-3 rounded-lg hover:bg-muted/50 transition-colors">
+      <div className="flex items-center gap-3">
+        <Search className="h-4 w-4 text-muted-foreground" />
+        <span className="text-sm font-medium truncate max-w-[150px]">
+          {item.query || "Empty search"}
+        </span>
+      </div>
+      <div className="flex items-center gap-2 text-xs text-muted-foreground">
+        <span>{item.results_count} results</span>
+        <span>•</span>
+        <span>{new Date(item.created_at).toLocaleDateString()}</span>
+      </div>
+    </div>
+  )
 }
 
-export function SearchStatsDialog({ open, onOpenChange, userId }: SearchStatsDialogProps) {
+function LoadingSkeletonItem({ i }: Readonly<{ i: number }>) {
+  return (
+    <Card key={i}>
+      <CardHeader className="pb-2">
+        <Skeleton className="h-4 w-24" />
+      </CardHeader>
+      <CardContent>
+        <Skeleton className="h-8 w-16" />
+      </CardContent>
+    </Card>
+  )
+}
+
+export function SearchStatsDialog({ open, onOpenChange, userId }: Readonly<SearchStatsDialogProps>) {
   const [stats, setStats] = useState<Stats | null>(null)
   const [loading, setLoading] = useState(true)
 
@@ -59,117 +112,13 @@ export function SearchStatsDialog({ open, onOpenChange, userId }: SearchStatsDia
 
       setLoading(true)
       try {
-        const supabase = createSupabaseBrowser()
-
-        // Fetch search history stats
-        const { data: searchHistory, error: searchError } = await supabase
-          .from("search_history")
-          .select("query, results_count, created_at")
-          .order("created_at", { ascending: false })
-          .limit(100)
-
-        if (searchError) throw searchError
-
-        // Calculate popular queries
-        const queryMap = new Map<string, number>()
-        const typedSearchHistory = (searchHistory || []) as SearchHistoryRecord[]
-        typedSearchHistory.forEach((search) => {
-          if (search.query) {
-            queryMap.set(search.query, (queryMap.get(search.query) || 0) + 1)
-          }
-        })
-        const popularQueries = Array.from(queryMap.entries())
-          .map(([query, count]) => ({ query, count }))
-          .sort((a, b) => b.count - a.count)
-          .slice(0, 5)
-
-        // Fetch community notes stats from personal_sticks
-        const { data: notes, error: notesError } = await supabase
-          .from("personal_sticks")
-          .select("id, view_count, user_id")
-          .eq("is_shared", true)
-
-        if (notesError) throw notesError
-
-        // Fetch total likes from personal_sticks_reactions
-        const { count: likesCount, error: likesError } = await supabase
-          .from("personal_sticks_reactions")
-          .select("*", { count: "exact", head: true })
-          .eq("reaction_type", "like")
-
-        if (likesError) throw likesError
-
-        // Fetch total replies from personal_sticks_replies
-        const { count: repliesCount, error: repliesError } = await supabase
-          .from("personal_sticks_replies")
-          .select("*", { count: "exact", head: true })
-
-        if (repliesError) throw repliesError
-
-        // Fetch trending tags from personal_sticks_tags
-        const { data: tags, error: tagsError } = await supabase
-          .from("personal_sticks_tags")
-          .select("tag_title, tag_content")
-          .limit(500)
-
-        if (tagsError) throw tagsError
-
-        // Process tags
-        const tagMap = new Map<string, number>()
-        const typedTags = (tags || []) as TagRecord[]
-        typedTags.forEach((tag) => {
-          const tagValue = tag.tag_title || tag.tag_content
-          if (tagValue) {
-            tagMap.set(tagValue, (tagMap.get(tagValue) || 0) + 1)
-          }
-        })
-        const trendingTags = Array.from(tagMap.entries())
-          .map(([tag, count]) => ({ tag, count }))
-          .sort((a, b) => b.count - a.count)
-          .slice(0, 8)
-
-        // Calculate top contributors
-        const typedNotes = (notes || []) as NoteRecord[]
-        const contributorMap = new Map<string, number>()
-        typedNotes.forEach((note) => {
-          if (note.user_id) {
-            contributorMap.set(note.user_id, (contributorMap.get(note.user_id) || 0) + 1)
-          }
-        })
-
-        // Fetch user names for top contributors
-        const topContributorIds = Array.from(contributorMap.entries())
-          .sort((a, b) => b[1] - a[1])
-          .slice(0, 5)
-          .map(([id]) => id)
-
-        let topContributors: Array<{ full_name: string; note_count: number }> = []
-        if (topContributorIds.length > 0) {
-          const { data: users } = await supabase.from("users").select("id, full_name").in("id", topContributorIds)
-
-          if (users) {
-            topContributors = topContributorIds.map((id) => {
-              const user = users.find((u: { id: string; full_name: string | null }) => u.id === id)
-              return {
-                full_name: user?.full_name || "Anonymous",
-                note_count: contributorMap.get(id) || 0,
-              }
-            })
-          }
+        const response = await fetch("/api/search-stats")
+        if (!response.ok) {
+          throw new Error("Failed to fetch stats")
         }
 
-        setStats({
-          totalSearches: typedSearchHistory.length,
-          totalResults: typedSearchHistory.reduce((sum, s) => sum + (s.results_count || 0), 0),
-          popularQueries,
-          totalNotes: typedNotes.length,
-          totalLikes: likesCount || 0,
-          totalViews: typedNotes.reduce((sum, n) => sum + (n.view_count || 0), 0),
-          totalReplies: repliesCount || 0,
-          trendingTags,
-          recentActivity: typedSearchHistory.slice(0, 5),
-          topContributors,
-        })
+        const data = await response.json()
+        setStats(data.stats)
       } catch (error) {
         console.error("Error fetching stats:", error)
       } finally {
@@ -195,14 +144,7 @@ export function SearchStatsDialog({ open, onOpenChange, userId }: SearchStatsDia
           <div className="space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
               {[1, 2, 3, 4].map((i) => (
-                <Card key={i}>
-                  <CardHeader className="pb-2">
-                    <Skeleton className="h-4 w-24" />
-                  </CardHeader>
-                  <CardContent>
-                    <Skeleton className="h-8 w-16" />
-                  </CardContent>
-                </Card>
+                <LoadingSkeletonItem key={i} i={i} />
               ))}
             </div>
             <Skeleton className="h-64 w-full" />
@@ -278,17 +220,7 @@ export function SearchStatsDialog({ open, onOpenChange, userId }: SearchStatsDia
                   {stats.popularQueries.length > 0 ? (
                     <div className="space-y-3">
                       {stats.popularQueries.map((item, index) => (
-                        <div key={index} className="flex items-center justify-between">
-                          <div className="flex items-center gap-2">
-                            <span className="flex items-center justify-center w-6 h-6 rounded-full bg-indigo-100 dark:bg-indigo-900/50 text-indigo-600 text-xs font-bold">
-                              {index + 1}
-                            </span>
-                            <span className="text-sm font-medium truncate max-w-[200px]">{item.query}</span>
-                          </div>
-                          <Badge variant="secondary" className="text-xs">
-                            {item.count} {item.count === 1 ? "search" : "searches"}
-                          </Badge>
-                        </div>
+                        <PopularQueryItem key={index} item={item} index={index} />
                       ))}
                     </div>
                   ) : (
@@ -310,14 +242,7 @@ export function SearchStatsDialog({ open, onOpenChange, userId }: SearchStatsDia
                   {stats.trendingTags.length > 0 ? (
                     <div className="flex flex-wrap gap-2">
                       {stats.trendingTags.map((item, index) => (
-                        <Badge
-                          key={index}
-                          variant="outline"
-                          className="border-purple-300 text-purple-700 dark:border-purple-700 dark:text-purple-400 hover:bg-purple-50 dark:hover:bg-purple-950/50"
-                        >
-                          #{item.tag}
-                          <span className="ml-1 text-xs text-muted-foreground">({item.count})</span>
-                        </Badge>
+                        <TrendingTagItem key={index} item={item} />
                       ))}
                     </div>
                   ) : (
@@ -341,17 +266,7 @@ export function SearchStatsDialog({ open, onOpenChange, userId }: SearchStatsDia
                   {stats.topContributors.length > 0 ? (
                     <div className="space-y-3">
                       {stats.topContributors.map((contributor, index) => (
-                        <div key={index} className="flex items-center justify-between">
-                          <div className="flex items-center gap-2">
-                            <span className="flex items-center justify-center w-6 h-6 rounded-full bg-cyan-100 dark:bg-cyan-900/50 text-cyan-600 text-xs font-bold">
-                              {index + 1}
-                            </span>
-                            <span className="text-sm font-medium truncate max-w-[180px]">{contributor.full_name}</span>
-                          </div>
-                          <Badge variant="secondary" className="text-xs">
-                            {contributor.note_count} {contributor.note_count === 1 ? "stick" : "sticks"}
-                          </Badge>
-                        </div>
+                        <ContributorItem key={index} contributor={contributor} index={index} />
                       ))}
                     </div>
                   ) : (
@@ -373,22 +288,7 @@ export function SearchStatsDialog({ open, onOpenChange, userId }: SearchStatsDia
                   {stats.recentActivity.length > 0 ? (
                     <div className="space-y-2">
                       {stats.recentActivity.map((item, index) => (
-                        <div
-                          key={index}
-                          className="flex items-center justify-between py-2 px-3 rounded-lg hover:bg-muted/50 transition-colors"
-                        >
-                          <div className="flex items-center gap-3">
-                            <Search className="h-4 w-4 text-muted-foreground" />
-                            <span className="text-sm font-medium truncate max-w-[150px]">
-                              {item.query || "Empty search"}
-                            </span>
-                          </div>
-                          <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                            <span>{item.results_count} results</span>
-                            <span>•</span>
-                            <span>{new Date(item.created_at).toLocaleDateString()}</span>
-                          </div>
-                        </div>
+                        <RecentActivityItem key={index} item={item} />
                       ))}
                     </div>
                   ) : (

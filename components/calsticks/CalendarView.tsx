@@ -27,11 +27,11 @@ import { WeekView } from "./WeekView"
 import { DayView } from "./DayView"
 
 interface CalendarViewProps {
-  calsticks: CalStick[]
-  onToggleComplete: (id: string, completed: boolean) => void
-  onUpdateDate: (id: string, date: Date | undefined) => void
-  onStickClick: (calstick: CalStick) => void
-  onUpdateTime?: (id: string, startTime: Date, endTime: Date) => void
+  readonly calsticks: CalStick[]
+  readonly onToggleComplete: (id: string, completed: boolean) => void
+  readonly onUpdateDate: (id: string, date: Date | undefined) => void
+  readonly onStickClick: (calstick: CalStick) => void
+  readonly onUpdateTime?: (id: string, startTime: Date, endTime: Date) => void
 }
 
 export function CalendarView({
@@ -40,7 +40,7 @@ export function CalendarView({
   onStickClick,
   onUpdateDate,
   onUpdateTime,
-}: CalendarViewProps) {
+}: Readonly<CalendarViewProps>) {
   const [viewMode, setViewMode] = useState<"month" | "week" | "day">("month")
   const [currentMonth, setCurrentMonth] = useState(new Date())
   const [currentWeek, setCurrentWeek] = useState(new Date())
@@ -177,7 +177,7 @@ export function CalendarView({
             return (
               <Card
                 key={day.toString()}
-                className={`min-h-[120px] ${!isCurrentMonth ? "opacity-40" : ""} ${
+                className={`min-h-[120px] ${isCurrentMonth ? "" : "opacity-40"} ${
                   isTodayDate ? "border-primary border-2" : ""
                 }`}
               >
@@ -187,14 +187,16 @@ export function CalendarView({
                   </div>
                   <div className="space-y-1">
                     {dayTasks.slice(0, 3).map((cs) => (
-                      <div
+                      <button
                         key={cs.id}
-                        className="text-xs p-1 rounded cursor-pointer hover:shadow-sm transition-shadow truncate"
+                        type="button"
+                        className="text-xs p-1 rounded cursor-pointer hover:shadow-sm transition-shadow truncate w-full text-left"
                         style={{ backgroundColor: cs.color + "20", borderLeft: `3px solid ${cs.color}` }}
                         onClick={() => onStickClick(cs)}
                       >
                         <div className="flex items-center gap-1">
                           <button
+                            type="button"
                             onClick={(e) => {
                               e.stopPropagation()
                               onToggleComplete(cs.id, cs.calstick_completed)
@@ -210,7 +212,7 @@ export function CalendarView({
                             {cs.stick?.topic || cs.content.substring(0, 20)}
                           </span>
                         </div>
-                      </div>
+                      </button>
                     ))}
                     {dayTasks.length > 3 && (
                       <div className="text-xs text-muted-foreground text-center">+{dayTasks.length - 3} more</div>

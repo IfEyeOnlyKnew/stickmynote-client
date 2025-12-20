@@ -1,12 +1,7 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { createClient } from "@supabase/supabase-js"
+import { db } from "@/lib/database/pg-client"
 
 export const dynamic = "force-dynamic"
-
-// Use service role for lockout checks (no auth required)
-function getServiceClient() {
-  return createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!)
-}
 
 export async function POST(request: NextRequest) {
   try {
@@ -16,16 +11,16 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Email required" }, { status: 400 })
     }
 
-    const supabase = getServiceClient()
     const normalizedEmail = email.toLowerCase().trim()
 
-    const { data: lockout } = await supabase
-      .from("account_lockouts")
-      .select("*")
-      .eq("email", normalizedEmail)
-      .maybeSingle()
+    const result = await db.query(
+      `SELECT * FROM account_lockouts WHERE email = $1`,
+      [normalizedEmail]
+    )
 
-    if (lockout && lockout.locked_until) {
+    const lockout = result.rows[0]
+
+    if (lockout?.locked_until) {
       const lockedUntil = new Date(lockout.locked_until)
       const now = new Date()
 

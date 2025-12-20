@@ -1,5 +1,5 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { createClient } from "@/lib/supabase/server"
+import { createDatabaseClient } from "@/lib/database/database-adapter"
 import { getCachedAuthUser } from "@/lib/auth/cached-auth"
 
 let del: any
@@ -7,19 +7,57 @@ async function initializeBlobModule() {
   try {
     const blobModule = await import("@vercel/blob")
     del = blobModule.del
-  } catch (error) {
+  } catch {
     del = async () => ({})
+  }
+}
+
+function getTableConfig(isStick: boolean, isTeamNote: boolean): { tableName: string; noteIdField: string } {
+  if (isStick) return { tableName: "stick_tabs", noteIdField: "stick_id" }
+  if (isTeamNote) return { tableName: "team_note_tabs", noteIdField: "team_note_id" }
+  return { tableName: "note_tabs", noteIdField: "note_id" }
+}
+
+function parseTabData(tabData: unknown): unknown[] {
+  if (tabData === null || tabData === undefined) return []
+
+  // Handle corrupted tab_data stored as individual characters
+  if (typeof tabData === "object" && !Array.isArray(tabData)) {
+    const keys = Object.keys(tabData as Record<string, unknown>)
+    const isCharacterArray = keys.length > 0 && keys.every((key) => !Number.isNaN(Number(key)))
+    if (isCharacterArray) {
+      const sortedKeys = [...keys].sort((a, b) => Number(a) - Number(b))
+      const jsonString = sortedKeys
+        .map((key) => (tabData as Record<string, string>)[key])
+        .join("")
+      const parsed = JSON.parse(jsonString)
+      return parsed?.exports || []
+    }
+    return (tabData as { exports?: unknown[] })?.exports || []
+  }
+
+  if (typeof tabData === "string") {
+    const parsed = JSON.parse(tabData)
+    return parsed?.exports || []
+  }
+
+  return []
+}
+
+async function deleteFromBlobStorage(exportUrl: string): Promise<void> {
+  try {
+    await del(exportUrl)
+  } catch (error) {
+    console.error("[delete-export] Blob deletion error:", error)
+    // Continue with database cleanup even if blob deletion fails
   }
 }
 
 export async function DELETE(request: NextRequest) {
   try {
-    if (!del) {
-      await initializeBlobModule()
-    }
+    if (!del) await initializeBlobModule()
 
-    const supabase = await createClient()
-    const authResult = await getCachedAuthUser(supabase)
+    const authResult = await getCachedAuthUser()
     if (authResult.rateLimited) {
       return NextResponse.json(
         { error: "Rate limit exceeded. Please try again in a moment." },
@@ -29,7 +67,6 @@ export async function DELETE(request: NextRequest) {
     if (!authResult.user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
-    const user = authResult.user
 
     const body = await request.json()
     const { noteId, exportUrl, isTeamNote, isStick } = body
@@ -38,28 +75,12 @@ export async function DELETE(request: NextRequest) {
       return NextResponse.json({ error: "Missing required fields" }, { status: 400 })
     }
 
-    // Delete from blob storage
-    try {
-      await del(exportUrl)
-    } catch (blobError) {
-      // Continue with database cleanup even if blob deletion fails
-    }
+    await deleteFromBlobStorage(exportUrl)
 
-    let tableName: string
-    let noteIdField: string
+    const db = await createDatabaseClient()
+    const { tableName, noteIdField } = getTableConfig(isStick, isTeamNote)
 
-    if (isStick) {
-      tableName = "stick_tabs"
-      noteIdField = "stick_id"
-    } else if (isTeamNote) {
-      tableName = "team_note_tabs"
-      noteIdField = "team_note_id"
-    } else {
-      tableName = "note_tabs"
-      noteIdField = "note_id"
-    }
-
-    const { data: detailsTabs, error: fetchError } = await supabase
+    const { data: detailsTabs, error: fetchError } = await db
       .from(tableName)
       .select("*")
       .eq(noteIdField, noteId)
@@ -73,42 +94,19 @@ export async function DELETE(request: NextRequest) {
       return NextResponse.json({ message: "Export already deleted or details tab not found" })
     }
 
-    const detailsTab = detailsTabs[0] // Use the first one if multiple exist
-
-    // Handle corrupted tab_data and extract exports properly
-    let currentExports = []
+    let currentExports: unknown[] = []
     try {
-      let tabData = detailsTab.tab_data
-
-      // Handle corrupted tab_data that's stored as individual characters
-      if (typeof tabData === "object" && tabData !== null && !Array.isArray(tabData)) {
-        const keys = Object.keys(tabData)
-        if (keys.length > 0 && keys.every((key) => !isNaN(Number(key)))) {
-          // Reconstruct the JSON string from individual characters
-          const jsonString = keys
-            .sort((a, b) => Number(a) - Number(b))
-            .map((key) => tabData[key])
-            .join("")
-          tabData = JSON.parse(jsonString)
-        }
-      } else if (typeof tabData === "string") {
-        tabData = JSON.parse(tabData)
-      }
-
-      currentExports = tabData?.exports || []
+      currentExports = parseTabData(detailsTabs[0].tab_data)
     } catch (error) {
+      console.error("[delete-export] Parse error:", error)
       currentExports = []
     }
 
-    // Remove only the specific export link
     const updatedExports = currentExports.filter((exp: any) => exp.url !== exportUrl)
 
-    // Update the details tab with proper object storage
-    const { error: updateError } = await supabase
+    const { error: updateError } = await db
       .from(tableName)
-      .update({
-        tab_data: { exports: updatedExports }, // Store as object, not corrupted format
-      })
+      .update({ tab_data: { exports: updatedExports } })
       .eq(noteIdField, noteId)
       .eq("tab_type", "details")
 

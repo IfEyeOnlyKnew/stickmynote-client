@@ -60,10 +60,10 @@ interface SocialStick {
   reaction_counts?: Record<string, number>
 }
 
-export default function SocialPadPage({ params }: { params: { padId: string } }) {
+export default function SocialPadPage({ params }: Readonly<{ params: { padId: string } }>) {
   const { user, loading } = useUser()
   const router = useRouter()
-  const padId = params.padId as string
+  const padId = params.padId
 
   const [pad, setPad] = useState<SocialPad | null>(null)
   const [sticks, setSticks] = useState<SocialStick[]>([])
@@ -75,6 +75,7 @@ export default function SocialPadPage({ params }: { params: { padId: string } })
   const [selectedStickId, setSelectedStickId] = useState<string | null>(null)
   const [selectedStick, setSelectedStick] = useState<{ id: string; topic: string } | null>(null)
 
+  /* eslint-disable react-hooks/exhaustive-deps */
   useEffect(() => {
     const processPendingInvites = async () => {
       if (!padId || !user) return
@@ -88,7 +89,7 @@ export default function SocialPadPage({ params }: { params: { padId: string } })
         console.log("[v0] Processed pending invites:", data)
 
         // If invites were processed, refresh the pad data
-        if (data.results && data.results.some((r: any) => r.status === "processed")) {
+        if (data.results?.some((r: any) => r.status === "processed")) {
           console.log("[v0] Invites were processed, refreshing pad data")
           fetchPadData()
         }
@@ -101,12 +102,15 @@ export default function SocialPadPage({ params }: { params: { padId: string } })
       processPendingInvites()
     }
   }, [padId, user])
+  /* eslint-enable react-hooks/exhaustive-deps */
 
+  /* eslint-disable react-hooks/exhaustive-deps */
   useEffect(() => {
     if (padId) {
       fetchPadData()
     }
   }, [padId])
+  /* eslint-enable react-hooks/exhaustive-deps */
 
   const fetchPadData = async () => {
     try {
@@ -174,6 +178,7 @@ export default function SocialPadPage({ params }: { params: { padId: string } })
 
   useEffect(() => {
     fetchUserRole()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user, padId])
 
   const isOwner = user && pad && pad.owner_id === user.id
@@ -340,7 +345,7 @@ export default function SocialPadPage({ params }: { params: { padId: string } })
                 No Sticks Yet
               </h3>
               <p className="text-gray-600 mb-6 max-w-md mx-auto">
-                Be the first to add content to this pad. Share your ideas, updates, or anything you'd like to
+                Be the first to add content to this pad. Share your ideas, updates, or anything you&apos;d like to
                 collaborate on!
               </p>
               {user && canAddSticks && (

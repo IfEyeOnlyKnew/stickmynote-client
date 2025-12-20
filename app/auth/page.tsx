@@ -2,7 +2,6 @@
 
 import type React from "react"
 
-import { createSupabaseBrowser } from "@/lib/supabase-browser"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Alert, AlertDescription } from "@/components/ui/alert"
@@ -28,8 +27,6 @@ export default function ResetPasswordPage() {
     email: "",
   })
 
-  const supabase = createSupabaseBrowser()
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
 
@@ -42,14 +39,18 @@ export default function ResetPasswordPage() {
     clearErrors()
 
     try {
-      const { error } = await supabase.auth.resetPasswordForEmail(formData.email, {
-        redirectTo: `${window.location.origin}/auth/reset-password/confirm`,
+      const response = await fetch("/api/auth/reset-password", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: formData.email }),
       })
 
-      if (error) {
-        setFieldError("email", error.message)
-      } else {
+      const data = await response.json()
+
+      if (response.ok) {
         setFieldError("email", "✓ Password reset email sent! Please check your inbox and follow the instructions.")
+      } else {
+        setFieldError("email", data.error || "Failed to send reset email")
       }
     } catch (err) {
       console.error("Reset password error:", err)
@@ -77,7 +78,7 @@ export default function ResetPasswordPage() {
           <CardHeader className="space-y-1">
             <CardTitle className="text-2xl font-bold text-center">Reset Password</CardTitle>
             <CardDescription className="text-center">
-              Enter your email address and we'll send you a link to reset your password
+              Enter your email address and we&apos;ll send you a link to reset your password
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">

@@ -8,32 +8,26 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Label } from "@/components/ui/label"
 import { Calendar, FileSpreadsheet, Mail, Copy, Check, RefreshCw, Download } from "lucide-react"
 import { toast } from "@/hooks/use-toast"
-import { useSupabase } from "@/lib/supabase-client"
+import { useUser } from "@/contexts/UserContext"
 
 interface IntegrationsModalProps {
-  isOpen: boolean
-  onClose: () => void
+  readonly isOpen: boolean
+  readonly onClose: () => void
 }
 
-export function IntegrationsModal({ isOpen, onClose }: IntegrationsModalProps) {
-  const { supabase } = useSupabase()
+export function IntegrationsModal({ isOpen, onClose }: Readonly<IntegrationsModalProps>) {
+  const { user } = useUser()
   const [userId, setUserId] = useState<string>("")
   const [icalUrl, setIcalUrl] = useState<string>("")
   const [loadingFeed, setLoadingFeed] = useState(false)
   const [copied, setCopied] = useState(false)
 
   useEffect(() => {
-    const getUser = async () => {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser()
-      if (user) {
-        setUserId(user.id)
-        fetchFeedUrl()
-      }
+    if (isOpen && user) {
+      setUserId(user.id)
+      fetchFeedUrl()
     }
-    if (isOpen) getUser()
-  }, [isOpen, supabase])
+  }, [isOpen, user])
 
   const fetchFeedUrl = async () => {
     try {
@@ -44,7 +38,7 @@ export function IntegrationsModal({ isOpen, onClose }: IntegrationsModalProps) {
       }
 
       const contentType = res.headers.get("content-type")
-      if (!contentType || !contentType.includes("application/json")) {
+      if (!contentType?.includes("application/json")) {
         console.error("Failed to fetch feed: Response is not JSON")
         return
       }
@@ -68,7 +62,7 @@ export function IntegrationsModal({ isOpen, onClose }: IntegrationsModalProps) {
       }
 
       const contentType = res.headers.get("content-type")
-      if (!contentType || !contentType.includes("application/json")) {
+      if (!contentType?.includes("application/json")) {
         toast({ title: "Error", description: "Server error - invalid response", variant: "destructive" })
         return
       }
@@ -79,6 +73,7 @@ export function IntegrationsModal({ isOpen, onClose }: IntegrationsModalProps) {
         toast({ title: "Feed Generated", description: "Your new calendar feed is ready." })
       }
     } catch (error) {
+      console.error("Failed to generate feed:", error)
       toast({ title: "Error", description: "Failed to generate feed", variant: "destructive" })
     } finally {
       setLoadingFeed(false)
@@ -93,7 +88,7 @@ export function IntegrationsModal({ isOpen, onClose }: IntegrationsModalProps) {
   }
 
   const downloadCsv = () => {
-    window.location.href = "/api/calsticks/export/csv"
+    globalThis.location.href = "/api/calsticks/export/csv"
   }
 
   return (
@@ -178,7 +173,7 @@ export function IntegrationsModal({ isOpen, onClose }: IntegrationsModalProps) {
                 </Button>
               </div>
               <p className="text-xs text-muted-foreground">
-                Note: Tasks will be added to your "Inbox" stick. If it doesn't exist, one will be created.
+                Note: Tasks will be added to your &quot;Inbox&quot; stick. If it doesn&apos;t exist, one will be created.
               </p>
             </div>
           </TabsContent>

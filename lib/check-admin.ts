@@ -1,4 +1,4 @@
-import { createClient } from "@/lib/supabase/server"
+import { createDatabaseClient } from "@/lib/database/database-adapter"
 
 export type AdminRole =
   | "global_admin"
@@ -10,9 +10,9 @@ export type AdminRole =
   | "community_admin"
 
 export async function checkAdminRole(userId: string, requiredRole?: AdminRole): Promise<boolean> {
-  const supabase = await createClient()
+  const db = await createDatabaseClient()
 
-  const query = supabase.from("social_hub_admins").select("role").eq("user_id", userId)
+  const query = db.from("social_hub_admins").select("role").eq("user_id", userId)
 
   if (requiredRole) {
     query.eq("role", requiredRole)
@@ -24,9 +24,9 @@ export async function checkAdminRole(userId: string, requiredRole?: AdminRole): 
 }
 
 export async function getUserAdminRoles(userId: string): Promise<AdminRole[]> {
-  const supabase = await createClient()
+  const db = await createDatabaseClient()
 
-  const { data } = await supabase.from("social_hub_admins").select("role").eq("user_id", userId)
+  const { data } = await db.from("social_hub_admins").select("role").eq("user_id", userId)
 
   return data?.map((d) => d.role as AdminRole) || []
 }

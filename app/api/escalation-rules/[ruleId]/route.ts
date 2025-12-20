@@ -1,11 +1,11 @@
-import { createClient } from "@/lib/supabase/server"
+import { createDatabaseClient } from "@/lib/database/database-adapter"
 import { NextResponse } from "next/server"
 import { getCachedAuthUser } from "@/lib/auth/cached-auth"
 
 export async function GET(request: Request, { params }: { params: Promise<{ ruleId: string }> }) {
   const { ruleId } = await params
-  const supabase = await createClient()
-  const authResult = await getCachedAuthUser(supabase)
+  const db = await createDatabaseClient()
+  const authResult = await getCachedAuthUser()
   if (authResult.rateLimited) {
     return NextResponse.json(
       { error: "Rate limit exceeded. Please try again in a moment." },
@@ -17,7 +17,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ rule
   }
   const user = authResult.user
 
-  const { data: rule, error } = await supabase
+  const { data: rule, error } = await db
     .from("notification_escalation_rules")
     .select("*")
     .eq("id", ruleId)
@@ -37,8 +37,8 @@ export async function GET(request: Request, { params }: { params: Promise<{ rule
 
 export async function PATCH(request: Request, { params }: { params: Promise<{ ruleId: string }> }) {
   const { ruleId } = await params
-  const supabase = await createClient()
-  const authResult = await getCachedAuthUser(supabase)
+  const db = await createDatabaseClient()
+  const authResult = await getCachedAuthUser()
   if (authResult.rateLimited) {
     return NextResponse.json(
       { error: "Rate limit exceeded. Please try again in a moment." },
@@ -53,7 +53,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ ru
   try {
     const body = await request.json()
 
-    const { data: rule, error } = await supabase
+    const { data: rule, error } = await db
       .from("notification_escalation_rules")
       .update({
         ...body,
@@ -81,8 +81,8 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ ru
 
 export async function DELETE(request: Request, { params }: { params: Promise<{ ruleId: string }> }) {
   const { ruleId } = await params
-  const supabase = await createClient()
-  const authResult = await getCachedAuthUser(supabase)
+  const db = await createDatabaseClient()
+  const authResult = await getCachedAuthUser()
   if (authResult.rateLimited) {
     return NextResponse.json(
       { error: "Rate limit exceeded. Please try again in a moment." },
@@ -94,7 +94,7 @@ export async function DELETE(request: Request, { params }: { params: Promise<{ r
   }
   const user = authResult.user
 
-  const { error } = await supabase
+  const { error } = await db
     .from("notification_escalation_rules")
     .delete()
     .eq("id", ruleId)

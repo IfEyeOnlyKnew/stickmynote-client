@@ -1,128 +1,73 @@
-import { createServerClient } from "@/lib/supabase/server"
-import { createServiceClient } from "@/lib/supabase/server"
 import { NextResponse } from "next/server"
-import { getCachedAuthUser } from "@/lib/auth/cached-auth"
+import { getSession } from "@/lib/auth/local-auth"
+import { db } from "@/lib/database/pg-client"
 
-export async function POST(request: Request) {
+export async function POST() {
   try {
-    const supabase = await createServerClient()
-    const serviceClient = createServiceClient()
-
-    const authResult = await getCachedAuthUser(supabase)
-    if (authResult.rateLimited) {
-      return NextResponse.json(
-        { error: "Rate limit exceeded. Please try again in a moment." },
-        { status: 429, headers: { "Retry-After": "30" } },
-      )
-    }
-    const user = authResult.user
-    if (!user) {
+    const session = await getSession()
+    if (!session) {
       return NextResponse.json({ error: "Not authenticated" }, { status: 401 })
     }
-
-    console.log("[v0] Processing pending invites for user:", user.email)
-
-    // Get user's email
+    const user = session.user
     const userEmail = user.email
     if (!userEmail) {
       return NextResponse.json({ error: "User email not found" }, { status: 400 })
     }
 
-    const { data: orgInvites, error: orgInvitesError } = await serviceClient
-      .from("organization_invites")
-      .select("id, org_id, role, invited_by")
-      .eq("email", userEmail.toLowerCase())
-      .eq("status", "pending")
-
-    if (orgInvitesError) {
-      console.error("[v0] Error fetching organization invites:", orgInvitesError)
-    }
-
-    const processedOrgInvites = []
-    if (orgInvites && orgInvites.length > 0) {
-      console.log("[v0] Found organization invites:", orgInvites.length)
-
-      for (const invite of orgInvites) {
-        // Check if already a member
-        const { data: existingMember } = await serviceClient
-          .from("organization_members")
-          .select("id")
-          .eq("org_id", invite.org_id)
-          .eq("user_id", user.id)
-          .maybeSingle()
-
-        if (existingMember) {
-          // Already a member, just mark invite as accepted
-          await serviceClient.from("organization_invites").update({ status: "accepted" }).eq("id", invite.id)
-          continue
-        }
-
-        // Create organization membership
-        const { error: memberError } = await serviceClient.from("organization_members").insert({
-          org_id: invite.org_id,
-          user_id: user.id,
-          role: invite.role,
-          invited_by: invite.invited_by,
-          joined_at: new Date().toISOString(),
-        })
-
-        if (memberError) {
-          console.error("[v0] Error creating organization membership:", memberError)
-          continue
-        }
-
-        // Mark invite as accepted
-        await serviceClient.from("organization_invites").update({ status: "accepted" }).eq("id", invite.id)
-
-        processedOrgInvites.push(invite.org_id)
+    // Process organization invites
+    const orgInvitesResult = await db.query(
+      `SELECT id, org_id, role, invited_by FROM organization_invites WHERE email = $1 AND status = 'pending'`,
+      [userEmail.toLowerCase()]
+    )
+    const orgInvites = orgInvitesResult.rows
+    const processedOrgInvites: string[] = []
+    for (const invite of orgInvites) {
+      // Check if already a member
+      const existingMemberResult = await db.query(
+        `SELECT id FROM organization_members WHERE org_id = $1 AND user_id = $2`,
+        [invite.org_id, user.id]
+      )
+      if (existingMemberResult.rows.length > 0) {
+        // Already a member, just mark invite as accepted
+        await db.query(
+          `UPDATE organization_invites SET status = 'accepted' WHERE id = $1`,
+          [invite.id]
+        )
+        continue
       }
+      // Create organization membership
+      await db.query(
+        `INSERT INTO organization_members (org_id, user_id, role, invited_by, joined_at) VALUES ($1, $2, $3, $4, $5)`,
+        [invite.org_id, user.id, invite.role, invite.invited_by, new Date().toISOString()]
+      )
+      // Mark invite as accepted
+      await db.query(
+        `UPDATE organization_invites SET status = 'accepted' WHERE id = $1`,
+        [invite.id]
+      )
+      processedOrgInvites.push(invite.org_id)
     }
 
     // Process pad invites
-    const { data: padInvites, error: padInvitesError } = await supabase
-      .from("paks_pad_pending_invites")
-      .select("pad_id, role")
-      .eq("email", userEmail)
-
-    if (padInvitesError) {
-      console.error("[v0] Error fetching pad invites:", padInvitesError)
+    const padInvitesResult = await db.query(
+      `SELECT pad_id, role FROM paks_pad_pending_invites WHERE email = $1`,
+      [userEmail]
+    )
+    const padInvites = padInvitesResult.rows
+    const processedPadInvites: string[] = []
+    for (const invite of padInvites) {
+      // Create pad membership
+      await db.query(
+        `INSERT INTO paks_pad_members (pad_id, user_id, role, accepted, joined_at) VALUES ($1, $2, $3, $4, $5)`,
+        [invite.pad_id, user.id, invite.role, true, new Date().toISOString()]
+      )
+      // Delete the pending invite
+      await db.query(
+        `DELETE FROM paks_pad_pending_invites WHERE pad_id = $1 AND email = $2`,
+        [invite.pad_id, userEmail]
+      )
+      processedPadInvites.push(invite.pad_id)
     }
-
-    const processedPadInvites = []
-    if (padInvites && padInvites.length > 0) {
-      console.log("[v0] Found pad invites:", padInvites.length)
-
-      for (const invite of padInvites) {
-        // Create pad membership
-        const { error: memberError } = await supabase.from("paks_pad_members").insert({
-          pad_id: invite.pad_id,
-          user_id: user.id,
-          role: invite.role,
-          accepted: true,
-          joined_at: new Date().toISOString(),
-        })
-
-        if (memberError) {
-          console.error("[v0] Error creating pad membership:", memberError)
-          continue
-        }
-
-        // Delete the pending invite
-        const { error: deleteError } = await supabase
-          .from("paks_pad_pending_invites")
-          .delete()
-          .eq("pad_id", invite.pad_id)
-          .eq("email", userEmail)
-
-        if (deleteError) {
-          console.error("[v0] Error deleting pad invite:", deleteError)
-        } else {
-          processedPadInvites.push(invite.pad_id)
-        }
-      }
-    }
-
-    console.log("[v0] Processed invites - Orgs:", processedOrgInvites.length, "Pads:", processedPadInvites.length)
 
     return NextResponse.json({
       success: true,

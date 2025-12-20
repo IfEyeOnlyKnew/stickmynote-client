@@ -233,8 +233,8 @@ export default function PortfolioClient() {
                         fill="#8884d8"
                         dataKey="value"
                       >
-                        {metrics.statusDistribution.map((entry, index) => (
-                          <Cell key={`cell-${index}`} fill={entry.color} />
+                        {metrics.statusDistribution.map((entry) => (
+                          <Cell key={entry.name} fill={entry.color} />
                         ))}
                       </Pie>
                       <Tooltip />

@@ -1,8 +1,8 @@
-import { createClient } from "@/lib/supabase/server"
+import { getSession } from "@/lib/auth/local-auth"
 import { NextResponse } from "next/server"
 import { APICache, withCache } from "@/lib/api-cache"
 import { getOrgContext } from "@/lib/auth/get-org-context"
-import { getCachedAuthUser } from "@/lib/auth/cached-auth"
+import { db } from "@/lib/database/pg-client"
 
 const ADMIN_EMAILS = ["chrisdoran63@outlook.com"]
 
@@ -13,18 +13,9 @@ export async function GET(request: Request) {
     const isAdmin = searchParams.get("admin") === "true"
     const isPrivate = searchParams.get("private") === "true"
 
-    const supabase = await createClient()
-    const authResult = await getCachedAuthUser(supabase)
-
-    if (authResult.rateLimited) {
-      return NextResponse.json(
-        { error: "Rate limit exceeded. Please try again in a moment." },
-        { status: 429, headers: { "Retry-After": "30" } },
-      )
-    }
-
-    const user = authResult.user
-    const orgContext = user ? await getOrgContext() : null
+    const session = await getSession()
+    const user = session?.user
+    const orgContext = user ? await getOrgContext(user.id) : null
 
     if (isPublic) {
       const cacheKey = APICache.getCacheKey("social-pads", { public: true })
@@ -32,14 +23,12 @@ export async function GET(request: Request) {
       return withCache(
         cacheKey,
         async () => {
-          const { data: publicPads, error } = await supabase
-            .from("social_pads")
-            .select("*, org_id")
-            .eq("is_public", true)
-            .order("created_at", { ascending: false })
-
-          if (error) throw error
-          return { pads: publicPads || [] }
+          const result = await db.query(
+            `SELECT * FROM social_pads 
+             WHERE is_public = true 
+             ORDER BY created_at DESC`,
+          )
+          return { pads: result.rows || [] }
         },
         { ttl: 60, staleWhileRevalidate: 300 },
       )
@@ -55,28 +44,26 @@ export async function GET(request: Request) {
       return withCache(
         cacheKey,
         async () => {
-          const { data: ownedPrivatePads, error: ownedError } = await supabase
-            .from("social_pads")
-            .select("*, org_id")
-            .eq("owner_id", user.id)
-            .eq("org_id", orgContext.orgId)
-            .eq("is_public", false)
-            .order("created_at", { ascending: false })
+          // Get owned private pads
+          const ownedResult = await db.query(
+            `SELECT * FROM social_pads 
+             WHERE owner_id = $1 AND org_id = $2 AND is_public = false 
+             ORDER BY created_at DESC`,
+            [user.id, orgContext.orgId],
+          )
 
-          const { data: memberPrivatePads, error: memberError } = await supabase
-            .from("social_pads")
-            .select("*, org_id, social_pad_members!inner(role, user_id)")
-            .eq("social_pad_members.user_id", user.id)
-            .eq("social_pad_members.accepted", true)
-            .eq("org_id", orgContext.orgId)
-            .eq("is_public", false)
-            .neq("owner_id", user.id)
-            .order("created_at", { ascending: false })
+          // Get member private pads
+          const memberResult = await db.query(
+            `SELECT sp.* FROM social_pads sp
+             INNER JOIN social_pad_members spm ON sp.id = spm.social_pad_id
+             WHERE spm.user_id = $1 AND spm.accepted = true 
+               AND sp.org_id = $2 AND sp.is_public = false 
+               AND sp.owner_id != $1
+             ORDER BY sp.created_at DESC`,
+            [user.id, orgContext.orgId],
+          )
 
-          if (ownedError) throw ownedError
-          if (memberError) throw memberError
-
-          const allPrivatePads = [...(ownedPrivatePads || []), ...(memberPrivatePads || [])]
+          const allPrivatePads = [...ownedResult.rows, ...memberResult.rows]
 
           return { pads: allPrivatePads }
         },
@@ -95,13 +82,10 @@ export async function GET(request: Request) {
         return NextResponse.json({ error: "Forbidden" }, { status: 403 })
       }
 
-      const { data: allPads, error } = await supabase
-        .from("social_pads")
-        .select("*, org_id")
-        .order("created_at", { ascending: false })
-
-      if (error) throw error
-      return NextResponse.json({ pads: allPads || [] })
+      const result = await db.query(
+        `SELECT * FROM social_pads ORDER BY created_at DESC`,
+      )
+      return NextResponse.json({ pads: result.rows || [] })
     }
 
     if (!user || !orgContext) {
@@ -113,27 +97,25 @@ export async function GET(request: Request) {
     return withCache(
       cacheKey,
       async () => {
-        const { data: ownedPads, error: ownedError } = await supabase
-          .from("social_pads")
-          .select("*, org_id")
-          .eq("owner_id", user.id)
-          .eq("org_id", orgContext.orgId)
-          .order("created_at", { ascending: false })
+        // Get owned pads
+        const ownedResult = await db.query(
+          `SELECT * FROM social_pads 
+           WHERE owner_id = $1 AND org_id = $2 
+           ORDER BY created_at DESC`,
+          [user.id, orgContext.orgId],
+        )
 
-        if (ownedError) throw ownedError
+        // Get member pads
+        const memberResult = await db.query(
+          `SELECT sp.* FROM social_pads sp
+           INNER JOIN social_pad_members spm ON sp.id = spm.social_pad_id
+           WHERE spm.user_id = $1 AND spm.accepted = true 
+             AND sp.org_id = $2 AND sp.owner_id != $1
+           ORDER BY sp.created_at DESC`,
+          [user.id, orgContext.orgId],
+        )
 
-        const { data: memberPads, error: memberError } = await supabase
-          .from("social_pads")
-          .select("*, org_id, social_pad_members!inner(role, user_id)")
-          .eq("social_pad_members.user_id", user.id)
-          .eq("social_pad_members.accepted", true)
-          .eq("org_id", orgContext.orgId)
-          .neq("owner_id", user.id)
-          .order("created_at", { ascending: false })
-
-        if (memberError) throw memberError
-
-        const allPads = [...(ownedPads || []), ...(memberPads || [])]
+        const allPads = [...ownedResult.rows, ...memberResult.rows]
         const uniquePads = Array.from(new Map(allPads.map((pad) => [pad.id, pad])).values())
 
         return { pads: uniquePads }
@@ -148,23 +130,15 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   try {
-    const supabase = await createClient()
-    const authResult = await getCachedAuthUser(supabase)
+    const session = await getSession()
 
-    if (authResult.rateLimited) {
-      return NextResponse.json(
-        { error: "Rate limit exceeded. Please try again in a moment." },
-        { status: 429, headers: { "Retry-After": "30" } },
-      )
-    }
-
-    if (!authResult.user) {
+    if (!session) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
-    const user = authResult.user
+    const user = session.user
 
-    const orgContext = await getOrgContext()
+    const orgContext = await getOrgContext(user.id)
     if (!orgContext) {
       return NextResponse.json({ error: "No organization context" }, { status: 403 })
     }
@@ -176,52 +150,54 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Pad name is required" }, { status: 400 })
     }
 
-    const insertData: any = {
-      name: name.trim(),
-      description: description?.trim() || null,
-      owner_id: user.id,
-      org_id: orgContext.orgId,
-      is_public: is_public || false,
-      category_id: category_id || null,
-      hub_type: hub_type || null,
-      hub_email: hub_email || null,
+    // Start transaction
+    await db.query("BEGIN")
+
+    try {
+      // Insert pad
+      const padResult = await db.query(
+        `INSERT INTO social_pads 
+         (name, description, owner_id, org_id, is_public, category_id, hub_type, hub_email, access_mode, home_code)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+         RETURNING *`,
+        [
+          name.trim(),
+          description?.trim() || null,
+          user.id,
+          orgContext.orgId,
+          is_public || false,
+          category_id || null,
+          hub_type || null,
+          hub_email || null,
+          access_mode || null,
+          home_code?.trim() || null,
+        ],
+      )
+
+      const pad = padResult.rows[0]
+
+      if (!pad) {
+        throw new Error("Failed to create pad")
+      }
+
+      // Add owner as member
+      await db.query(
+        `INSERT INTO social_pad_members 
+         (social_pad_id, user_id, org_id, role, accepted, invited_by, admin_level)
+         VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+        [pad.id, user.id, orgContext.orgId, "editor", true, user.id, "owner"],
+      )
+
+      await db.query("COMMIT")
+
+      await APICache.invalidate(`social-pads:userId=${user.id}:orgId=${orgContext.orgId}`)
+      await APICache.invalidate(`social-pads:public=true`)
+
+      return NextResponse.json({ pad })
+    } catch (error) {
+      await db.query("ROLLBACK")
+      throw error
     }
-
-    if (home_code) {
-      insertData.home_code = home_code.trim()
-    }
-
-    if (access_mode) {
-      insertData.access_mode = access_mode
-    }
-
-    const { data: pad, error: padError } = await supabase.from("social_pads").insert(insertData).select().maybeSingle()
-
-    if (padError || !pad) {
-      console.error("[v0] Error creating pad:", padError)
-      throw padError || new Error("Failed to create pad")
-    }
-
-    const { error: memberError } = await supabase.from("social_pad_members").insert({
-      social_pad_id: pad.id,
-      user_id: user.id,
-      org_id: orgContext.orgId,
-      role: "editor",
-      accepted: true,
-      invited_by: user.id,
-      admin_level: "owner",
-    })
-
-    if (memberError) {
-      console.error("[v0] Error adding member:", memberError)
-      await supabase.from("social_pads").delete().eq("id", pad.id)
-      throw memberError
-    }
-
-    await APICache.invalidate(`social-pads:userId=${user.id}:orgId=${orgContext.orgId}`)
-    await APICache.invalidate(`social-pads:public=true`)
-
-    return NextResponse.json({ pad })
   } catch (error: any) {
     console.error("[v0] Error creating social pad:", error)
     return NextResponse.json({ error: error?.message || "Failed to create social pad" }, { status: 500 })

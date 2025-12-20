@@ -6,26 +6,13 @@ import { Button } from "@/components/ui/button"
 export default function GlobalError({
   error,
   reset,
-}: {
+}: Readonly<{
   error: Error & { digest?: string }
   reset: () => void
-}) {
+}>) {
   useEffect(() => {
-    const logError = async () => {
-      if (process.env.NODE_ENV === "production") {
-        try {
-          const Sentry = await import("@sentry/nextjs")
-          Sentry.captureException(error)
-        } catch (err) {
-          console.error("Failed to load Sentry:", err)
-          console.error("Global error:", error)
-        }
-      } else {
-        console.error("Global error:", error)
-      }
-    }
-
-    logError()
+    // Log errors to console (could be extended to log to database)
+    console.error("Global error:", error)
   }, [error])
 
   return (

@@ -1,12 +1,12 @@
-import { createClient } from "@/lib/supabase/server"
+import { createDatabaseClient } from "@/lib/database/database-adapter"
 import { type NextRequest, NextResponse } from "next/server"
 import { getCachedAuthUser } from "@/lib/auth/cached-auth"
 
 export async function GET(request: NextRequest, { params }: { params: Promise<{ padId: string }> }) {
   const { padId } = await params
-  const supabase = await createClient()
+  const db = await createDatabaseClient()
 
-  const authResult = await getCachedAuthUser(supabase)
+  const authResult = await getCachedAuthUser()
   if (authResult.rateLimited) {
     return NextResponse.json(
       { error: "Rate limit exceeded. Please try again in a moment." },
@@ -18,7 +18,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
   }
   const user = authResult.user
 
-  const { data: pad } = await supabase.from("social_pads").select("owner_id").eq("id", padId).maybeSingle()
+  const { data: pad } = await db.from("social_pads").select("owner_id").eq("id", padId).maybeSingle()
 
   if (!pad) {
     return NextResponse.json({ error: "Pad not found" }, { status: 404 })
@@ -26,7 +26,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
 
   const isOwner = pad.owner_id === user.id
 
-  const { data: membership } = await supabase
+  const { data: membership } = await db
     .from("social_pad_members")
     .select("role")
     .eq("social_pad_id", padId)
@@ -40,7 +40,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
   }
 
   // Get cleanup policy
-  const { data: policy, error } = await supabase
+  const { data: policy, error } = await db
     .from("social_pad_cleanup_policies")
     .select("*")
     .eq("social_pad_id", padId)
@@ -75,17 +75,17 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
 
 export async function PUT(request: NextRequest, { params }: { params: Promise<{ padId: string }> }) {
   const { padId } = await params
-  const supabase = await createClient()
+  const db = await createDatabaseClient()
 
   const {
     data: { user },
-  } = await supabase.auth.getUser()
+  } = await db.auth.getUser()
   if (!user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
   }
 
   // Check if user is pad owner
-  const { data: pad } = await supabase.from("social_pads").select("owner_id").eq("id", padId).single()
+  const { data: pad } = await db.from("social_pads").select("owner_id").eq("id", padId).single()
 
   if (!pad) {
     return NextResponse.json({ error: "Pad not found" }, { status: 404 })
@@ -120,7 +120,7 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
   }
 
   // Upsert policy
-  const { data: policy, error } = await supabase
+  const { data: policy, error } = await db
     .from("social_pad_cleanup_policies")
     .upsert(
       {
@@ -144,23 +144,23 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
 
 export async function DELETE(request: NextRequest, { params }: { params: Promise<{ padId: string }> }) {
   const { padId } = await params
-  const supabase = await createClient()
+  const db = await createDatabaseClient()
 
   const {
     data: { user },
-  } = await supabase.auth.getUser()
+  } = await db.auth.getUser()
   if (!user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
   }
 
   // Check if user is pad owner
-  const { data: pad } = await supabase.from("social_pads").select("owner_id").eq("id", padId).single()
+  const { data: pad } = await db.from("social_pads").select("owner_id").eq("id", padId).single()
 
   if (!pad || pad.owner_id !== user.id) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 })
   }
 
-  const { error } = await supabase.from("social_pad_cleanup_policies").delete().eq("social_pad_id", padId)
+  const { error } = await db.from("social_pad_cleanup_policies").delete().eq("social_pad_id", padId)
 
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 })

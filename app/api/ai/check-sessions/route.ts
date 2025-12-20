@@ -1,13 +1,13 @@
 import { NextResponse } from "next/server"
-import { createClient } from "@/lib/supabase/server"
+import { createDatabaseClient } from "@/lib/database/database-adapter"
 import { getCachedAuthUser } from "@/lib/auth/cached-auth"
 
 export const dynamic = "force-dynamic"
 
 export async function GET() {
   try {
-    const supabase = await createClient()
-    const authResult = await getCachedAuthUser(supabase)
+    const db = await createDatabaseClient()
+    const authResult = await getCachedAuthUser()
 
     if (authResult.rateLimited) {
       return NextResponse.json(
@@ -23,7 +23,7 @@ export async function GET() {
     const user = authResult.user
 
     // Get user's organization
-    const { data: member } = await supabase
+    const { data: member } = await db
       .from("organization_members")
       .select("org_id")
       .eq("user_id", user.id)
@@ -34,7 +34,7 @@ export async function GET() {
     // Get max sessions from org settings (default 2)
     let maxSessions = 2
     if (orgId) {
-      const { data: org } = await supabase
+      const { data: org } = await db
         .from("organizations")
         .select("ai_sessions_per_day")
         .eq("id", orgId)
@@ -47,13 +47,13 @@ export async function GET() {
 
     // Count sessions used today
     const today = new Date().toISOString().split("T")[0]
-    const { count } = await supabase
+    const { data: sessions } = await db
       .from("ai_answer_sessions")
-      .select("*", { count: "exact", head: true })
+      .select("id")
       .eq("user_id", user.id)
       .eq("session_date", today)
 
-    const usedSessions = count || 0
+    const usedSessions = sessions?.length || 0
     const remainingSessions = Math.max(0, maxSessions - usedSessions)
 
     return NextResponse.json({

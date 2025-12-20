@@ -5,7 +5,7 @@ function timingSafeEqual(a: string, b: string) {
   if (a.length !== b.length) return false
   let result = 0
   for (let i = 0; i < a.length; i++) {
-    result |= a.charCodeAt(i) ^ b.charCodeAt(i)
+    result |= (a.codePointAt(i) ?? 0) ^ (b.codePointAt(i) ?? 0)
   }
   return result === 0
 }

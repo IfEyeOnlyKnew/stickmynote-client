@@ -1,21 +1,21 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { createSupabaseServer } from "@/lib/supabase/server"
+import { createDatabaseClient } from "@/lib/database/database-adapter"
 
 export const dynamic = "force-dynamic"
 
 // GET - Fetch all rooms for the current user
 export async function GET() {
   try {
-    const supabase = await createSupabaseServer()
+    const db = await createDatabaseClient()
     const {
       data: { user },
-    } = await supabase.auth.getUser()
+    } = await db.auth.getUser()
 
     if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
-    const { data: rooms, error } = await supabase
+    const { data: rooms, error } = await db
       .from("video_rooms")
       .select("*")
       .eq("created_by", user.id)
@@ -36,10 +36,10 @@ export async function GET() {
 // POST - Create a new video room
 export async function POST(request: NextRequest) {
   try {
-    const supabase = await createSupabaseServer()
+    const db = await createDatabaseClient()
     const {
       data: { user },
-    } = await supabase.auth.getUser()
+    } = await db.auth.getUser()
 
     if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
@@ -52,7 +52,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Room name is required" }, { status: 400 })
     }
 
-    const { data: userProfile } = await supabase.from("users").select("email, username").eq("id", user.id).single()
+    const { data: userProfile } = await db.from("users").select("email, username").eq("id", user.id).single()
 
     const dailyDomain = process.env.NEXT_PUBLIC_DAILY_DOMAIN || "stickmynote.daily.co"
     const dailyApiKey = process.env.DAILY_API_KEY
@@ -102,7 +102,7 @@ export async function POST(request: NextRequest) {
       roomUrl = `https://${dailyDomain}/${roomName}`
     }
 
-    const { data: room, error: dbError } = await supabase
+    const { data: room, error: dbError } = await db
       .from("video_rooms")
       .insert({
         name,
@@ -156,10 +156,10 @@ export async function POST(request: NextRequest) {
 // DELETE - Delete a video room
 export async function DELETE(request: NextRequest) {
   try {
-    const supabase = await createSupabaseServer()
+    const db = await createDatabaseClient()
     const {
       data: { user },
-    } = await supabase.auth.getUser()
+    } = await db.auth.getUser()
 
     if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
@@ -173,7 +173,7 @@ export async function DELETE(request: NextRequest) {
     }
 
     // Verify the room belongs to the user
-    const { data: room, error: fetchError } = await supabase
+    const { data: room, error: fetchError } = await db
       .from("video_rooms")
       .select("*")
       .eq("id", roomId)
@@ -207,7 +207,7 @@ export async function DELETE(request: NextRequest) {
       }
     }
 
-    const { error: deleteError } = await supabase
+    const { error: deleteError } = await db
       .from("video_rooms")
       .delete()
       .eq("id", roomId)

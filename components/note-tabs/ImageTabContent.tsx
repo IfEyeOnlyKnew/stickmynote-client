@@ -41,7 +41,7 @@ export function ImageTabContent({
         <div className="space-y-4">
           <div className="space-y-4">
             <div>
-              <label className="text-sm font-medium text-gray-700 mb-2 block">Image URL Web</label>
+              <span className="text-sm font-medium text-gray-700 mb-2 block">Image URL Web</span>
               <div className="flex gap-2">
                 <Input
                   value={imageUrl}
@@ -60,7 +60,7 @@ export function ImageTabContent({
             </div>
 
             <div className="border-t pt-4">
-              <label className="text-sm font-medium text-gray-700 mb-2 block">Image URL Personal</label>
+              <span className="text-sm font-medium text-gray-700 mb-2 block">Image URL Personal</span>
               <div className="space-y-2">
                 <div className="flex gap-2">
                   <Input type="file" accept="image/*" onChange={onFileSelect} className="flex-1" />
@@ -101,7 +101,7 @@ export function ImageTabContent({
         <div className="text-center py-8 text-gray-500">
           <ImageIcon className="h-12 w-12 mx-auto mb-2 opacity-50" />
           <p>No images added yet</p>
-          {!readOnly && <p className="text-sm">Click "Add from URL" or "Upload" to get started</p>}
+          {!readOnly && <p className="text-sm">Click &quot;Add from URL&quot; or &quot;Upload&quot; to get started</p>}
         </div>
       )}
     </div>

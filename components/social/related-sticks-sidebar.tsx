@@ -22,9 +22,11 @@ export function RelatedSticksSidebar({ stickId }: RelatedSticksSidebarProps) {
   const [relatedSticks, setRelatedSticks] = useState<RelatedStick[]>([])
   const [loading, setLoading] = useState(true)
 
+  /* eslint-disable react-hooks/exhaustive-deps */
   useEffect(() => {
     fetchRelatedSticks()
   }, [stickId])
+  /* eslint-enable react-hooks/exhaustive-deps */
 
   const fetchRelatedSticks = async () => {
     try {
@@ -80,9 +82,12 @@ export function RelatedSticksSidebar({ stickId }: RelatedSticksSidebarProps) {
         {relatedSticks.map((stick) => (
           <div
             key={stick.id}
+            role="button"
+            tabIndex={0}
             className="p-3 rounded-lg border cursor-pointer hover:bg-accent transition-colors"
             style={{ backgroundColor: stick.color }}
             onClick={() => router.push(`/social/sticks/${stick.id}`)}
+            onKeyDown={(e) => e.key === "Enter" && router.push(`/social/sticks/${stick.id}`)}
           >
             <h4 className="font-medium text-sm line-clamp-1">{stick.topic}</h4>
             <p className="text-xs text-muted-foreground line-clamp-2 mt-1">{stick.content}</p>

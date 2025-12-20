@@ -1,12 +1,12 @@
-import { createServerClient } from "@/lib/supabase/server"
+import { createDatabaseClient } from "@/lib/database/database-adapter"
 import { type NextRequest, NextResponse } from "next/server"
 import { getCachedAuthUser } from "@/lib/auth/cached-auth"
 
 export async function POST(request: NextRequest) {
   try {
-    const supabase = await createServerClient()
+    const db = await createDatabaseClient()
 
-    const authResult = await getCachedAuthUser(supabase)
+    const authResult = await getCachedAuthUser()
     if (authResult.rateLimited) {
       return NextResponse.json(
         { error: "Rate limit exceeded. Please try again in a moment." },
@@ -26,7 +26,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Get existing emails to avoid duplicates
-    const { data: existingAccounts } = await supabase.from("social_accounts").select("email").eq("owner_id", user.id)
+    const { data: existingAccounts } = await db.from("social_accounts").select("email").eq("owner_id", user.id)
 
     const existingEmails = new Set(existingAccounts?.map((a) => a.email) || [])
 
@@ -51,7 +51,7 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const { data, error } = await supabase.from("social_accounts").insert(newAccounts).select()
+    const { data, error } = await db.from("social_accounts").insert(newAccounts).select()
 
     if (error) throw error
 

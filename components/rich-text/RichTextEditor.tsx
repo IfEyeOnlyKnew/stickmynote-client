@@ -55,6 +55,135 @@ interface RichTextEditorProps {
   className?: string
 }
 
+// Extracted loading state component
+function EditorLoading({ className }: { className?: string }) {
+  return (
+    <div className={cn("border border-gray-300 rounded-md p-3 min-h-[120px] bg-gray-50", className)}>
+      <div className="animate-pulse flex items-center justify-center h-full">
+        <div className="text-gray-500">Loading rich text editor...</div>
+      </div>
+    </div>
+  )
+}
+
+// Extracted error state component
+function EditorError({ 
+  error, 
+  className, 
+  onReload 
+}: { 
+  error: string
+  className?: string
+  onReload: () => void 
+}) {
+  return (
+    <div className={cn("border border-red-300 rounded-md p-3 min-h-[120px] bg-red-50", className)}>
+      <div className="text-red-600">
+        <p className="font-medium">Editor Error</p>
+        <p className="text-sm">{error}</p>
+        <Button
+          variant="outline"
+          size="sm"
+          className="mt-2 bg-transparent"
+          onClick={onReload}
+        >
+          Reload Editor
+        </Button>
+      </div>
+    </div>
+  )
+}
+
+// Check if clipboard item is an image
+function findImageInClipboard(items: DataTransferItemList): File | null {
+  for (const item of Array.from(items)) {
+    if (item.type.includes("image")) {
+      return item.getAsFile()
+    }
+  }
+  return null
+}
+
+// Pre-configured TipTap extensions
+const createEditorExtensions = () => [
+  StarterKit.configure({
+    heading: { levels: [1, 2, 3] },
+    codeBlock: false,
+  }),
+  Underline,
+  Highlight.configure({ multicolor: true }),
+  TextAlign.configure({ types: ["heading", "paragraph"] }),
+  CodeBlockLowlight.configure({
+    lowlight,
+    HTMLAttributes: { class: "bg-gray-900 text-gray-100 p-4 rounded-md my-2 overflow-x-auto" },
+  }),
+  Image.configure({
+    inline: true,
+    allowBase64: true,
+    HTMLAttributes: { class: "max-w-full h-auto rounded-md my-2" },
+  }),
+  Link.configure({
+    openOnClick: false,
+    HTMLAttributes: {
+      class: "text-blue-600 underline hover:text-blue-800 cursor-pointer",
+      target: "_blank",
+      rel: "noopener noreferrer",
+    },
+  }),
+  Table.configure({
+    resizable: true,
+    HTMLAttributes: { class: "border-collapse table-auto w-full my-4" },
+  }),
+  TableRow.configure({ HTMLAttributes: { class: "border border-gray-300" } }),
+  TableHeader.configure({ HTMLAttributes: { class: "border border-gray-300 bg-gray-100 font-bold p-2 text-left" } }),
+  TableCell.configure({ HTMLAttributes: { class: "border border-gray-300 p-2" } }),
+]
+
+// Editor prose classes
+const getEditorProseClasses = (readOnly: boolean) => cn(
+  "prose prose-sm max-w-none focus:outline-none min-h-[120px] p-3",
+  "prose-headings:font-semibold prose-headings:text-gray-900",
+  "prose-p:text-gray-700 prose-p:leading-relaxed",
+  "prose-strong:text-gray-900 prose-em:text-gray-700",
+  "prose-ul:text-gray-700 prose-ol:text-gray-700",
+  "prose-blockquote:text-gray-600 prose-blockquote:border-gray-300",
+  "prose-a:text-blue-600 prose-a:underline hover:prose-a:text-blue-800",
+  "prose-table:border-collapse prose-table:w-full",
+  "prose-th:border prose-th:border-gray-300 prose-th:bg-gray-100 prose-th:p-2 prose-th:text-left",
+  "prose-td:border prose-td:border-gray-300 prose-td:p-2",
+  "prose-code:bg-gray-100 prose-code:px-1 prose-code:py-0.5 prose-code:rounded prose-code:text-sm",
+  "prose-pre:bg-gray-900 prose-pre:text-gray-100",
+  readOnly && "prose-p:text-gray-900",
+)
+
+// Toolbar button component
+interface ToolbarButtonProps {
+  onClick: () => void
+  isActive?: boolean
+  title: string
+  icon: React.ReactNode
+  disabled?: boolean
+}
+
+function ToolbarButton({ onClick, isActive, title, icon, disabled }: Readonly<ToolbarButtonProps>) {
+  return (
+    <Button
+      variant="ghost"
+      size="sm"
+      onClick={onClick}
+      className={cn("h-8 w-8 p-0", isActive && "bg-gray-200")}
+      title={title}
+      disabled={disabled}
+    >
+      {icon}
+    </Button>
+  )
+}
+
+function ToolbarDivider() {
+  return <div className="w-px h-6 bg-gray-300 mx-1" />
+}
+
 export function RichTextEditor({
   content,
   onChange,
@@ -71,152 +200,6 @@ export function RichTextEditor({
   const [isUploadingImage, setIsUploadingImage] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
-  const editor = useEditor({
-    extensions: [
-      StarterKit.configure({
-        heading: {
-          levels: [1, 2, 3],
-        },
-        codeBlock: false,
-      }),
-      Underline,
-      Highlight.configure({
-        multicolor: true,
-      }),
-      TextAlign.configure({
-        types: ["heading", "paragraph"],
-      }),
-      CodeBlockLowlight.configure({
-        lowlight,
-        HTMLAttributes: {
-          class: "bg-gray-900 text-gray-100 p-4 rounded-md my-2 overflow-x-auto",
-        },
-      }),
-      Image.configure({
-        inline: true,
-        allowBase64: true,
-        HTMLAttributes: {
-          class: "max-w-full h-auto rounded-md my-2",
-        },
-      }),
-      Link.configure({
-        openOnClick: false,
-        HTMLAttributes: {
-          class: "text-blue-600 underline hover:text-blue-800 cursor-pointer",
-          target: "_blank",
-          rel: "noopener noreferrer",
-        },
-      }),
-      Table.configure({
-        resizable: true,
-        HTMLAttributes: {
-          class: "border-collapse table-auto w-full my-4",
-        },
-      }),
-      TableRow.configure({
-        HTMLAttributes: {
-          class: "border border-gray-300",
-        },
-      }),
-      TableHeader.configure({
-        HTMLAttributes: {
-          class: "border border-gray-300 bg-gray-100 font-bold p-2 text-left",
-        },
-      }),
-      TableCell.configure({
-        HTMLAttributes: {
-          class: "border border-gray-300 p-2",
-        },
-      }),
-    ],
-    content,
-    editable: !readOnly,
-    onUpdate: ({ editor }) => {
-      try {
-        if (!isExternalUpdate.current) {
-          const html = editor.getHTML()
-          const text = editor.getText()
-
-          // Check character limit
-          if (text.length <= maxLength) {
-            handleChange(html)
-          } else {
-            // Revert to previous content if over limit
-            isExternalUpdate.current = true
-            editor.commands.setContent(lastContent.current)
-            isExternalUpdate.current = false
-          }
-        }
-      } catch (err) {
-        console.error("[v0] RichTextEditor update error:", err)
-        setError(err instanceof Error ? err.message : "An error occurred")
-      }
-    },
-    onCreate: ({ editor }) => {
-      setIsLoading(false)
-      setError(null)
-
-      const editorElement = editor.view.dom
-      editorElement.addEventListener("paste", handlePaste as any)
-    },
-    onDestroy: () => {
-      if (editor) {
-        const editorElement = editor.view.dom
-        editorElement.removeEventListener("paste", handlePaste as any)
-      }
-    },
-    editorProps: {
-      attributes: {
-        class: cn(
-          "prose prose-sm max-w-none focus:outline-none min-h-[120px] p-3",
-          "prose-headings:font-semibold prose-headings:text-gray-900",
-          "prose-p:text-gray-700 prose-p:leading-relaxed",
-          "prose-strong:text-gray-900 prose-em:text-gray-700",
-          "prose-ul:text-gray-700 prose-ol:text-gray-700",
-          "prose-blockquote:text-gray-600 prose-blockquote:border-gray-300",
-          "prose-a:text-blue-600 prose-a:underline hover:prose-a:text-blue-800",
-          "prose-table:border-collapse prose-table:w-full",
-          "prose-th:border prose-th:border-gray-300 prose-th:bg-gray-100 prose-th:p-2 prose-th:text-left",
-          "prose-td:border prose-td:border-gray-300 prose-td:p-2",
-          "prose-code:bg-gray-100 prose-code:px-1 prose-code:py-0.5 prose-code:rounded prose-code:text-sm",
-          "prose-pre:bg-gray-900 prose-pre:text-gray-100",
-          readOnly && "prose-p:text-gray-900",
-        ),
-      },
-      handleKeyDown: (view, event) => {
-        if (event.ctrlKey || event.metaKey) {
-          const key = event.key.toLowerCase()
-          const editorShortcuts = ["b", "i", "u", "z", "y"]
-
-          if (editorShortcuts.includes(key)) {
-            event.preventDefault()
-            event.stopPropagation()
-
-            if (key === "b") {
-              editor?.chain().focus().toggleBold().run()
-              return true
-            } else if (key === "i") {
-              editor?.chain().focus().toggleItalic().run()
-              return true
-            } else if (key === "u") {
-              editor?.chain().focus().toggleUnderline().run()
-              return true
-            } else if (key === "z") {
-              if (event.shiftKey) {
-                editor?.chain().focus().redo().run()
-              } else {
-                editor?.chain().focus().undo().run()
-              }
-              return true
-            }
-            return true
-          }
-        }
-        return false
-      },
-    },
-  })
-
   const handleChange = useCallback(
     (newContent: string) => {
       if (newContent !== lastContent.current) {
@@ -226,6 +209,62 @@ export function RichTextEditor({
     },
     [onChange],
   )
+
+  const editor = useEditor({
+    extensions: createEditorExtensions(),
+    content,
+    editable: !readOnly,
+    onUpdate: ({ editor }) => {
+      if (isExternalUpdate.current) return
+      
+      try {
+        const html = editor.getHTML()
+        const text = editor.getText()
+
+        if (text.length <= maxLength) {
+          handleChange(html)
+        } else {
+          isExternalUpdate.current = true
+          editor.commands.setContent(lastContent.current)
+          isExternalUpdate.current = false
+        }
+      } catch (err) {
+        console.error("[v0] RichTextEditor update error:", err)
+        setError(err instanceof Error ? err.message : "An error occurred")
+      }
+    },
+    onCreate: ({ editor }) => {
+      setIsLoading(false)
+      setError(null)
+    },
+    editorProps: {
+      attributes: { class: getEditorProseClasses(readOnly) },
+      handleKeyDown: (view, event) => {
+        if (!editor || !(event.ctrlKey || event.metaKey)) return false
+        
+        const key = event.key.toLowerCase()
+        const editorShortcuts = ["b", "i", "u", "z", "y"]
+
+        if (!editorShortcuts.includes(key)) return false
+        
+        event.preventDefault()
+        event.stopPropagation()
+
+        const shortcutActions: Record<string, () => void> = {
+          b: () => editor.chain().focus().toggleBold().run(),
+          i: () => editor.chain().focus().toggleItalic().run(),
+          u: () => editor.chain().focus().toggleUnderline().run(),
+          z: () => event.shiftKey 
+            ? editor.chain().focus().redo().run() 
+            : editor.chain().focus().undo().run(),
+          y: () => editor.chain().focus().redo().run(),
+        }
+
+        shortcutActions[key]?.()
+        return true
+      },
+    },
+  })
 
   const handleImageUpload = useCallback(
     async (file: File) => {
@@ -268,20 +307,26 @@ export function RichTextEditor({
       const items = event.clipboardData?.items
       if (!items) return
 
-      for (let i = 0; i < items.length; i++) {
-        const item = items[i]
-        if (item.type.indexOf("image") !== -1) {
-          event.preventDefault()
-          const file = item.getAsFile()
-          if (file) {
-            handleImageUpload(file)
-          }
-          break
-        }
+      const imageFile = findImageInClipboard(items)
+      if (imageFile) {
+        event.preventDefault()
+        handleImageUpload(imageFile)
       }
     },
     [editor, handleImageUpload],
   )
+
+  // Attach paste event listener
+  useEffect(() => {
+    if (!editor) return
+    
+    const editorElement = editor.view.dom
+    editorElement.addEventListener("paste", handlePaste as EventListener)
+    
+    return () => {
+      editorElement.removeEventListener("paste", handlePaste as EventListener)
+    }
+  }, [editor, handlePaste])
 
   useEffect(() => {
     if (!editor && !isLoading) {
@@ -301,7 +346,7 @@ export function RichTextEditor({
   const handleAddLink = useCallback(() => {
     if (!editor) return
 
-    const url = window.prompt("Enter URL:")
+    const url = globalThis.prompt("Enter URL:")
     if (url) {
       editor.chain().focus().setLink({ href: url }).run()
     }
@@ -323,240 +368,169 @@ export function RichTextEditor({
     [handleImageUpload],
   )
 
+  const handleReload = useCallback(() => {
+    setError(null)
+    setIsLoading(true)
+    globalThis.location.reload()
+  }, [])
+
+  // Prevent default keyboard shortcuts that we handle in the editor
+  const handleContainerKeyDown = useCallback((e: React.KeyboardEvent) => {
+    if (!(e.ctrlKey || e.metaKey)) return
+    const key = e.key.toLowerCase()
+    if (["i", "b", "u", "z", "y"].includes(key)) {
+      e.preventDefault()
+      e.stopPropagation()
+    }
+  }, [])
+
   if (error) {
-    return (
-      <div className={cn("border border-red-300 rounded-md p-3 min-h-[120px] bg-red-50", className)}>
-        <div className="text-red-600">
-          <p className="font-medium">Editor Error</p>
-          <p className="text-sm">{error}</p>
-          <Button
-            variant="outline"
-            size="sm"
-            className="mt-2 bg-transparent"
-            onClick={() => {
-              setError(null)
-              setIsLoading(true)
-              window.location.reload()
-            }}
-          >
-            Reload Editor
-          </Button>
-        </div>
-      </div>
-    )
+    return <EditorError error={error} className={className} onReload={handleReload} />
   }
 
   if (isLoading || !editor) {
-    return (
-      <div className={cn("border border-gray-300 rounded-md p-3 min-h-[120px] bg-gray-50", className)}>
-        <div className="animate-pulse flex items-center justify-center h-full">
-          <div className="text-gray-500">Loading rich text editor...</div>
-        </div>
-      </div>
-    )
+    return <EditorLoading className={className} />
   }
 
   const currentLength = editor.getText().length
 
   return (
     <div
+      role="textbox"
+      tabIndex={0}
       className={cn("border border-gray-300 rounded-md", className)}
-      onKeyDown={(e) => {
-        if (e.ctrlKey || e.metaKey) {
-          const key = e.key.toLowerCase()
-          if (["i", "b", "u", "z", "y"].includes(key)) {
-            e.preventDefault()
-            e.stopPropagation()
-          }
-        }
-      }}
+      onKeyDown={handleContainerKeyDown}
     >
       {!readOnly && (
         <div className="border-b border-gray-200 p-2 flex items-center justify-between bg-gray-50">
           <div className="flex items-center gap-1 flex-wrap">
-            <Button
-              variant="ghost"
-              size="sm"
+            <ToolbarButton
               onClick={() => editor.chain().focus().toggleHeading({ level: 1 }).run()}
-              className={cn("h-8 w-8 p-0", editor.isActive("heading", { level: 1 }) && "bg-gray-200")}
+              isActive={editor.isActive("heading", { level: 1 })}
               title="Heading 1"
-            >
-              <Heading1 className="h-4 w-4" />
-            </Button>
-            <Button
-              variant="ghost"
-              size="sm"
+              icon={<Heading1 className="h-4 w-4" />}
+            />
+            <ToolbarButton
               onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()}
-              className={cn("h-8 w-8 p-0", editor.isActive("heading", { level: 2 }) && "bg-gray-200")}
+              isActive={editor.isActive("heading", { level: 2 })}
               title="Heading 2"
-            >
-              <Heading2 className="h-4 w-4" />
-            </Button>
-            <Button
-              variant="ghost"
-              size="sm"
+              icon={<Heading2 className="h-4 w-4" />}
+            />
+            <ToolbarButton
               onClick={() => editor.chain().focus().toggleHeading({ level: 3 }).run()}
-              className={cn("h-8 w-8 p-0", editor.isActive("heading", { level: 3 }) && "bg-gray-200")}
+              isActive={editor.isActive("heading", { level: 3 })}
               title="Heading 3"
-            >
-              <Heading3 className="h-4 w-4" />
-            </Button>
+              icon={<Heading3 className="h-4 w-4" />}
+            />
 
-            <div className="w-px h-6 bg-gray-300 mx-1" />
+            <ToolbarDivider />
 
-            <Button
-              variant="ghost"
-              size="sm"
+            <ToolbarButton
               onClick={() => editor.chain().focus().toggleBold().run()}
-              className={cn("h-8 w-8 p-0", editor.isActive("bold") && "bg-gray-200")}
+              isActive={editor.isActive("bold")}
               title="Bold (Ctrl+B)"
-            >
-              <Bold className="h-4 w-4" />
-            </Button>
-            <Button
-              variant="ghost"
-              size="sm"
+              icon={<Bold className="h-4 w-4" />}
+            />
+            <ToolbarButton
               onClick={() => editor.chain().focus().toggleItalic().run()}
-              className={cn("h-8 w-8 p-0", editor.isActive("italic") && "bg-gray-200")}
+              isActive={editor.isActive("italic")}
               title="Italic (Ctrl+I)"
-            >
-              <Italic className="h-4 w-4" />
-            </Button>
-            <Button
-              variant="ghost"
-              size="sm"
+              icon={<Italic className="h-4 w-4" />}
+            />
+            <ToolbarButton
               onClick={() => editor.chain().focus().toggleUnderline().run()}
-              className={cn("h-8 w-8 p-0", editor.isActive("underline") && "bg-gray-200")}
+              isActive={editor.isActive("underline")}
               title="Underline (Ctrl+U)"
-            >
-              <UnderlineIcon className="h-4 w-4" />
-            </Button>
-            <Button
-              variant="ghost"
-              size="sm"
+              icon={<UnderlineIcon className="h-4 w-4" />}
+            />
+            <ToolbarButton
               onClick={() => editor.chain().focus().toggleHighlight().run()}
-              className={cn("h-8 w-8 p-0", editor.isActive("highlight") && "bg-gray-200")}
+              isActive={editor.isActive("highlight")}
               title="Highlight"
-            >
-              <Highlighter className="h-4 w-4" />
-            </Button>
+              icon={<Highlighter className="h-4 w-4" />}
+            />
 
-            <div className="w-px h-6 bg-gray-300 mx-1" />
+            <ToolbarDivider />
 
-            <Button
-              variant="ghost"
-              size="sm"
+            <ToolbarButton
               onClick={() => editor.chain().focus().setTextAlign("left").run()}
-              className={cn("h-8 w-8 p-0", editor.isActive({ textAlign: "left" }) && "bg-gray-200")}
+              isActive={editor.isActive({ textAlign: "left" })}
               title="Align Left"
-            >
-              <AlignLeft className="h-4 w-4" />
-            </Button>
-            <Button
-              variant="ghost"
-              size="sm"
+              icon={<AlignLeft className="h-4 w-4" />}
+            />
+            <ToolbarButton
               onClick={() => editor.chain().focus().setTextAlign("center").run()}
-              className={cn("h-8 w-8 p-0", editor.isActive({ textAlign: "center" }) && "bg-gray-200")}
+              isActive={editor.isActive({ textAlign: "center" })}
               title="Align Center"
-            >
-              <AlignCenter className="h-4 w-4" />
-            </Button>
-            <Button
-              variant="ghost"
-              size="sm"
+              icon={<AlignCenter className="h-4 w-4" />}
+            />
+            <ToolbarButton
               onClick={() => editor.chain().focus().setTextAlign("right").run()}
-              className={cn("h-8 w-8 p-0", editor.isActive({ textAlign: "right" }) && "bg-gray-200")}
+              isActive={editor.isActive({ textAlign: "right" })}
               title="Align Right"
-            >
-              <AlignRight className="h-4 w-4" />
-            </Button>
+              icon={<AlignRight className="h-4 w-4" />}
+            />
 
-            <div className="w-px h-6 bg-gray-300 mx-1" />
+            <ToolbarDivider />
 
-            <Button
-              variant="ghost"
-              size="sm"
+            <ToolbarButton
               onClick={() => editor.chain().focus().toggleBulletList().run()}
-              className={cn("h-8 w-8 p-0", editor.isActive("bulletList") && "bg-gray-200")}
+              isActive={editor.isActive("bulletList")}
               title="Bullet List"
-            >
-              <List className="h-4 w-4" />
-            </Button>
-            <Button
-              variant="ghost"
-              size="sm"
+              icon={<List className="h-4 w-4" />}
+            />
+            <ToolbarButton
               onClick={() => editor.chain().focus().toggleOrderedList().run()}
-              className={cn("h-8 w-8 p-0", editor.isActive("orderedList") && "bg-gray-200")}
+              isActive={editor.isActive("orderedList")}
               title="Numbered List"
-            >
-              <ListOrdered className="h-4 w-4" />
-            </Button>
-            <Button
-              variant="ghost"
-              size="sm"
+              icon={<ListOrdered className="h-4 w-4" />}
+            />
+            <ToolbarButton
               onClick={() => editor.chain().focus().toggleBlockquote().run()}
-              className={cn("h-8 w-8 p-0", editor.isActive("blockquote") && "bg-gray-200")}
+              isActive={editor.isActive("blockquote")}
               title="Quote"
-            >
-              <Quote className="h-4 w-4" />
-            </Button>
-            <Button
-              variant="ghost"
-              size="sm"
+              icon={<Quote className="h-4 w-4" />}
+            />
+            <ToolbarButton
               onClick={() => editor.chain().focus().toggleCodeBlock().run()}
-              className={cn("h-8 w-8 p-0", editor.isActive("codeBlock") && "bg-gray-200")}
+              isActive={editor.isActive("codeBlock")}
               title="Code Block"
-            >
-              <Code className="h-4 w-4" />
-            </Button>
+              icon={<Code className="h-4 w-4" />}
+            />
 
-            <div className="w-px h-6 bg-gray-300 mx-1" />
+            <ToolbarDivider />
 
-            <Button
-              variant="ghost"
-              size="sm"
+            <ToolbarButton
               onClick={handleImageButtonClick}
               disabled={isUploadingImage}
-              className="h-8 w-8 p-0"
               title="Insert Image (or paste)"
-            >
-              <ImageIcon className="h-4 w-4" />
-            </Button>
+              icon={<ImageIcon className="h-4 w-4" />}
+            />
             <input ref={fileInputRef} type="file" accept="image/*" onChange={handleFileChange} className="hidden" />
 
-            <Button
-              variant="ghost"
-              size="sm"
+            <ToolbarButton
               onClick={handleAddLink}
-              className={cn("h-8 w-8 p-0", editor.isActive("link") && "bg-gray-200")}
+              isActive={editor.isActive("link")}
               title="Add Link"
-            >
-              <Link2 className="h-4 w-4" />
-            </Button>
+              icon={<Link2 className="h-4 w-4" />}
+            />
 
             {editor.isActive("link") && (
-              <Button
-                variant="ghost"
-                size="sm"
+              <ToolbarButton
                 onClick={() => editor.chain().focus().unsetLink().run()}
-                className="h-8 w-8 p-0"
                 title="Remove Link"
-              >
-                <Trash2 className="h-4 w-4" />
-              </Button>
+                icon={<Trash2 className="h-4 w-4" />}
+              />
             )}
 
-            <div className="w-px h-6 bg-gray-300 mx-1" />
+            <ToolbarDivider />
 
-            <Button
-              variant="ghost"
-              size="sm"
+            <ToolbarButton
               onClick={() => editor.chain().focus().insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run()}
-              className={cn("h-8 w-8 p-0", editor.isActive("table") && "bg-gray-200")}
+              isActive={editor.isActive("table")}
               title="Insert Table"
-            >
-              <TableIcon className="h-4 w-4" />
-            </Button>
+              icon={<TableIcon className="h-4 w-4" />}
+            />
 
             {editor.isActive("table") && (
               <>
@@ -590,39 +564,27 @@ export function RichTextEditor({
               </>
             )}
 
-            <div className="w-px h-6 bg-gray-300 mx-1" />
+            <ToolbarDivider />
 
-            <Button
-              variant="ghost"
-              size="sm"
+            <ToolbarButton
               onClick={() => editor.chain().focus().undo().run()}
               disabled={!editor.can().undo()}
-              className="h-8 w-8 p-0"
               title="Undo (Ctrl+Z)"
-            >
-              <Undo className="h-4 w-4" />
-            </Button>
-            <Button
-              variant="ghost"
-              size="sm"
+              icon={<Undo className="h-4 w-4" />}
+            />
+            <ToolbarButton
               onClick={() => editor.chain().focus().redo().run()}
               disabled={!editor.can().redo()}
-              className="h-8 w-8 p-0"
               title="Redo (Ctrl+Y)"
-            >
-              <Redo className="h-4 w-4" />
-            </Button>
+              icon={<Redo className="h-4 w-4" />}
+            />
           </div>
           {onExpandClick && (
-            <Button
-              variant="ghost"
-              size="sm"
+            <ToolbarButton
               onClick={onExpandClick}
-              className="h-8 w-8 p-0"
               title="Expand to full screen"
-            >
-              <Maximize2 className="h-4 w-4" />
-            </Button>
+              icon={<Maximize2 className="h-4 w-4" />}
+            />
           )}
         </div>
       )}

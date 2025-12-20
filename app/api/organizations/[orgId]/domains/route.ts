@@ -1,5 +1,5 @@
 import { getCachedAuthUser } from "@/lib/auth/cached-auth"
-import { createClient } from "@/lib/supabase/server"
+import { createDatabaseClient } from "@/lib/database/database-adapter"
 import { type NextRequest, NextResponse } from "next/server"
 
 interface RouteContext {
@@ -10,9 +10,9 @@ interface RouteContext {
 export async function GET(request: NextRequest, context: RouteContext) {
   try {
     const { orgId } = await context.params
-    const supabase = await createClient()
+    const db = await createDatabaseClient()
 
-    const authResult = await getCachedAuthUser(supabase)
+    const authResult = await getCachedAuthUser()
 
     if (authResult.rateLimited) {
       return NextResponse.json(
@@ -28,21 +28,21 @@ export async function GET(request: NextRequest, context: RouteContext) {
     const user = authResult.user
 
     // Check if user has access to this organization
-    const { data: membership } = await supabase
+    const { data: membership } = await db
       .from("organization_members")
       .select("role")
       .eq("org_id", orgId)
       .eq("user_id", user.id)
       .maybeSingle()
 
-    const { data: org } = await supabase.from("organizations").select("owner_id").eq("id", orgId).maybeSingle()
+    const { data: org } = await db.from("organizations").select("owner_id").eq("id", orgId).maybeSingle()
 
     if (!membership && org?.owner_id !== user.id) {
       return NextResponse.json({ error: "Access denied" }, { status: 403 })
     }
 
     // Fetch domains
-    const { data: domains, error } = await supabase
+    const { data: domains, error } = await db
       .from("organization_domains")
       .select("*")
       .eq("org_id", orgId)
@@ -65,9 +65,9 @@ export async function GET(request: NextRequest, context: RouteContext) {
 export async function POST(request: NextRequest, context: RouteContext) {
   try {
     const { orgId } = await context.params
-    const supabase = await createClient()
+    const db = await createDatabaseClient()
 
-    const authResult = await getCachedAuthUser(supabase)
+    const authResult = await getCachedAuthUser()
 
     if (authResult.rateLimited) {
       return NextResponse.json(
@@ -83,7 +83,7 @@ export async function POST(request: NextRequest, context: RouteContext) {
     const user = authResult.user
 
     // Check if user is owner or contact
-    const { data: org } = await supabase
+    const { data: org } = await db
       .from("organizations")
       .select("owner_id, metadata")
       .eq("id", orgId)
@@ -93,7 +93,7 @@ export async function POST(request: NextRequest, context: RouteContext) {
       return NextResponse.json({ error: "Organization not found" }, { status: 404 })
     }
 
-    const { data: userProfile } = await supabase.from("users").select("email").eq("id", user.id).maybeSingle()
+    const { data: userProfile } = await db.from("users").select("email").eq("id", user.id).maybeSingle()
 
     const isOwner = org.owner_id === user.id
     const metadata = org.metadata as Record<string, string> | null
@@ -121,7 +121,7 @@ export async function POST(request: NextRequest, context: RouteContext) {
     }
 
     // Check if domain already exists
-    const { data: existingDomain } = await supabase
+    const { data: existingDomain } = await db
       .from("organization_domains")
       .select("id, org_id")
       .eq("domain", normalizedDomain)
@@ -136,7 +136,7 @@ export async function POST(request: NextRequest, context: RouteContext) {
     }
 
     // Insert new domain
-    const { data: newDomain, error } = await supabase
+    const { data: newDomain, error } = await db
       .from("organization_domains")
       .insert({
         org_id: orgId,

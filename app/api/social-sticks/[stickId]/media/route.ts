@@ -1,11 +1,11 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { getOrgContext } from "@/lib/auth/get-org-context"
 import { getCachedAuthUser, createRateLimitResponse, createUnauthorizedResponse } from "@/lib/auth/cached-auth"
-import { createClient } from "@/lib/supabase/server"
+import { createDatabaseClient } from "@/lib/database/database-adapter"
 
 export async function POST(request: NextRequest, { params }: { params: { stickId: string } }) {
-  const supabase = await createClient()
-  const authResult = await getCachedAuthUser(supabase)
+  const db = await createDatabaseClient()
+  const authResult = await getCachedAuthUser()
 
   if (authResult.rateLimited) {
     return createRateLimitResponse()
@@ -24,7 +24,7 @@ export async function POST(request: NextRequest, { params }: { params: { stickId
   try {
     const { url, type, filename } = await request.json()
 
-    const { data: stick } = await supabase
+    const { data: stick } = await db
       .from("social_sticks")
       .select("user_id")
       .eq("id", params.stickId)
@@ -35,7 +35,7 @@ export async function POST(request: NextRequest, { params }: { params: { stickId
       return NextResponse.json({ error: "Unauthorized" }, { status: 403 })
     }
 
-    const { data, error } = await supabase
+    const { data, error } = await db
       .from("social_stick_media")
       .insert({
         social_stick_id: params.stickId,
@@ -62,8 +62,8 @@ export async function POST(request: NextRequest, { params }: { params: { stickId
 }
 
 export async function DELETE(request: NextRequest, { params }: { params: { stickId: string } }) {
-  const supabase = await createClient()
-  const authResult = await getCachedAuthUser(supabase)
+  const db = await createDatabaseClient()
+  const authResult = await getCachedAuthUser()
 
   if (authResult.rateLimited) {
     return createRateLimitResponse()
@@ -82,7 +82,7 @@ export async function DELETE(request: NextRequest, { params }: { params: { stick
   try {
     const { url } = await request.json()
 
-    const { error } = await supabase
+    const { error } = await db
       .from("social_stick_media")
       .delete()
       .eq("social_stick_id", params.stickId)

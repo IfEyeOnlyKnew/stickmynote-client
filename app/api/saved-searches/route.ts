@@ -1,13 +1,13 @@
-import { createServerClient } from "@/lib/supabase/server"
+import { createDatabaseClient } from "@/lib/database/database-adapter"
 import { NextResponse } from "next/server"
 import { getCachedAuthUser } from "@/lib/auth/cached-auth"
 
 // GET /api/saved-searches - Fetch saved searches
 export async function GET(request: Request) {
   try {
-    const supabase = await createServerClient()
+    const db = await createDatabaseClient()
 
-    const authResult = await getCachedAuthUser(supabase)
+    const authResult = await getCachedAuthUser()
     if (authResult.rateLimited) {
       return NextResponse.json(
         { error: "Rate limit exceeded. Please try again in a moment." },
@@ -19,7 +19,7 @@ export async function GET(request: Request) {
     }
     const user = authResult.user
 
-    const { data, error } = await supabase
+    const { data, error } = await db
       .from("saved_searches")
       .select("*")
       .eq("user_id", user.id)
@@ -40,9 +40,9 @@ export async function GET(request: Request) {
 // POST /api/saved-searches - Create saved search
 export async function POST(request: Request) {
   try {
-    const supabase = await createServerClient()
+    const db = await createDatabaseClient()
 
-    const authResult = await getCachedAuthUser(supabase)
+    const authResult = await getCachedAuthUser()
     if (authResult.rateLimited) {
       return NextResponse.json(
         { error: "Rate limit exceeded. Please try again in a moment." },
@@ -61,7 +61,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Name and query are required" }, { status: 400 })
     }
 
-    const { data, error } = await supabase
+    const { data, error } = await db
       .from("saved_searches")
       .insert({
         user_id: user.id,

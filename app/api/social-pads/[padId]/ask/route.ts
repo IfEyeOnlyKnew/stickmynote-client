@@ -1,4 +1,4 @@
-import { createClient } from "@/lib/supabase/server"
+import { createDatabaseClient } from "@/lib/database/database-adapter"
 import { NextResponse } from "next/server"
 import { GrokService } from "@/lib/ai/grok-service"
 import { getOrgContext } from "@/lib/auth/get-org-context"
@@ -15,9 +15,9 @@ export async function POST(req: Request, { params }: { params: Promise<{ padId: 
       return new NextResponse("Question is required", { status: 400 })
     }
 
-    const supabase = await createClient()
+    const db = await createDatabaseClient()
 
-    const authResult = await getCachedAuthUser(supabase)
+    const authResult = await getCachedAuthUser()
     if (authResult.rateLimited) {
       return NextResponse.json(
         { error: "Rate limit exceeded. Please try again in a moment." },
@@ -35,7 +35,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ padId: 
     }
 
     // Fetch all sticks in the pad
-    const { data: sticks, error: sticksError } = await supabase
+    const { data: sticks, error: sticksError } = await db
       .from("social_sticks")
       .select(
         `
@@ -74,7 +74,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ padId: 
       })),
     })
 
-    const { data: qaRecord, error: qaError } = await supabase
+    const { data: qaRecord, error: qaError } = await db
       .from("social_qa_history")
       .insert({
         social_pad_id: padId,

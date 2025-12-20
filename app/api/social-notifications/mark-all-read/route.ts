@@ -1,77 +1,75 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { createClient } from "@/lib/supabase/server"
+import { getSession } from "@/lib/auth/local-auth"
+import { db } from "@/lib/database/pg-client"
 import { getOrgContext } from "@/lib/auth/get-org-context"
-import { getCachedAuthUser } from "@/lib/auth/cached-auth"
 
 // POST /api/social-notifications/mark-all-read - Mark all social notifications as read
 export async function POST(req: NextRequest) {
   try {
-    const supabase = await createClient()
-
-    const authResult = await getCachedAuthUser(supabase)
-    if (authResult.rateLimited) {
-      return NextResponse.json(
-        { error: "Rate limit exceeded. Please try again in a moment." },
-        { status: 429, headers: { "Retry-After": "30" } },
-      )
-    }
-    if (!authResult.user) {
+    const session = await getSession()
+    if (!session) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
-    const user = authResult.user
+    const user = session.user
 
     const orgContext = await getOrgContext(user.id)
     if (!orgContext) {
       return NextResponse.json({ error: "Organization context required" }, { status: 403 })
     }
 
-    const { data: memberPads } = await supabase
-      .from("social_pad_members")
-      .select("social_pad_id")
-      .eq("user_id", user.id)
+    // Get pads where user is a member
+    const memberPadsResult = await db.query(
+      `SELECT social_pad_id FROM social_pad_members WHERE user_id = $1`,
+      [user.id]
+    )
 
-    const { data: ownedPads } = await supabase
-      .from("social_pads")
-      .select("id")
-      .eq("owner_id", user.id)
-      .eq("org_id", orgContext.orgId)
+    // Get pads owned by user
+    const ownedPadsResult = await db.query(
+      `SELECT id FROM social_pads WHERE owner_id = $1 AND org_id = $2`,
+      [user.id, orgContext.orgId]
+    )
 
     const padIds = [
-      ...(memberPads?.map((m: { social_pad_id: string }) => m.social_pad_id) || []),
-      ...(ownedPads?.map((p: { id: string }) => p.id) || []),
+      ...memberPadsResult.rows.map((m: any) => m.social_pad_id),
+      ...ownedPadsResult.rows.map((p: any) => p.id),
     ]
 
     if (padIds.length === 0) {
       return NextResponse.json({ success: true })
     }
 
-    const { data: stickActivities } = await supabase
-      .from("social_sticks")
-      .select("id")
-      .in("social_pad_id", padIds)
-      .eq("org_id", orgContext.orgId)
-      .neq("user_id", user.id)
-      .order("created_at", { ascending: false })
-      .limit(50)
+    // Get recent stick activities in user's pads (not by user)
+    const stickActivitiesResult = await db.query(
+      `SELECT id FROM social_sticks 
+       WHERE social_pad_id = ANY($1) 
+       AND org_id = $2 
+       AND user_id <> $3 
+       ORDER BY created_at DESC 
+       LIMIT 50`,
+      [padIds, orgContext.orgId, user.id]
+    )
+    const stickActivities = stickActivitiesResult.rows
 
-    const { data: replyActivities } = await supabase
-      .from("social_stick_replies")
-      .select("id, social_sticks!inner(social_pad_id, user_id)")
-      .eq("org_id", orgContext.orgId)
-      .neq("user_id", user.id)
-      .order("created_at", { ascending: false })
-      .limit(50)
+    // Get recent reply activities
+    const replyActivitiesResult = await db.query(
+      `SELECT r.id, s.social_pad_id, s.user_id as stick_owner_id
+       FROM social_stick_replies r
+       JOIN social_sticks s ON r.stick_id = s.id
+       WHERE r.org_id = $1 
+       AND r.user_id <> $2
+       ORDER BY r.created_at DESC 
+       LIMIT 50`,
+      [orgContext.orgId, user.id]
+    )
 
-    const filteredReplies =
-      replyActivities?.filter((reply: any) => {
-        const padId = reply.social_sticks?.social_pad_id
-        const stickOwnerId = reply.social_sticks?.user_id
-        return (padId && padIds.includes(padId)) || stickOwnerId === user.id
-      }) || []
+    // Filter replies to only those in user's pads or on user's sticks
+    const filteredReplies = replyActivitiesResult.rows.filter((reply: any) => {
+      return padIds.includes(reply.social_pad_id) || reply.stick_owner_id === user.id
+    })
 
     // Create notification keys for all activities
     const notificationKeys = [
-      ...(stickActivities?.map((stick: any) => `stick_${stick.id}`) || []),
+      ...stickActivities.map((stick: any) => `stick_${stick.id}`),
       ...filteredReplies.map((reply: any) => `reply_${reply.id}`),
     ]
 
@@ -79,22 +77,25 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ success: true })
     }
 
-    // Batch insert/upsert all as read
+    // Batch upsert all as read
     const now = new Date().toISOString()
-    const readRecords = notificationKeys.map((key) => ({
-      user_id: user.id,
-      notification_key: key,
-      last_read_at: now,
-    }))
-
-    const { error: upsertError } = await supabase.from("social_notification_reads").upsert(readRecords, {
-      onConflict: "user_id,notification_key",
+    
+    // Build upsert query for batch insert
+    const values: any[] = []
+    const placeholders: string[] = []
+    notificationKeys.forEach((key, i) => {
+      const baseIndex = i * 3
+      placeholders.push(`($${baseIndex + 1}, $${baseIndex + 2}, $${baseIndex + 3})`)
+      values.push(user.id, key, now)
     })
 
-    if (upsertError) {
-      console.error("[v0] Error marking all as read:", upsertError)
-      return NextResponse.json({ error: "Failed to mark all as read" }, { status: 500 })
-    }
+    await db.query(
+      `INSERT INTO social_notification_reads (user_id, notification_key, last_read_at)
+       VALUES ${placeholders.join(", ")}
+       ON CONFLICT (user_id, notification_key) 
+       DO UPDATE SET last_read_at = EXCLUDED.last_read_at`,
+      values
+    )
 
     return NextResponse.json({ success: true, marked: notificationKeys.length })
   } catch (error) {

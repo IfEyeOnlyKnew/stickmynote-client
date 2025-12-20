@@ -1,9 +1,12 @@
 "use client"
-import { useState } from "react"
+
+import { useState, useCallback } from "react"
 import { useRouter } from "next/navigation"
 import { useToast } from "@/hooks/use-toast"
-import { createClient } from "@/lib/supabase/client"
-import { isPublicEmailDomain } from "@/lib/utils/email-domain"
+
+// ============================================================================
+// Types
+// ============================================================================
 
 export interface SignInData {
   email: string
@@ -27,357 +30,530 @@ export interface ResetPasswordData {
   email: string
 }
 
+interface LockoutInfo {
+  locked: boolean
+  remainingMinutes?: number
+  remainingAttempts?: number
+}
+
+interface AuthState {
+  isLoading: boolean
+  error: string
+  lockoutInfo: LockoutInfo | null
+}
+
+interface LockoutCheckResponse {
+  locked: boolean
+  remainingMinutes?: number
+}
+
+interface SignInResponse {
+  success?: boolean
+  user?: { id: string; email?: string }
+  error?: string
+  locked?: boolean
+  remainingMinutes?: number
+}
+
+interface SignUpResponse {
+  success?: boolean
+  user?: { id: string }
+  error?: string
+}
+
+interface MembershipResponse {
+  hasOrganization?: boolean
+  isMember?: boolean
+  hasPendingRequest?: boolean
+  organization?: { name: string }
+}
+
+// ============================================================================
+// Constants
+// ============================================================================
+
+const MIN_PASSWORD_LENGTH = 6
+const TOAST_DURATION_LONG = 8000
+const TOAST_DURATION_EXTRA_LONG = 10000
+
+const FETCH_OPTIONS = {
+  credentials: "include" as RequestCredentials,
+}
+
+const JSON_HEADERS = {
+  "Content-Type": "application/json",
+}
+
+// ============================================================================
+// Helpers
+// ============================================================================
+
+async function fetchCSRFToken(): Promise<string | null> {
+  try {
+    const response = await fetch("/api/csrf", {
+      method: "GET",
+      ...FETCH_OPTIONS,
+    })
+    if (!response.ok) {
+      console.error("[AuthForm] Failed to fetch CSRF token")
+      return null
+    }
+    const data = await response.json()
+    return data.csrfToken
+  } catch (err) {
+    console.error("[AuthForm] CSRF token fetch error:", err)
+    return null
+  }
+}
+
+function buildAuthHeaders(csrfToken: string | null): Record<string, string> {
+  const headers: Record<string, string> = { ...JSON_HEADERS }
+  if (csrfToken) {
+    headers["X-CSRF-Token"] = csrfToken
+  }
+  return headers
+}
+
+function formatLockoutMessage(minutes: number): string {
+  const plural = minutes !== 1 ? "s" : ""
+  return `Account is temporarily locked. Please try again in ${minutes} minute${plural}.`
+}
+
+function formatLockoutToastMessage(minutes: number): string {
+  const plural = minutes !== 1 ? "s" : ""
+  return `Too many failed login attempts. Please try again in ${minutes} minute${plural}.`
+}
+
+function extractDomainFromEmail(email: string): string | null {
+  const parts = email.split("@")
+  return parts.length > 1 ? parts[1].toLowerCase() : null
+}
+
+// ============================================================================
+// Validation
+// ============================================================================
+
+interface ValidationResult {
+  valid: boolean
+  error?: string
+}
+
+function validateSignUpData(data: SignUpData): ValidationResult {
+  if (data.password !== data.confirmPassword) {
+    return { valid: false, error: "Passwords do not match" }
+  }
+
+  if (data.password.length < MIN_PASSWORD_LENGTH) {
+    return { valid: false, error: `Password must be at least ${MIN_PASSWORD_LENGTH} characters long` }
+  }
+
+  if (!data.fullName.trim()) {
+    return { valid: false, error: "Full name is required" }
+  }
+
+  if (!data.username.trim()) {
+    return { valid: false, error: "Username is required" }
+  }
+
+  return { valid: true }
+}
+
+function validateResetPasswordData(data: ResetPasswordData): ValidationResult {
+  if (!data.email.trim()) {
+    return { valid: false, error: "Please enter your email address" }
+  }
+  return { valid: true }
+}
+
+// ============================================================================
+// API Calls
+// ============================================================================
+
+async function checkLockoutStatus(email: string): Promise<LockoutCheckResponse | null> {
+  try {
+    const response = await fetch("/api/auth/check-lockout", {
+      method: "POST",
+      headers: JSON_HEADERS,
+      body: JSON.stringify({ email }),
+    })
+
+    if (response.ok) {
+      return await response.json()
+    }
+  } catch {
+    // Non-critical - continue with sign in
+  }
+  return null
+}
+
+async function checkOrganizationMembership(
+  domain: string
+): Promise<{ show: boolean; message?: string; title?: string }> {
+  try {
+    const response = await fetch(`/api/organizations/check-membership?domain=${domain}`)
+    if (response.ok) {
+      const data: MembershipResponse = await response.json()
+
+      if (data.hasOrganization && !data.isMember) {
+        const message = data.hasPendingRequest
+          ? "Your access request is pending approval."
+          : `You need to request access to ${data.organization?.name} to use full features.`
+
+        return { show: true, message, title: "Organization Access Required" }
+      }
+    }
+  } catch {
+    // Non-critical - continue with login
+  }
+  return { show: false }
+}
+
+async function sendVerificationEmail(email: string, fullName: string, userId: string): Promise<void> {
+  try {
+    await fetch("/api/send-verification-email", {
+      method: "POST",
+      headers: JSON_HEADERS,
+      body: JSON.stringify({ email, fullName, userId }),
+    })
+  } catch {
+    // Non-critical - user is created successfully
+  }
+}
+
+type SignInResult =
+  | { success: true; user: { id: string; email?: string }; email: string }
+  | { success: false; error: string; locked?: boolean; remainingMinutes?: number }
+
+async function performSignIn(
+  email: string,
+  password: string
+): Promise<SignInResult> {
+  // Check lockout status first
+  const lockoutData = await checkLockoutStatus(email)
+  if (lockoutData?.locked) {
+    const minutes = lockoutData.remainingMinutes || 1
+    return {
+      success: false,
+      error: formatLockoutMessage(minutes),
+      locked: true,
+      remainingMinutes: minutes,
+    }
+  }
+
+  // Fetch CSRF token
+  const csrfToken = await fetchCSRFToken()
+  if (!csrfToken) {
+    return {
+      success: false,
+      error: "Security token could not be obtained. Please refresh the page and try again.",
+    }
+  }
+
+  // Call sign in API
+  const response = await fetch("/api/auth/signin", {
+    method: "POST",
+    headers: buildAuthHeaders(csrfToken),
+    ...FETCH_OPTIONS,
+    body: JSON.stringify({ email, password }),
+  })
+
+  const data: SignInResponse = await response.json()
+
+  if (!response.ok) {
+    return {
+      success: false,
+      error: data.error || "Invalid credentials",
+      locked: data.locked,
+      remainingMinutes: data.remainingMinutes,
+    }
+  }
+
+  if (data.success && data.user) {
+    return { success: true, user: data.user, email }
+  }
+
+  return { success: false, error: "Sign in failed" }
+}
+
+async function handlePostSignInRedirect(
+  user: { id: string; email?: string },
+  originalEmail: string
+): Promise<{ redirect: string; membership?: { title: string; message: string }; isFirstLogin?: boolean; isOwner?: boolean }> {
+  const userEmail = user.email || originalEmail
+
+  let membership: { title: string; message: string } | undefined
+
+  // Check organization membership
+  const domain = extractDomainFromEmail(userEmail)
+  if (domain) {
+    const membershipCheck = await checkOrganizationMembership(domain)
+    if (membershipCheck.show && membershipCheck.title && membershipCheck.message) {
+      membership = { title: membershipCheck.title, message: membershipCheck.message }
+    }
+  }
+
+  // Call post-login API to update login count and get redirect
+  try {
+    const response = await fetch("/api/auth/post-login", {
+      method: "POST",
+      ...FETCH_OPTIONS,
+    })
+    
+    if (response.ok) {
+      const data = await response.json()
+      return { 
+        redirect: data.redirect || "/dashboard", 
+        membership,
+        isFirstLogin: data.isFirstLogin,
+        isOwner: data.isOwner
+      }
+    }
+  } catch {
+    // Non-critical - fall back to dashboard
+  }
+
+  return { redirect: "/dashboard", membership }
+}
+
+// ============================================================================
+// Hook
+// ============================================================================
+
 export function useAuthForm(redirectTo = "/dashboard") {
-  const [isLoading, setIsLoading] = useState(false)
-  const [error, setError] = useState("")
-  const [lockoutInfo, setLockoutInfo] = useState<{
-    locked: boolean
-    remainingMinutes?: number
-    remainingAttempts?: number
-  } | null>(null)
+  const [state, setState] = useState<AuthState>({
+    isLoading: false,
+    error: "",
+    lockoutInfo: null,
+  })
+
   const router = useRouter()
   const { toast } = useToast()
 
-  const signIn = async (data: SignInData) => {
-    setIsLoading(true)
-    setError("")
-    setLockoutInfo(null)
+  const setLoading = useCallback((isLoading: boolean) => {
+    setState((prev) => ({ ...prev, isLoading }))
+  }, [])
 
-    const supabase = createClient()
-    const normalizedEmail = data.email.trim().toLowerCase()
+  const setError = useCallback((error: string) => {
+    setState((prev) => ({ ...prev, error }))
+  }, [])
 
-    try {
-      const lockoutCheck = await fetch("/api/auth/check-lockout", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: normalizedEmail }),
-      })
+  const setLockoutInfo = useCallback((lockoutInfo: LockoutInfo | null) => {
+    setState((prev) => ({ ...prev, lockoutInfo }))
+  }, [])
 
-      if (lockoutCheck.ok) {
-        const lockoutData = await lockoutCheck.json()
-        if (lockoutData.locked) {
-          setLockoutInfo({
-            locked: true,
-            remainingMinutes: lockoutData.remainingMinutes,
-          })
-          setError(
-            `Account is temporarily locked. Please try again in ${lockoutData.remainingMinutes} minute${lockoutData.remainingMinutes !== 1 ? "s" : ""}.`,
-          )
-          toast({
-            title: "Account Locked",
-            description: `Too many failed login attempts. Please try again in ${lockoutData.remainingMinutes} minute${lockoutData.remainingMinutes !== 1 ? "s" : ""}.`,
-            variant: "destructive",
-          })
-          setIsLoading(false)
+  const resetState = useCallback(() => {
+    setState({ isLoading: true, error: "", lockoutInfo: null })
+  }, [])
+
+  const signIn = useCallback(
+    async (data: SignInData): Promise<boolean> => {
+      resetState()
+
+      const normalizedEmail = data.email.trim().toLowerCase()
+
+      try {
+        const result = await performSignIn(normalizedEmail, data.password)
+
+        if (!result.success) {
+          const title = result.locked ? "Account Locked" : "Sign In Failed"
+          const description = result.locked
+            ? formatLockoutToastMessage(result.remainingMinutes || 1)
+            : result.error
+
+          if (result.locked) {
+            setLockoutInfo({ locked: true, remainingMinutes: result.remainingMinutes })
+          }
+
+          setError(result.error)
+          toast({ title, description, variant: "destructive" })
+          setLoading(false)
           return false
         }
-      }
-
-      const { data: authData, error: signInError } = await supabase.auth.signInWithPassword({
-        email: normalizedEmail,
-        password: data.password,
-      })
-
-      if (signInError) {
-        const recordResponse = await fetch("/api/auth/record-attempt", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ email: normalizedEmail, success: false }),
-        })
-
-        if (recordResponse.ok) {
-          const recordData = await recordResponse.json()
-          if (recordData.locked) {
-            setLockoutInfo({ locked: true, remainingMinutes: Math.ceil(recordData.lockoutMinutes || 15) })
-            setError(
-              `Account has been locked due to too many failed attempts. Please try again in ${recordData.lockoutMinutes || 15} minutes.`,
-            )
-            toast({
-              title: "Account Locked",
-              description: `Too many failed login attempts. Your account has been locked for ${recordData.lockoutMinutes || 15} minutes.`,
-              variant: "destructive",
-            })
-          } else if (recordData.remainingAttempts !== undefined) {
-            setLockoutInfo({ locked: false, remainingAttempts: recordData.remainingAttempts })
-            const attemptWarning =
-              recordData.remainingAttempts <= 2
-                ? ` (${recordData.remainingAttempts} attempt${recordData.remainingAttempts !== 1 ? "s" : ""} remaining before lockout)`
-                : ""
-            setError(`${signInError.message}${attemptWarning}`)
-            toast({
-              title: "Sign In Failed",
-              description: `${signInError.message}${attemptWarning}`,
-              variant: "destructive",
-            })
-          }
-        } else {
-          setError(signInError.message)
-          toast({
-            title: "Sign In Failed",
-            description: signInError.message,
-            variant: "destructive",
-          })
-        }
-        setIsLoading(false)
-        return false
-      }
-
-      if (authData.user && authData.session) {
-        await fetch("/api/auth/record-attempt", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ email: normalizedEmail, success: true }),
-        })
 
         toast({
           title: "Welcome back!",
           description: "You have been signed in successfully.",
         })
 
-        let finalRedirect = redirectTo
+        const postSignIn = await handlePostSignInRedirect(result.user, result.email)
 
-        const { data: userProfile } = await supabase
-          .from("users")
-          .select("hub_mode")
-          .eq("id", authData.user.id)
-          .single()
-
-        const userEmail = authData.user.email || data.email
-        const isPersonalEmail = isPublicEmailDomain(userEmail)
-
-        if (!isPersonalEmail) {
-          const domain = userEmail.split("@")[1]?.toLowerCase()
-          if (domain) {
-            try {
-              const membershipRes = await fetch(`/api/organizations/check-membership?domain=${domain}`)
-              if (membershipRes.ok) {
-                const membershipData = await membershipRes.json()
-
-                if (membershipData.hasOrganization && !membershipData.isMember) {
-                  toast({
-                    title: "Organization Access Required",
-                    description: membershipData.hasPendingRequest
-                      ? "Your access request is pending approval."
-                      : `You need to request access to ${membershipData.organization?.name} to use full features.`,
-                    duration: 8000,
-                  })
-                }
-              }
-            } catch (err) {
-              // Non-critical - continue with login
-            }
-          }
+        if (postSignIn.membership) {
+          toast({
+            title: postSignIn.membership.title,
+            description: postSignIn.membership.message,
+            duration: TOAST_DURATION_LONG,
+          })
         }
 
-        let effectiveHubMode = userProfile?.hub_mode
-        if (!effectiveHubMode) {
-          effectiveHubMode = isPersonalEmail ? "personal_only" : "full_access"
-        }
-
-        if (effectiveHubMode === "personal_only") {
-          finalRedirect = "/notes"
-        } else if (effectiveHubMode === "full_access") {
-          finalRedirect = "/dashboard"
-        }
-
+        const finalRedirect = postSignIn.redirect === "/dashboard" ? redirectTo : postSignIn.redirect
         router.push(finalRedirect)
         return true
+      } catch (err) {
+        console.error("[AuthForm] Sign in error:", err)
+        setError("An unexpected error occurred. Please try again.")
+        toast({
+          title: "Error",
+          description: "An unexpected error occurred. Please try again.",
+          variant: "destructive",
+        })
+      } finally {
+        setLoading(false)
       }
-    } catch (err) {
-      setError("An unexpected error occurred. Please try again.")
-      toast({
-        title: "Error",
-        description: "An unexpected error occurred. Please try again.",
-        variant: "destructive",
-      })
-    } finally {
-      setIsLoading(false)
-    }
-    return false
-  }
-
-  const signUp = async (data: SignUpData) => {
-    setIsLoading(true)
-    setError("")
-
-    const supabase = createClient()
-
-    if (data.password !== data.confirmPassword) {
-      setError("Passwords do not match")
-      setIsLoading(false)
       return false
-    }
+    },
+    [resetState, setLockoutInfo, setError, setLoading, toast, router, redirectTo]
+  )
 
-    if (data.password.length < 6) {
-      setError("Password must be at least 6 characters long")
-      setIsLoading(false)
-      return false
-    }
+  const signUp = useCallback(
+    async (data: SignUpData): Promise<boolean> => {
+      resetState()
 
-    if (!data.fullName.trim()) {
-      setError("Full name is required")
-      setIsLoading(false)
-      return false
-    }
+      // Validate input
+      const validation = validateSignUpData(data)
+      if (!validation.valid) {
+        setError(validation.error!)
+        setLoading(false)
+        return false
+      }
 
-    if (!data.username.trim()) {
-      setError("Username is required")
-      setIsLoading(false)
-      return false
-    }
+      try {
+        // Fetch CSRF token
+        const csrfToken = await fetchCSRFToken()
+        if (!csrfToken) {
+          setError("Security token could not be obtained. Please refresh the page and try again.")
+          toast({
+            title: "Security Error",
+            description: "Please refresh the page and try again.",
+            variant: "destructive",
+          })
+          setLoading(false)
+          return false
+        }
 
-    try {
-      const redirectUrl = process.env.NEXT_PUBLIC_DEV_SUPABASE_REDIRECT_URL || `${window.location.origin}/dashboard`
-
-      const { data: authData, error } = await supabase.auth.signUp({
-        email: data.email.trim(),
-        password: data.password,
-        options: {
-          emailRedirectTo: redirectUrl,
-          data: {
+        // Call sign up API
+        const response = await fetch("/api/auth/signup", {
+          method: "POST",
+          headers: buildAuthHeaders(csrfToken),
+          ...FETCH_OPTIONS,
+          body: JSON.stringify({
+            email: data.email.trim(),
+            password: data.password,
+            fullName: data.fullName.trim(),
             username: data.username.trim(),
-            full_name: data.fullName.trim(),
             phone: data.phone?.trim() || "",
             location: data.location?.trim() || "",
             bio: data.bio?.trim() || "",
             website: data.website?.trim() || "",
-            avatar_url: data.avatarUrl?.trim() || "",
-          },
-        },
-      })
-
-      if (error) {
-        let userMessage = error.message
-        if (
-          error.message.includes("rate limit") ||
-          error.message.includes("429") ||
-          error.message.includes("Too Many Requests") ||
-          error.message.includes("Email rate limit exceeded")
-        ) {
-          userMessage =
-            "Too many sign-up attempts. Please wait a few minutes and try again, or contact support if this persists."
-        } else if (error.message.includes("confirmation email") || error.message.includes("sending email")) {
-          userMessage =
-            "Your account was created! We're sending you a verification email. If you don't receive it, please try signing in."
-        } else if (error.message.includes("already registered")) {
-          userMessage = "This email is already registered. Please sign in instead or use a different email."
-        } else if (error.message.includes("invalid email")) {
-          userMessage = "Please enter a valid email address."
-        } else if (error.message.includes("password")) {
-          userMessage = "Password must be at least 6 characters with a mix of letters and numbers."
-        }
-
-        setError(userMessage)
-        toast({
-          title: "Sign Up Failed",
-          description: userMessage,
-          variant: "destructive",
-          duration: 8000,
+            avatarUrl: data.avatarUrl?.trim() || "",
+          }),
         })
-        return false
-      }
 
-      if (authData.user) {
-        try {
-          const emailResponse = await fetch("/api/send-verification-email", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              email: data.email.trim(),
-              fullName: data.fullName.trim(),
-              userId: authData.user.id,
-            }),
-          })
+        const signUpData: SignUpResponse = await response.json()
 
-          const emailResult = await emailResponse.json()
+        if (!response.ok) {
+          let userMessage = signUpData.error || "Failed to create account"
 
-          if (!emailResponse.ok) {
-            toast({
-              title: "Account created!",
-              description:
-                "Your account was created successfully. If you don't receive a verification email, please try signing in.",
-              duration: 10000,
-            })
-          } else {
-            toast({
-              title: "Account created successfully!",
-              description: "Please check your email inbox for a verification link to complete your registration.",
-              duration: 10000,
-            })
+          if (signUpData.error?.includes("already exists")) {
+            userMessage = "This email is already registered. Please sign in instead or use a different email."
           }
-        } catch (emailErr) {
+
+          setError(userMessage)
           toast({
-            title: "Account created!",
-            description:
-              "Your account was created successfully. If you don't receive a verification email, please try signing in.",
-            duration: 10000,
+            title: "Sign Up Failed",
+            description: userMessage,
+            variant: "destructive",
+            duration: TOAST_DURATION_LONG,
           })
+          return false
         }
 
-        return true
-      }
-    } catch (err) {
-      setError("An unexpected error occurred. Please try again.")
-      toast({
-        title: "Error",
-        description: "An unexpected error occurred. Please try again.",
-        variant: "destructive",
-      })
-    } finally {
-      setIsLoading(false)
-    }
-    return false
-  }
+        if (signUpData.success && signUpData.user) {
+          toast({
+            title: "Account created successfully!",
+            description: "You can now sign in with your email and password.",
+            duration: TOAST_DURATION_EXTRA_LONG,
+          })
 
-  const resetPassword = async (data: ResetPasswordData) => {
-    setIsLoading(true)
-    setError("")
+          // Try to send verification email (non-blocking)
+          await sendVerificationEmail(data.email.trim(), data.fullName.trim(), signUpData.user.id)
 
-    const supabase = createClient()
-
-    if (!data.email.trim()) {
-      setError("Please enter your email address")
-      setIsLoading(false)
-      return false
-    }
-
-    try {
-      const { error } = await supabase.auth.resetPasswordForEmail(data.email.trim(), {
-        redirectTo: `${window.location.origin}/auth/reset-password/confirm`,
-      })
-
-      if (error) {
-        setError(error.message)
+          return true
+        }
+      } catch (err) {
+        console.error("[AuthForm] Sign up error:", err)
+        setError("An unexpected error occurred. Please try again.")
         toast({
-          title: "Reset Failed",
-          description: error.message,
+          title: "Error",
+          description: "An unexpected error occurred. Please try again.",
           variant: "destructive",
         })
+      } finally {
+        setLoading(false)
+      }
+      return false
+    },
+    [resetState, setError, setLoading, toast]
+  )
+
+  const resetPassword = useCallback(
+    async (data: ResetPasswordData): Promise<boolean> => {
+      resetState()
+
+      // Validate input
+      const validation = validateResetPasswordData(data)
+      if (!validation.valid) {
+        setError(validation.error!)
+        setLoading(false)
         return false
       }
 
-      toast({
-        title: "Check your email",
-        description: "We sent you a password reset link. Please check your email.",
-      })
-      return true
-    } catch (err) {
-      setError("An unexpected error occurred. Please try again.")
-      toast({
-        title: "Error",
-        description: "An unexpected error occurred. Please try again.",
-        variant: "destructive",
-      })
-    } finally {
-      setIsLoading(false)
-    }
-    return false
-  }
+      try {
+        const csrfToken = await fetchCSRFToken()
+
+        const response = await fetch("/api/auth/reset-password", {
+          method: "POST",
+          headers: buildAuthHeaders(csrfToken),
+          ...FETCH_OPTIONS,
+          body: JSON.stringify({ email: data.email.trim() }),
+        })
+
+        const result = await response.json()
+
+        if (!response.ok) {
+          setError(result.error || "Failed to send reset email")
+          toast({
+            title: "Reset Failed",
+            description: result.error || "Failed to send reset email",
+            variant: "destructive",
+          })
+          return false
+        }
+
+        toast({
+          title: "Check your email",
+          description: "We sent you a password reset link. Please check your email.",
+        })
+        return true
+      } catch (err) {
+        console.error("[AuthForm] Reset password error:", err)
+        setError("An unexpected error occurred. Please try again.")
+        toast({
+          title: "Error",
+          description: "An unexpected error occurred. Please try again.",
+          variant: "destructive",
+        })
+      } finally {
+        setLoading(false)
+      }
+      return false
+    },
+    [resetState, setError, setLoading, toast]
+  )
 
   return {
-    isLoading,
-    error,
-    lockoutInfo,
+    isLoading: state.isLoading,
+    error: state.error,
+    lockoutInfo: state.lockoutInfo,
     signIn,
     signUp,
     resetPassword,

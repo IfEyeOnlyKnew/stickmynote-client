@@ -1,12 +1,12 @@
-import { createServerClient } from "@/lib/supabase/server"
+import { createDatabaseClient } from "@/lib/database/database-adapter"
 import { getCachedAuthUser } from "@/lib/auth/cached-auth"
 import { NextResponse } from "next/server"
 
 export async function GET() {
   try {
-    const supabase = await createServerClient()
+    const db = await createDatabaseClient()
 
-    const authResult = await getCachedAuthUser(supabase)
+    const authResult = await getCachedAuthUser()
     if (authResult.rateLimited) {
       return NextResponse.json(
         { error: "Rate limit exceeded. Please try again in a moment." },
@@ -19,7 +19,7 @@ export async function GET() {
     const user = authResult.user
 
     // Fetch all calsticks for the user
-    const { data: tasks, error: tasksError } = await supabase
+    const { data: tasks, error: tasksError } = await db
       .from("paks_pad_stick_replies")
       .select("*")
       .eq("user_id", user.id)
@@ -56,7 +56,7 @@ export async function GET() {
     const completionRate = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0
 
     // Velocity trend (last 8 weeks)
-    const velocityTrend = []
+    const velocityTrend: { week: string; completed: number }[] = []
     for (let i = 7; i >= 0; i--) {
       const weekStart = new Date(now)
       weekStart.setDate(weekStart.getDate() - i * 7)

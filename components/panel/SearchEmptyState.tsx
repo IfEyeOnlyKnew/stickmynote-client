@@ -35,7 +35,7 @@ export function SearchEmptyState({
           <div className="bg-white p-4 rounded-xl border-2 border-indigo-100 shadow-sm">
             <Sparkles className="h-5 w-5 text-indigo-500 mb-2" />
             <h4 className="font-semibold text-sm text-gray-900 mb-1">Use Keywords</h4>
-            <p className="text-xs text-gray-500">Try searching for "design tips" or "productivity"</p>
+            <p className="text-xs text-gray-500">Try searching for &quot;design tips&quot; or &quot;productivity&quot;</p>
           </div>
           <div className="bg-white p-4 rounded-xl border-2 border-purple-100 shadow-sm">
             <TrendingUp className="h-5 w-5 text-purple-500 mb-2" />
@@ -84,7 +84,7 @@ export function SearchEmptyState({
       <p className="text-gray-500 text-center max-w-md mb-8">
         {searchQuery ? (
           <>
-            We couldn't find any notes matching <span className="font-semibold text-gray-700">"{searchQuery}"</span>
+            We couldn&apos;t find any notes matching <span className="font-semibold text-gray-700">&quot;{searchQuery}&quot;</span>
           </>
         ) : (
           "Try adjusting your filters or search term"

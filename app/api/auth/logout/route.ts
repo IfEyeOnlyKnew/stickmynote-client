@@ -1,6 +1,6 @@
-import { createSupabaseServer } from "@/lib/supabase-server"
 import { NextResponse, type NextRequest } from "next/server"
 import { validateCSRFMiddleware } from "@/lib/csrf"
+import { cookies } from "next/headers"
 
 export async function POST(request: NextRequest) {
   try {
@@ -9,21 +9,14 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Invalid or missing CSRF token" }, { status: 403 })
     }
 
-    const supabase = await createSupabaseServer()
-
-    const { error } = await supabase.auth.signOut({ scope: "global" })
-
-    if (error) {
-      console.error("Logout error:", error)
-      return NextResponse.json({ error: "Failed to logout" }, { status: 500 })
-    }
-
     const response = NextResponse.json({ success: true })
 
-    // Clear Supabase auth cookies
-    const cookiesToClear = ["sb-access-token", "sb-refresh-token", "csrf-token"]
+    // Clear auth cookies
+    const cookieStore = cookies()
+    const cookiesToClear = ["auth-token", "csrf-token"]
 
     cookiesToClear.forEach((cookieName) => {
+      cookieStore.delete(cookieName)
       response.cookies.delete(cookieName)
     })
 

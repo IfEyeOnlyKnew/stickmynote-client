@@ -1,8 +1,8 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { spawn } from "child_process"
-import path from "path"
-import fs from "fs"
-import { promisify } from "util"
+import { spawn } from "node:child_process"
+import path from "node:path"
+import fs from "node:fs"
+import { promisify } from "node:util"
 
 let put: any, del: any
 
@@ -12,6 +12,7 @@ const initializeModules = async () => {
     put = blobModule.put
     del = blobModule.del
   } catch (error) {
+    console.warn("Blob storage module not available, using fallback:", error)
     put = async () => ({ url: "" })
     del = async () => ({})
   }
@@ -44,7 +45,7 @@ export async function POST(request: NextRequest) {
     const outputPath = path.join(tempDir, `output-${Date.now()}.docx`)
 
     // Write input file
-    await writeFile(inputPath, Buffer.from(buffer))
+    await writeFile(inputPath, new Uint8Array(buffer))
 
     // Run Python cleanup script
     const pythonProcess = spawn("python3", ["/app/scripts/cleanup-docx.py", inputPath, outputPath])
@@ -91,7 +92,9 @@ export async function POST(request: NextRequest) {
     try {
       await unlink(inputPath)
       await unlink(outputPath)
-    } catch (cleanupError) {}
+    } catch (cleanupError) {
+      console.warn("Failed to clean up temporary files:", cleanupError)
+    }
 
     // Delete original blob
     await del(blobUrl)

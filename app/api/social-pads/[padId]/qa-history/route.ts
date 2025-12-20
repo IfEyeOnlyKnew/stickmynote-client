@@ -1,4 +1,4 @@
-import { createClient } from "@/lib/supabase/server"
+import { createDatabaseClient } from "@/lib/database/database-adapter"
 import { NextResponse } from "next/server"
 import { getOrgContext } from "@/lib/auth/get-org-context"
 import { getCachedAuthUser } from "@/lib/auth/cached-auth"
@@ -9,8 +9,8 @@ export async function GET(req: Request, { params }: { params: Promise<{ padId: s
     const url = new URL(req.url)
     const limit = Number.parseInt(url.searchParams.get("limit") || "20")
 
-    const supabase = await createClient()
-    const authResult = await getCachedAuthUser(supabase)
+    const db = await createDatabaseClient()
+    const authResult = await getCachedAuthUser()
     if (authResult.rateLimited) {
       return new NextResponse(JSON.stringify({ error: "Rate limited" }), {
         status: 429,
@@ -28,7 +28,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ padId: s
     }
 
     // Fetch Q&A history for this pad
-    const { data: history, error } = await supabase
+    const { data: history, error } = await db
       .from("social_qa_history")
       .select("*")
       .eq("social_pad_id", padId)

@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server"
-import { createSupabaseServer } from "@/lib/supabase-server"
+import { createServiceDatabaseClient } from "@/lib/database/database-adapter"
+import type { DatabaseClient } from "@/lib/database/database-adapter"
 import { getCachedAuthUser } from "@/lib/auth/cached-auth"
 import { getOrgContext } from "@/lib/auth/get-org-context"
 
@@ -184,14 +185,14 @@ function dedupeByIdOrUrl<T extends { id?: string; url?: string }>(items: T[]) {
   return out
 }
 
-async function getUser(supabase: Awaited<ReturnType<typeof createSupabaseServer>>) {
-  const authResult = await getCachedAuthUser(supabase)
+async function getUser(db: DatabaseClient) {
+  const authResult = await getCachedAuthUser()
   if (authResult.rateLimited) return { user: null, rateLimited: true }
   return { user: authResult.user, rateLimited: false }
 }
 
-async function getNote(supabase: Awaited<ReturnType<typeof createSupabaseServer>>, noteId: string) {
-  const { data, error } = await supabase
+async function getNote(db: DatabaseClient, noteId: string) {
+  const { data, error } = await db
     .from("personal_sticks")
     .select("id,user_id,is_shared,org_id")
     .eq("id", noteId)
@@ -207,17 +208,17 @@ function isUserIdColumnError(err: any) {
 }
 
 async function safeInsertNoteTab(
-  supabase: Awaited<ReturnType<typeof createSupabaseServer>>,
+  db: DatabaseClient,
   payload: any,
   userId: string,
 ) {
-  let ins = await supabase
+  let ins = await db
     .from("personal_sticks_tabs")
     .insert({ ...payload, user_id: userId })
     .select("*")
     .single()
   if (ins.error && isUserIdColumnError(ins.error)) {
-    ins = await supabase.from("personal_sticks_tabs").insert(payload).select("*").single()
+    ins = await db.from("personal_sticks_tabs").insert(payload).select("*").single()
   }
   if (ins.error) throw ins.error
   return ins.data
@@ -281,8 +282,8 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "Invalid noteId" }, { status: 400 })
     }
 
-    const supabase = await createSupabaseServer()
-    const { user, rateLimited } = await getUser(supabase)
+    const db = await createServiceDatabaseClient()
+    const { user, rateLimited } = await getUser(db)
     if (rateLimited) {
       return NextResponse.json(
         { error: "Too many requests. Please try again later." },
@@ -294,7 +295,7 @@ export async function GET(request: NextRequest) {
     const orgContext = await getOrgContext(user.id)
     const userOrgId = orgContext?.orgId || null
 
-    const note = await getNote(supabase, noteId)
+    const note = await getNote(db, noteId)
     if (!note) return NextResponse.json({ error: "Not found" }, { status: 404 })
 
     const accessCheck = canAccessNote(note, user.id, userOrgId)
@@ -304,7 +305,7 @@ export async function GET(request: NextRequest) {
 
     const noteOrgId = note.org_id || null
 
-    let query = supabase
+    let query = db
       .from("personal_sticks_tabs")
       .select("id, personal_stick_id, tab_name, tab_type, tab_content, tab_data, tab_order, created_at, updated_at")
       .eq("personal_stick_id", noteId)
@@ -337,8 +338,8 @@ export async function GET(request: NextRequest) {
 // Body: { noteId: string, tabType: 'videos'|'images', items: VideoInfo[] | ImageInfo[] }
 export async function POST(request: NextRequest) {
   try {
-    const supabase = await createSupabaseServer()
-    const { user, rateLimited } = await getUser(supabase)
+    const db = await createServiceDatabaseClient()
+    const { user, rateLimited } = await getUser(db)
     if (rateLimited) {
       return NextResponse.json(
         { error: "Too many requests. Please try again later." },
@@ -359,7 +360,7 @@ export async function POST(request: NextRequest) {
     if (!["videos", "images"].includes(tabType)) return NextResponse.json({ error: "Invalid tabType" }, { status: 400 })
     if (!items.length) return NextResponse.json({ error: "No items to merge" }, { status: 400 })
 
-    const note = await getNote(supabase, noteId)
+    const note = await getNote(db, noteId)
     if (!note) return NextResponse.json({ error: "Not found" }, { status: 404 })
 
     const modifyCheck = canModifyNote(note, user.id, userOrgId)
@@ -371,7 +372,7 @@ export async function POST(request: NextRequest) {
 
     const dbType: DbTabType = tabType === "videos" ? "video" : "images"
 
-    let findQuery = supabase
+    let findQuery = db
       .from("personal_sticks_tabs")
       .select("id, tab_type, tab_data")
       .eq("personal_stick_id", noteId)
@@ -398,7 +399,7 @@ export async function POST(request: NextRequest) {
         ...(noteOrgId ? { org_id: noteOrgId } : {}),
       }
       try {
-        tab = await safeInsertNoteTab(supabase, payload, user.id)
+        tab = await safeInsertNoteTab(db, payload, user.id)
       } catch (e: any) {
         console.error("Insert note_tab failed:", e)
         return NextResponse.json({ error: e?.message || "Insert failed" }, { status: 500 })
@@ -432,7 +433,7 @@ export async function POST(request: NextRequest) {
     const merged = dedupeByIdOrUrl([...(currentArr || []), ...normalizedIncoming])
     const newTabData = { ...baseData, [tabType]: merged }
 
-    let updateQuery = supabase
+    let updateQuery = db
       .from("personal_sticks_tabs")
       .update({
         tab_type: dbType,
@@ -465,8 +466,8 @@ export async function POST(request: NextRequest) {
 // Body: { noteId: string, tabType: 'videos'|'images', itemId: string }
 export async function DELETE(request: NextRequest) {
   try {
-    const supabase = await createSupabaseServer()
-    const { user, rateLimited } = await getUser(supabase)
+    const db = await createServiceDatabaseClient()
+    const { user, rateLimited } = await getUser(db)
     if (rateLimited) {
       return NextResponse.json(
         { error: "Too many requests. Please try again later." },
@@ -487,7 +488,7 @@ export async function DELETE(request: NextRequest) {
     if (!["videos", "images"].includes(tabType)) return NextResponse.json({ error: "Invalid tabType" }, { status: 400 })
     if (!itemId) return NextResponse.json({ error: "Missing itemId" }, { status: 400 })
 
-    const note = await getNote(supabase, noteId)
+    const note = await getNote(db, noteId)
     if (!note) return NextResponse.json({ error: "Not found" }, { status: 404 })
 
     const modifyCheck = canModifyNote(note, user.id, userOrgId)
@@ -499,7 +500,7 @@ export async function DELETE(request: NextRequest) {
 
     const dbType: DbTabType = tabType === "videos" ? "video" : "images"
 
-    let findQuery = supabase
+    let findQuery = db
       .from("personal_sticks_tabs")
       .select("id, tab_type, tab_data")
       .eq("personal_stick_id", noteId)
@@ -522,7 +523,7 @@ export async function DELETE(request: NextRequest) {
     const filtered = (currentArr || []).filter((i) => (i?.id || i?.url || "") !== itemId)
     const newTabData = { ...baseData, [tabType]: filtered }
 
-    let updateQuery = supabase
+    let updateQuery = db
       .from("personal_sticks_tabs")
       .update({
         tab_type: dbType,
@@ -551,8 +552,8 @@ export async function DELETE(request: NextRequest) {
 // Body: { noteId: string, details: string }
 export async function PUT(request: NextRequest) {
   try {
-    const supabase = await createSupabaseServer()
-    const { user, rateLimited } = await getUser(supabase)
+    const db = await createServiceDatabaseClient()
+    const { user, rateLimited } = await getUser(db)
     if (rateLimited) {
       return NextResponse.json(
         { error: "Too many requests. Please try again later." },
@@ -570,7 +571,7 @@ export async function PUT(request: NextRequest) {
 
     if (!validateUUID(noteId)) return NextResponse.json({ error: "Invalid noteId" }, { status: 400 })
 
-    const note = await getNote(supabase, noteId)
+    const note = await getNote(db, noteId)
     if (!note) return NextResponse.json({ error: "Not found" }, { status: 404 })
 
     const modifyCheck = canModifyNote(note, user.id, userOrgId)
@@ -582,7 +583,7 @@ export async function PUT(request: NextRequest) {
 
     const dbType: DbTabType = "details"
 
-    let findQuery = supabase
+    let findQuery = db
       .from("personal_sticks_tabs")
       .select("id, tab_type, tab_content, tab_data")
       .eq("personal_stick_id", noteId)
@@ -609,13 +610,13 @@ export async function PUT(request: NextRequest) {
         ...(noteOrgId ? { org_id: noteOrgId } : {}),
       }
       try {
-        tab = await safeInsertNoteTab(supabase, payload, user.id)
+        tab = await safeInsertNoteTab(db, payload, user.id)
       } catch (e: any) {
         console.error("Insert details tab failed:", e)
         return NextResponse.json({ error: e?.message || "Insert failed" }, { status: 500 })
       }
     } else {
-      let updateQuery = supabase
+      let updateQuery = db
         .from("personal_sticks_tabs")
         .update({
           tab_content: details,

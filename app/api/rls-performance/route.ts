@@ -1,5 +1,5 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { getSupabaseServiceClient } from "@/lib/supabase-server"
+import { createServiceDatabaseClient } from "@/lib/database/database-adapter"
 import { isDiagnosticAccessible } from "@/lib/is-production"
 
 export async function GET(_request: NextRequest) {
@@ -8,10 +8,10 @@ export async function GET(_request: NextRequest) {
   }
 
   try {
-    const supabase = await getSupabaseServiceClient()
+    const db = await createServiceDatabaseClient()
 
     // Test basic connection
-    const { data: _connectionTest, error: connectionError } = await supabase.from("users").select("count").limit(1)
+    const { data: _connectionTest, error: connectionError } = await db.from("users").select("count").limit(1)
 
     if (connectionError) {
       return NextResponse.json(
@@ -27,7 +27,7 @@ export async function GET(_request: NextRequest) {
     // Test RLS performance on notes table
     const startTime = Date.now()
 
-    const { data: notesData, error: notesError } = await supabase
+    const { data: notesData, error: notesError } = await db
       .from("notes")
       .select("id, topic, created_at")
       .limit(10)
@@ -47,7 +47,7 @@ export async function GET(_request: NextRequest) {
     }
 
     // Test user table access
-    const { data: usersData, error: usersError } = await supabase.from("users").select("id, email, username").limit(5)
+    const { data: usersData, error: usersError } = await db.from("users").select("id, email, username").limit(5)
 
     return NextResponse.json({
       status: "success",

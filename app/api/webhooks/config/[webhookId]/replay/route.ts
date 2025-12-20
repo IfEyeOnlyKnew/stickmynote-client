@@ -1,13 +1,13 @@
-import { createClient } from "@/lib/supabase/server"
+import { createDatabaseClient } from "@/lib/database/database-adapter"
 import { NextResponse } from "next/server"
-import crypto from "crypto"
+import crypto from "node:crypto"
 import { getCachedAuthUser } from "@/lib/auth/cached-auth"
 
 export async function POST(request: Request, { params }: { params: Promise<{ webhookId: string }> }) {
   const { webhookId } = await params
-  const supabase = await createClient()
+  const db = await createDatabaseClient()
 
-  const { user, rateLimited } = await getCachedAuthUser(supabase)
+  const { user, rateLimited } = await getCachedAuthUser()
 
   if (rateLimited) {
     return NextResponse.json({ error: "Too many requests" }, { status: 429 })
@@ -25,7 +25,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ web
       return NextResponse.json({ error: "log_id is required" }, { status: 400 })
     }
 
-    const { data: log, error: logError } = await supabase
+    const { data: log, error: logError } = await db
       .from("webhook_delivery_logs")
       .select("*")
       .eq("id", log_id)
@@ -36,7 +36,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ web
       return NextResponse.json({ error: "Log not found" }, { status: 404 })
     }
 
-    const { data: webhook, error: webhookError } = await supabase
+    const { data: webhook, error: webhookError } = await db
       .from("webhook_configurations")
       .select("*")
       .eq("id", webhookId)
@@ -56,7 +56,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ web
       "X-Webhook-Signature": signature,
       "X-Webhook-Timestamp": new Date().toISOString(),
       "X-Webhook-Replay": "true",
-      ...((webhook.headers as Record<string, string>) || {}),
+      ...(webhook.headers as Record<string, string> | undefined),
     }
 
     const startTime = Date.now()
@@ -76,7 +76,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ web
       // Ignore
     }
 
-    await supabase
+    await db
       .from("webhook_delivery_logs")
       .update({
         status: response.ok ? "success" : "failed",

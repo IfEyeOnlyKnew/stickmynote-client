@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
-import { createBrowserClient } from "@supabase/ssr"
 
 const FULL_ACCESS_ROUTES = [
   "/dashboard",
@@ -26,35 +25,26 @@ export function useHubModeGuard() {
 
   useEffect(() => {
     async function checkAccess() {
-      const supabase = createBrowserClient(
-        process.env.NEXT_PUBLIC_SUPABASE_URL!,
-        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-      )
-
       try {
-        const {
-          data: { user },
-          error: authError,
-        } = await supabase.auth.getUser()
+        // Use local API to check auth status
+        const authResponse = await fetch("/api/auth/session")
+        const authData = await authResponse.json()
 
-        if (authError || !user) {
+        if (!authData.user) {
           router.replace("/auth/login")
           return
         }
 
-        const { data: profile, error: profileError } = await supabase
-          .from("users")
-          .select("hub_mode")
-          .eq("id", user.id)
-          .single()
-
-        if (profileError) {
-          console.error("useHubModeGuard - Error fetching profile:", profileError.message)
+        // Fetch user profile via API
+        const profileResponse = await fetch("/api/user/profile")
+        if (!profileResponse.ok) {
+          console.error("useHubModeGuard - Error fetching profile")
           setIsAuthorized(true)
           setIsLoading(false)
           return
         }
 
+        const profile = await profileResponse.json()
         const userHubMode = profile?.hub_mode || "personal_only"
         setHubMode(userHubMode)
 
@@ -62,7 +52,7 @@ export function useHubModeGuard() {
         const isFullAccessRoute = FULL_ACCESS_ROUTES.some((route) => currentPath.startsWith(route))
 
         if (userHubMode === "personal_only" && isFullAccessRoute) {
-          router.replace("/notes")
+          router.replace("/personal")
           return
         }
 

@@ -5,17 +5,6 @@ import { Button } from "@/components/ui/button"
 import { AlertTriangle } from "lucide-react"
 import { isDevelopment } from "@/lib/client-env"
 
-let Sentry: any = null
-if (typeof window !== "undefined" && process.env.NODE_ENV === "production") {
-  import("@sentry/nextjs")
-    .then((module) => {
-      Sentry = module
-    })
-    .catch(() => {
-      // Sentry not available, will use console.error instead
-    })
-}
-
 interface ErrorBoundaryProps {
   children: React.ReactNode
   fallback?: React.ReactNode
@@ -37,16 +26,28 @@ export class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoun
   }
 
   componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
-    if (Sentry) {
-      Sentry.captureException(error, {
-        contexts: {
-          react: {
-            componentStack: errorInfo.componentStack,
-          },
-        },
-      })
-    } else {
-      console.error("Error caught by ErrorBoundary:", error, errorInfo)
+    // Log error to console and potentially to error_logs table via API
+    console.error("Error caught by ErrorBoundary:", error, errorInfo)
+    
+    // Try to log to our error_logs API endpoint
+    if (typeof window !== "undefined" && process.env.NODE_ENV === "production") {
+      try {
+        fetch("/api/log-error", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            error_message: error.message,
+            error_stack: error.stack,
+            component_stack: errorInfo.componentStack,
+            error_type: "react_error_boundary",
+            url: window.location.href,
+          }),
+        }).catch(() => {
+          // Silently fail if error logging fails
+        })
+      } catch {
+        // Silently fail
+      }
     }
   }
 
@@ -65,7 +66,7 @@ export class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoun
               <AlertTriangle className="h-12 w-12 text-destructive" />
             </div>
             <h1 className="text-2xl font-bold">Something went wrong</h1>
-            <p className="text-muted-foreground">We've been notified and are working to fix the issue.</p>
+            <p className="text-muted-foreground">We&apos;ve been notified and are working to fix the issue.</p>
             <div className="flex gap-2 justify-center">
               <Button
                 onClick={() => {

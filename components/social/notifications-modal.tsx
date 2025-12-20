@@ -230,8 +230,11 @@ export function NotificationsModal({ open, onOpenChange }: NotificationsModalPro
         <CardContent className="p-0">
           {/* Group header */}
           <div
+            role="button"
+            tabIndex={0}
             className="flex items-center gap-3 p-4 cursor-pointer hover:bg-gray-50"
             onClick={() => group.notifications.length > 1 && toggleGroup(group.key)}
+            onKeyDown={(e) => e.key === "Enter" && group.notifications.length > 1 && toggleGroup(group.key)}
           >
             <div className="shrink-0">{getActivityIcon(group.activityTypes)}</div>
 
@@ -315,10 +318,13 @@ export function NotificationsModal({ open, onOpenChange }: NotificationsModalPro
                 return (
                   <div
                     key={notification.id}
+                    role="button"
+                    tabIndex={0}
                     className={`flex items-center gap-3 px-4 py-3 border-b last:border-b-0 cursor-pointer hover:bg-gray-100 ${
                       !isRead ? "bg-blue-50/30" : ""
                     }`}
                     onClick={() => handleNotificationClick(notification)}
+                    onKeyDown={(e) => e.key === "Enter" && handleNotificationClick(notification)}
                   >
                     <div className="w-5" /> {/* Spacer for alignment */}
                     <div className="flex-1 min-w-0">
@@ -395,17 +401,19 @@ export function NotificationsModal({ open, onOpenChange }: NotificationsModalPro
 
             <TabsContent value="inbox" className="mt-0">
               <ScrollArea className="h-[calc(80vh-200px)] px-6">
-                {loading ? (
+                {loading && (
                   <div className="flex items-center justify-center py-12">
                     <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600" />
                   </div>
-                ) : actionableGroups.length === 0 ? (
+                )}
+                {!loading && actionableGroups.length === 0 && (
                   <div className="text-center py-12">
                     <Inbox className="h-12 w-12 text-gray-400 mx-auto mb-4" />
                     <h3 className="text-lg font-semibold mb-2">Inbox Zero</h3>
                     <p className="text-gray-600">No actionable notifications right now.</p>
                   </div>
-                ) : (
+                )}
+                {!loading && actionableGroups.length > 0 && (
                   <div className="space-y-2 py-4">{actionableGroups.map((group) => renderGroup(group))}</div>
                 )}
               </ScrollArea>
@@ -413,17 +421,19 @@ export function NotificationsModal({ open, onOpenChange }: NotificationsModalPro
 
             <TabsContent value="activity" className="mt-0">
               <ScrollArea className="h-[calc(80vh-200px)] px-6">
-                {loading ? (
+                {loading && (
                   <div className="flex items-center justify-center py-12">
                     <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600" />
                   </div>
-                ) : activityGroups.length === 0 ? (
+                )}
+                {!loading && activityGroups.length === 0 && (
                   <div className="text-center py-12">
                     <Activity className="h-12 w-12 text-gray-400 mx-auto mb-4" />
                     <h3 className="text-lg font-semibold mb-2">No Activity</h3>
                     <p className="text-gray-600">Recent activity will appear here.</p>
                   </div>
-                ) : (
+                )}
+                {!loading && activityGroups.length > 0 && (
                   <div className="space-y-2 py-4">{activityGroups.map((group) => renderGroup(group, false))}</div>
                 )}
               </ScrollArea>

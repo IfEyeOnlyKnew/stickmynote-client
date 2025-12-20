@@ -1,14 +1,14 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { createServerClient } from "@/lib/supabase/server"
+import { createDatabaseClient } from "@/lib/database/database-adapter"
 import { getCachedAuthUser } from "@/lib/auth/cached-auth"
 
 // POST: Mark article as helpful
 export async function POST(request: NextRequest, { params }: { params: { padId: string; articleId: string } }) {
   try {
-    const supabase = await createServerClient()
+    const db = await createDatabaseClient()
     const { articleId } = params
 
-    const authResult = await getCachedAuthUser(supabase)
+    const authResult = await getCachedAuthUser()
     if (authResult.rateLimited) {
       return NextResponse.json(
         { error: "Rate limit exceeded. Please try again in a moment." },
@@ -21,7 +21,7 @@ export async function POST(request: NextRequest, { params }: { params: { padId: 
     const user = authResult.user
 
     // Insert helpful vote
-    const { error } = await supabase.from("social_kb_helpful_votes").insert({
+    const { error } = await db.from("social_kb_helpful_votes").insert({
       kb_article_id: articleId,
       user_id: user.id,
     })
@@ -44,10 +44,10 @@ export async function POST(request: NextRequest, { params }: { params: { padId: 
 // DELETE: Remove helpful vote
 export async function DELETE(request: NextRequest, { params }: { params: { padId: string; articleId: string } }) {
   try {
-    const supabase = await createServerClient()
+    const db = await createDatabaseClient()
     const { articleId } = params
 
-    const authResult = await getCachedAuthUser(supabase)
+    const authResult = await getCachedAuthUser()
     if (authResult.rateLimited) {
       return NextResponse.json(
         { error: "Rate limit exceeded. Please try again in a moment." },
@@ -59,7 +59,7 @@ export async function DELETE(request: NextRequest, { params }: { params: { padId
     }
     const user = authResult.user
 
-    const { error } = await supabase
+    const { error } = await db
       .from("social_kb_helpful_votes")
       .delete()
       .eq("kb_article_id", articleId)

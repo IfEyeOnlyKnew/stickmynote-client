@@ -1,13 +1,13 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { createClient } from "@/lib/supabase/server"
+import { createDatabaseClient } from "@/lib/database/database-adapter"
 import type { NotificationPreferences } from "@/types/notification-preferences"
 import { getCachedAuthUser } from "@/lib/auth/cached-auth"
 
 export async function GET(req: NextRequest) {
   try {
-    const supabase = await createClient()
+    const db = await createDatabaseClient()
 
-    const authResult = await getCachedAuthUser(supabase)
+    const authResult = await getCachedAuthUser()
     if (authResult.rateLimited) {
       return NextResponse.json(
         { error: "Rate limit exceeded. Please try again in a moment." },
@@ -19,7 +19,7 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
-    const { data: preferences, error } = await supabase
+    const { data: preferences, error } = await db
       .from("notification_preferences")
       .select("*")
       .eq("user_id", user.id)
@@ -55,7 +55,7 @@ export async function GET(req: NextRequest) {
 
     // If no preferences exist, create default ones
     if (!preferences) {
-      const { data: newPreferences, error: insertError } = await supabase
+      const { data: newPreferences, error: insertError } = await db
         .from("notification_preferences")
         .insert({
           user_id: user.id,
@@ -80,9 +80,9 @@ export async function GET(req: NextRequest) {
 
 export async function PUT(req: NextRequest) {
   try {
-    const supabase = await createClient()
+    const db = await createDatabaseClient()
 
-    const authResult = await getCachedAuthUser(supabase)
+    const authResult = await getCachedAuthUser()
     if (authResult.rateLimited) {
       return NextResponse.json(
         { error: "Rate limit exceeded. Please try again in a moment." },
@@ -99,7 +99,7 @@ export async function PUT(req: NextRequest) {
     // Remove fields that shouldn't be updated directly
     const { id, user_id, created_at, ...updateData } = body as any
 
-    const { data: preferences, error } = await supabase
+    const { data: preferences, error } = await db
       .from("notification_preferences")
       .update({
         ...updateData,

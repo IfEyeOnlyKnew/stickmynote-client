@@ -1,11 +1,11 @@
-import { createClient } from "@/lib/supabase/server"
+import { createDatabaseClient } from "@/lib/database/database-adapter"
 import { NextResponse } from "next/server"
 import { getCachedAuthUser } from "@/lib/auth/cached-auth"
 
 export async function POST(request: Request, { params }: { params: Promise<{ escalationId: string }> }) {
   const { escalationId } = await params
-  const supabase = await createClient()
-  const authResult = await getCachedAuthUser(supabase)
+  const db = await createDatabaseClient()
+  const authResult = await getCachedAuthUser()
   if (authResult.rateLimited) {
     return NextResponse.json(
       { error: "Rate limit exceeded. Please try again in a moment." },
@@ -17,7 +17,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ esc
   }
   const user = authResult.user
 
-  const { data: escalation, error } = await supabase
+  const { data: escalation, error } = await db
     .from("notification_escalations")
     .update({
       status: "acknowledged",

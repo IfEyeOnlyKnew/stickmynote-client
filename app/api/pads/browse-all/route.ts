@@ -1,4 +1,4 @@
-import { createServerClient } from "@/lib/supabase/server"
+import { createDatabaseClient } from "@/lib/database/database-adapter"
 import { NextResponse, type NextRequest } from "next/server"
 import { APICache } from "@/lib/api-cache"
 import { getOrgContext } from "@/lib/auth/get-org-context"
@@ -8,9 +8,9 @@ export const dynamic = "force-dynamic"
 
 export async function GET(request: NextRequest) {
   try {
-    const supabase = await createServerClient()
+    const db = await createDatabaseClient()
 
-    const authResult = await getCachedAuthUser(supabase)
+    const authResult = await getCachedAuthUser()
     if (authResult.rateLimited) {
       return NextResponse.json(
         { error: "Rate limit exceeded. Please try again in a moment." },
@@ -46,13 +46,13 @@ export async function GET(request: NextRequest) {
       })
     }
 
-    const { count: totalCount } = await supabase
+    const { count: totalCount } = await db
       .from("paks_pads")
       .select("*", { count: "exact", head: true })
       .is("multi_pak_id", null)
       .eq("org_id", orgContext.orgId)
 
-    const { data: allPads, error: padsError } = await supabase
+    const { data: allPads, error: padsError } = await db
       .from("paks_pads")
       .select(`
         id,
@@ -72,7 +72,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "Failed to fetch Pads" }, { status: 500 })
     }
 
-    const { data: userMemberships, error: membershipsError } = await supabase
+    const { data: userMemberships, error: membershipsError } = await db
       .from("paks_pad_members")
       .select("pad_id, role")
       .eq("user_id", user.id)
@@ -86,7 +86,7 @@ export async function GET(request: NextRequest) {
 
     const userPadIds = new Set(userMemberships?.map((m) => m.pad_id) || [])
 
-    const { data: accessRequests, error: requestsError } = await supabase
+    const { data: accessRequests, error: requestsError } = await db
       .from("paks_pad_access_requests")
       .select("pad_id, status")
       .eq("user_id", user.id)

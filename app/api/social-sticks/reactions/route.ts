@@ -1,12 +1,12 @@
-import { createClient } from "@/lib/supabase/server"
+import { createDatabaseClient } from "@/lib/database/database-adapter"
 import { NextResponse } from "next/server"
 import { getCachedAuthUser } from "@/lib/auth/cached-auth"
 
 export async function GET() {
   try {
-    const supabase = await createClient()
+    const db = await createDatabaseClient()
 
-    const { user, rateLimited } = await getCachedAuthUser(supabase)
+    const { user, rateLimited } = await getCachedAuthUser()
 
     if (rateLimited) {
       return NextResponse.json({ reactions: [] })
@@ -17,7 +17,7 @@ export async function GET() {
     }
 
     // Get user's organization
-    const { data: membership } = await supabase
+    const { data: membership } = await db
       .from("organization_members")
       .select("org_id")
       .eq("user_id", user.id)
@@ -28,7 +28,7 @@ export async function GET() {
     }
 
     // Get all reactions for sticks in the user's organization
-    const { data: reactions, error } = await supabase
+    const { data: reactions, error } = await db
       .from("social_stick_reactions") // Fixed table name from social_sticks_reactions to social_stick_reactions (singular)
       .select(`
         id,

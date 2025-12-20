@@ -1,6 +1,5 @@
-import { createServerClient } from "@/lib/supabase/server"
+import { getSession, type User } from "@/lib/auth/local-auth"
 import { type NextRequest, NextResponse } from "next/server"
-import type { User } from "@supabase/supabase-js"
 
 export interface AuthResult {
   user: User | null
@@ -14,13 +13,9 @@ export interface AuthResult {
  */
 export async function requireAuth(request?: NextRequest): Promise<AuthResult> {
   try {
-    const supabase = await createServerClient()
-    const {
-      data: { user },
-      error,
-    } = await supabase.auth.getUser()
+    const session = await getSession()
 
-    if (error || !user) {
+    if (!session) {
       return {
         user: null,
         error: "Unauthorized",
@@ -28,7 +23,7 @@ export async function requireAuth(request?: NextRequest): Promise<AuthResult> {
       }
     }
 
-    return { user, error: null }
+    return { user: session.user, error: null }
   } catch (error) {
     console.error("[Auth] Error in requireAuth:", error)
     return {
@@ -85,8 +80,8 @@ export async function requireOwnership(
  */
 export async function isAdmin(userId: string): Promise<boolean> {
   // Future: Query user roles from database
-  // const supabase = await createServerClient()
-  // const { data } = await supabase
+  // const db = await createDatabaseClient()
+  // const { data } = await db
   //   .from('user_roles')
   //   .select('role')
   //   .eq('user_id', userId)

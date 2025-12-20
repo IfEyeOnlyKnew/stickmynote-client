@@ -1,4 +1,4 @@
-import { createClient } from "@/lib/supabase/server"
+import { createDatabaseClient } from "@/lib/database/database-adapter"
 
 export interface SearchOptions {
   query: string
@@ -25,10 +25,10 @@ export class SearchEngine {
     const startTime = performance.now()
     const { query, limit = 20, offset = 0, fuzzy = true, userId, filter = "all", orgId } = options
 
-    const supabase = await createClient()
+    const db = await createDatabaseClient()
 
     // Build the search query
-    let dbQuery = supabase.from("notes").select(
+    let dbQuery = db.from("notes").select(
       `
         id, topic, content, color, position_x, position_y, is_shared,
         created_at, updated_at, user_id, z_index
@@ -92,9 +92,9 @@ export class SearchEngine {
     const startTime = performance.now()
     const { query, limit = 50, offset = 0, fuzzy = true, userId, orgId } = options
 
-    const supabase = await createClient()
+    const db = await createDatabaseClient()
 
-    let dbQuery = supabase.from("paks_pads").select(
+    let dbQuery = db.from("paks_pads").select(
       `
         id, name, description, owner_id, created_at, updated_at
       `,
@@ -147,9 +147,9 @@ export class SearchEngine {
     const startTime = performance.now()
     const { query, limit = 50, offset = 0, fuzzy = true, userId, orgId } = options
 
-    const supabase = await createClient()
+    const db = await createDatabaseClient()
 
-    let dbQuery = supabase.from("paks_pad_sticks").select(
+    let dbQuery = db.from("paks_pad_sticks").select(
       `
         id, topic, content, color, pad_id, user_id, created_at, updated_at,
         pads:paks_pads(id, name, owner_id)

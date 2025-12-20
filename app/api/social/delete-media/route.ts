@@ -1,5 +1,5 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { createClient } from "@/lib/supabase/server"
+import { createDatabaseClient } from "@/lib/database/database-adapter"
 import { getCachedAuthUser } from "@/lib/auth/cached-auth"
 
 let del: any
@@ -9,6 +9,7 @@ const initializeModules = async () => {
     const blobModule = await import("@vercel/blob")
     del = blobModule.del
   } catch (error) {
+    console.error("[delete-media] Blob module load error:", error)
     console.warn("[v0] @vercel/blob not available")
     del = async () => {}
   }
@@ -18,9 +19,9 @@ export async function DELETE(request: NextRequest) {
   await initializeModules()
 
   try {
-    const supabase = await createClient()
+    await createDatabaseClient()
 
-    const { user, error: authError, rateLimited } = await getCachedAuthUser(supabase)
+    const { user, error: authError, rateLimited } = await getCachedAuthUser()
 
     if (rateLimited) {
       return NextResponse.json({ error: "Too many requests" }, { status: 429 })

@@ -1,15 +1,15 @@
-import { createClient } from "@/lib/supabase/server"
+import { createDatabaseClient } from "@/lib/database/database-adapter"
 import { NextResponse } from "next/server"
 import { getCachedAuthUser, createRateLimitResponse, createUnauthorizedResponse } from "@/lib/auth/cached-auth"
 
 // Create reactions table for replies
 export async function GET(request: Request, { params }: { params: { replyId: string } }) {
   try {
-    const supabase = await createClient()
+    const db = await createDatabaseClient()
     const { replyId } = params
 
     // Get all reactions for this reply with user data
-    const { data: reactions, error } = await supabase
+    const { data: reactions, error } = await db
       .from("social_reply_reactions")
       .select(`
         *,
@@ -44,8 +44,8 @@ export async function GET(request: Request, { params }: { params: { replyId: str
 
 export async function POST(request: Request, { params }: { params: { replyId: string } }) {
   try {
-    const supabase = await createClient()
-    const authResult = await getCachedAuthUser(supabase)
+    const db = await createDatabaseClient()
+    const authResult = await getCachedAuthUser()
 
     if (authResult.rateLimited) {
       return createRateLimitResponse()
@@ -60,7 +60,7 @@ export async function POST(request: Request, { params }: { params: { replyId: st
     const { reaction_type } = await request.json()
 
     // Check if user already reacted with this type
-    const { data: existing } = await supabase
+    const { data: existing } = await db
       .from("social_reply_reactions")
       .select("id")
       .eq("social_reply_id", replyId)
@@ -70,14 +70,14 @@ export async function POST(request: Request, { params }: { params: { replyId: st
 
     if (existing) {
       // Remove the reaction if it already exists (toggle behavior)
-      const { error } = await supabase.from("social_reply_reactions").delete().eq("id", existing.id)
+      const { error } = await db.from("social_reply_reactions").delete().eq("id", existing.id)
 
       if (error) throw error
 
       return NextResponse.json({ removed: true, reactionType: reaction_type })
     } else {
       // Add the new reaction
-      const { data: reaction, error } = await supabase
+      const { data: reaction, error } = await db
         .from("social_reply_reactions")
         .insert({
           social_reply_id: replyId,

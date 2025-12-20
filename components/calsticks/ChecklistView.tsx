@@ -10,13 +10,13 @@ import type { ChecklistItem, ChecklistData } from "@/types/checklist"
 import { toast } from "@/hooks/use-toast"
 
 interface ChecklistViewProps {
-  calstickId: string
-  checklist: ChecklistData
-  onUpdate: (checklist: ChecklistData) => Promise<void>
-  readOnly?: boolean
+  readonly calstickId: string
+  readonly checklist: ChecklistData
+  readonly onUpdate: (checklist: ChecklistData) => Promise<void>
+  readonly readOnly?: boolean
 }
 
-export function ChecklistView({ calstickId, checklist, onUpdate, readOnly = false }: ChecklistViewProps) {
+export function ChecklistView({ calstickId, checklist, onUpdate, readOnly = false }: Readonly<ChecklistViewProps>) {
   const [items, setItems] = useState<ChecklistItem[]>(checklist.items || [])
   const [newItemText, setNewItemText] = useState("")
   const [isAdding, setIsAdding] = useState(false)
@@ -36,6 +36,7 @@ export function ChecklistView({ calstickId, checklist, onUpdate, readOnly = fals
       created_at: new Date().toISOString(),
     }
 
+    const previousItems = [...items]
     const updatedItems = [...items, newItem]
     setItems(updatedItems)
     setNewItemText("")
@@ -49,7 +50,7 @@ export function ChecklistView({ calstickId, checklist, onUpdate, readOnly = fals
       })
     } catch (error) {
       console.error("Error adding checklist item:", error)
-      setItems(items) // Revert on error
+      setItems(previousItems) // Revert on error
       toast({
         title: "Error",
         description: "Failed to add checklist item",
@@ -59,15 +60,16 @@ export function ChecklistView({ calstickId, checklist, onUpdate, readOnly = fals
   }
 
   const handleToggleItem = async (itemId: string) => {
-    const updatedItems = items.map((item) =>
-      item.id === itemId
-        ? {
-            ...item,
-            completed: !item.completed,
-            completed_at: !item.completed ? new Date().toISOString() : null,
-          }
-        : item,
-    )
+    const previousItems = [...items]
+    const updatedItems = items.map((item) => {
+      if (item.id !== itemId) return item
+      const newCompleted = !item.completed
+      return {
+        ...item,
+        completed: newCompleted,
+        completed_at: newCompleted ? new Date().toISOString() : null,
+      }
+    })
 
     setItems(updatedItems)
 
@@ -75,7 +77,7 @@ export function ChecklistView({ calstickId, checklist, onUpdate, readOnly = fals
       await onUpdate({ items: updatedItems })
     } catch (error) {
       console.error("Error toggling checklist item:", error)
-      setItems(items) // Revert on error
+      setItems(previousItems) // Revert on error
       toast({
         title: "Error",
         description: "Failed to update checklist item",
@@ -85,6 +87,7 @@ export function ChecklistView({ calstickId, checklist, onUpdate, readOnly = fals
   }
 
   const handleDeleteItem = async (itemId: string) => {
+    const previousItems = [...items]
     const updatedItems = items.filter((item) => item.id !== itemId)
     setItems(updatedItems)
 
@@ -96,7 +99,7 @@ export function ChecklistView({ calstickId, checklist, onUpdate, readOnly = fals
       })
     } catch (error) {
       console.error("Error deleting checklist item:", error)
-      setItems(items) // Revert on error
+      setItems(previousItems) // Revert on error
       toast({
         title: "Error",
         description: "Failed to delete checklist item",
@@ -155,6 +158,7 @@ export function ChecklistView({ calstickId, checklist, onUpdate, readOnly = fals
                     setNewItemText("")
                   }
                 }}
+                // eslint-disable-next-line jsx-a11y/no-autofocus
                 autoFocus
                 className="text-sm"
               />

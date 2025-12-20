@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useCallback } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Button } from "@/components/ui/button"
@@ -37,13 +37,8 @@ export default function WorkloadClient() {
   const [selectedUser, setSelectedUser] = useState<string>("all")
   const [currentWeek, setCurrentWeek] = useState(new Date())
   const [loading, setLoading] = useState(true)
-  const [viewMode, setViewMode] = useState<"week" | "month">("week")
 
-  useEffect(() => {
-    fetchWorkloadData()
-  }, [currentWeek])
-
-  const fetchWorkloadData = async () => {
+  const fetchWorkloadData = useCallback(async () => {
     try {
       setLoading(true)
       const weekStart = startOfWeek(currentWeek)
@@ -62,7 +57,11 @@ export default function WorkloadClient() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [currentWeek])
+
+  useEffect(() => {
+    fetchWorkloadData()
+  }, [fetchWorkloadData])
 
   const calculateDailyWorkload = (user: WorkloadData): DailyWorkload[] => {
     const weekStart = startOfWeek(currentWeek)
@@ -70,7 +69,6 @@ export default function WorkloadClient() {
     const days = eachDayOfInterval({ start: weekStart, end: weekEnd })
 
     return days.map((day) => {
-      const dayStr = format(day, "yyyy-MM-dd")
       const tasksForDay = user.tasks.filter((task) => task.dueDate && isSameDay(new Date(task.dueDate), day))
 
       const allocated = tasksForDay.reduce((sum, task) => sum + (task.estimatedHours || 0), 0)
@@ -87,23 +85,24 @@ export default function WorkloadClient() {
     })
   }
 
+  const getUserAllocatedHoursForDay = (user: WorkloadData, day: Date): number => {
+    const tasksForDay = user.tasks.filter((task) => task.dueDate && isSameDay(new Date(task.dueDate), day))
+    return tasksForDay.reduce((sum, task) => sum + (task.estimatedHours || 0), 0)
+  }
+
   const calculateTeamWorkload = (): DailyWorkload[] => {
     const weekStart = startOfWeek(currentWeek)
     const weekEnd = endOfWeek(currentWeek)
     const days = eachDayOfInterval({ start: weekStart, end: weekEnd })
 
     return days.map((day) => {
-      const dayStr = format(day, "yyyy-MM-dd")
-
       let totalAllocated = 0
       let totalCapacity = 0
 
-      workloadData.forEach((user) => {
-        const tasksForDay = user.tasks.filter((task) => task.dueDate && isSameDay(new Date(task.dueDate), day))
-
-        totalAllocated += tasksForDay.reduce((sum, task) => sum + (task.estimatedHours || 0), 0)
+      for (const user of workloadData) {
+        totalAllocated += getUserAllocatedHoursForDay(user, day)
         totalCapacity += user.capacityHoursPerDay
-      })
+      }
 
       return {
         date: format(day, "EEE MM/dd"),
@@ -122,8 +121,13 @@ export default function WorkloadClient() {
   }
 
   const selectedUserData = workloadData.find((u) => u.userId === selectedUser)
-  const chartData =
-    selectedUser === "all" ? calculateTeamWorkload() : selectedUserData ? calculateDailyWorkload(selectedUserData) : []
+
+  const getChartData = (): DailyWorkload[] => {
+    if (selectedUser === "all") return calculateTeamWorkload()
+    if (selectedUserData) return calculateDailyWorkload(selectedUserData)
+    return []
+  }
+  const chartData = getChartData()
 
   const overloadUsers = getOverloadUsers()
 
@@ -273,8 +277,8 @@ export default function WorkloadClient() {
                 <Legend />
                 <Bar dataKey="capacity" fill="#94a3b8" name="Capacity" />
                 <Bar dataKey="allocated" name="Allocated">
-                  {chartData.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={entry.overload > 0 ? "#ef4444" : "#22c55e"} />
+                  {chartData.map((entry) => (
+                    <Cell key={entry.date} fill={entry.overload > 0 ? "#ef4444" : "#22c55e"} />
                   ))}
                 </Bar>
               </BarChart>

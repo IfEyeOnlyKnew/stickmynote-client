@@ -89,9 +89,11 @@ export function useAdvancedSearch<T = any>(options: UseAdvancedSearchOptions) {
   )
 
   // Trigger search when debounced query changes
+  /* eslint-disable react-hooks/exhaustive-deps */
   useEffect(() => {
     performSearch(debouncedQuery, 0)
   }, [debouncedQuery, filter])
+  /* eslint-enable react-hooks/exhaustive-deps */
 
   const loadMore = useCallback(() => {
     if (!state.loading && state.hasMore) {

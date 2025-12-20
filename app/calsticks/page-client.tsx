@@ -1,7 +1,7 @@
 "use client"
 
-import { useState, useEffect } from "react"
-import { useRouter, useSearchParams } from "next/navigation"
+import { useState, useEffect, useCallback } from "react"
+import { useSearchParams } from "next/navigation"
 import {
   Search,
   LayoutGrid,
@@ -27,7 +27,7 @@ import { toast } from "@/hooks/use-toast"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import dynamic from "next/dynamic"
 import type { CalStick, Dependency } from "@/types/calstick"
-import { createClient } from "@/lib/supabase/client"
+import { useUser } from "@/contexts/user-context"
 import { SmartCaptureDialog } from "@/components/calsticks/SmartCaptureDialog"
 import { AutoScheduleDialog } from "@/components/calsticks/AutoScheduleDialog"
 import { KanbanView } from "@/components/calsticks/KanbanView"
@@ -43,19 +43,12 @@ import { useIsMobile } from "@/hooks/use-mobile"
 import { AgendaView } from "@/components/calsticks/AgendaView"
 import { CustomFieldsDialog } from "@/components/calsticks/CustomFieldsDialog"
 import { TaskSettings } from "@/components/calsticks/TaskSettings"
-import type { RealtimePostgresChangesPayload } from "@supabase/supabase-js"
 
 const GanttChart = dynamic(() => import("@/components/calsticks/GanttChart"), { ssr: false })
 const StoryMapView = dynamic(() => import("@/components/calsticks/StoryMap"), { ssr: false })
 
 type ViewMode = "list" | "kanban" | "calendar" | "gantt" | "agenda" | "storymap"
-type Priority = "urgent" | "high" | "medium" | "low" | "none"
-type Status = "todo" | "in-progress" | "review" | "done"
 type FilterType = "all" | "completed" | "not-completed" | "promoted"
-
-interface GroupedCalSticks {
-  [key: string]: CalStick[]
-}
 
 interface Pad {
   id: string
@@ -63,22 +56,17 @@ interface Pad {
 }
 
 export default function CalSticksPageClient() {
-  const router = useRouter()
   const searchParams = useSearchParams()
-  const supabase = createClient()
+  const { user } = useUser()
   const [calsticks, setCalsticks] = useState<CalStick[]>([])
   const [dependencies, setDependencies] = useState<Dependency[]>([])
   const [loading, setLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState("")
   const [filter, setFilter] = useState<FilterType>("all")
-  const [page, setPage] = useState(1)
-  const [hasMore, setHasMore] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editDate, setEditDate] = useState<Date | undefined>(undefined)
   const [ganttStickId, setGanttStickId] = useState<string | null>(null)
   const [ganttCalSticks, setGanttCalSticks] = useState<CalStick[]>([])
-  const [selectedStick, setSelectedStick] = useState<CalStick | null>(null)
-  const [isFullscreenOpen, setIsFullscreenOpen] = useState(false)
   const [selectedTask, setSelectedTask] = useState<CalStick | null>(null)
   const [isTaskModalOpen, setIsTaskModalOpen] = useState(false)
   const [showCustomFieldsSettings, setShowCustomFieldsSettings] = useState(false)
@@ -91,16 +79,88 @@ export default function CalSticksPageClient() {
 
   const [viewMode, setViewMode] = useState<ViewMode>("kanban")
 
-  type ActiveUser = { userId: string; username: string; taskId?: string }
-  const [activeUsers, setActiveUsers] = useState<Record<string, ActiveUser>>({})
-  const [currentUserId, setCurrentUserId] = useState("")
-
   const [showSmartCapture, setShowSmartCapture] = useState(false)
   const [showAutoSchedule, setShowAutoSchedule] = useState(false)
 
   const [autoArchiveDays, setAutoArchiveDays] = useState(14)
 
   const isMobile = useIsMobile()
+
+  const fetchDependencies = useCallback(async (taskIds: string[]) => {
+    try {
+      const response = await fetch("/api/calsticks/dependencies", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ taskIds }),
+      })
+
+      const contentType = response.headers.get("content-type")
+      if (!contentType?.includes("application/json")) {
+        console.error("[v0] Dependencies API returned non-JSON response:", contentType)
+        setDependencies([])
+        return
+      }
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}))
+        console.error("[v0] Error fetching dependencies: HTTP", response.status, errorData)
+        setDependencies([])
+        return
+      }
+
+      const data = await response.json()
+      setDependencies(data.dependencies || [])
+    } catch (error) {
+      console.error("[v0] Error fetching dependencies:", error)
+      setDependencies([])
+    }
+  }, [])
+
+  const fetchCalSticks = useCallback(async () => {
+    try {
+      setLoading(true)
+      const params = new URLSearchParams({
+        filter,
+        search: searchQuery,
+        limit: "50",
+        padId: selectedPad,
+      })
+
+      const response = await fetch(`/api/calsticks?${params}`, {
+        cache: "no-store",
+        headers: { "Cache-Control": "no-cache" },
+      })
+      if (!response.ok) throw new Error("Failed to fetch CalSticks")
+
+      const data = await response.json()
+      setCalsticks(data.calsticks)
+
+      if (data.calsticks && data.calsticks.length > 0) {
+        await fetchDependencies(data.calsticks.map((cs: CalStick) => cs.id))
+      }
+    } catch (error) {
+      console.error("Error fetching CalSticks:", error)
+      toast({
+        title: "Error",
+        description: "Failed to load CalSticks",
+        variant: "destructive",
+      })
+    } finally {
+      setLoading(false)
+    }
+  }, [filter, searchQuery, selectedPad, fetchDependencies])
+
+  const fetchPads = useCallback(async () => {
+    try {
+      const response = await fetch("/api/pads")
+      if (response.ok) {
+        const data = await response.json()
+        setPads(data.pads || [])
+      }
+    } catch (error) {
+      console.error("Error fetching pads:", error)
+    }
+  }, [])
 
   useEffect(() => {
     const stickIdParam = searchParams.get("stickId")
@@ -120,106 +180,29 @@ export default function CalSticksPageClient() {
   }, [searchParams])
 
   useEffect(() => {
-    const initUser = async () => {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser()
-      if (user) {
-        setCurrentUserId(user.id)
-      }
-    }
-    initUser()
-  }, [])
-
-  useEffect(() => {
     fetchPads()
-  }, [])
+  }, [fetchPads])
 
   useEffect(() => {
     fetchCalSticks()
-  }, [filter, searchQuery, page, selectedPad])
+  }, [fetchCalSticks])
 
+  // Polling for realtime updates
   useEffect(() => {
-    if (!currentUserId) return
+    if (!user?.id) return
 
-    console.log("[v0] Setting up realtime subscriptions")
+    const POLL_INTERVAL = 30000 // 30 seconds
 
-    // Subscribe to calstick changes
-    const calstickChannel = supabase
-      .channel("calsticks-changes")
-      .on(
-        "postgres_changes",
-        {
-          event: "*",
-          schema: "public",
-          table: "calstick_tasks",
-        },
-        (payload: RealtimePostgresChangesPayload<CalStick>) => {
-          if (payload.eventType === "INSERT") {
-            setCalsticks((prev) => {
-              const newData = payload.new as CalStick
-              const exists = prev.some((c) => c.id === newData.id)
-              if (exists) return prev
-              return [...prev, newData]
-            })
-          } else if (payload.eventType === "UPDATE") {
-            const newData = payload.new as CalStick
-            setCalsticks((prev) => prev.map((c) => (c.id === newData.id ? { ...c, ...newData } : c)))
-          } else if (payload.eventType === "DELETE") {
-            const oldData = payload.old as CalStick
-            setCalsticks((prev) => prev.filter((c) => c.id !== oldData.id))
-          }
-        },
-      )
-      .subscribe()
-
-    // Subscribe to presence - who is viewing/editing
-    const presenceChannel = supabase.channel("calsticks-presence", {
-      config: {
-        presence: {
-          key: currentUserId,
-        },
-      },
-    })
-
-    presenceChannel
-      .on("presence", { event: "sync" }, () => {
-        const state = presenceChannel.presenceState()
-
-        const users: Record<string, ActiveUser> = {}
-        const entries = Object.entries(state) as [string, ActiveUser[]][]
-        entries.forEach(([key, presences]) => {
-          if (presences.length > 0) {
-            users[key] = presences[0]
-          }
-        })
-        setActiveUsers(users)
+    const intervalId = setInterval(() => {
+      fetchCalSticks().catch((error) => {
+        console.error("[CalSticks] Polling error:", error)
       })
-      .on("presence", { event: "join" }, ({ key, newPresences }: { key: string; newPresences: ActiveUser[] }) => {
-        // User joined
-      })
-      .on("presence", { event: "leave" }, ({ key, leftPresences }: { key: string; leftPresences: ActiveUser[] }) => {
-        // User left
-      })
-      .subscribe(async (status: string) => {
-        if (status === "SUBSCRIBED") {
-          // Announce presence
-          const {
-            data: { user },
-          } = await supabase.auth.getUser()
-          await presenceChannel.track({
-            userId: currentUserId,
-            username: user?.email?.split("@")[0] || "Anonymous",
-            online_at: new Date().toISOString(),
-          })
-        }
-      })
+    }, POLL_INTERVAL)
 
     return () => {
-      calstickChannel.unsubscribe()
-      presenceChannel.unsubscribe()
+      clearInterval(intervalId)
     }
-  }, [currentUserId, supabase])
+  }, [user?.id, fetchCalSticks])
 
   useEffect(() => {
     const fetchSettings = async () => {
@@ -236,105 +219,17 @@ export default function CalSticksPageClient() {
     fetchSettings()
   }, [])
 
-  const handleTaskEdit = async (taskId: string) => {
-    setSelectedTask(calsticks.find((c) => c.id === taskId) || null)
-    setIsTaskModalOpen(true)
-
-    // Update presence to show user is editing this task
-    const presenceChannel = supabase.channel("calsticks-presence")
-    await presenceChannel.track({
-      userId: currentUserId,
-      taskId: taskId,
-      editing: true,
-    })
-  }
-
-  const fetchPads = async () => {
-    try {
-      const response = await fetch("/api/pads")
-      if (response.ok) {
-        const data = await response.json()
-        setPads(data.pads || [])
-      }
-    } catch (error) {
-      console.error("Error fetching pads:", error)
-    }
-  }
-
-  const fetchCalSticks = async () => {
-    try {
-      setLoading(true)
-      const params = new URLSearchParams({
-        filter,
-        search: searchQuery,
-        page: page.toString(),
-        limit: "50",
-        padId: selectedPad,
-      })
-
-      const response = await fetch(`/api/calsticks?${params}`, {
-        cache: "no-store",
-        headers: { "Cache-Control": "no-cache" },
-      })
-      if (!response.ok) throw new Error("Failed to fetch CalSticks")
-
-      const data = await response.json()
-      setCalsticks(data.calsticks)
-      setHasMore(data.hasMore)
-
-      if (data.calsticks && data.calsticks.length > 0) {
-        await fetchDependencies(data.calsticks.map((cs: CalStick) => cs.id))
-      }
-    } catch (error) {
-      console.error("Error fetching CalSticks:", error)
-      toast({
-        title: "Error",
-        description: "Failed to load CalSticks",
-        variant: "destructive",
-      })
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  const fetchDependencies = async (taskIds: string[]) => {
-    try {
-      const response = await fetch("/api/calsticks/dependencies", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ taskIds }),
-      })
-
-      const contentType = response.headers.get("content-type")
-      if (!contentType || !contentType.includes("application/json")) {
-        console.error("[v0] Dependencies API returned non-JSON response:", contentType)
-        setDependencies([])
-        return
-      }
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}))
-        console.error("[v0] Error fetching dependencies: HTTP", response.status, errorData)
-        setDependencies([])
-        return
-      }
-
-      const data = await response.json()
-      setDependencies(data.dependencies || [])
-    } catch (error) {
-      console.error("[v0] Error fetching dependencies:", error)
-      setDependencies([])
-    }
-  }
-
   const toggleComplete = async (calstickId: string, completed: boolean) => {
+    const newCompleted = !completed
+    const completedAt = newCompleted ? new Date().toISOString() : null
+
     try {
       const response = await fetch(`/api/sticks/replies/${calstickId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          calstick_completed: !completed,
-          calstick_completed_at: !completed ? new Date().toISOString() : null,
+          calstick_completed: newCompleted,
+          calstick_completed_at: completedAt,
         }),
       })
 
@@ -345,8 +240,8 @@ export default function CalSticksPageClient() {
           cs.id === calstickId
             ? {
                 ...cs,
-                calstick_completed: !completed,
-                calstick_completed_at: !completed ? new Date().toISOString() : null,
+                calstick_completed: newCompleted,
+                calstick_completed_at: completedAt,
               }
             : cs,
         ),
@@ -354,7 +249,7 @@ export default function CalSticksPageClient() {
 
       toast({
         title: "Success",
-        description: `Task marked as ${!completed ? "complete" : "incomplete"}`,
+        description: `Task marked as ${newCompleted ? "complete" : "incomplete"}`,
       })
     } catch (error) {
       console.error("Error updating CalStick:", error)
@@ -516,36 +411,6 @@ export default function CalSticksPageClient() {
     }
   }
 
-  const handleCloseFullscreen = () => {
-    setIsFullscreenOpen(false)
-    setSelectedStick(null)
-  }
-
-  const handleStickUpdate = (updatedStick: CalStick) => {
-    setCalsticks((prev) =>
-      prev.map((cs) => {
-        if (cs.stick_id === updatedStick.id) {
-          return {
-            ...cs,
-            stick: cs.stick
-              ? {
-                  ...cs.stick,
-                  topic: updatedStick.stick?.topic || cs.stick.topic,
-                  content: updatedStick.stick?.content || updatedStick.content,
-                }
-              : cs.stick,
-          }
-        }
-        return cs
-      }),
-    )
-  }
-
-  const handleStickDelete = (stickId: string) => {
-    setCalsticks((prev) => prev.filter((cs) => cs.stick_id !== stickId))
-    handleCloseFullscreen()
-  }
-
   const filteredCalSticks = calsticks.filter((cs) => {
     if (filter === "completed") {
       return cs.calstick_completed
@@ -655,9 +520,8 @@ export default function CalSticksPageClient() {
 
   const handleSmartCapture = async (tasks: any[]) => {
     try {
-      const createdTasks = []
       for (const task of tasks) {
-        const response = await fetch("/api/calsticks", {
+        await fetch("/api/calsticks", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -669,11 +533,6 @@ export default function CalSticksPageClient() {
             calstick_labels: task.tags || [],
           }),
         })
-
-        if (response.ok) {
-          const newTask = await response.json()
-          createdTasks.push(newTask)
-        }
       }
 
       await fetchCalSticks()
@@ -701,24 +560,6 @@ export default function CalSticksPageClient() {
       console.error("Error applying auto-schedule:", error)
       throw error
     }
-  }
-
-  const unscheduledTasks = calsticks.filter((cs) => !cs.calstick_date && !cs.calstick_start_date)
-
-  const handleNewTask = () => {
-    const newTask: Partial<CalStick> = {
-      id: "new", // Temporary ID for new task
-      calstick_priority: "medium",
-      calstick_status: "todo",
-      calstick_labels: [],
-      created_at: new Date().toISOString(),
-    }
-    setSelectedTask(newTask as CalStick)
-    setIsTaskModalOpen(true)
-  }
-
-  const handleExport = () => {
-    setShowExportDialog(true)
   }
 
   return (
@@ -768,7 +609,9 @@ export default function CalSticksPageClient() {
 
               <Button variant="outline" size="sm" onClick={() => setFilter(filter === "all" ? "not-completed" : "all")}>
                 <Filter className="h-4 w-4 mr-2" />
-                {filter === "all" ? "All" : filter === "completed" ? "Completed" : "Active"}
+                {filter === "all" && "All"}
+                {filter === "completed" && "Completed"}
+                {filter !== "all" && filter !== "completed" && "Active"}
               </Button>
 
               <Button variant="outline" size="sm" onClick={() => setFilter(filter === "promoted" ? "all" : "promoted")}>
@@ -852,14 +695,15 @@ export default function CalSticksPageClient() {
       </header>
 
       <main className="container mx-auto px-4 py-6">
-        {loading ? (
+        {loading && (
           <div className="flex items-center justify-center py-12">
             <div className="text-center">
               <div className="inline-block h-8 w-8 animate-spin rounded-full border-4 border-solid border-current border-r-transparent"></div>
               <p className="mt-2 text-sm text-muted-foreground">Loading tasks...</p>
             </div>
           </div>
-        ) : calsticks.length === 0 ? (
+        )}
+        {!loading && calsticks.length === 0 && (
           <div className="flex flex-col items-center justify-center py-12 text-center">
             <FileText className="h-12 w-12 text-muted-foreground mb-4" />
             <h3 className="text-lg font-semibold mb-2">No tasks yet</h3>
@@ -873,9 +717,8 @@ export default function CalSticksPageClient() {
               </Button>
             </div>
           </div>
-        ) : (
-          renderContent()
         )}
+        {!loading && calsticks.length > 0 && renderContent()}
       </main>
 
       <ExportDialog

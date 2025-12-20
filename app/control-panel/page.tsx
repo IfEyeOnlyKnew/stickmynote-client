@@ -54,11 +54,11 @@ export default function PanelPage() {
             <div className="flex items-center gap-4">
               <Button
                 variant="ghost"
-                onClick={() => router.push("/notes")}
+                onClick={() => router.push("/personal")}
                 className="gap-2 hover:bg-purple-100/50 transition-colors"
               >
                 <ArrowLeft className="h-4 w-4" />
-                Back to Notes
+                Back to Personal
               </Button>
               <Separator orientation="vertical" className="h-6" />
               <div className="flex items-center gap-3">
@@ -88,7 +88,7 @@ export default function PanelPage() {
           <BreadcrumbNav
             items={[
               { label: "Dashboard", href: "/dashboard" },
-              { label: "Notes", href: "/notes" },
+              { label: "Personal", href: "/personal" },
               { label: "Control Panel", current: true },
             ]}
           />

@@ -1,15 +1,14 @@
 import { NextResponse } from "next/server"
-import { createClient } from "@/lib/supabase/server"
+import { createDatabaseClient } from "@/lib/database/database-adapter"
 import { generateText } from "ai"
-import { xai } from "@ai-sdk/xai"
 import { getCachedAuthUser } from "@/lib/auth/cached-auth"
 
 export const dynamic = "force-dynamic"
 
 export async function POST(request: Request) {
   try {
-    const supabase = await createClient()
-    const authResult = await getCachedAuthUser(supabase)
+    const db = await createDatabaseClient()
+    const authResult = await getCachedAuthUser()
 
     if (authResult.rateLimited) {
       return NextResponse.json(
@@ -35,7 +34,7 @@ export async function POST(request: Request) {
     }
 
     // Get user's organization
-    const { data: member } = await supabase
+    const { data: member } = await db
       .from("organization_members")
       .select("org_id")
       .eq("user_id", user.id)
@@ -46,7 +45,7 @@ export async function POST(request: Request) {
     // Check remaining sessions
     let maxSessions = 2
     if (orgId) {
-      const { data: org } = await supabase
+      const { data: org } = await db
         .from("organizations")
         .select("ai_sessions_per_day")
         .eq("id", orgId)
@@ -61,13 +60,13 @@ export async function POST(request: Request) {
 
     let sessionCount = 0
     try {
-      const { count } = await supabase
+      const { data: sessions } = await db
         .from("ai_answer_sessions")
-        .select("*", { count: "exact", head: true })
+        .select("id")
         .eq("user_id", user.id)
         .eq("session_date", today)
 
-      sessionCount = count || 0
+      sessionCount = sessions?.length || 0
     } catch {
       // Table might not exist yet, continue without limit
       console.log("ai_answer_sessions table not available, skipping limit check")
@@ -77,7 +76,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Daily AI session limit reached. Try again tomorrow." }, { status: 429 })
     }
 
-    // Generate answer using AI SDK with xAI Grok
+    // Generate answer using AI SDK with Vercel AI Gateway
     const prompt = `You are a helpful assistant. Please provide a clear, concise, and informative answer to the following question:
 
 Question: ${question}
@@ -85,14 +84,14 @@ Question: ${question}
 Provide a helpful answer. If you need more context to answer properly, explain what additional information would be helpful.`
 
     const { text: answer } = await generateText({
-      model: xai("grok-3-mini"),
+      model: "xai/grok-3-mini" as any,
       prompt,
       maxOutputTokens: 500,
     })
 
     // Log the session (ignore errors if table doesn't exist)
     try {
-      await supabase.from("ai_answer_sessions").insert({
+      await db.from("ai_answer_sessions").insert({
         user_id: user.id,
         org_id: orgId,
         stick_id: stickId,

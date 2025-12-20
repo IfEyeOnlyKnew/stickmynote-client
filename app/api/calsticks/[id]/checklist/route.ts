@@ -1,13 +1,13 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { createSupabaseServer } from "@/lib/supabase-server"
+import { createServiceDatabaseClient } from "@/lib/database/database-adapter"
 import { getOrgContext } from "@/lib/auth/get-org-context"
 import { getCachedAuthUser } from "@/lib/auth/cached-auth"
 import type { ChecklistData } from "@/types/checklist"
 
 export async function PATCH(request: NextRequest, { params }: { params: { id: string } }) {
   try {
-    const supabase = await createSupabaseServer()
-    const authResult = await getCachedAuthUser(supabase)
+    const db = await createServiceDatabaseClient()
+    const authResult = await getCachedAuthUser()
 
     if (authResult.rateLimited) {
       return NextResponse.json(
@@ -36,7 +36,7 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
     const totalItems = checklist_items.items.length
     const progress = totalItems > 0 ? Math.round((completedItems / totalItems) * 100) : 0
 
-    const { data, error } = await supabase
+    const { data, error } = await db
       .from("paks_pad_stick_replies")
       .update({
         calstick_checklist_items: checklist_items,

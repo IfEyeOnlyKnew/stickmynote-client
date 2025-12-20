@@ -49,28 +49,28 @@ export default function SocialActivityPage() {
         return (
           <>
             <span className="font-semibold">{userName}</span> created a new stick{" "}
-            <span className="font-medium">"{stickTopic}"</span> in {padName}
+            <span className="font-medium">&quot;{stickTopic}&quot;</span> in {padName}
           </>
         )
       case "updated":
         return (
           <>
             <span className="font-semibold">{userName}</span> updated the stick{" "}
-            <span className="font-medium">"{stickTopic}"</span> in {padName}
+            <span className="font-medium">&quot;{stickTopic}&quot;</span> in {padName}
           </>
         )
       case "replied":
         return (
           <>
             <span className="font-semibold">{userName}</span> replied to{" "}
-            <span className="font-medium">"{stickTopic}"</span> in {padName}
+            <span className="font-medium">&quot;{stickTopic}&quot;</span> in {padName}
           </>
         )
       case "shared":
         return (
           <>
             <span className="font-semibold">{userName}</span> shared the stick{" "}
-            <span className="font-medium">"{stickTopic}"</span>
+            <span className="font-medium">&quot;{stickTopic}&quot;</span>
           </>
         )
       default:

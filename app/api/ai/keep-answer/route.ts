@@ -1,14 +1,14 @@
 import { NextResponse } from "next/server"
-import { createClient } from "@/lib/supabase/server"
+import { createDatabaseClient } from "@/lib/database/database-adapter"
 import { getCachedAuthUser } from "@/lib/auth/cached-auth"
 
 export const dynamic = "force-dynamic"
 
 export async function POST(request: Request) {
   try {
-    const supabase = await createClient()
+    const db = await createDatabaseClient()
 
-    const authResult = await getCachedAuthUser(supabase)
+    const authResult = await getCachedAuthUser()
     if (authResult.rateLimited) {
       return NextResponse.json(
         { error: "Rate limit exceeded. Please try again in a moment." },
@@ -27,7 +27,7 @@ export async function POST(request: Request) {
     }
 
     // Find the most recent session for this stick and user
-    const { data: session } = await supabase
+    const { data: session } = await db
       .from("ai_answer_sessions")
       .select("id")
       .eq("user_id", user.id)
@@ -42,10 +42,10 @@ export async function POST(request: Request) {
     }
 
     // Update session to mark as kept
-    await supabase.from("ai_answer_sessions").update({ was_kept: true }).eq("id", session.id)
+    await db.from("ai_answer_sessions").update({ was_kept: true }).eq("id", session.id)
 
     // Create the attachment
-    const { error: attachmentError } = await supabase.from("ai_answer_attachments").insert({
+    const { error: attachmentError } = await db.from("ai_answer_attachments").insert({
       session_id: session.id,
       stick_id: stickId,
       stick_type: stickType,

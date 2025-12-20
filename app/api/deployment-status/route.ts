@@ -15,12 +15,12 @@ export async function GET() {
       timestamp: new Date().toISOString(),
       domain: process.env.NEXT_PUBLIC_SITE_URL || "localhost:3000",
       features: {
-        authentication: !!process.env.NEXT_PUBLIC_SUPABASE_URL,
-        database: !!process.env.SUPABASE_SERVICE_ROLE_KEY,
+        authentication: !!process.env.JWT_SECRET,
+        database: !!process.env.POSTGRES_HOST || !!process.env.DATABASE_URL,
         ai_integration: !!process.env.XAI_API_KEY,
-        email: !!process.env.RESEND_API_KEY,
+        email: !!process.env.RESEND_API_KEY || !!process.env.SMTP_HOST,
         blob_storage: !!process.env.BLOB_READ_WRITE_TOKEN,
-        redis: !!process.env.UPSTASH_REDIS_REST_URL,
+        redis: !!process.env.UPSTASH_REDIS_REST_URL || !!process.env.REDIS_URL,
       },
       checks: {
         environment_variables: checkEnvironmentVariables(),
@@ -51,9 +51,9 @@ export async function GET() {
 
 function checkEnvironmentVariables() {
   const required = [
-    "NEXT_PUBLIC_SUPABASE_URL",
-    "NEXT_PUBLIC_SUPABASE_ANON_KEY",
-    "SUPABASE_SERVICE_ROLE_KEY",
+    "POSTGRES_HOST",
+    "POSTGRES_DATABASE",
+    "POSTGRES_USER",
     "NEXT_PUBLIC_SITE_URL",
   ]
 

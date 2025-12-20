@@ -1,17 +1,12 @@
 import { redirect } from "next/navigation"
-import { createSupabaseServer } from "@/lib/supabase-server"
+import { getSession } from "@/lib/auth/local-auth"
 import CalSticksPageClient from "./page-client"
 import { requireFullAccess } from "@/lib/auth/check-hub-mode-access"
 
 export default async function CalSticksPage() {
-  const supabase = await createSupabaseServer()
+  const session = await getSession()
 
-  const {
-    data: { user },
-    error,
-  } = await supabase.auth.getUser()
-
-  if (error || !user) {
+  if (!session) {
     redirect("/auth/login")
   }
 

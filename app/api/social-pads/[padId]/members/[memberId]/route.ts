@@ -1,12 +1,12 @@
-import { createServerClient } from "@/lib/supabase/server"
+import { createDatabaseClient } from "@/lib/database/database-adapter"
 import { type NextRequest, NextResponse } from "next/server"
 import { getCachedAuthUser } from "@/lib/auth/cached-auth"
 
 export async function PATCH(request: NextRequest, { params }: { params: { padId: string; memberId: string } }) {
   try {
-    const supabase = await createServerClient()
+    const db = await createDatabaseClient()
 
-    const authResult = await getCachedAuthUser(supabase)
+    const authResult = await getCachedAuthUser()
     if (authResult.rateLimited) {
       return NextResponse.json({ error: "Rate limited" }, { status: 429, headers: { "Retry-After": "30" } })
     }
@@ -16,7 +16,7 @@ export async function PATCH(request: NextRequest, { params }: { params: { padId:
     const user = authResult.user
 
     // Check if user is owner of the pad
-    const { data: membership } = await supabase
+    const { data: membership } = await db
       .from("social_pad_members")
       .select("admin_level")
       .eq("social_pad_id", params.padId)
@@ -35,7 +35,7 @@ export async function PATCH(request: NextRequest, { params }: { params: { padId:
     }
 
     // Prevent changing owner's admin level
-    const { data: targetMember } = await supabase
+    const { data: targetMember } = await db
       .from("social_pad_members")
       .select("admin_level")
       .eq("id", params.memberId)
@@ -45,7 +45,7 @@ export async function PATCH(request: NextRequest, { params }: { params: { padId:
       return NextResponse.json({ error: "Cannot change owner's admin level" }, { status: 400 })
     }
 
-    const { data: updatedMember, error } = await supabase
+    const { data: updatedMember, error } = await db
       .from("social_pad_members")
       .update({ admin_level })
       .eq("id", params.memberId)
@@ -64,9 +64,9 @@ export async function PATCH(request: NextRequest, { params }: { params: { padId:
 
 export async function DELETE(request: NextRequest, { params }: { params: { padId: string; memberId: string } }) {
   try {
-    const supabase = await createServerClient()
+    const db = await createDatabaseClient()
 
-    const authResult = await getCachedAuthUser(supabase)
+    const authResult = await getCachedAuthUser()
     if (authResult.rateLimited) {
       return NextResponse.json({ error: "Rate limited" }, { status: 429, headers: { "Retry-After": "30" } })
     }
@@ -76,7 +76,7 @@ export async function DELETE(request: NextRequest, { params }: { params: { padId
     const user = authResult.user
 
     // Check if user is owner of the pad
-    const { data: membership } = await supabase
+    const { data: membership } = await db
       .from("social_pad_members")
       .select("admin_level")
       .eq("social_pad_id", params.padId)
@@ -88,7 +88,7 @@ export async function DELETE(request: NextRequest, { params }: { params: { padId
     }
 
     // Prevent removing owner
-    const { data: targetMember } = await supabase
+    const { data: targetMember } = await db
       .from("social_pad_members")
       .select("admin_level")
       .eq("id", params.memberId)
@@ -98,7 +98,7 @@ export async function DELETE(request: NextRequest, { params }: { params: { padId
       return NextResponse.json({ error: "Cannot remove owner" }, { status: 400 })
     }
 
-    const { error } = await supabase
+    const { error } = await db
       .from("social_pad_members")
       .delete()
       .eq("id", params.memberId)

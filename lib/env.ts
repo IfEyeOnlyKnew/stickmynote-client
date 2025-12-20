@@ -33,13 +33,8 @@ const isProduction = process.env.NODE_ENV === "production"
 const isVercel = process.env.VERCEL === "1"
 
 const serverSchema = z.object({
-  // Supabase - REQUIRED
-  SUPABASE_URL: z.string().url("SUPABASE_URL must be a valid URL"),
-  SUPABASE_ANON_KEY: z.string().min(1, "SUPABASE_ANON_KEY is required"),
-  SUPABASE_SERVICE_ROLE_KEY: z.string().min(1, "SUPABASE_SERVICE_ROLE_KEY is required"),
-  SUPABASE_JWT_SECRET: z.string().min(1, "SUPABASE_JWT_SECRET is required"),
-
-  // Database (Postgres via Supabase) - OPTIONAL
+  // Database (PostgreSQL) - REQUIRED
+  DATABASE_URL: z.string().optional(),
   POSTGRES_URL: z.string().url().optional(),
   POSTGRES_PRISMA_URL: z.string().url().optional(),
   POSTGRES_URL_NON_POOLING: z.string().url().optional(),
@@ -47,6 +42,9 @@ const serverSchema = z.object({
   POSTGRES_PASSWORD: z.string().optional(),
   POSTGRES_DATABASE: z.string().optional(),
   POSTGRES_HOST: z.string().optional(),
+
+  // Authentication (Local JWT)
+  JWT_SECRET: z.string().min(32, "JWT_SECRET must be at least 32 characters").optional(),
 
   // Redis (Upstash) - OPTIONAL but recommended for production
   UPSTASH_REDIS_REST_URL: z.string().url().optional(),
@@ -99,8 +97,6 @@ const serverSchema = z.object({
 
   // Public URLs - OPTIONAL but recommended
   NEXT_PUBLIC_SITE_URL: z.string().url().optional(),
-  NEXT_PUBLIC_SUPABASE_URL: z.string().url().optional(),
-  NEXT_PUBLIC_SUPABASE_ANON_KEY: z.string().optional(),
   NEXT_PUBLIC_DAILY_DOMAIN: z.string().optional(),
   NEXT_PUBLIC_SENTRY_DSN: z.string().url().optional(),
 
@@ -114,8 +110,7 @@ function validateProductionEnv(env: z.infer<typeof serverSchema>) {
 
   const productionRequired = {
     CSRF_SECRET: env.CSRF_SECRET,
-    SUPABASE_URL: env.SUPABASE_URL,
-    SUPABASE_SERVICE_ROLE_KEY: env.SUPABASE_SERVICE_ROLE_KEY,
+    DATABASE_URL: env.DATABASE_URL || env.POSTGRES_URL,
     NEXT_PUBLIC_SITE_URL: env.NEXT_PUBLIC_SITE_URL,
   }
 

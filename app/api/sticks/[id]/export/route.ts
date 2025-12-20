@@ -1,102 +1,331 @@
-import { type NextRequest, NextResponse } from "next/server"
-import { createSupabaseServer } from "@/lib/supabase-server"
-import { getCachedAuthUser } from "@/lib/auth/cached-auth"
+import { type NextRequest, NextResponse } from "next/server";
+import { createDatabaseClient } from "@/lib/database/database-adapter";
+import { getCachedAuthUser } from "@/lib/auth/cached-auth";
+import type { DatabaseClient } from "@/lib/database/database-adapter";
 
-let generateText: any, xai: any, put: any, Document: any, Packer: any, Paragraph: any, TextRun: any, HeadingLevel: any
+let generateText: typeof import("ai").generateText | undefined;
+let put: typeof import("@vercel/blob").put | undefined;
+let Document: typeof import("docx").Document | undefined;
+let Packer: typeof import("docx").Packer | undefined;
+let Paragraph: typeof import("docx").Paragraph | undefined;
+let TextRun: typeof import("docx").TextRun | undefined;
+let HeadingLevel: typeof import("docx").HeadingLevel | undefined;
 
-// Initialize modules with fallbacks
 const initializeModules = async () => {
   try {
-    const aiModule = await import("ai")
-    generateText = aiModule.generateText
-  } catch (error) {
-    console.warn("ai module not available")
-    generateText = async () => ({ text: "AI service unavailable" })
+    const aiModule = await import("ai");
+    generateText = aiModule.generateText;
+  } catch {
+    // ai module is optional - continue without AI features
   }
 
   try {
-    const xaiModule = await import("@ai-sdk/xai")
-    xai = xaiModule.xai
-  } catch (error) {
-    console.warn("@ai-sdk/xai not available")
-    xai = () => "grok-4"
+    const blobModule = await import("@vercel/blob");
+    put = blobModule.put;
+  } catch {
+    // @vercel/blob is optional - continue without blob storage
   }
 
   try {
-    const blobModule = await import("@vercel/blob")
-    put = blobModule.put
-  } catch (error) {
-    console.warn("@vercel/blob not available")
-    put = async () => ({ url: "" })
+    const docxModule = await import("docx");
+    Document = docxModule.Document;
+    Packer = docxModule.Packer;
+    Paragraph = docxModule.Paragraph;
+    TextRun = docxModule.TextRun;
+    HeadingLevel = docxModule.HeadingLevel;
+  } catch {
+    // docx module is optional - continue without DOCX generation
   }
-
-  try {
-    const docxModule = await import("docx")
-    Document = docxModule.Document
-    Packer = docxModule.Packer
-    Paragraph = docxModule.Paragraph
-    TextRun = docxModule.TextRun
-    HeadingLevel = docxModule.HeadingLevel
-  } catch (error) {
-    console.warn("docx module not available")
-    Document = class {
-      constructor() {}
-    }
-    Packer = { toBuffer: async () => Buffer.from("") }
-    Paragraph = class {
-      constructor() {}
-    }
-    TextRun = class {
-      constructor() {}
-    }
-    HeadingLevel = { TITLE: 0, HEADING_1: 1, HEADING_2: 2 }
-  }
-}
+};
 
 interface ExportData {
   exports?: Array<{
-    url: string
-    filename: string
-    created_at: string
-    type: string
-  }>
-  [key: string]: any
+    url: string;
+    filename: string;
+    created_at: string;
+    type: string;
+  }>;
+  [key: string]: any;
 }
 
-export async function POST(request: NextRequest, { params }: { params: { id: string } }) {
-  await initializeModules()
+interface StickData {
+  id: string;
+  topic?: string;
+  content?: string;
+  created_at: string;
+  updated_at?: string;
+  pad_id: string;
+  pads?: {
+    name?: string;
+    multi_pak_id?: string;
+    owner_id?: string;
+    multi_paks?: { owner_id?: string };
+  };
+}
+
+interface Reply {
+  created_at: string;
+  content: string;
+  user?: { username?: string; email?: string };
+}
+
+interface MediaLink {
+  title?: string;
+  caption?: string;
+  url?: string;
+  embed_url?: string;
+}
+
+const toneInstructions: Record<string, string> = {
+  professional:
+    "Provide a professional, structured summary suitable for a business report. Use clear, objective language and organize key points logically with distinct paragraphs for different topics.",
+  casual:
+    "Write this summary in a conversational, friendly tone as if explaining to a friend. Use everyday language and focus on the main takeaways. Break into natural conversation paragraphs.",
+  friendly:
+    "Write this summary in a warm, approachable tone that's professional yet personable. Focus on collaboration and positive outcomes with clear paragraph breaks.",
+  formal:
+    "Provide a formal, detailed summary with precise language suitable for official documentation. Structure with clear sections and comprehensive coverage of all topics.",
+};
+
+function getTonePrompt(tone: string): string {
+  return toneInstructions[tone] || toneInstructions.professional;
+}
+
+async function checkUserAccess(
+  db: DatabaseClient,
+  stickData: StickData,
+  userId: string
+): Promise<boolean> {
+  // Check if user is the pad owner
+  if (stickData.pads?.owner_id === userId) {
+    return true;
+  }
+
+  // Check if user is the multi-pak owner
+  if (
+    stickData.pads?.multi_pak_id &&
+    stickData.pads?.multi_paks?.owner_id === userId
+  ) {
+    return true;
+  }
+
+  // Check direct pad membership
+  const { data: padMember } = await db
+    .from("paks_pad_members")
+    .select("role")
+    .eq("pad_id", stickData.pad_id)
+    .eq("user_id", userId)
+    .eq("accepted", true)
+    .maybeSingle();
+
+  if (padMember) {
+    return true;
+  }
+
+  // Check multi-pak membership
+  if (stickData.pads?.multi_pak_id) {
+    const { data: multiPakMember } = await db
+      .from("multi_pak_members")
+      .select("role")
+      .eq("multi_pak_id", stickData.pads.multi_pak_id)
+      .eq("user_id", userId)
+      .eq("accepted", true)
+      .maybeSingle();
+
+    if (multiPakMember) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+function parseTabData(tabData: unknown): MediaLink[] {
+  try {
+    const data = typeof tabData === "string" ? JSON.parse(tabData) : tabData;
+    return data?.videos || data?.images || [];
+  } catch {
+    return [];
+  }
+}
+
+function formatVideoLinks(
+  videoTabs: Array<{ tab_data: unknown }>
+): MediaLink[] {
+  return videoTabs.flatMap((tab) => {
+    const videos = parseTabData(tab.tab_data);
+    return videos.map((video: MediaLink) => ({
+      ...video,
+      embed_url: video.embed_url || video.url,
+    }));
+  });
+}
+
+function formatImageLinks(
+  imageTabs: Array<{ tab_data: unknown }>
+): MediaLink[] {
+  return imageTabs.flatMap((tab) => parseTabData(tab.tab_data));
+}
+
+function buildPrompt(
+  tone: string,
+  stickData: StickData,
+  videoLinks: MediaLink[],
+  imageLinks: MediaLink[],
+  replies: Reply[] | null
+): string {
+  const videoLinksFormatted =
+    videoLinks.length > 0
+      ? `- Video Links (${videoLinks.length}): ${videoLinks
+          .map((v) =>
+            [v.title || "Untitled", " (", v.embed_url || v.url, ")"].join("")
+          )
+          .join(", ")}`
+      : "- No video content";
+  const imageLinksFormatted =
+    imageLinks.length > 0
+      ? `- Image Links (${imageLinks.length}): ${imageLinks
+          .map((i) => [i.caption || "Untitled", " (", i.url, ")"].join(""))
+          .join(", ")}`
+      : "- No image content";
+  const repliesFormatted =
+    replies && replies.length > 0
+      ? replies
+          .map((r) => {
+            const username = r.user?.username || r.user?.email || "User";
+            const date = new Date(r.created_at).toLocaleDateString();
+            return `- ${username} (${date}): ${r.content}`;
+          })
+          .join("\n")
+      : "- No replies yet";
+
+  return `${getTonePrompt(tone)}
+
+Please create a comprehensive summary of this Multi-pak Stick with all its components. Structure your response with clear paragraph breaks between different topics:
+
+**Stick Information:**
+- Topic: ${stickData.topic || "Untitled"}
+- Content: ${stickData.content || "No content"}
+- Pad: ${stickData.pads?.name || "Unknown Pad"}
+- Created: ${new Date(stickData.created_at).toLocaleDateString()}
+- Updated: ${
+    stickData.updated_at
+      ? new Date(stickData.updated_at).toLocaleDateString()
+      : "Never"
+  }
+
+**Media Content:**
+${videoLinksFormatted}
+${imageLinksFormatted}
+
+**Replies and Discussion (${replies?.length || 0} replies):**
+${repliesFormatted}
+
+Please provide a well-structured, comprehensive summary that captures all aspects of this stick. Use clear paragraph breaks to separate different topics and themes. Format it as a professional document that could serve as a complete record of this stick's content and discussion.`;
+}
+
+interface ExportLink {
+  url: string;
+  filename: string;
+  created_at: string;
+  type: string;
+}
+
+async function saveExportLink(
+  db: DatabaseClient,
+  stickId: string,
+  userId: string,
+  exportLink: ExportLink
+): Promise<void> {
+  const { data: existingDetailsTab } = await db
+    .from("paks_pad_stick_tabs")
+    .select("*")
+    .eq("stick_id", stickId)
+    .eq("tab_type", "details")
+    .maybeSingle();
+
+  if (existingDetailsTab) {
+    let currentData: ExportData = {};
+    try {
+      if (typeof existingDetailsTab.tab_data === "string") {
+        currentData = JSON.parse(existingDetailsTab.tab_data);
+      } else if (
+        existingDetailsTab.tab_data &&
+        typeof existingDetailsTab.tab_data === "object"
+      ) {
+        currentData = existingDetailsTab.tab_data as ExportData;
+      }
+    } catch {
+      currentData = {};
+    }
+
+    const updatedExports = [...(currentData.exports || []), exportLink];
+    const newTabData = { ...currentData, exports: updatedExports };
+
+    await db
+      .from("paks_pad_stick_tabs")
+      .update({
+        tab_data: newTabData,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", existingDetailsTab.id);
+  } else {
+    await db.from("paks_pad_stick_tabs").insert({
+      stick_id: stickId,
+      user_id: userId,
+      tab_type: "details",
+      tab_name: "Details",
+      tab_content: "Stick details and exports",
+      tab_data: { exports: [exportLink] },
+      tab_order: 3,
+    });
+  }
+}
+
+export async function POST(
+  request: NextRequest,
+  { params }: { params: { id: string } }
+) {
+  await initializeModules();
 
   try {
-    const { tone = "formal" } = await request.json()
-    const stickId = params.id
+    const { tone = "formal" } = await request.json();
+    const stickId = params.id;
 
     if (!stickId) {
-      return NextResponse.json({ error: "Stick ID is required" }, { status: 400 })
+      return NextResponse.json(
+        { error: "Stick ID is required" },
+        { status: 400 }
+      );
     }
 
     // Check if XAI_API_KEY is configured
     if (!process.env.XAI_API_KEY) {
-      return NextResponse.json({ error: "AI service not configured" }, { status: 500 })
+      return NextResponse.json(
+        { error: "AI service not configured" },
+        { status: 500 }
+      );
     }
 
-    const supabase = await createSupabaseServer()
+    const db = await createDatabaseClient();
 
-    const authResult = await getCachedAuthUser(supabase)
+    const authResult = await getCachedAuthUser();
     if (authResult.rateLimited) {
       return NextResponse.json(
         { error: "Rate limit exceeded. Please try again in a moment." },
-        { status: 429, headers: { "Retry-After": "30" } },
-      )
+        { status: 429, headers: { "Retry-After": "30" } }
+      );
     }
     if (!authResult.user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
-    const user = authResult.user
+    const user = authResult.user;
 
     // Fetch stick data with pad and multi-pak information
-    const { data: stickData, error: stickError } = await supabase
+    const { data: stickData, error: stickError } = await db
       .from("paks_pad_sticks")
-      .select(`
+      .select(
+        `
         *,
         pads:paks_pads(
           name, 
@@ -104,170 +333,109 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
           owner_id,
           multi_paks(owner_id)
         )
-      `)
+      `
+      )
       .eq("id", stickId)
-      .maybeSingle()
+      .maybeSingle();
 
     if (stickError || !stickData) {
-      return NextResponse.json({ error: "Stick not found or access denied" }, { status: 404 })
+      return NextResponse.json(
+        { error: "Stick not found or access denied" },
+        { status: 404 }
+      );
     }
 
-    let hasAccess = false
-
-    // Check if user is the pad owner
-    if (stickData.pads?.owner_id === user.id) {
-      hasAccess = true
-    }
-    // Check if user is the multi-pak owner (if pad belongs to a multi-pak)
-    else if (stickData.pads?.multi_pak_id && stickData.pads?.multi_paks?.owner_id === user.id) {
-      hasAccess = true
-    }
-    // Check direct pad membership
-    else {
-      const { data: padMember } = await supabase
-        .from("paks_pad_members")
-        .select("role")
-        .eq("pad_id", stickData.pad_id)
-        .eq("user_id", user.id)
-        .eq("accepted", true)
-        .maybeSingle()
-
-      if (padMember) {
-        hasAccess = true
-      }
-      // Check multi-pak membership (if pad belongs to a multi-pak)
-      else if (stickData.pads?.multi_pak_id) {
-        const { data: multiPakMember } = await supabase
-          .from("multi_pak_members")
-          .select("role")
-          .eq("multi_pak_id", stickData.pads.multi_pak_id)
-          .eq("user_id", user.id)
-          .eq("accepted", true)
-          .maybeSingle()
-
-        if (multiPakMember) {
-          hasAccess = true
-        }
-      }
-    }
+    const hasAccess = await checkUserAccess(
+      db,
+      stickData as StickData,
+      user.id
+    );
 
     if (!hasAccess) {
-      return NextResponse.json({ error: "Access denied" }, { status: 403 })
+      return NextResponse.json({ error: "Access denied" }, { status: 403 });
     }
 
     // Fetch stick replies
-    const { data: replies } = await supabase
+    const { data: replies } = await db
       .from("paks_pad_stick_replies")
-      .select(`
+      .select(
+        `
         *,
         user:users(username, email)
-      `)
+      `
+      )
       .eq("stick_id", stickId)
-      .order("created_at", { ascending: true })
+      .order("created_at", { ascending: true });
 
     // Fetch stick tabs
-    const { data: stickTabs } = await supabase
+    const { data: stickTabs } = await db
       .from("paks_pad_stick_tabs")
       .select("*")
       .eq("stick_id", stickId)
-      .order("tab_order", { ascending: true })
+      .order("tab_order", { ascending: true });
 
     // Process tabs content
-    const videoTabs = stickTabs?.filter((tab) => tab.tab_type === "video") || []
-    const imageTabs = stickTabs?.filter((tab) => tab.tab_type === "images") || []
+    const videoTabs =
+      stickTabs?.filter((tab) => tab.tab_type === "video") || [];
+    const imageTabs =
+      stickTabs?.filter((tab) => tab.tab_type === "images") || [];
+    const videoLinks = formatVideoLinks(videoTabs);
+    const imageLinks = formatImageLinks(imageTabs);
 
-    const videoLinks = videoTabs.flatMap((tab) => {
-      try {
-        let data = tab.tab_data
-        if (typeof data === "string") {
-          data = JSON.parse(data)
-        }
-        const videos = data?.videos || []
-        return videos.map((video: any) => ({
-          ...video,
-          embed_url: video.embed_url || video.url,
-        }))
-      } catch {
-        return []
-      }
-    })
-
-    const imageLinks = imageTabs.flatMap((tab) => {
-      try {
-        let data = tab.tab_data
-        if (typeof data === "string") {
-          data = JSON.parse(data)
-        }
-        return data?.images || []
-      } catch {
-        return []
-      }
-    })
-
-    const getTonePrompt = (selectedTone: string) => {
-      const toneInstructions = {
-        professional:
-          "Provide a professional, structured summary suitable for a business report. Use clear, objective language and organize key points logically with distinct paragraphs for different topics.",
-        casual:
-          "Write this summary in a conversational, friendly tone as if explaining to a friend. Use everyday language and focus on the main takeaways. Break into natural conversation paragraphs.",
-        friendly:
-          "Write this summary in a warm, approachable tone that's professional yet personable. Focus on collaboration and positive outcomes with clear paragraph breaks.",
-        formal:
-          "Provide a formal, detailed summary with precise language suitable for official documentation. Structure with clear sections and comprehensive coverage of all topics.",
-      }
-      return toneInstructions[selectedTone as keyof typeof toneInstructions] || toneInstructions.professional
-    }
-
-    // Create comprehensive prompt for AI
-    const prompt = `${getTonePrompt(tone)}
-
-Please create a comprehensive summary of this Multi-pak Stick with all its components. Structure your response with clear paragraph breaks using double line breaks (\\n\\n) between different topics:
-
-**Stick Information:**
-- Topic: ${stickData.topic || "Untitled"}
-- Content: ${stickData.content || "No content"}
-- Pad: ${stickData.pads?.name || "Unknown Pad"}
-- Created: ${new Date(stickData.created_at).toLocaleDateString()}
-- Updated: ${stickData.updated_at ? new Date(stickData.updated_at).toLocaleDateString() : "Never"}
-
-**Media Content:**
-${videoLinks.length > 0 ? `- Video Links (${videoLinks.length}): ${videoLinks.map((v) => `${v.title || "Untitled"} (${v.embed_url || v.url})`).join(", ")}` : "- No video content"}
-${imageLinks.length > 0 ? `- Image Links (${imageLinks.length}): ${imageLinks.map((i) => `${i.caption || "Untitled"} (${i.url})`).join(", ")}` : "- No image content"}
-
-**Replies and Discussion (${replies?.length || 0} replies):**
-${replies && replies.length > 0 ? replies.map((r) => `- ${r.user?.username || r.user?.email || "User"} (${new Date(r.created_at).toLocaleDateString()}): ${r.content}`).join("\\n") : "- No replies yet"}
-
-Please provide a well-structured, comprehensive summary that captures all aspects of this stick. Use clear paragraph breaks (\\n\\n) to separate different topics and themes. Format it as a professional document that could serve as a complete record of this stick's content and discussion.`
+    // Build prompt and generate AI summary
+    const prompt = buildPrompt(
+      tone,
+      stickData as StickData,
+      videoLinks,
+      imageLinks,
+      replies as Reply[] | null
+    );
 
     // Generate comprehensive summary using AI
-    const { text: comprehensiveSummary } = await generateText({
-      model: xai("grok-4"),
+    const { text: comprehensiveSummary } = (await generateText?.({
+      model: "xai/grok-3" as any,
       prompt: prompt,
-      maxTokens: 2000,
-    })
+      maxOutputTokens: 2000,
+    })) || { text: "AI service unavailable" };
+
+    // Check if docx module is available
+    if (!Document || !Paragraph || !TextRun || !Packer) {
+      return NextResponse.json(
+        { error: "DOCX generation not available" },
+        { status: 500 }
+      );
+    }
+
+    // Create local references to avoid TypeScript narrowing issues in callbacks
+    const DocxDocument = Document;
+    const DocxParagraph = Paragraph;
+    const DocxTextRun = TextRun;
+    const DocxPacker = Packer;
 
     // Create DOCX document
     const summaryParagraphs = comprehensiveSummary
       .split(/\n\n+/)
       .filter((paragraph: string) => paragraph.trim().length > 0)
-      .map((paragraph: string) => paragraph.trim())
+      .map((paragraph: string) => paragraph.trim());
 
-    const doc = new Document({
+    const doc = new DocxDocument({
       sections: [
         {
           children: [
             // Title
-            new Paragraph({
+            new DocxParagraph({
               text: "MULTI-PAK STICK EXPORT",
-              heading: HeadingLevel.TITLE,
+              heading: HeadingLevel?.TITLE,
               spacing: { after: 400 },
             }),
 
             // Document metadata
-            new Paragraph({
+            new DocxParagraph({
               children: [
-                new TextRun({
-                  text: `Generated on ${new Date().toLocaleDateString()} at ${new Date().toLocaleTimeString()} | Tone: ${tone.charAt(0).toUpperCase() + tone.slice(1)}`,
+                new DocxTextRun({
+                  text: `Generated on ${new Date().toLocaleDateString()} at ${new Date().toLocaleTimeString()} | Tone: ${
+                    tone.charAt(0).toUpperCase() + tone.slice(1)
+                  }`,
                   italics: true,
                   size: 20,
                 }),
@@ -276,61 +444,70 @@ Please provide a well-structured, comprehensive summary that captures all aspect
             }),
 
             // Executive Summary
-            new Paragraph({
+            new DocxParagraph({
               text: "EXECUTIVE SUMMARY",
-              heading: HeadingLevel.HEADING_1,
+              heading: HeadingLevel?.HEADING_1,
               spacing: { before: 400, after: 200 },
             }),
             ...summaryParagraphs.map(
               (paragraphText: string) =>
-                new Paragraph({
+                new DocxParagraph({
                   children: [
-                    new TextRun({
+                    new DocxTextRun({
                       text: paragraphText,
                       size: 24,
                     }),
                   ],
                   spacing: { after: 300 },
-                }),
+                })
             ),
 
             // Stick Information
-            new Paragraph({
+            new DocxParagraph({
               text: "STICK INFORMATION",
-              heading: HeadingLevel.HEADING_1,
+              heading: HeadingLevel?.HEADING_1,
               spacing: { before: 400, after: 200 },
             }),
-            new Paragraph({
+            new DocxParagraph({
               children: [
-                new TextRun({ text: "Topic: ", bold: true, size: 24 }),
-                new TextRun({ text: stickData.topic || "Untitled", size: 24 }),
+                new DocxTextRun({ text: "Topic: ", bold: true, size: 24 }),
+                new DocxTextRun({
+                  text: stickData.topic || "Untitled",
+                  size: 24,
+                }),
               ],
               spacing: { after: 200 },
             }),
-            new Paragraph({
+            new DocxParagraph({
               children: [
-                new TextRun({ text: "Pad: ", bold: true, size: 24 }),
-                new TextRun({ text: stickData.pads?.name || "Unknown Pad", size: 24 }),
+                new DocxTextRun({ text: "Pad: ", bold: true, size: 24 }),
+                new DocxTextRun({
+                  text: stickData.pads?.name || "Unknown Pad",
+                  size: 24,
+                }),
               ],
               spacing: { after: 200 },
             }),
-            new Paragraph({
+            new DocxParagraph({
               children: [
-                new TextRun({ text: "Created: ", bold: true, size: 24 }),
-                new TextRun({ text: new Date(stickData.created_at).toLocaleDateString(), size: 24 }),
+                new DocxTextRun({ text: "Created: ", bold: true, size: 24 }),
+                new DocxTextRun({
+                  text: new Date(stickData.created_at).toLocaleDateString(),
+                  size: 24,
+                }),
               ],
               spacing: { after: 200 },
             }),
 
             // Main Content
-            new Paragraph({
+            new DocxParagraph({
               text: "MAIN CONTENT",
-              heading: HeadingLevel.HEADING_1,
+              heading: HeadingLevel?.HEADING_1,
               spacing: { before: 400, after: 200 },
             }),
-            new Paragraph({
+            new DocxParagraph({
               children: [
-                new TextRun({
+                new DocxTextRun({
                   text: stickData.content || "No content provided.",
                   size: 24,
                 }),
@@ -341,48 +518,64 @@ Please provide a well-structured, comprehensive summary that captures all aspect
             // Media Content
             ...(videoLinks.length > 0 || imageLinks.length > 0
               ? [
-                  new Paragraph({
+                  new DocxParagraph({
                     text: "MEDIA CONTENT",
-                    heading: HeadingLevel.HEADING_1,
+                    heading: HeadingLevel?.HEADING_1,
                     spacing: { before: 400, after: 200 },
                   }),
                   ...(videoLinks.length > 0
                     ? [
-                        new Paragraph({
-                          children: [new TextRun({ text: "Videos:", bold: true, size: 24 })],
+                        new DocxParagraph({
+                          children: [
+                            new DocxTextRun({
+                              text: "Videos:",
+                              bold: true,
+                              size: 24,
+                            }),
+                          ],
                           spacing: { after: 200 },
                         }),
                         ...videoLinks.map(
                           (video: any) =>
-                            new Paragraph({
+                            new DocxParagraph({
                               children: [
-                                new TextRun({
-                                  text: `• ${video.title || "Untitled"}: ${video.embed_url || video.url}`,
+                                new DocxTextRun({
+                                  text: `• ${video.title || "Untitled"}: ${
+                                    video.embed_url || video.url
+                                  }`,
                                   size: 24,
                                 }),
                               ],
                               spacing: { after: 200 },
-                            }),
+                            })
                         ),
                       ]
                     : []),
                   ...(imageLinks.length > 0
                     ? [
-                        new Paragraph({
-                          children: [new TextRun({ text: "Images:", bold: true, size: 24 })],
+                        new DocxParagraph({
+                          children: [
+                            new DocxTextRun({
+                              text: "Images:",
+                              bold: true,
+                              size: 24,
+                            }),
+                          ],
                           spacing: { after: 200 },
                         }),
                         ...imageLinks.map(
                           (image: any) =>
-                            new Paragraph({
+                            new DocxParagraph({
                               children: [
-                                new TextRun({
-                                  text: `• ${image.caption || "Untitled"}: ${image.url}`,
+                                new DocxTextRun({
+                                  text: `• ${image.caption || "Untitled"}: ${
+                                    image.url
+                                  }`,
                                   size: 24,
                                 }),
                               ],
                               spacing: { after: 200 },
-                            }),
+                            })
                         ),
                       ]
                     : []),
@@ -390,31 +583,37 @@ Please provide a well-structured, comprehensive summary that captures all aspect
               : []),
 
             // Discussion and Replies
-            new Paragraph({
+            new DocxParagraph({
               text: `DISCUSSION AND REPLIES (${replies?.length || 0})`,
-              heading: HeadingLevel.HEADING_1,
+              heading: HeadingLevel?.HEADING_1,
               spacing: { before: 400, after: 200 },
             }),
             ...(replies && replies.length > 0
               ? replies.flatMap((reply) => [
-                  new Paragraph({
+                  new DocxParagraph({
                     children: [
-                      new TextRun({
-                        text: `${reply.user?.username || reply.user?.email || "Anonymous User"}`,
+                      new DocxTextRun({
+                        text: `${
+                          reply.user?.username ||
+                          reply.user?.email ||
+                          "Anonymous User"
+                        }`,
                         bold: true,
                         size: 26,
                       }),
-                      new TextRun({
-                        text: ` (${new Date(reply.created_at).toLocaleDateString()})`,
+                      new DocxTextRun({
+                        text: ` (${new Date(
+                          reply.created_at
+                        ).toLocaleDateString()})`,
                         italics: true,
                         size: 22,
                       }),
                     ],
                     spacing: { after: 100 },
                   }),
-                  new Paragraph({
+                  new DocxParagraph({
                     children: [
-                      new TextRun({
+                      new DocxTextRun({
                         text: reply.content,
                         size: 24,
                       }),
@@ -423,9 +622,9 @@ Please provide a well-structured, comprehensive summary that captures all aspect
                   }),
                 ])
               : [
-                  new Paragraph({
+                  new DocxParagraph({
                     children: [
-                      new TextRun({
+                      new DocxTextRun({
                         text: "No replies or discussion available.",
                         italics: true,
                         size: 24,
@@ -436,14 +635,14 @@ Please provide a well-structured, comprehensive summary that captures all aspect
                 ]),
 
             // Document Footer
-            new Paragraph({
+            new DocxParagraph({
               text: "END OF DOCUMENT",
-              heading: HeadingLevel.HEADING_2,
+              heading: HeadingLevel?.HEADING_2,
               spacing: { before: 600, after: 200 },
             }),
-            new Paragraph({
+            new DocxParagraph({
               children: [
-                new TextRun({
+                new DocxTextRun({
                   text: "This document contains a comprehensive export of the Multi-pak Stick including all content, media, and discussion threads. Generated automatically by Stick My Note application.",
                   italics: true,
                   size: 20,
@@ -454,80 +653,44 @@ Please provide a well-structured, comprehensive summary that captures all aspect
           ],
         },
       ],
-    })
+    });
 
-    const buffer = await Packer.toBuffer(doc)
-    const docxBlob = new Blob([buffer], {
+    const buffer = await DocxPacker.toBuffer(doc);
+    const docxBlob = new Blob([new Uint8Array(buffer)], {
       type: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-    })
+    });
 
     const sanitizedTopic = (stickData.topic || "Untitled")
-      .replace(/[^a-zA-Z0-9\s-]/g, "")
-      .replace(/\s+/g, "-")
+      .replaceAll(/[^a-zA-Z0-9\s-]/g, "")
+      .replaceAll(/\s+/g, "-")
       .toLowerCase()
-      .substring(0, 50)
+      .substring(0, 50);
 
-    const filename = `${sanitizedTopic}-export-${Date.now()}.docx`
-    const blob = await put(filename, docxBlob, {
+    const filename = `${sanitizedTopic}-export-${Date.now()}.docx`;
+    const blob = (await put?.(filename, docxBlob, {
       access: "public",
-    })
+    })) || { url: "" };
 
     const exportLink = {
       url: blob.url,
       filename: filename,
       created_at: new Date().toISOString(),
       type: "complete_export",
-    }
+    };
 
-    const { data: existingDetailsTab } = await supabase
-      .from("paks_pad_stick_tabs")
-      .select("*")
-      .eq("stick_id", stickId)
-      .eq("tab_type", "details")
-      .maybeSingle()
-
-    if (existingDetailsTab) {
-      let currentData = {}
-      try {
-        if (typeof existingDetailsTab.tab_data === "string") {
-          currentData = JSON.parse(existingDetailsTab.tab_data)
-        } else if (existingDetailsTab.tab_data && typeof existingDetailsTab.tab_data === "object") {
-          currentData = existingDetailsTab.tab_data
-        }
-      } catch {
-        currentData = {}
-      }
-
-      const updatedExports = [...((currentData as ExportData).exports || []), exportLink]
-      const newTabData = { ...currentData, exports: updatedExports }
-
-      await supabase
-        .from("paks_pad_stick_tabs")
-        .update({
-          tab_data: newTabData,
-          updated_at: new Date().toISOString(),
-        })
-        .eq("id", existingDetailsTab.id)
-    } else {
-      await supabase.from("paks_pad_stick_tabs").insert({
-        stick_id: stickId,
-        user_id: user.id,
-        tab_type: "details",
-        tab_name: "Details",
-        tab_content: "Stick details and exports",
-        tab_data: { exports: [exportLink] },
-        tab_order: 3,
-      })
-    }
+    await saveExportLink(db, stickId, user.id, exportLink);
 
     return NextResponse.json({
       success: true,
       exportUrl: blob.url,
       filename: filename,
       message: "Complete stick export generated successfully",
-    })
+    });
   } catch (error) {
-    console.error("Export stick error:", error)
-    return NextResponse.json({ error: `Failed to export stick: ${(error as Error).message}` }, { status: 500 })
+    console.error("Export stick error:", error);
+    return NextResponse.json(
+      { error: `Failed to export stick: ${(error as Error).message}` },
+      { status: 500 }
+    );
   }
 }

@@ -39,11 +39,13 @@ export function AddCitationModal({ open, onOpenChange, stickId, padId, onCitatio
   const [loading, setLoading] = useState(false)
   const [submitting, setSubmitting] = useState(false)
 
+  /* eslint-disable react-hooks/exhaustive-deps */
   useEffect(() => {
     if (open && padId) {
       fetchKBArticles()
     }
   }, [open, padId])
+  /* eslint-enable react-hooks/exhaustive-deps */
 
   const fetchKBArticles = async () => {
     try {
@@ -161,21 +163,24 @@ export function AddCitationModal({ open, onOpenChange, stickId, padId, onCitatio
           {sourceType === "kb" && (
             <div>
               <Label className="mb-2 block">Select Article</Label>
-              {loading ? (
+              {loading && (
                 <div className="flex items-center justify-center py-4">
                   <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-purple-600" />
                 </div>
-              ) : kbArticles.length === 0 ? (
+              )}
+              {!loading && kbArticles.length === 0 && (
                 <div className="text-center py-4 text-sm text-gray-500">
                   No knowledge base articles found. Create one first!
                 </div>
-              ) : (
+              )}
+              {!loading && kbArticles.length > 0 && (
                 <ScrollArea className="h-[200px] border rounded-md p-2">
                   <div className="space-y-2">
                     {kbArticles.map((article) => (
-                      <div
+                      <button
+                        type="button"
                         key={article.id}
-                        className={`p-3 border rounded cursor-pointer hover:bg-gray-50 ${
+                        className={`w-full text-left p-3 border rounded cursor-pointer hover:bg-gray-50 ${
                           selectedKBArticle === article.id ? "border-purple-500 bg-purple-50" : ""
                         }`}
                         onClick={() => setSelectedKBArticle(article.id)}
@@ -196,7 +201,7 @@ export function AddCitationModal({ open, onOpenChange, stickId, padId, onCitatio
                             </div>
                           </div>
                         </div>
-                      </div>
+                      </button>
                     ))}
                   </div>
                 </ScrollArea>

@@ -22,7 +22,6 @@ class SMTPEmailService {
     const smtpUser = process.env.SMTP_USER
     const smtpPassword = process.env.SMTP_PASSWORD
     const smtpSecure = process.env.SMTP_SECURE === "true" // true for 465, false for other ports
-    const smtpFrom = process.env.SMTP_FROM_EMAIL || "noreply@stickmynote.com"
 
     if (!smtpHost) {
       console.warn("[Email] SMTP_HOST not configured, email sending disabled")

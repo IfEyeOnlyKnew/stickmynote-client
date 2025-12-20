@@ -1,0 +1,8 @@
+export { GeneralTab } from "./GeneralTab"
+export { BrandingTab } from "./BrandingTab"
+export { ContactsTab } from "./ContactsTab"
+export { RequestsTab } from "./RequestsTab"
+export { OrgSettingsTab } from "./OrgSettingsTab"
+export { AutomationTab } from "./AutomationTab"
+export { MembersTab } from "./MembersTab"
+export { AccountTab } from "./AccountTab"

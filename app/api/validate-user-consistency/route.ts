@@ -1,12 +1,12 @@
-import { createClient } from "@/lib/supabase/server"
+import { createDatabaseClient } from "@/lib/database/database-adapter"
 import { NextResponse } from "next/server"
 import { getCachedAuthUser } from "@/lib/auth/cached-auth"
 
 export async function POST() {
   try {
-    const supabase = await createClient()
+    const db = await createDatabaseClient()
 
-    const { user, error: authError, rateLimited } = await getCachedAuthUser(supabase)
+    const { user, error: authError, rateLimited } = await getCachedAuthUser()
 
     if (rateLimited) {
       return NextResponse.json({ error: "Too many requests" }, { status: 429 })
@@ -18,7 +18,7 @@ export async function POST() {
 
     try {
       // Try to validate ID consistency
-      const { data: validation, error: validationError } = await supabase.rpc("validate_user_id_consistency", {
+      const { data: validation, error: validationError } = await db.rpc("validate_user_id_consistency", {
         user_email: user.email,
       })
 
@@ -43,7 +43,7 @@ export async function POST() {
         console.error("ID mismatch detected:", result)
 
         // Log the mismatch
-        await supabase.from("user_id_mismatch_log").insert({
+        await db.from("user_id_mismatch_log").insert({
           auth_user_id: result.auth_user_id,
           profile_user_id: result.profile_user_id,
           email: user.email,
@@ -64,6 +64,7 @@ export async function POST() {
         user_id: result.auth_user_id,
       })
     } catch (rpcError) {
+      console.error("[validate-user-consistency] RPC error:", rpcError)
       console.log("[v0] Validation function not available, skipping validation")
       return NextResponse.json({
         valid: true,

@@ -3,8 +3,7 @@
 import type React from "react"
 
 import { useEffect } from "react"
-import { useRouter } from "next/navigation"
-import { createSupabaseBrowser } from "@/lib/supabase-browser"
+import { useRouter, useSearchParams } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Lock } from "lucide-react"
@@ -31,19 +30,14 @@ export default function ResetPasswordConfirmPage() {
   })
 
   const router = useRouter()
-  const supabase = createSupabaseBrowser()
+  const searchParams = useSearchParams()
+  const token = searchParams.get("token")
 
   useEffect(() => {
-    // Handle the auth callback
-    const handleAuthCallback = async () => {
-      const { error } = await supabase.auth.getUser()
-      if (error) {
-        setFieldError("password", "Invalid or expired reset link. Please request a new one.")
-      }
+    if (!token) {
+      setFieldError("password", "Invalid or expired reset link. Please request a new one.")
     }
-
-    handleAuthCallback()
-  }, [supabase.auth, setFieldError])
+  }, [token, setFieldError])
 
   const handleUpdatePassword = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -63,12 +57,16 @@ export default function ResetPasswordConfirmPage() {
     }
 
     try {
-      const { error } = await supabase.auth.updateUser({
-        password: formData.password,
+      const response = await fetch("/api/auth/reset-password/confirm", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ token, password: formData.password }),
       })
 
-      if (error) {
-        setFieldError("password", error.message)
+      const data = await response.json()
+
+      if (!response.ok) {
+        setFieldError("password", data.error || "Failed to update password")
       } else {
         router.push("/auth/login?message=Password updated successfully")
       }

@@ -1,12 +1,12 @@
-import { createServerClient } from "@/lib/supabase/server"
+import { createDatabaseClient } from "@/lib/database/database-adapter"
 import { NextResponse } from "next/server"
 import { getCachedAuthUser, createRateLimitResponse, createUnauthorizedResponse } from "@/lib/auth/cached-auth"
 
 // PATCH /api/notifications/[id] - Mark activity as read/unread
 export async function PATCH(request: Request, { params }: { params: { id: string } }) {
   try {
-    const supabase = await createServerClient()
-    const authResult = await getCachedAuthUser(supabase)
+    const db = await createDatabaseClient()
+    const authResult = await getCachedAuthUser()
 
     if (authResult.rateLimited) {
       return createRateLimitResponse()
@@ -24,7 +24,7 @@ export async function PATCH(request: Request, { params }: { params: { id: string
       return NextResponse.json({ error: "Invalid read status" }, { status: 400 })
     }
 
-    const { data: activity, error: fetchError } = await supabase
+    const { data: activity, error: fetchError } = await db
       .from("personal_sticks_activities")
       .select("metadata")
       .eq("id", id)
@@ -42,7 +42,7 @@ export async function PATCH(request: Request, { params }: { params: { id: string
     const metadata = activity.metadata || {}
     metadata.read = read
 
-    const { data, error } = await supabase
+    const { data, error } = await db
       .from("personal_sticks_activities")
       .update({ metadata })
       .eq("id", id)
@@ -64,8 +64,8 @@ export async function PATCH(request: Request, { params }: { params: { id: string
 // DELETE /api/notifications/[id] - Delete activity
 export async function DELETE(request: Request, { params }: { params: { id: string } }) {
   try {
-    const supabase = await createServerClient()
-    const authResult = await getCachedAuthUser(supabase)
+    const db = await createDatabaseClient()
+    const authResult = await getCachedAuthUser()
 
     if (authResult.rateLimited) {
       return createRateLimitResponse()
@@ -77,7 +77,7 @@ export async function DELETE(request: Request, { params }: { params: { id: strin
 
     const { id } = params
 
-    const { error } = await supabase.from("personal_sticks_activities").delete().eq("id", id)
+    const { error } = await db.from("personal_sticks_activities").delete().eq("id", id)
 
     if (error) {
       console.error("Error deleting activity:", error)

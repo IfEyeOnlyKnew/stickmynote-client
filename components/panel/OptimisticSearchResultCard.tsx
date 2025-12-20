@@ -192,7 +192,7 @@ export function OptimisticSearchResultCard({
 
   const handleCopy = (e: React.MouseEvent) => {
     e.stopPropagation()
-    const noteUrl = `${window.location.origin}/notes/${note.id}`
+    const noteUrl = `${window.location.origin}/personal/${note.id}`
     navigator.clipboard.writeText(noteUrl)
     toast({
       title: "Link copied",

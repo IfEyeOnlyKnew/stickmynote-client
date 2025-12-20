@@ -1,5 +1,4 @@
 // Production health check utilities
-import { createClient } from "@/lib/supabase/client"
 
 export interface HealthCheckResult {
   service: string
@@ -16,43 +15,34 @@ export interface SystemHealth {
 }
 
 /**
- * Check Supabase database connectivity
+ * Check database connectivity via API
  */
 export async function checkDatabaseHealth(): Promise<HealthCheckResult> {
   const start = Date.now()
 
   try {
-    const supabase = createClient()
-    if (!supabase) {
-      return {
-        service: "database",
-        status: "unhealthy",
-        error: "Supabase client not initialized",
-      }
-    }
-
-    // Test basic connectivity
-    const { data, error } = await supabase.from("users").select("id").limit(1).single()
-
+    const response = await fetch("/api/system/health", { cache: "no-store" })
     const responseTime = Date.now() - start
-
-    if (error && error.code !== "PGRST116") {
-      // PGRST116 is "no rows returned"
+    
+    if (!response.ok) {
       return {
         service: "database",
         status: "unhealthy",
         responseTime,
-        error: error.message,
+        error: `Health check failed: ${response.status}`,
       }
     }
 
+    const data = await response.json()
+    
     return {
       service: "database",
-      status: responseTime > 1000 ? "degraded" : "healthy",
+      status: data.checks?.database?.status || (responseTime > 1000 ? "degraded" : "healthy"),
       responseTime,
       details: {
         connected: true,
         queryTime: responseTime,
+        ...data.checks?.database?.details,
       },
     }
   } catch (error) {
@@ -72,35 +62,27 @@ export async function checkAuthHealth(): Promise<HealthCheckResult> {
   const start = Date.now()
 
   try {
-    const supabase = createClient()
-    if (!supabase) {
-      return {
-        service: "auth",
-        status: "unhealthy",
-        error: "Supabase client not initialized",
-      }
-    }
-
-    const { data, error } = await supabase.auth.getUser()
+    const response = await fetch("/api/user/current", { cache: "no-store" })
     const responseTime = Date.now() - start
 
-    if (error) {
+    // 401 is expected if not logged in, but indicates auth is working
+    if (response.status === 401 || response.ok) {
       return {
         service: "auth",
-        status: "unhealthy",
+        status: responseTime > 500 ? "degraded" : "healthy",
         responseTime,
-        error: error.message,
+        details: {
+          userCheck: true,
+          responseTime,
+        },
       }
     }
 
     return {
       service: "auth",
-      status: responseTime > 500 ? "degraded" : "healthy",
+      status: "unhealthy",
       responseTime,
-      details: {
-        userCheck: true,
-        responseTime,
-      },
+      error: `Auth check failed: ${response.status}`,
     }
   } catch (error) {
     return {

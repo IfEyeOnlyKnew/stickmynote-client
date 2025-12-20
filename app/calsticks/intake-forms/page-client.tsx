@@ -82,7 +82,7 @@ export default function IntakeFormsClient() {
   }
 
   const copyLink = (token: string) => {
-    const url = `${window.location.origin}/intake/${token}`
+    const url = `${globalThis.location.origin}/intake/${token}`
     navigator.clipboard.writeText(url)
   }
 
@@ -160,7 +160,14 @@ export default function IntakeFormsClient() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {forms.map((form) => (
+                {loading && (
+                  <TableRow>
+                    <TableCell colSpan={4} className="text-center text-muted-foreground">
+                      Loading forms...
+                    </TableCell>
+                  </TableRow>
+                )}
+                {!loading && forms.map((form) => (
                   <TableRow key={form.id}>
                     <TableCell>
                       <div>
@@ -185,7 +192,7 @@ export default function IntakeFormsClient() {
                         <Button
                           variant="ghost"
                           size="sm"
-                          onClick={() => window.open(`/intake/${form.share_token}`, "_blank")}
+                          onClick={() => globalThis.open(`/intake/${form.share_token}`, "_blank")}
                         >
                           <ExternalLink className="h-4 w-4" />
                         </Button>
@@ -193,7 +200,7 @@ export default function IntakeFormsClient() {
                     </TableCell>
                   </TableRow>
                 ))}
-                {forms.length === 0 && (
+                {!loading && forms.length === 0 && (
                   <TableRow>
                     <TableCell colSpan={4} className="text-center text-muted-foreground">
                       No forms created yet

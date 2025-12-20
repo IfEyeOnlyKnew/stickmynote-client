@@ -1,13 +1,13 @@
 import { NextResponse } from "next/server"
-import { createClient } from "@/lib/supabase/server"
+import { createDatabaseClient } from "@/lib/database/database-adapter"
 import { GrokService } from "@/lib/ai/grok-service"
 import { getOrgContext } from "@/lib/auth/get-org-context"
 import { getCachedAuthUser } from "@/lib/auth/cached-auth"
 
 export async function POST(request: Request) {
   try {
-    const supabase = await createClient()
-    const authResult = await getCachedAuthUser(supabase)
+    const db = await createDatabaseClient()
+    const authResult = await getCachedAuthUser()
 
     if (authResult.rateLimited) {
       return NextResponse.json(
@@ -33,7 +33,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Content and padId are required" }, { status: 400 })
     }
 
-    const { data: existingSticks, error } = await supabase
+    const { data: existingSticks, error } = await db
       .from("social_sticks")
       .select("id, content, topic")
       .eq("social_pad_id", padId)
@@ -49,6 +49,7 @@ export async function POST(request: Request) {
 
     return NextResponse.json(result)
   } catch (error) {
+    console.error("[check-duplicate] Error:", error)
     return NextResponse.json({ error: "Failed to check duplicate" }, { status: 500 })
   }
 }

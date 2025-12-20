@@ -1,5 +1,5 @@
 import type { NextRequest } from "next/server"
-import { createSupabaseServer } from "@/lib/supabase-server"
+import { createDatabaseClient } from "@/lib/database/database-adapter"
 import { replyValidation, validateAndSanitize, validateUUID } from "@/lib/input-validation-enhanced"
 import { NextResponse } from "next/server"
 import { sanitizeRequestBody } from "@/lib/html-sanitizer"
@@ -8,9 +8,9 @@ import { getCachedAuthUser } from "@/lib/auth/cached-auth"
 
 export async function GET(request: NextRequest) {
   try {
-    const supabase = await createSupabaseServer()
+    const db = await createDatabaseClient()
 
-    const authResult = await getCachedAuthUser(supabase)
+    const authResult = await getCachedAuthUser()
 
     if (authResult.rateLimited) {
       return NextResponse.json(
@@ -37,7 +37,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "Valid note ID is required" }, { status: 400 })
     }
 
-    const { data: note, error: noteError } = await supabase
+    const { data: note, error: noteError } = await db
       .from("personal_sticks")
       .select("user_id, is_shared, org_id")
       .eq("id", noteId)
@@ -52,7 +52,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "Access denied" }, { status: 403 })
     }
 
-    const { data: replies, error } = await supabase
+    const { data: replies, error } = await db
       .from("personal_sticks_replies")
       .select(`
         *,
@@ -76,9 +76,9 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const supabase = await createSupabaseServer()
+    const db = await createDatabaseClient()
 
-    const authResult = await getCachedAuthUser(supabase)
+    const authResult = await getCachedAuthUser()
 
     if (authResult.rateLimited) {
       return NextResponse.json(
@@ -108,7 +108,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Validation failed", details: validatedData.errors }, { status: 400 })
     }
 
-    const { data: note, error: noteError } = await supabase
+    const { data: note, error: noteError } = await db
       .from("personal_sticks")
       .select("user_id, is_shared, org_id")
       .eq("id", validatedData.data.note_id)
@@ -123,7 +123,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Cannot reply to this note" }, { status: 403 })
     }
 
-    const { data: reply, error } = await supabase
+    const { data: reply, error } = await db
       .from("personal_sticks_replies")
       .insert({
         personal_stick_id: validatedData.data.note_id,

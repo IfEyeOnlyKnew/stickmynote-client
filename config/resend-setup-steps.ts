@@ -45,22 +45,12 @@ export const resendSetupSteps: SetupStepConfig[] = [
     ],
   },
   {
-    id: "configure-supabase",
-    title: "Configure Supabase SMTP Settings",
+    id: "configure-smtp",
+    title: "Configure SMTP Settings (Optional)",
     content: [
       {
         type: "text",
-        data: "Configure Supabase to use Resend for sending emails:",
-      },
-      {
-        type: "list",
-        data: [
-          "Go to your Supabase project dashboard",
-          "Navigate to Authentication → Email Templates",
-          'Click on "SMTP Settings" at the bottom',
-          'Enable "Enable custom SMTP"',
-          "Use these settings:",
-        ],
+        data: "Configure your email service to use Resend SMTP if needed:",
       },
       {
         type: "settings",
@@ -93,7 +83,7 @@ export const resendSetupSteps: SetupStepConfig[] = [
           "Go to Resend Dashboard → Domains",
           "Add your domain",
           "Add the required DNS records",
-          "Update the sender email in Supabase SMTP settings",
+          "Update the sender email in your environment variables",
         ],
       },
     ],

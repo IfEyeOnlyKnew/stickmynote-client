@@ -1,13 +1,13 @@
-import { createClient } from "@/lib/supabase/server"
+import { createDatabaseClient } from "@/lib/database/database-adapter"
 import { NextResponse } from "next/server"
-import crypto from "crypto"
+import crypto from "node:crypto"
 import { getCachedAuthUser } from "@/lib/auth/cached-auth"
 
-export async function POST(request: Request, { params }: { params: Promise<{ webhookId: string }> }) {
+export async function POST(_request: Request, { params }: { params: Promise<{ webhookId: string }> }) {
   const { webhookId } = await params
-  const supabase = await createClient()
+  const db = await createDatabaseClient()
 
-  const { user, rateLimited } = await getCachedAuthUser(supabase)
+  const { user, rateLimited } = await getCachedAuthUser()
 
   if (rateLimited) {
     return NextResponse.json({ error: "Too many requests" }, { status: 429 })
@@ -17,7 +17,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ web
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
   }
 
-  const { data: webhook, error: webhookError } = await supabase
+  const { data: webhook, error: webhookError } = await db
     .from("webhook_configurations")
     .select("*")
     .eq("id", webhookId)
@@ -48,7 +48,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ web
     "Content-Type": "application/json",
     "X-Webhook-Signature": signature,
     "X-Webhook-Timestamp": new Date().toISOString(),
-    ...((webhook.headers as Record<string, string>) || {}),
+    ...(webhook.headers as Record<string, string> | undefined),
   }
 
   const startTime = Date.now()
@@ -70,7 +70,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ web
     }
 
     // Log the test delivery
-    await supabase.from("webhook_delivery_logs").insert({
+    await db.from("webhook_delivery_logs").insert({
       webhook_id: webhookId,
       event_type: "test",
       event_id: crypto.randomUUID(),
@@ -86,14 +86,14 @@ export async function POST(request: Request, { params }: { params: Promise<{ web
     })
 
     // Update webhook stats
-    await supabase
+    await db
       .from("webhook_configurations")
       .update({
         total_deliveries: (webhook.total_deliveries || 0) + 1,
         successful_deliveries: response.ok
           ? (webhook.successful_deliveries || 0) + 1
           : webhook.successful_deliveries || 0,
-        failed_deliveries: !response.ok ? (webhook.failed_deliveries || 0) + 1 : webhook.failed_deliveries || 0,
+        failed_deliveries: response.ok ? webhook.failed_deliveries || 0 : (webhook.failed_deliveries || 0) + 1,
         last_triggered_at: new Date().toISOString(),
         ...(response.ok
           ? { last_success_at: new Date().toISOString() }
@@ -112,7 +112,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ web
     const errorMessage = error instanceof Error ? error.message : "Unknown error"
 
     // Log failed delivery
-    await supabase.from("webhook_delivery_logs").insert({
+    await db.from("webhook_delivery_logs").insert({
       webhook_id: webhookId,
       event_type: "test",
       event_id: crypto.randomUUID(),
@@ -126,7 +126,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ web
     })
 
     // Update webhook stats
-    await supabase
+    await db
       .from("webhook_configurations")
       .update({
         total_deliveries: (webhook.total_deliveries || 0) + 1,

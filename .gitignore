@@ -15,6 +15,8 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
+debug.log
+**/debug.log
 
 # env files - NEVER commit these!
 .env
@@ -45,3 +47,7 @@ secrets/
 *.bak
 *.sql
 *.dump
+
+# Database schema exports
+database-schema.json
+schema.sql

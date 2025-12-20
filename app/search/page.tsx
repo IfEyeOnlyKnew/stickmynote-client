@@ -17,6 +17,21 @@ import type { SearchFilters } from "@/types/search"
 import { format } from "date-fns"
 import { Header } from "@/components/header"
 
+// Helper function to format date range display
+function formatDateRangeDisplay(dateRange: { from: Date | null; to: Date | null } | undefined): string {
+  if (!dateRange?.from) return "Pick a date range"
+  if (dateRange.to) {
+    return `${format(dateRange.from, "MMM d")} - ${format(dateRange.to, "MMM d, yyyy")}`
+  }
+  return format(dateRange.from, "MMM d, yyyy")
+}
+
+// Helper function to get visibility select value
+function getVisibilityValue(shared: boolean | null | undefined): string {
+  if (shared === null || shared === undefined) return "all"
+  return shared ? "shared" : "personal"
+}
+
 export default function SearchPage() {
   const router = useRouter()
   const { user } = useUser()
@@ -201,18 +216,7 @@ export default function SearchPage() {
                           <PopoverTrigger asChild>
                             <Button variant="outline" className="w-full justify-start bg-transparent">
                               <CalendarIcon className="mr-2 h-4 w-4" />
-                              {filters.dateRange?.from ? (
-                                filters.dateRange.to ? (
-                                  <>
-                                    {format(filters.dateRange.from, "MMM d")} -{" "}
-                                    {format(filters.dateRange.to, "MMM d, yyyy")}
-                                  </>
-                                ) : (
-                                  format(filters.dateRange.from, "MMM d, yyyy")
-                                )
-                              ) : (
-                                "Pick a date range"
-                              )}
+                              {formatDateRangeDisplay(filters.dateRange)}
                             </Button>
                           </PopoverTrigger>
                           <PopoverContent className="w-auto p-0" align="start">
@@ -240,7 +244,7 @@ export default function SearchPage() {
                       <div className="space-y-2">
                         <Label>Visibility</Label>
                         <Select
-                          value={filters.shared === null ? "all" : filters.shared ? "shared" : "personal"}
+                          value={getVisibilityValue(filters.shared)}
                           onValueChange={(value) => {
                             setFilters({
                               ...filters,
@@ -306,24 +310,27 @@ export default function SearchPage() {
                 </div>
               </CardHeader>
               <CardContent>
-                {loading ? (
+                {loading && (
                   <div className="flex items-center justify-center py-12">
                     <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
                   </div>
-                ) : results.length === 0 ? (
+                )}
+                {!loading && results.length === 0 && (
                   <div className="text-center py-12">
                     <StickyNote className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
                     <p className="text-muted-foreground">
                       {query ? "No notes found matching your search" : "Enter a search query to get started"}
                     </p>
                   </div>
-                ) : (
+                )}
+                {!loading && results.length > 0 && (
                   <div className="space-y-3">
                     {results.map((note) => (
-                      <div
+                      <button
+                        type="button"
                         key={note.id}
-                        className="p-4 border rounded-lg hover:bg-muted/50 cursor-pointer transition-colors"
-                        onClick={() => router.push(`/notes?note=${note.id}`)}
+                        className="w-full text-left p-4 border rounded-lg hover:bg-muted/50 cursor-pointer transition-colors"
+                        onClick={() => router.push(`/personal?note=${note.id}`)}
                       >
                         <div className="flex items-start justify-between gap-4">
                           <div className="flex-1 min-w-0">
@@ -342,7 +349,7 @@ export default function SearchPage() {
                           </div>
                           <div className="w-12 h-12 rounded-lg flex-shrink-0" style={{ backgroundColor: note.color }} />
                         </div>
-                      </div>
+                      </button>
                     ))}
                   </div>
                 )}

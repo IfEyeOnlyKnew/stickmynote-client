@@ -1,15 +1,15 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { createServerClient } from "@/lib/supabase/server"
+import { createDatabaseClient } from "@/lib/database/database-adapter"
 import { getCachedAuthUser } from "@/lib/auth/cached-auth"
 
 export async function GET(request: NextRequest) {
   try {
-    const supabase = await createServerClient()
+    const db = await createDatabaseClient()
     const { searchParams } = new URL(request.url)
     const start = searchParams.get("start")
     const end = searchParams.get("end")
 
-    const authResult = await getCachedAuthUser(supabase)
+    const authResult = await getCachedAuthUser()
     if (authResult.rateLimited) {
       return NextResponse.json(
         { error: "Rate limit exceeded. Please try again in a moment." },
@@ -19,15 +19,14 @@ export async function GET(request: NextRequest) {
     if (!authResult.user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
-    const user = authResult.user
 
     // Get all users with their capacity settings
-    let { data: users, error: usersError } = await supabase
+    let { data: users, error: usersError } = await db
       .from("users")
       .select("id, full_name, email, hourly_rate_cents, capacity_hours_per_day")
 
     if (usersError && usersError.code === "42703") {
-      const { data: basicUsers, error: basicUsersError } = await supabase.from("users").select("id, full_name, email")
+      const { data: basicUsers, error: basicUsersError } = await db.from("users").select("id, full_name, email")
 
       if (basicUsersError) {
         return NextResponse.json({ error: "Failed to fetch users" }, { status: 500 })
@@ -45,7 +44,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Get all tasks assigned to users within the date range
-    const query = supabase
+    const query = db
       .from("paks_pad_stick_replies")
       .select(`
         id,
@@ -95,6 +94,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({ users: workloadData })
   } catch (error) {
+    console.error("[calsticks/workload] Error:", error)
     return NextResponse.json({ error: "Internal server error" }, { status: 500 })
   }
 }

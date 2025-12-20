@@ -1,13 +1,13 @@
-import { createClient } from "@/lib/supabase/server"
+import { createDatabaseClient } from "@/lib/database/database-adapter"
 import { NextResponse } from "next/server"
 import { getCachedAuthUser } from "@/lib/auth/cached-auth"
 
 export async function POST(request: Request, { params }: { params: { padId: string } }) {
   try {
     const { padId } = params
-    const supabase = await createClient()
+    const db = await createDatabaseClient()
 
-    const authResult = await getCachedAuthUser(supabase)
+    const authResult = await getCachedAuthUser()
     if (authResult.rateLimited) {
       return NextResponse.json({ error: "Rate limited" }, { status: 429, headers: { "Retry-After": "30" } })
     }
@@ -20,7 +20,7 @@ export async function POST(request: Request, { params }: { params: { padId: stri
     console.log("[v0] Process pending invites - User:", user.email, "Pad:", padId)
 
     // Check for pending invites for this user's email
-    const { data: pendingInvites, error: fetchError } = await supabase
+    const { data: pendingInvites, error: fetchError } = await db
       .from("social_pad_pending_invites")
       .select("*")
       .eq("email", user.email)
@@ -38,11 +38,11 @@ export async function POST(request: Request, { params }: { params: { padId: stri
 
     console.log("[v0] Process pending invites - Found", pendingInvites.length, "pending invites")
 
-    const results = []
+    const results: { invite_id: string; status: string; error?: string }[] = []
 
     for (const invite of pendingInvites) {
       // Check if already a member
-      const { data: existingMember } = await supabase
+      const { data: existingMember } = await db
         .from("social_pad_members")
         .select("id")
         .eq("social_pad_id", padId)
@@ -52,13 +52,13 @@ export async function POST(request: Request, { params }: { params: { padId: stri
       if (existingMember) {
         console.log("[v0] Process pending invites - User already a member, deleting invite")
         // Delete the pending invite
-        await supabase.from("social_pad_pending_invites").delete().eq("id", invite.id)
+        await db.from("social_pad_pending_invites").delete().eq("id", invite.id)
         results.push({ invite_id: invite.id, status: "already_member" })
         continue
       }
 
       // Create membership
-      const { error: memberError } = await supabase.from("social_pad_members").insert({
+      const { error: memberError } = await db.from("social_pad_members").insert({
         social_pad_id: padId,
         user_id: user.id,
         role: invite.role,
@@ -75,7 +75,7 @@ export async function POST(request: Request, { params }: { params: { padId: stri
       console.log("[v0] Process pending invites - Created membership")
 
       // Delete the processed invite
-      const { error: deleteError } = await supabase.from("social_pad_pending_invites").delete().eq("id", invite.id)
+      const { error: deleteError } = await db.from("social_pad_pending_invites").delete().eq("id", invite.id)
 
       if (deleteError) {
         console.error("[v0] Process pending invites - Error deleting invite:", deleteError)

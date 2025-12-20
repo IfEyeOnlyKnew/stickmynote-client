@@ -1,41 +1,29 @@
 "use client"
 
-import { useState, useEffect } from "react"
-import { createSupabaseBrowser } from "@/lib/supabase-browser"
+import { useState, useEffect, useRef } from "react"
+import { useUser } from "@/contexts/user-context"
 
 export function useLikes(targetId: string, targetType: "stick" | "reply" = "stick") {
+  const { user } = useUser()
   const [likeCount, setLikeCount] = useState(0)
   const [isLiked, setIsLiked] = useState(false)
   const [loading, setLoading] = useState(true)
+  const pollIntervalRef = useRef<NodeJS.Timeout | null>(null)
 
   useEffect(() => {
     if (!targetId) return
 
     fetchLikes()
 
-    const supabase = createSupabaseBrowser()
-    const tableName = targetType === "stick" ? "social_stick_reactions" : "social_reply_reactions"
-    const filterColumn = targetType === "stick" ? "social_stick_id" : "social_reply_id"
-
-    const channel = supabase
-      .channel(`likes:${targetType}:${targetId}`)
-      .on(
-        "postgres_changes",
-        {
-          event: "*",
-          schema: "public",
-          table: tableName,
-          filter: `${filterColumn}=eq.${targetId}`,
-        },
-        () => {
-          fetchLikes()
-        },
-      )
-      .subscribe()
+    // Poll for updates every 30 seconds instead of realtime subscription
+    pollIntervalRef.current = setInterval(fetchLikes, 30000)
 
     return () => {
-      channel.unsubscribe()
+      if (pollIntervalRef.current) {
+        clearInterval(pollIntervalRef.current)
+      }
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [targetId, targetType])
 
   const fetchLikes = async () => {
@@ -53,11 +41,6 @@ export function useLikes(targetId: string, targetType: "stick" | "reply" = "stic
         setLikeCount(heartReactions.length)
 
         // Check if current user has liked
-        const supabase = createSupabaseBrowser()
-        const {
-          data: { user },
-        } = await supabase.auth.getUser()
-
         if (user) {
           const userHasLiked = heartReactions.some((r: any) => r.user_id === user.id)
           setIsLiked(userHasLiked)

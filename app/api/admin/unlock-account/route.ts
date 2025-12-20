@@ -1,14 +1,14 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { createClient } from "@/lib/supabase/server"
+import { createDatabaseClient } from "@/lib/database/database-adapter"
 import { getCachedAuthUser } from "@/lib/auth/cached-auth"
 
 export const dynamic = "force-dynamic"
 
 export async function POST(request: NextRequest) {
   try {
-    const supabase = await createClient()
+    const db = await createDatabaseClient()
 
-    const authResult = await getCachedAuthUser(supabase)
+    const authResult = await getCachedAuthUser()
     if (authResult.rateLimited) {
       return NextResponse.json(
         { error: "Rate limit exceeded. Please try again in a moment." },
@@ -20,7 +20,7 @@ export async function POST(request: NextRequest) {
     }
     const user = authResult.user
 
-    const { data: membership } = await supabase
+    const { data: membership } = await db
       .from("organization_members")
       .select("role, org_id")
       .eq("user_id", user.id)
@@ -39,7 +39,7 @@ export async function POST(request: NextRequest) {
 
     const normalizedEmail = email.toLowerCase().trim()
 
-    const { error } = await supabase.from("login_attempts").delete().eq("email", normalizedEmail).eq("success", false)
+    const { error } = await db.from("login_attempts").delete().eq("email", normalizedEmail).eq("success", false)
 
     if (error) {
       console.error("Error unlocking account:", error)

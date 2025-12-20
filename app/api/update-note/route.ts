@@ -1,5 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server"
-import { createClient } from "@/lib/supabase/server"
+import { createDatabaseClient } from "@/lib/database/database-adapter"
 import { getCachedAuthUser } from "@/lib/auth/cached-auth"
 
 export const dynamic = "force-dynamic"
@@ -10,9 +10,9 @@ export async function POST(request: NextRequest) {
   try {
     console.log("[v0] POST /api/update-note - Request received")
 
-    const supabase = await createClient()
+    const db = await createDatabaseClient()
 
-    const { user, error: authError, rateLimited } = await getCachedAuthUser(supabase)
+    const { user, error: authError, rateLimited } = await getCachedAuthUser()
 
     if (rateLimited) {
       return NextResponse.json({ error: "Too many requests" }, { status: 429 })
@@ -37,7 +37,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Get the note to verify ownership
-    const { data: note, error: fetchError } = await supabase
+    const { data: note, error: fetchError } = await db
       .from("personal_sticks")
       .select("id, user_id, is_shared")
       .eq("id", noteId)
@@ -78,7 +78,7 @@ export async function POST(request: NextRequest) {
     console.log("[v0] Updating note with:", updates)
 
     // Update the note
-    const { data: updatedNote, error: updateError } = await supabase
+    const { data: updatedNote, error: updateError } = await db
       .from("personal_sticks")
       .update(updates)
       .eq("id", noteId)

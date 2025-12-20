@@ -8,7 +8,7 @@ import { Loader2, BarChart3, Sparkles, TrendingUp, ChevronDown } from "lucide-re
 import { useUser } from "@/contexts/user-context"
 import { useToast } from "@/hooks/use-toast"
 import { useCSRF } from "@/hooks/useCSRF"
-import type { Note } from "@/types/note"
+import type { Note, Reply } from "@/types/note"
 import { Button } from "@/components/ui/button"
 import { UserMenu } from "@/components/user-menu"
 import { BreadcrumbNav } from "@/components/breadcrumb-nav"
@@ -30,7 +30,7 @@ export default function CommunityPanelPage() {
   const { toast } = useToast()
   const router = useRouter()
   const windowSize = useWindowSize()
-  const { updateOrganizePreference } = useUserProfile(user?.id || null)
+  useUserProfile(user?.id || null)
   const { csrfToken } = useCSRF()
   const csrfTokenRef = useRef<string | null>(csrfToken)
 
@@ -41,14 +41,11 @@ export default function CommunityPanelPage() {
   const [communityNotes, setCommunityNotes] = useState<Note[]>([])
   const [loading, setLoading] = useState(true)
   const [hasMore, setHasMore] = useState(false)
-  const [page, setPage] = useState(1)
   const [searchTerm, setSearchTerm] = useState("")
-  const [initialLoadTime, setInitialLoadTime] = useState(new Date())
-  const [newSticksCount, setNewSticksCount] = useState(0)
   const [isLoadingMore, setIsLoadingMore] = useState(false)
   const [loadError, setLoadError] = useState(false)
   const lastErrorTimeRef = useRef<number>(0)
-  const [userAvatar, setUserAvatar] = useState<string | null>(null)
+  const [userAvatar] = useState<string | null>(null)
   const [recentSearches, setRecentSearches] = useState<string[]>([])
   const [trendingTags, setTrendingTags] = useState<string[]>([])
   const [availableTags, setAvailableTags] = useState<string[]>([])
@@ -56,7 +53,7 @@ export default function CommunityPanelPage() {
     sortBy: "relevance",
   })
   const [totalResults, setTotalResults] = useState(0)
-  const [pendingCount, setPendingCount] = useState(0)
+  const [pendingCount] = useState(0)
   const [showStats, setShowStats] = useState(false)
   const [fullscreenHook, setFullscreenHook] = useState<{
     isFullscreen: boolean
@@ -81,9 +78,45 @@ export default function CommunityPanelPage() {
       }))
     },
   })
-  const [lastLoadedAt] = useState<string>(() => new Date().toISOString())
   const loadMoreTriggerRef = useRef<HTMLDivElement | null>(null)
-  const [replyHook, setReplyHook] = useState({
+
+  // Helper: Update note's replies with new reply
+  const addReplyToNote = useCallback((noteId: string, reply: Reply) => {
+    setCommunityNotes((prevNotes) =>
+      prevNotes.map((note) => {
+        if (note.id !== noteId) return note
+        return { ...note, replies: [...(note.replies || []), reply] }
+      }),
+    )
+  }, [])
+
+  // Helper: Update specific reply in note (extracted mapper to reduce nesting)
+  const createReplyMapper = (replyId: string, updatedReply: Partial<Reply>) => 
+    (r: Reply): Reply => r.id === replyId ? { ...r, ...updatedReply } : r
+
+  const updateReplyInNote = useCallback((noteId: string, replyId: string, updatedReply: Partial<Reply>) => {
+    setCommunityNotes((prevNotes) =>
+      prevNotes.map((note) => {
+        if (note.id !== noteId) return note
+        return { ...note, replies: note.replies?.map(createReplyMapper(replyId, updatedReply)) }
+      }),
+    )
+  }, [])
+
+  // Helper: Remove reply from note (extracted filter to reduce nesting)
+  const createReplyFilter = (replyId: string) => 
+    (r: Reply): boolean => r.id !== replyId
+
+  const removeReplyFromNote = useCallback((noteId: string, replyId: string) => {
+    setCommunityNotes((prevNotes) =>
+      prevNotes.map((note) => {
+        if (note.id !== noteId) return note
+        return { ...note, replies: note.replies?.filter(createReplyFilter(replyId)) }
+      }),
+    )
+  }, [])
+
+  const [replyHook] = useState({
     handleAddReply: async (noteId: string, content: string, color?: string): Promise<void> => {
       try {
         const currentCsrfToken = csrfTokenRef.current
@@ -102,20 +135,7 @@ export default function CommunityPanelPage() {
         }
 
         const { reply } = await response.json()
-
-        // Update the note in communityNotes with the new reply
-        setCommunityNotes((prevNotes) =>
-          prevNotes.map((note) => {
-            if (note.id === noteId) {
-              const currentReplies = note.replies || []
-              return {
-                ...note,
-                replies: [...currentReplies, reply],
-              }
-            }
-            return note
-          }),
-        )
+        addReplyToNote(noteId, reply)
       } catch (error) {
         console.error("Error adding reply:", error)
         throw error
@@ -123,7 +143,6 @@ export default function CommunityPanelPage() {
     },
     handleEditReply: async (replyId: string, content: string, color?: string): Promise<void> => {
       try {
-        // Find which note contains this reply
         const noteWithReply = communityNotes.find((note) => note.replies?.some((r: { id: string }) => r.id === replyId))
 
         if (!noteWithReply) {
@@ -146,19 +165,7 @@ export default function CommunityPanelPage() {
         }
 
         const { reply: updatedReply } = await response.json()
-
-        // Update the reply in communityNotes
-        setCommunityNotes((prevNotes) =>
-          prevNotes.map((note) => {
-            if (note.id === noteWithReply.id) {
-              return {
-                ...note,
-                replies: note.replies?.map((r: { id: string }) => (r.id === replyId ? { ...r, ...updatedReply } : r)),
-              }
-            }
-            return note
-          }),
-        )
+        updateReplyInNote(noteWithReply.id, replyId, updatedReply)
       } catch (error) {
         console.error("Error editing reply:", error)
         throw error
@@ -166,7 +173,6 @@ export default function CommunityPanelPage() {
     },
     handleDeleteReply: async (replyId: string): Promise<void> => {
       try {
-        // Find which note contains this reply
         const noteWithReply = communityNotes.find((note) => note.replies?.some((r: { id: string }) => r.id === replyId))
 
         if (!noteWithReply) {
@@ -188,18 +194,7 @@ export default function CommunityPanelPage() {
           throw new Error(errorData.error || "Failed to delete reply")
         }
 
-        // Remove the reply from communityNotes
-        setCommunityNotes((prevNotes) =>
-          prevNotes.map((note) => {
-            if (note.id === noteWithReply.id) {
-              return {
-                ...note,
-                replies: note.replies?.filter((r: { id: string }) => r.id !== replyId),
-              }
-            }
-            return note
-          }),
-        )
+        removeReplyFromNote(noteWithReply.id, replyId)
       } catch (error) {
         console.error("Error deleting reply:", error)
         throw error
@@ -210,7 +205,7 @@ export default function CommunityPanelPage() {
   const [debouncedSearchTerm, setDebouncedSearchTerm] = useState("")
   const [circuitOpen, setCircuitOpen] = useState(false)
   const circuitOpenTimeRef = useRef<number>(0)
-  const CIRCUIT_BREAKER_TIMEOUT = 30000 // 30 seconds cooldown after rate limit
+  const CIRCUIT_BREAKER_TIMEOUT = 30000 // 30 seconds cool down after rate limit
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -220,6 +215,61 @@ export default function CommunityPanelPage() {
     return () => clearTimeout(timer)
   }, [searchTerm])
 
+  // Helper: Check if circuit breaker should block request
+  const isCircuitBreakerBlocking = useCallback(() => {
+    const now = Date.now()
+    if (!circuitOpen) return false
+    
+    if (now - circuitOpenTimeRef.current < CIRCUIT_BREAKER_TIMEOUT) {
+      console.warn(
+        `Circuit breaker open - ${Math.ceil((CIRCUIT_BREAKER_TIMEOUT - (now - circuitOpenTimeRef.current)) / 1000)}s remaining`,
+      )
+      return true
+    }
+    // Reset circuit breaker after timeout
+    setCircuitOpen(false)
+    return false
+  }, [circuitOpen])
+
+  // Helper: Handle rate limit response
+  const handleRateLimitResponse = useCallback(() => {
+    console.warn("Rate limited - circuit breaker activated for 30 seconds")
+    setCircuitOpen(true)
+    circuitOpenTimeRef.current = Date.now()
+    setLoadError(true)
+    lastErrorTimeRef.current = Date.now()
+    setHasMore(false)
+  }, [])
+
+  // Helper: Handle non-JSON response
+  const handleNonJsonResponse = useCallback(async (response: Response) => {
+    console.warn("Non-JSON response received:", await response.text().catch(() => "unable to read"))
+    setLoadError(true)
+    lastErrorTimeRef.current = Date.now()
+    setHasMore(false)
+  }, [])
+
+  // Helper: Update notes from search response
+  const updateNotesFromResponse = useCallback((data: { notes?: Note[]; totalCount?: number; hasMore?: boolean }, pageToFetch: number) => {
+    const newNotes = data.notes || []
+    const totalCount = data.totalCount || 0
+    const moreAvailable = data.hasMore || false
+
+    if (pageToFetch === 1) {
+      setCommunityNotes(newNotes)
+    } else {
+      setCommunityNotes((prev) => {
+        const existingIds = new Set(prev.map((n) => n.id))
+        const uniqueNewNotes = newNotes.filter((n: Note) => !existingIds.has(n.id))
+        return [...prev, ...uniqueNewNotes]
+      })
+    }
+
+    setTotalResults(totalCount)
+    setHasMore(moreAvailable)
+    setLoadError(false)
+  }, [])
+
   const searchCommunityNotes = useCallback(
     async (pageToFetch: number) => {
       if (!user) {
@@ -227,20 +277,10 @@ export default function CommunityPanelPage() {
         return
       }
 
-      const now = Date.now()
-      if (circuitOpen && now - circuitOpenTimeRef.current < CIRCUIT_BREAKER_TIMEOUT) {
-        console.warn(
-          `Circuit breaker open - ${Math.ceil((CIRCUIT_BREAKER_TIMEOUT - (now - circuitOpenTimeRef.current)) / 1000)}s remaining`,
-        )
-        return
-      } else if (circuitOpen) {
-        // Reset circuit breaker after timeout
-        setCircuitOpen(false)
-      }
+      if (isCircuitBreakerBlocking()) return
 
-      if (loadError && now - lastErrorTimeRef.current < 10000) {
-        return
-      }
+      const now = Date.now()
+      if (loadError && now - lastErrorTimeRef.current < 10000) return
 
       if (pageToFetch === 1) {
         setLoading(true)
@@ -267,46 +307,20 @@ export default function CommunityPanelPage() {
         })
 
         if (response.status === 429) {
-          console.warn("Rate limited - circuit breaker activated for 30 seconds")
-          setCircuitOpen(true)
-          circuitOpenTimeRef.current = Date.now()
-          setLoadError(true)
-          lastErrorTimeRef.current = Date.now()
-          setHasMore(false)
+          handleRateLimitResponse()
           return
         }
 
         const contentType = response.headers.get("content-type")
-        if (!contentType || !contentType.includes("application/json")) {
-          console.warn("Non-JSON response received:", await response.text().catch(() => "unable to read"))
-          setLoadError(true)
-          lastErrorTimeRef.current = Date.now()
-          setHasMore(false)
+        if (!contentType?.includes("application/json")) {
+          await handleNonJsonResponse(response)
           return
         }
 
-        if (!response.ok) {
-          throw new Error("Failed to search")
-        }
+        if (!response.ok) throw new Error("Failed to search")
 
         const data = await response.json()
-        const newNotes = data.notes || []
-        const totalCount = data.totalCount || 0
-        const moreAvailable = data.hasMore || false
-
-        if (pageToFetch === 1) {
-          setCommunityNotes(newNotes)
-        } else {
-          setCommunityNotes((prev) => {
-            const existingIds = new Set(prev.map((n) => n.id))
-            const uniqueNewNotes = newNotes.filter((n: Note) => !existingIds.has(n.id))
-            return [...prev, ...uniqueNewNotes]
-          })
-        }
-
-        setTotalResults(totalCount)
-        setHasMore(moreAvailable)
-        setLoadError(false)
+        updateNotesFromResponse(data, pageToFetch)
       } catch (err) {
         console.error("Error fetching panel notes:", err)
         setLoadError(true)
@@ -321,14 +335,14 @@ export default function CommunityPanelPage() {
         setIsLoadingMore(false)
       }
     },
-    [user, debouncedSearchTerm, searchFilters, loadError, isLoadingMore, csrfToken, circuitOpen],
+    [user, debouncedSearchTerm, searchFilters, loadError, isLoadingMore, isCircuitBreakerBlocking, handleRateLimitResponse, handleNonJsonResponse, updateNotesFromResponse],
   )
 
   const handleLoadMore = useCallback(() => {
     if (!isLoadingMore && hasMore && !loadError) {
-      searchCommunityNotes(page + 1)
+      searchCommunityNotes(2)
     }
-  }, [isLoadingMore, hasMore, page, searchCommunityNotes, loadError])
+  }, [isLoadingMore, hasMore, searchCommunityNotes, loadError])
 
   const handleSearchChange = useCallback((term: string) => {
     setSearchTerm(term)
@@ -374,7 +388,9 @@ export default function CommunityPanelPage() {
               position,
             }),
           })
-        } catch (error) {}
+        } catch (error) {
+          console.warn("Failed to track click:", error)
+        }
       }
       fullscreenHook.openFullscreen(noteId)
     },
@@ -392,9 +408,12 @@ export default function CommunityPanelPage() {
           setTrendingTags(data.trending || [])
           setAvailableTags(data.tags || [])
         }
-      } catch (error) {}
+      } catch (error) {
+        console.warn("Failed to fetch suggestions:", error)
+      }
     }
     fetchSuggestions()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user])
 
   useEffect(() => {
@@ -411,6 +430,7 @@ export default function CommunityPanelPage() {
     if (user && !circuitOpen) {
       searchCommunityNotes(1)
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user, debouncedSearchTerm, searchFilters, circuitOpen])
 
   useEffect(() => {
@@ -469,6 +489,178 @@ export default function CommunityPanelPage() {
 
   if (!user) return null
 
+  // Extracted handlers for UnifiedNote (reduces nesting depth)
+  const handleNoteUpdateInFullscreen = (updatedNote: Note) => {
+    setCommunityNotes((prev) => prev.map((n) => (n.id === updatedNote.id ? updatedNote : n)))
+  }
+
+  const handleDeleteNoteInFullscreen = async (noteId: string) => {
+    const note = communityNotes.find((n) => n.id === noteId)
+    if (note?.user_id !== user?.id) return
+    
+    try {
+      await fetch(`/api/notes/${noteId}`, { method: "DELETE" })
+      setCommunityNotes((prev) => prev.filter((n) => n.id !== noteId))
+      fullscreenHook.closeFullscreen()
+      toast({
+        title: "Success",
+        description: "Note deleted successfully",
+      })
+    } catch {
+      toast({
+        title: "Error",
+        description: "Failed to delete note",
+        variant: "destructive",
+      })
+    }
+  }
+
+  const handleUpdateSharingInFullscreen = async (noteId: string, isShared: boolean) => {
+    setCommunityNotes((prev) => prev.map((n) => (n.id === noteId ? { ...n, is_shared: isShared } : n)))
+  }
+
+  const handleUpdateColorInFullscreen = async (noteId: string, color: string) => {
+    setCommunityNotes((prev) => prev.map((n) => (n.id === noteId ? { ...n, color } : n)))
+  }
+
+  const handleTopicChangeInFullscreen = async (noteId: string, topic: string) => {
+    setCommunityNotes((prev) => prev.map((n) => (n.id === noteId ? { ...n, topic } : n)))
+  }
+
+  const handleContentChangeInFullscreen = async (noteId: string, content: string) => {
+    setCommunityNotes((prev) => prev.map((n) => (n.id === noteId ? { ...n, content } : n)))
+  }
+
+  const handleGenerateTagsInFullscreen = async (noteId: string) => {
+    try {
+      const currentCsrfToken = csrfTokenRef.current
+      const response = await fetch("/api/generate-tags", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(currentCsrfToken ? { "X-CSRF-Token": currentCsrfToken } : {}),
+        },
+        body: JSON.stringify({ noteId }),
+      })
+      if (response.ok) {
+        const { tags } = await response.json()
+        setCommunityNotes((prev) => prev.map((n) => (n.id === noteId ? { ...n, tags } : n)))
+        toast({
+          title: "Success",
+          description: "Tags generated successfully",
+        })
+      }
+    } catch {
+      toast({
+        title: "Error",
+        description: "Failed to generate tags",
+        variant: "destructive",
+      })
+    }
+  }
+
+  // Helper: Render empty state for no search term
+  const renderNoSearchEmptyState = () => (
+    <div className="flex flex-col items-center justify-center py-20 px-4">
+      <div className="w-16 h-16 rounded-full bg-gray-100 flex items-center justify-center mb-4">
+        <Sparkles className="h-8 w-8 text-gray-400" />
+      </div>
+      <h3 className="text-xl font-bold text-gray-900 mb-2">No recent sticks found</h3>
+      <p className="text-gray-500 text-center max-w-sm">Check back later for new updates from the community.</p>
+    </div>
+  )
+
+  // Helper: Render load more button
+  const renderLoadMoreButton = (label: string) => (
+    <div className="flex justify-center pb-12">
+      <Button
+        onClick={handleLoadMore}
+        disabled={isLoadingMore}
+        variant="outline"
+        size="lg"
+        className="rounded-full px-8 border-indigo-200 text-indigo-700 hover:bg-indigo-50 hover:border-indigo-300 transition-all shadow-sm bg-transparent"
+      >
+        {isLoadingMore ? (
+          <>
+            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            Loading more...
+          </>
+        ) : (
+          <>
+            Show {pendingCount > 0 ? pendingCount : DEFAULT_CHUNK_SIZE} {label}
+            <ChevronDown className="ml-2 h-4 w-4" />
+          </>
+        )}
+      </Button>
+    </div>
+  )
+
+  // Helper: Render recent shared sticks (no search term)
+  const renderRecentSticks = () => (
+    <div className="container mx-auto px-4">
+      <div className="mb-6 text-center">
+        <h2 className="text-2xl font-bold bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent">
+          Recent Shared Sticks
+        </h2>
+        <p className="text-gray-600 mt-2">Explore the latest from the community</p>
+      </div>
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6 pb-8">
+        {communityNotes.map((note, index) => (
+          <OptimisticSearchResultCard
+            key={note.id}
+            note={note}
+            onOpen={(noteId) => handleNoteClick(noteId, index)}
+            currentUserId={user?.id}
+          />
+        ))}
+      </div>
+      {hasMore && renderLoadMoreButton("Shared Sticks")}
+    </div>
+  )
+
+  // Helper: Render search results
+  const renderSearchResults = () => (
+    <div className="container mx-auto px-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6 pb-8">
+        {communityNotes.map((note, index) => (
+          <OptimisticSearchResultCard
+            key={note.id}
+            note={note}
+            searchTerm={searchTerm}
+            onOpen={(noteId) => handleNoteClick(noteId, index)}
+            currentUserId={user?.id}
+          />
+        ))}
+      </div>
+      {hasMore && renderLoadMoreButton("Results")}
+    </div>
+  )
+
+  // Helper: Render main content based on state
+  const renderMainContent = () => {
+    const hasSearchTerm = searchTerm.trim()
+    
+    if (!hasSearchTerm) {
+      if (loading) return <SearchResultsSkeletonGrid count={9} />
+      if (communityNotes.length === 0) return renderNoSearchEmptyState()
+      return renderRecentSticks()
+    }
+    
+    if (loading) return <SearchResultsSkeletonGrid count={6} />
+    if (communityNotes.length === 0) {
+      return (
+        <SearchEmptyState
+          type="no-results"
+          searchQuery={searchTerm}
+          trendingTags={trendingTags}
+          onTagClick={handleTagClick}
+          onClearFilters={handleClearFilters}
+        />
+      )
+    }
+    return renderSearchResults()
+  }
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-white to-purple-50 relative panel-page-transition">
       <div className="sticky top-0 z-50 bg-white/90 backdrop-blur-lg border-b border-indigo-100 shadow-sm">
@@ -477,7 +669,7 @@ export default function CommunityPanelPage() {
             <BreadcrumbNav
               items={[
                 { label: "Dashboard", href: "/dashboard" },
-                { label: "Personal Hub", href: "/notes" },
+                { label: "Personal Hub", href: "/personal" },
                 { label: "ComSticks", current: true },
               ]}
             />
@@ -529,7 +721,7 @@ export default function CommunityPanelPage() {
                 <div className="panel-result-count inline-flex items-center gap-2">
                   <TrendingUp className="h-4 w-4" />
                   <span>
-                    Found {totalResults} note{totalResults !== 1 ? "s" : ""}
+                    Found {totalResults} note{totalResults === 1 ? "" : "s"}
                   </span>
                 </div>
               )}
@@ -539,110 +731,7 @@ export default function CommunityPanelPage() {
       </div>
 
       <div className="relative min-h-[calc(100vh-200px)] pt-8 panel-scrollbar">
-        {!searchTerm.trim() ? (
-          loading ? (
-            <SearchResultsSkeletonGrid count={9} />
-          ) : communityNotes.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-20 px-4">
-              <div className="w-16 h-16 rounded-full bg-gray-100 flex items-center justify-center mb-4">
-                <Sparkles className="h-8 w-8 text-gray-400" />
-              </div>
-              <h3 className="text-xl font-bold text-gray-900 mb-2">No recent sticks found</h3>
-              <p className="text-gray-500 text-center max-w-sm">Check back later for new updates from the community.</p>
-            </div>
-          ) : (
-            <div className="container mx-auto px-4">
-              <div className="mb-6 text-center">
-                <h2 className="text-2xl font-bold bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent">
-                  Recent Shared Sticks
-                </h2>
-                <p className="text-gray-600 mt-2">Explore the latest from the community</p>
-              </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6 pb-8">
-                {communityNotes.map((note, index) => (
-                  <OptimisticSearchResultCard
-                    key={note.id}
-                    note={note}
-                    onOpen={(noteId) => handleNoteClick(noteId, index)}
-                    currentUserId={user?.id}
-                  />
-                ))}
-              </div>
-
-              {hasMore && (
-                <div className="flex justify-center pb-12">
-                  <Button
-                    onClick={handleLoadMore}
-                    disabled={isLoadingMore}
-                    variant="outline"
-                    size="lg"
-                    className="rounded-full px-8 border-indigo-200 text-indigo-700 hover:bg-indigo-50 hover:border-indigo-300 transition-all shadow-sm bg-transparent"
-                  >
-                    {isLoadingMore ? (
-                      <>
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        Loading more...
-                      </>
-                    ) : (
-                      <>
-                        Show {pendingCount > 0 ? pendingCount : DEFAULT_CHUNK_SIZE} Shared Sticks
-                        <ChevronDown className="ml-2 h-4 w-4" />
-                      </>
-                    )}
-                  </Button>
-                </div>
-              )}
-            </div>
-          )
-        ) : loading ? (
-          <SearchResultsSkeletonGrid count={6} />
-        ) : communityNotes.length === 0 ? (
-          <SearchEmptyState
-            type="no-results"
-            searchQuery={searchTerm}
-            trendingTags={trendingTags}
-            onTagClick={handleTagClick}
-            onClearFilters={handleClearFilters}
-          />
-        ) : (
-          <div className="container mx-auto px-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6 pb-8">
-              {communityNotes.map((note, index) => (
-                <OptimisticSearchResultCard
-                  key={note.id}
-                  note={note}
-                  searchTerm={searchTerm}
-                  onOpen={(noteId) => handleNoteClick(noteId, index)}
-                  currentUserId={user?.id}
-                />
-              ))}
-            </div>
-
-            {hasMore && (
-              <div className="flex justify-center pb-12">
-                <Button
-                  onClick={handleLoadMore}
-                  disabled={isLoadingMore}
-                  variant="outline"
-                  size="lg"
-                  className="rounded-full px-8 border-indigo-200 text-indigo-700 hover:bg-indigo-50 hover:border-indigo-300 transition-all shadow-sm bg-transparent"
-                >
-                  {isLoadingMore ? (
-                    <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      Loading more...
-                    </>
-                  ) : (
-                    <>
-                      Show {pendingCount > 0 ? pendingCount : DEFAULT_CHUNK_SIZE} Results
-                      <ChevronDown className="ml-2 h-4 w-4" />
-                    </>
-                  )}
-                </Button>
-              </div>
-            )}
-          </div>
-        )}
+        {renderMainContent()}
         <div ref={loadMoreTriggerRef} aria-hidden="true" className="h-1 w-full" />
       </div>
 
@@ -679,69 +768,14 @@ export default function CommunityPanelPage() {
                 onAddReply={replyHook.handleAddReply}
                 onEditReply={replyHook.handleEditReply}
                 onDeleteReply={replyHook.handleDeleteReply}
-                onNoteUpdate={(updatedNote) => {
-                  setCommunityNotes((prev) => prev.map((n) => (n.id === updatedNote.id ? updatedNote : n)))
-                }}
-                onDeleteNote={async (noteId) => {
-                  const note = communityNotes.find((n) => n.id === noteId)
-                  if (note?.user_id === user?.id) {
-                    try {
-                      await fetch(`/api/notes/${noteId}`, { method: "DELETE" })
-                      setCommunityNotes((prev) => prev.filter((n) => n.id !== noteId))
-                      fullscreenHook.closeFullscreen()
-                      toast({
-                        title: "Success",
-                        description: "Note deleted successfully",
-                      })
-                    } catch {
-                      toast({
-                        title: "Error",
-                        description: "Failed to delete note",
-                        variant: "destructive",
-                      })
-                    }
-                  }
-                }}
-                onUpdateSharing={async (noteId, isShared) => {
-                  setCommunityNotes((prev) => prev.map((n) => (n.id === noteId ? { ...n, is_shared: isShared } : n)))
-                }}
-                onUpdateColor={async (noteId, color) => {
-                  setCommunityNotes((prev) => prev.map((n) => (n.id === noteId ? { ...n, color } : n)))
-                }}
-                onTopicChange={async (noteId, topic) => {
-                  setCommunityNotes((prev) => prev.map((n) => (n.id === noteId ? { ...n, topic } : n)))
-                }}
-                onContentChange={async (noteId, content) => {
-                  setCommunityNotes((prev) => prev.map((n) => (n.id === noteId ? { ...n, content } : n)))
-                }}
+                onNoteUpdate={handleNoteUpdateInFullscreen}
+                onDeleteNote={handleDeleteNoteInFullscreen}
+                onUpdateSharing={handleUpdateSharingInFullscreen}
+                onUpdateColor={handleUpdateColorInFullscreen}
+                onTopicChange={handleTopicChangeInFullscreen}
+                onContentChange={handleContentChangeInFullscreen}
                 onDetailsChange={() => {}}
-                onGenerateTags={async (noteId) => {
-                  try {
-                    const currentCsrfToken = csrfTokenRef.current
-                    const response = await fetch("/api/generate-tags", {
-                      method: "POST",
-                      headers: {
-                        "Content-Type": "application/json",
-                        ...(currentCsrfToken ? { "X-CSRF-Token": currentCsrfToken } : {}),
-                      },
-                      body: JSON.stringify({ noteId }),
-                    })
-                    if (response.ok) {
-                      const { tags } = await response.json()
-                      setCommunityNotes((prev) => prev.map((n) => (n.id === noteId ? { ...n, tags } : n)))
-                      toast({
-                        title: "Success",
-                        description: "Tags generated successfully",
-                      })
-                    }
-                  } catch {
-                    toast({
-                      title: "Error",
-                      description: "Failed to generate tags",
-                      variant: "destructive",
-                    })
-                  }
-                }}
+                onGenerateTags={handleGenerateTagsInFullscreen}
                 hideGenerateTags={true}
               />
             </UnifiedFullscreen>

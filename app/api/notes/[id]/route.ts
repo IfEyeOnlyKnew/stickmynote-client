@@ -1,26 +1,11 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { createSupabaseServer } from "@/lib/supabase-server"
-import { noteValidation, validateUUID } from "@/lib/input-validation-enhanced"
-import { applyRateLimit } from "@/lib/rate-limiter-enhanced"
+import { getSession } from "@/lib/auth/local-auth"
+import { db } from "@/lib/database/pg-client"
+import { validateUUID } from "@/lib/input-validation-enhanced"
 import { sanitizeRequestBody } from "@/lib/html-sanitizer"
-import { getCachedAuthUser, createRateLimitResponse, createUnauthorizedResponse } from "@/lib/auth/cached-auth"
-import { getOrgContext } from "@/lib/auth/get-org-context"
-import { validateCSRFMiddleware } from "@/lib/csrf"
 
 export const runtime = "nodejs"
 export const dynamic = "force-dynamic"
-
-const notePartialSchema = noteValidation.partial()
-
-async function safeRateLimit(request: NextRequest, userId: string, action: string) {
-  try {
-    const res = await applyRateLimit(request, userId, action)
-    return res.success
-  } catch (err) {
-    console.warn("Rate limit provider error, allowing request:", err)
-    return true
-  }
-}
 
 // ============================================================================
 // GET - Fetch single note
@@ -28,19 +13,10 @@ async function safeRateLimit(request: NextRequest, userId: string, action: strin
 
 export async function GET(request: NextRequest, context: { params: Promise<{ id: string }> }) {
   try {
-    const { user, error: authError } = await getCachedAuthUser()
+    const session = await getSession()
 
-    if (authError === "rate_limited") {
-      return createRateLimitResponse()
-    }
-
-    if (!user) {
-      return createUnauthorizedResponse()
-    }
-
-    const orgContext = await getOrgContext(user.id)
-    if (!orgContext) {
-      return NextResponse.json({ error: "No organization context" }, { status: 403 })
+    if (!session?.user) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
     const params = await context.params
@@ -49,29 +25,79 @@ export async function GET(request: NextRequest, context: { params: Promise<{ id:
       return NextResponse.json({ error: "Invalid note ID" }, { status: 400 })
     }
 
-    if (!(await safeRateLimit(request, user.id, "notes_read"))) {
-      return NextResponse.json({ error: "Rate limit exceeded" }, { status: 429, headers: { "Retry-After": "60" } })
-    }
+    // Fetch the main note
+    const noteResult = await db.query(
+      `SELECT * FROM personal_sticks WHERE id = $1 AND user_id = $2`,
+      [noteId, session.user.id]
+    )
 
-    const supabase = await createSupabaseServer()
-
-    const { data: note, error } = await supabase
-      .from("notes")
-      .select("*")
-      .eq("id", noteId)
-      .eq("user_id", user.id)
-      .eq("org_id", orgContext.orgId)
-      .maybeSingle()
-
-    if (error || !note) {
+    if (noteResult.rows.length === 0) {
       return NextResponse.json({ error: "Note not found" }, { status: 404 })
     }
 
-    return NextResponse.json(note)
-  } catch (err) {
-    if (err instanceof Error && err.message === "RATE_LIMITED") {
-      return createRateLimitResponse()
+    const note = noteResult.rows[0]
+
+    // Fetch tabs data
+    const tabsResult = await db.query(
+      `SELECT tab_type, tab_data, tab_name, tags FROM personal_sticks_tabs WHERE personal_stick_id = $1`,
+      [noteId]
+    )
+    const noteTabs = tabsResult.rows
+
+    // Parse tabs for details, videos, images, hyperlinks
+    let details = ""
+    let videos: any[] = []
+    let images: any[] = []
+    let hyperlinks: { url: string; title?: string }[] = []
+
+    if (noteTabs && Array.isArray(noteTabs)) {
+      const detailsTab = noteTabs.find((tab: any) => tab.tab_type === "details")
+      if (detailsTab && detailsTab.tab_data?.content) {
+        details = detailsTab.tab_data.content
+      }
+
+      const videosTab = noteTabs.find((tab: any) => tab.tab_type === "videos")
+      if (videosTab && videosTab.tab_data) {
+        videos = Array.isArray(videosTab.tab_data) ? videosTab.tab_data : []
+      }
+
+      const imagesTab = noteTabs.find((tab: any) => tab.tab_type === "images")
+      if (imagesTab && imagesTab.tab_data) {
+        images = Array.isArray(imagesTab.tab_data) ? imagesTab.tab_data : []
+      }
+
+      const tagsTab = noteTabs.find((tab: any) => tab.tab_name === "Tags")
+      if (tagsTab && tagsTab.tags) {
+        try {
+          hyperlinks = Array.isArray(tagsTab.tags)
+            ? tagsTab.tags
+            : typeof tagsTab.tags === "string"
+              ? JSON.parse(tagsTab.tags || "[]")
+              : []
+        } catch (err) {
+          console.warn(`Failed to parse hyperlinks for note ${noteId}:`, err)
+          hyperlinks = []
+        }
+      }
     }
+
+    // Fetch tags data
+    const tagsResult = await db.query(
+      `SELECT tag_title, tag_content, tag_order FROM personal_sticks_tags WHERE personal_stick_id = $1 ORDER BY tag_order ASC`,
+      [noteId]
+    )
+    const tags = (tagsResult.rows || []).map((t: { tag_title: string }) => t.tag_title)
+
+    // Return note with all related data
+    return NextResponse.json({
+      ...note,
+      details,
+      tags,
+      images,
+      videos,
+      hyperlinks,
+    })
+  } catch (err) {
     console.error("GET /api/notes/[id] error:", err)
     return NextResponse.json({ error: "Internal server error" }, { status: 500 })
   }
@@ -83,62 +109,55 @@ export async function GET(request: NextRequest, context: { params: Promise<{ id:
 
 export async function PUT(request: NextRequest, context: { params: Promise<{ id: string }> }) {
   try {
-    const { user, error: authError } = await getCachedAuthUser()
+    const session = await getSession()
 
-    if (authError === "rate_limited") {
-      return createRateLimitResponse()
-    }
-
-    if (!user) {
-      return createUnauthorizedResponse()
-    }
-
-    const orgContext = await getOrgContext(user.id)
-    if (!orgContext) {
-      return NextResponse.json({ error: "No organization context" }, { status: 403 })
+    if (!session?.user) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
     const params = await context.params
     const noteId = params.id
-    if (!validateUUID(noteId)) return NextResponse.json({ error: "Invalid note ID" }, { status: 400 })
-
-    if (!(await safeRateLimit(request, user.id, "notes_update"))) {
-      return NextResponse.json({ error: "Rate limit exceeded" }, { status: 429, headers: { "Retry-After": "60" } })
+    if (!validateUUID(noteId)) {
+      return NextResponse.json({ error: "Invalid note ID" }, { status: 400 })
     }
 
     const body = await request.json()
     const sanitizedBody = sanitizeRequestBody(body, ["topic", "content"])
-    const parsed = noteValidation.safeParse(sanitizedBody)
 
-    if (!parsed.success) {
-      return NextResponse.json({ error: "Validation failed", details: parsed.error.flatten() }, { status: 400 })
-    }
+    const now = new Date().toISOString()
 
-    const supabase = await createSupabaseServer()
+    const result = await db.query(
+      `UPDATE personal_sticks SET
+        title = COALESCE($1, title),
+        topic = COALESCE($2, topic),
+        content = COALESCE($3, content),
+        color = COALESCE($4, color),
+        position_x = COALESCE($5, position_x),
+        position_y = COALESCE($6, position_y),
+        is_shared = COALESCE($7, is_shared),
+        updated_at = $8
+       WHERE id = $9 AND user_id = $10
+       RETURNING *`,
+      [
+        sanitizedBody.title ?? null,
+        sanitizedBody.topic ?? null,
+        sanitizedBody.content ?? null,
+        sanitizedBody.color ?? null,
+        sanitizedBody.position_x ?? null,
+        sanitizedBody.position_y ?? null,
+        sanitizedBody.is_shared ?? null,
+        now,
+        noteId,
+        session.user.id
+      ]
+    )
 
-    const update: Record<string, unknown> = {
-      ...parsed.data,
-      updated_at: new Date().toISOString(),
-    }
-
-    const { data: note, error } = await supabase
-      .from("notes")
-      .update(update)
-      .eq("id", noteId)
-      .eq("user_id", user.id)
-      .eq("org_id", orgContext.orgId)
-      .select()
-      .single()
-
-    if (error || !note) {
+    if (result.rows.length === 0) {
       return NextResponse.json({ error: "Note not found or update failed" }, { status: 404 })
     }
 
-    return NextResponse.json(note)
+    return NextResponse.json(result.rows[0])
   } catch (err) {
-    if (err instanceof Error && err.message === "RATE_LIMITED") {
-      return createRateLimitResponse()
-    }
     console.error("PUT /api/notes/[id] error:", err)
     return NextResponse.json({ error: "Internal server error" }, { status: 500 })
   }
@@ -150,19 +169,10 @@ export async function PUT(request: NextRequest, context: { params: Promise<{ id:
 
 export async function PATCH(request: NextRequest, context: { params: Promise<{ id: string }> }) {
   try {
-    const { user, error: authError } = await getCachedAuthUser()
+    const session = await getSession()
 
-    if (authError === "rate_limited") {
-      return createRateLimitResponse()
-    }
-
-    if (!user) {
-      return createUnauthorizedResponse()
-    }
-
-    const orgContext = await getOrgContext(user.id)
-    if (!orgContext) {
-      return NextResponse.json({ error: "No organization context" }, { status: 403 })
+    if (!session?.user) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
     const params = await context.params
@@ -172,53 +182,43 @@ export async function PATCH(request: NextRequest, context: { params: Promise<{ i
       return NextResponse.json({ error: "Invalid note ID" }, { status: 400 })
     }
 
-    if (!(await safeRateLimit(request, user.id, "notes_update"))) {
-      return NextResponse.json({ error: "Rate limit exceeded" }, { status: 429, headers: { "Retry-After": "60" } })
-    }
-
     const body = await request.json()
     const sanitizedBody = sanitizeRequestBody(body, ["topic", "content"])
-    const parsed = notePartialSchema.safeParse(sanitizedBody)
 
-    if (!parsed.success) {
-      return NextResponse.json({ error: "Validation failed", details: parsed.error.flatten() }, { status: 400 })
-    }
+    const now = new Date().toISOString()
 
-    const supabase = await createSupabaseServer()
+    const result = await db.query(
+      `UPDATE personal_sticks SET
+        title = COALESCE($1, title),
+        topic = COALESCE($2, topic),
+        content = COALESCE($3, content),
+        color = COALESCE($4, color),
+        position_x = COALESCE($5, position_x),
+        position_y = COALESCE($6, position_y),
+        is_shared = COALESCE($7, is_shared),
+        updated_at = $8
+       WHERE id = $9 AND user_id = $10
+       RETURNING *`,
+      [
+        sanitizedBody.title ?? null,
+        sanitizedBody.topic ?? null,
+        sanitizedBody.content ?? null,
+        sanitizedBody.color ?? null,
+        sanitizedBody.position_x ?? null,
+        sanitizedBody.position_y ?? null,
+        sanitizedBody.is_shared ?? null,
+        now,
+        noteId,
+        session.user.id
+      ]
+    )
 
-    const update: Record<string, unknown> = {
-      updated_at: new Date().toISOString(),
-    }
-
-    if ("topic" in parsed.data && parsed.data.topic !== undefined) update.topic = parsed.data.topic
-    if ("content" in parsed.data && parsed.data.content !== undefined) update.content = parsed.data.content
-    if ("color" in parsed.data && parsed.data.color !== undefined) update.color = parsed.data.color
-    if ("position_x" in parsed.data && parsed.data.position_x !== undefined) update.position_x = parsed.data.position_x
-    if ("position_y" in parsed.data && parsed.data.position_y !== undefined) update.position_y = parsed.data.position_y
-    if ("is_shared" in parsed.data && parsed.data.is_shared !== undefined) update.is_shared = parsed.data.is_shared
-
-    const { data: note, error } = await supabase
-      .from("notes")
-      .update(update)
-      .eq("id", noteId)
-      .eq("user_id", user.id)
-      .eq("org_id", orgContext.orgId)
-      .select()
-      .single()
-
-    if (error) {
-      return NextResponse.json({ error: "Note not found or update failed", details: error.message }, { status: 404 })
-    }
-
-    if (!note) {
+    if (result.rows.length === 0) {
       return NextResponse.json({ error: "Note not found" }, { status: 404 })
     }
 
-    return NextResponse.json(note)
+    return NextResponse.json(result.rows[0])
   } catch (err) {
-    if (err instanceof Error && err.message === "RATE_LIMITED") {
-      return createRateLimitResponse()
-    }
     console.error("PATCH /api/notes/[id] error:", err)
     return NextResponse.json({ error: "Internal server error" }, { status: 500 })
   }
@@ -229,55 +229,30 @@ export async function PATCH(request: NextRequest, context: { params: Promise<{ i
 // ============================================================================
 
 export async function DELETE(request: NextRequest, context: { params: Promise<{ id: string }> }) {
-  // Validate CSRF token for note deletion
-  const isCSRFValid = await validateCSRFMiddleware(request)
-  if (!isCSRFValid) {
-    return NextResponse.json({ error: "Invalid or missing CSRF token" }, { status: 403 })
-  }
-
   try {
-    const { user, error: authError } = await getCachedAuthUser()
+    const session = await getSession()
 
-    if (authError === "rate_limited") {
-      return createRateLimitResponse()
-    }
-
-    if (!user) {
-      return createUnauthorizedResponse()
-    }
-
-    const orgContext = await getOrgContext(user.id)
-    if (!orgContext) {
-      return NextResponse.json({ error: "No organization context" }, { status: 403 })
+    if (!session?.user) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
     const params = await context.params
     const noteId = params.id
-    if (!validateUUID(noteId)) return NextResponse.json({ error: "Invalid note ID" }, { status: 400 })
-
-    if (!(await safeRateLimit(request, user.id, "notes_delete"))) {
-      return NextResponse.json({ error: "Rate limit exceeded" }, { status: 429, headers: { "Retry-After": "60" } })
+    if (!validateUUID(noteId)) {
+      return NextResponse.json({ error: "Invalid note ID" }, { status: 400 })
     }
 
-    const supabase = await createSupabaseServer()
+    const result = await db.query(
+      `DELETE FROM personal_sticks WHERE id = $1 AND user_id = $2 RETURNING id`,
+      [noteId, session.user.id]
+    )
 
-    const { error } = await supabase
-      .from("notes")
-      .delete()
-      .eq("id", noteId)
-      .eq("user_id", user.id)
-      .eq("org_id", orgContext.orgId)
-
-    if (error) {
-      console.error("Error deleting note:", error)
-      return NextResponse.json({ error: "Failed to delete note" }, { status: 500 })
+    if (result.rows.length === 0) {
+      return NextResponse.json({ error: "Note not found" }, { status: 404 })
     }
 
     return NextResponse.json({ message: "Note deleted successfully" })
   } catch (err) {
-    if (err instanceof Error && err.message === "RATE_LIMITED") {
-      return createRateLimitResponse()
-    }
     console.error("DELETE /api/notes/[id] error:", err)
     return NextResponse.json({ error: "Internal server error" }, { status: 500 })
   }

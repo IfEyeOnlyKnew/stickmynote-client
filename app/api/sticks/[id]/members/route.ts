@@ -1,11 +1,11 @@
 import { getCachedAuthUser, createRateLimitResponse, createUnauthorizedResponse } from "@/lib/auth/cached-auth"
-import { createServerClient } from "@/lib/supabase/server"
+import { createDatabaseClient } from "@/lib/database/database-adapter"
 import { type NextRequest, NextResponse } from "next/server"
 
 export async function POST(request: NextRequest, { params }: { params: { id: string } }) {
   try {
-    const supabase = await createServerClient()
-    const authResult = await getCachedAuthUser(supabase)
+    const db = await createDatabaseClient()
+    const authResult = await getCachedAuthUser()
 
     if (authResult.rateLimited) {
       return createRateLimitResponse()
@@ -25,7 +25,7 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
       return NextResponse.json({ error: "Email is required" }, { status: 400 })
     }
 
-    const { data: stick } = await supabase
+    const { data: stick } = await db
       .from("paks_pad_sticks")
       .select("user_id, pad_id, title")
       .eq("id", stickId)
@@ -35,10 +35,10 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
       return NextResponse.json({ error: "Not authorized" }, { status: 403 })
     }
 
-    const { data: pad } = await supabase.from("paks_pads").select("id, title").eq("id", stick.pad_id).maybeSingle()
+    const { data: pad } = await db.from("paks_pads").select("id, title").eq("id", stick.pad_id).maybeSingle()
 
     // Find the user by email
-    const { data: invitedUser } = await supabase
+    const { data: invitedUser } = await db
       .from("users")
       .select("id, email, username")
       .eq("email", email)
@@ -48,7 +48,7 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
       return NextResponse.json({ error: "User not found" }, { status: 404 })
     }
 
-    const { data: existingMember } = await supabase
+    const { data: existingMember } = await db
       .from("paks_pad_stick_members")
       .select("*")
       .eq("stick_id", stickId)
@@ -59,7 +59,7 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
       return NextResponse.json({ error: "User is already a member" }, { status: 400 })
     }
 
-    const { error: insertError } = await supabase.from("paks_pad_stick_members").insert({
+    const { error: insertError } = await db.from("paks_pad_stick_members").insert({
       stick_id: stickId,
       user_id: invitedUser.id,
       role,
@@ -108,8 +108,8 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
 
 export async function DELETE(request: NextRequest, { params }: { params: { id: string } }) {
   try {
-    const supabase = await createServerClient()
-    const authResult = await getCachedAuthUser(supabase)
+    const db = await createDatabaseClient()
+    const authResult = await getCachedAuthUser()
 
     if (authResult.rateLimited) {
       return createRateLimitResponse()
@@ -129,13 +129,13 @@ export async function DELETE(request: NextRequest, { params }: { params: { id: s
       return NextResponse.json({ error: "User ID is required" }, { status: 400 })
     }
 
-    const { data: stick } = await supabase.from("paks_pad_sticks").select("user_id").eq("id", stickId).maybeSingle()
+    const { data: stick } = await db.from("paks_pad_sticks").select("user_id").eq("id", stickId).maybeSingle()
 
     if (!stick || stick.user_id !== user.id) {
       return NextResponse.json({ error: "Not authorized" }, { status: 403 })
     }
 
-    const { error: deleteError } = await supabase
+    const { error: deleteError } = await db
       .from("paks_pad_stick_members")
       .delete()
       .eq("stick_id", stickId)
@@ -155,8 +155,8 @@ export async function DELETE(request: NextRequest, { params }: { params: { id: s
 
 export async function GET(request: NextRequest, { params }: { params: { id: string } }) {
   try {
-    const supabase = await createServerClient()
-    const authResult = await getCachedAuthUser(supabase)
+    const db = await createDatabaseClient()
+    const authResult = await getCachedAuthUser()
 
     if (authResult.rateLimited) {
       return createRateLimitResponse()
@@ -168,7 +168,7 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
 
     const stickId = params.id
 
-    const { data: members, error } = await supabase
+    const { data: members, error } = await db
       .from("paks_pad_stick_members")
       .select(`
         *,

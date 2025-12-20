@@ -1,12 +1,12 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { createClient } from "@/lib/supabase/server"
+import { createDatabaseClient } from "@/lib/database/database-adapter"
 
 export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
   try {
-    const supabase = await createClient()
+    const db = await createDatabaseClient()
     const { id } = params
 
-    const { data: template, error: fetchError } = await supabase
+    const { data: template, error: fetchError } = await db
       .from("paks_pad_templates")
       .select("use_count")
       .eq("id", id)
@@ -19,7 +19,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     }
 
     if (template) {
-      const { error: updateError } = await supabase
+      const { error: updateError } = await db
         .from("paks_pad_templates")
         .update({ use_count: (template.use_count || 0) + 1 })
         .eq("id", id)

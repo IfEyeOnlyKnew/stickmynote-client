@@ -1,12 +1,12 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { createSupabaseServer } from "@/lib/supabase-server"
+import { createServiceDatabaseClient } from "@/lib/database/database-adapter"
 import { getCachedAuthUser } from "@/lib/auth/cached-auth"
 
 export async function DELETE(request: NextRequest) {
   try {
-    const supabase = await createSupabaseServer()
+    const db = await createServiceDatabaseClient()
 
-    const authResult = await getCachedAuthUser(supabase)
+    const authResult = await getCachedAuthUser()
     if (authResult.rateLimited) {
       return NextResponse.json(
         { error: "Rate limit exceeded. Please try again in a moment." },
@@ -25,7 +25,7 @@ export async function DELETE(request: NextRequest) {
       return NextResponse.json({ error: "Invalid email IDs array" }, { status: 400 })
     }
 
-    let query = supabase.from("saved_emails").delete().eq("user_id", user.id).in("id", emailIds)
+    let query = db.from("saved_emails").delete().eq("user_id", user.id).in("id", emailIds)
 
     if (teamId) {
       query = query.eq("team_id", teamId)
@@ -54,9 +54,9 @@ export async function POST(request: NextRequest) {
     console.log("[v0] Bulk saved emails API - Content type:", contentType)
     console.log("[v0] Bulk saved emails API - Upload type header:", uploadType)
 
-    const supabase = await createSupabaseServer()
+    const db = await createServiceDatabaseClient()
 
-    const authResult = await getCachedAuthUser(supabase)
+    const authResult = await getCachedAuthUser()
     if (authResult.rateLimited) {
       return NextResponse.json(
         { error: "Rate limit exceeded. Please try again in a moment." },
@@ -165,7 +165,7 @@ export async function POST(request: NextRequest) {
 
       try {
         // Check for existing emails
-        const { data: existingEmails } = await supabase
+        const { data: existingEmails } = await db
           .from("saved_emails")
           .select("email")
           .eq("user_id", user.id)
@@ -191,7 +191,7 @@ export async function POST(request: NextRequest) {
         }
 
         // Insert new emails
-        const { data: insertedEmails, error: insertError } = await supabase
+        const { data: insertedEmails, error: insertError } = await db
           .from("saved_emails")
           .insert(newEmails)
           .select()
@@ -277,7 +277,7 @@ export async function POST(request: NextRequest) {
       })
 
       console.log("[v0] Bulk saved emails API - Checking for existing JSON emails")
-      const { data: existingEmails } = await supabase
+      const { data: existingEmails } = await db
         .from("saved_emails")
         .select("email")
         .eq("user_id", user.id)
@@ -311,7 +311,7 @@ export async function POST(request: NextRequest) {
 
       console.log("[v0] Bulk saved emails API - Inserting", newEmails.length, "emails from JSON")
 
-      const { data: insertedEmails, error: insertError } = await supabase
+      const { data: insertedEmails, error: insertError } = await db
         .from("saved_emails")
         .insert(newEmails)
         .select()

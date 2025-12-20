@@ -1,7 +1,7 @@
 "use client"
 import { GenericNoteTabs } from "@/components/GenericNoteTabs"
 import type { NoteTabsConfig } from "@/types/note-tabs-config"
-import { getNoteTabs, saveNoteTab, deleteNoteTabItem } from "@/lib/note-tabs"
+import { getNoteTabs, saveNoteTab, deleteNoteTabItem } from "@/lib/note-tabs-client"
 
 interface NoteTabsProps {
   noteId: string

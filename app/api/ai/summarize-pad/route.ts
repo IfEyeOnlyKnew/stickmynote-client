@@ -1,7 +1,6 @@
 import { generateText } from "ai"
-import { createClient } from "@/lib/supabase/server"
+import { createDatabaseClient } from "@/lib/database/database-adapter"
 import { NextResponse } from "next/server"
-import { xai } from "@ai-sdk/xai"
 import { getOrgContext } from "@/lib/auth/get-org-context"
 import { getCachedAuthUser } from "@/lib/auth/cached-auth"
 
@@ -9,8 +8,8 @@ export const maxDuration = 30
 
 export async function POST(req: Request) {
   try {
-    const supabase = await createClient()
-    const authResult = await getCachedAuthUser(supabase)
+    const db = await createDatabaseClient()
+    const authResult = await getCachedAuthUser()
 
     if (authResult.rateLimited) {
       return NextResponse.json(
@@ -36,14 +35,14 @@ export async function POST(req: Request) {
       return new NextResponse("Pad ID is required", { status: 400 })
     }
 
-    const { data: pad } = await supabase
+    const { data: pad } = await db
       .from("paks_pads")
       .select("*")
       .eq("id", padId)
       .eq("org_id", orgContext.orgId)
       .maybeSingle()
 
-    const { data: sticks } = await supabase
+    const { data: sticks } = await db
       .from("paks_pad_sticks")
       .select(`
         *,
@@ -62,7 +61,7 @@ export async function POST(req: Request) {
 
     const sticksContext = sticks
       ?.map(
-        (stick) => `
+        (stick: any) => `
       Topic: ${stick.topic || "Untitled"}
       Content: ${stick.content}
       Tasks: ${stick.calsticks?.[0]?.count || 0}
@@ -71,7 +70,7 @@ export async function POST(req: Request) {
       .join("\n")
 
     const { text } = await generateText({
-      model: xai("grok-2-1212"),
+      model: "xai/grok-2-1212" as any,
       prompt: `Summarize the progress and content of this project pad named "${pad.name}".
       
       Pad Description: ${pad.description || "None"}

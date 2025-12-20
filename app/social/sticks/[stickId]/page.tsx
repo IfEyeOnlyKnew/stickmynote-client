@@ -46,6 +46,121 @@ interface SocialStick {
   replies?: Reply[]
 }
 
+interface ReplyCardProps {
+  reply: Reply
+  depth?: number
+  editingReplyId: string | null
+  editContent: string
+  userId?: string
+  onEditContentChange: (content: string) => void
+  onStartEdit: (reply: Reply) => void
+  onCancelEdit: () => void
+  onSaveEdit: (replyId: string) => void
+  onOpenReplyModal: (reply?: Reply) => void
+  getDisplayName: (reply: Reply) => string
+  getInitials: (reply: Reply) => string
+}
+
+function ReplyCard({
+  reply,
+  depth = 0,
+  editingReplyId,
+  editContent,
+  userId,
+  onEditContentChange,
+  onStartEdit,
+  onCancelEdit,
+  onSaveEdit,
+  onOpenReplyModal,
+  getDisplayName,
+  getInitials,
+}: Readonly<ReplyCardProps>) {
+  const isEditing = editingReplyId === reply.id
+  const isOwner = reply.user_id === userId
+
+  return (
+    <div className={depth > 0 ? "ml-12 mt-4" : ""}>
+      <Card className="bg-white border-2 shadow-lg hover:shadow-xl transition-shadow">
+        <CardContent className="pt-6">
+          <div className="flex items-start gap-4">
+            <Avatar className="h-10 w-10">
+              {reply.users?.avatar_url && (
+                <AvatarImage src={reply.users.avatar_url || "/placeholder.svg"} alt={getDisplayName(reply)} />
+              )}
+              <AvatarFallback>{getInitials(reply)}</AvatarFallback>
+            </Avatar>
+            <div className="flex-1">
+              <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center gap-2">
+                  <span className="font-semibold text-gray-900">{getDisplayName(reply)}</span>
+                  <span className="text-sm text-gray-500">{new Date(reply.created_at).toLocaleString()}</span>
+                  {reply.updated_at !== reply.created_at && <span className="text-xs text-gray-400">(edited)</span>}
+                </div>
+                <div className="flex gap-2">
+                  {isOwner && !isEditing && (
+                    <Button variant="ghost" size="sm" onClick={() => onStartEdit(reply)}>
+                      <Edit2 className="h-4 w-4" />
+                    </Button>
+                  )}
+                  <Button variant="ghost" size="sm" onClick={() => onOpenReplyModal(reply)}>
+                    <MessageSquare className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
+              {isEditing ? (
+                <div className="space-y-2">
+                  <Textarea
+                    value={editContent}
+                    onChange={(e) => onEditContentChange(e.target.value)}
+                    rows={3}
+                    maxLength={1000}
+                  />
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm text-gray-500">{editContent.length}/1000</span>
+                    <div className="flex gap-2">
+                      <Button variant="outline" size="sm" onClick={onCancelEdit}>
+                        <X className="h-4 w-4 mr-1" />
+                        Cancel
+                      </Button>
+                      <Button size="sm" onClick={() => onSaveEdit(reply.id)}>
+                        <Save className="h-4 w-4 mr-1" />
+                        Save
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <p className="text-gray-800 whitespace-pre-wrap">{reply.content}</p>
+              )}
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+      {reply.replies && reply.replies.length > 0 && (
+        <div className="space-y-4 mt-4">
+          {reply.replies.map((nestedReply) => (
+            <ReplyCard
+              key={nestedReply.id}
+              reply={nestedReply}
+              depth={depth + 1}
+              editingReplyId={editingReplyId}
+              editContent={editContent}
+              userId={userId}
+              onEditContentChange={onEditContentChange}
+              onStartEdit={onStartEdit}
+              onCancelEdit={onCancelEdit}
+              onSaveEdit={onSaveEdit}
+              onOpenReplyModal={onOpenReplyModal}
+              getDisplayName={getDisplayName}
+              getInitials={getInitials}
+            />
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
 export default function SocialStickDetailPage() {
   const { user, loading } = useUser()
   const router = useRouter()
@@ -65,11 +180,13 @@ export default function SocialStickDetailPage() {
     }
   }, [user, loading, router])
 
+  /* eslint-disable react-hooks/exhaustive-deps */
   useEffect(() => {
     if (user && stickId) {
       fetchStick()
     }
   }, [user, stickId])
+  /* eslint-enable react-hooks/exhaustive-deps */
 
   const fetchStick = async () => {
     try {
@@ -171,7 +288,7 @@ export default function SocialStickDetailPage() {
         setEditingReplyId(null)
         setEditContent("")
         setStick((prevStick) => {
-          if (!prevStick || !prevStick.replies) return prevStick
+          if (!prevStick?.replies) return prevStick
           return {
             ...prevStick,
             replies: prevStick.replies.map((reply) =>
@@ -225,79 +342,6 @@ export default function SocialStickDetailPage() {
     })
 
     return rootReplies
-  }
-
-  const ReplyCard = ({ reply, depth = 0 }: { reply: Reply; depth?: number }) => {
-    const isEditing = editingReplyId === reply.id
-    const isOwner = reply.user_id === user?.id
-
-    return (
-      <div className={depth > 0 ? "ml-12 mt-4" : ""}>
-        <Card className="bg-white border-2 shadow-lg hover:shadow-xl transition-shadow">
-          <CardContent className="pt-6">
-            <div className="flex items-start gap-4">
-              <Avatar className="h-10 w-10">
-                {reply.users?.avatar_url && (
-                  <AvatarImage src={reply.users.avatar_url || "/placeholder.svg"} alt={getDisplayName(reply)} />
-                )}
-                <AvatarFallback>{getInitials(reply)}</AvatarFallback>
-              </Avatar>
-              <div className="flex-1">
-                <div className="flex items-center justify-between mb-2">
-                  <div className="flex items-center gap-2">
-                    <span className="font-semibold text-gray-900">{getDisplayName(reply)}</span>
-                    <span className="text-sm text-gray-500">{new Date(reply.created_at).toLocaleString()}</span>
-                    {reply.updated_at !== reply.created_at && <span className="text-xs text-gray-400">(edited)</span>}
-                  </div>
-                  <div className="flex gap-2">
-                    {isOwner && !isEditing && (
-                      <Button variant="ghost" size="sm" onClick={() => handleStartEdit(reply)}>
-                        <Edit2 className="h-4 w-4" />
-                      </Button>
-                    )}
-                    <Button variant="ghost" size="sm" onClick={() => handleOpenReplyModal(reply)}>
-                      <MessageSquare className="h-4 w-4" />
-                    </Button>
-                  </div>
-                </div>
-                {isEditing ? (
-                  <div className="space-y-2">
-                    <Textarea
-                      value={editContent}
-                      onChange={(e) => setEditContent(e.target.value)}
-                      rows={3}
-                      maxLength={1000}
-                    />
-                    <div className="flex justify-between items-center">
-                      <span className="text-sm text-gray-500">{editContent.length}/1000</span>
-                      <div className="flex gap-2">
-                        <Button variant="outline" size="sm" onClick={handleCancelEdit}>
-                          <X className="h-4 w-4 mr-1" />
-                          Cancel
-                        </Button>
-                        <Button size="sm" onClick={() => handleSaveEdit(reply.id)}>
-                          <Save className="h-4 w-4 mr-1" />
-                          Save
-                        </Button>
-                      </div>
-                    </div>
-                  </div>
-                ) : (
-                  <p className="text-gray-800 whitespace-pre-wrap">{reply.content}</p>
-                )}
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-        {reply.replies && reply.replies.length > 0 && (
-          <div className="space-y-4 mt-4">
-            {reply.replies.map((nestedReply) => (
-              <ReplyCard key={nestedReply.id} reply={nestedReply} depth={depth + 1} />
-            ))}
-          </div>
-        )}
-      </div>
-    )
   }
 
   if (loading || loadingStick) {
@@ -367,7 +411,20 @@ export default function SocialStickDetailPage() {
           {organizedReplies.length > 0 ? (
             <div className="space-y-4">
               {organizedReplies.map((reply) => (
-                <ReplyCard key={reply.id} reply={reply} />
+                <ReplyCard
+                  key={reply.id}
+                  reply={reply}
+                  editingReplyId={editingReplyId}
+                  editContent={editContent}
+                  userId={user?.id}
+                  onEditContentChange={setEditContent}
+                  onStartEdit={handleStartEdit}
+                  onCancelEdit={handleCancelEdit}
+                  onSaveEdit={handleSaveEdit}
+                  onOpenReplyModal={handleOpenReplyModal}
+                  getDisplayName={getDisplayName}
+                  getInitials={getInitials}
+                />
               ))}
             </div>
           ) : (

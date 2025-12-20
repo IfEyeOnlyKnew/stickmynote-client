@@ -1,22 +1,18 @@
-import { createClient } from "@/lib/supabase/server"
+import { getSession } from "@/lib/auth/local-auth"
 import { type NextRequest, NextResponse } from "next/server"
-import { getCachedAuthUser } from "@/lib/auth/cached-auth"
+import { db } from "@/lib/database/pg-client"
 
 export const dynamic = "force-dynamic"
 
 export async function GET(request: NextRequest) {
   try {
-    const supabase = await createClient()
+    const session = await getSession()
 
-    const { user, error: authError, rateLimited } = await getCachedAuthUser(supabase)
-
-    if (rateLimited) {
-      return NextResponse.json({ error: "Too many requests" }, { status: 429 })
-    }
-
-    if (authError || !user) {
+    if (!session) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
+
+    const user = session.user
 
     const { searchParams } = new URL(request.url)
     const page = Number.parseInt(searchParams.get("page") || "0")
@@ -24,49 +20,48 @@ export async function GET(request: NextRequest) {
     const search = searchParams.get("search") || ""
 
     console.log("[v0] GET /api/user/accessible-pads - Query params:", { page, limit, search })
-    console.log("[v0] GET /api/user/accessible-pads - Fetching pads with left join on multi_paks")
 
-    let query = supabase
-      .from("paks_pads")
-      .select(`
-        id,
-        name,
-        created_at,
-        owner_id,
-        multi_pak_id,
-        multi_paks!left(name)
-      `)
-      .or(`owner_id.eq.${user.id},id.in.(select pad_id from paks_pad_members where user_id.eq.${user.id})`)
-      .order("created_at", { ascending: false })
-      .range(page * limit, (page + 1) * limit - 1)
+    const offset = page * limit
+    let query = `
+      SELECT 
+        pp.id,
+        pp.name,
+        pp.created_at,
+        pp.owner_id,
+        pp.multi_pak_id,
+        mp.name as multi_pak_name
+      FROM paks_pads pp
+      LEFT JOIN multi_paks mp ON mp.id = pp.multi_pak_id
+      WHERE pp.owner_id = $1
+         OR pp.id IN (
+           SELECT pad_id FROM paks_pad_members WHERE user_id = $1
+         )
+    `
+    const params: any[] = [user.id]
 
     if (search) {
-      query = query.ilike("name", `%${search}%`)
+      query += ` AND pp.name ILIKE $${params.length + 1}`
+      params.push(`%${search}%`)
     }
 
-    const { data: pads, error } = await query
+    query += ` ORDER BY pp.created_at DESC LIMIT $${params.length + 1} OFFSET $${params.length + 2}`
+    params.push(limit, offset)
 
-    if (error) {
-      console.error("[v0] GET /api/user/accessible-pads - Error fetching pads:", error)
-      console.error("[v0] GET /api/user/accessible-pads - Error code:", error.code)
-      console.error("[v0] GET /api/user/accessible-pads - Error message:", error.message)
-      return NextResponse.json({ error: "Failed to fetch pads" }, { status: 500 })
-    }
+    const result = await db.query(query, params)
 
-    console.log("[v0] GET /api/user/accessible-pads - Successfully fetched", pads?.length || 0, "pads")
+    console.log("[v0] GET /api/user/accessible-pads - Successfully fetched", result.rows.length, "pads")
 
-    const formattedPads =
-      pads?.map((pad: any) => ({
-        id: pad.id,
-        name: pad.name,
-        isOwner: pad.owner_id === user.id,
-        multiPakName: pad.multi_paks?.name || null,
-        href: `/pads/${pad.id}`,
-      })) || []
+    const formattedPads = result.rows.map((pad: any) => ({
+      id: pad.id,
+      name: pad.name,
+      isOwner: pad.owner_id === user.id,
+      multiPakName: pad.multi_pak_name || null,
+      href: `/pads/${pad.id}`,
+    }))
 
     return NextResponse.json({
       pads: formattedPads,
-      hasMore: pads?.length === limit,
+      hasMore: result.rows.length === limit,
     })
   } catch (error) {
     console.error("[v0] GET /api/user/accessible-pads - Unexpected error:", error)

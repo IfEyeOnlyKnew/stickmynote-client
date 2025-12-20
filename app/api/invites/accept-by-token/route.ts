@@ -1,14 +1,12 @@
-import { createServerClient } from "@/lib/supabase/server"
-import { createServiceClient } from "@/lib/supabase/server"
+import { createServiceDatabaseClient } from "@/lib/database/database-adapter"
 import { NextResponse } from "next/server"
 import { getCachedAuthUser } from "@/lib/auth/cached-auth"
 
 export async function POST(request: Request) {
   try {
-    const supabase = await createServerClient()
-    const serviceClient = createServiceClient()
+    const serviceDb = await createServiceDatabaseClient()
 
-    const authResult = await getCachedAuthUser(supabase)
+    const authResult = await getCachedAuthUser()
     if (authResult.rateLimited) {
       return NextResponse.json(
         { error: "Rate limit exceeded. Please try again in a moment." },
@@ -28,7 +26,7 @@ export async function POST(request: Request) {
 
     console.log("[v0] Processing organization invite with token for user:", user.email)
 
-    const { data: invite, error: inviteError } = await serviceClient
+    const { data: invite, error: inviteError } = await serviceDb
       .from("organization_invites")
       .select("*, organizations(name)")
       .eq("token", token)
@@ -59,7 +57,7 @@ export async function POST(request: Request) {
     }
 
     // Check if user is already a member
-    const { data: existingMember } = await serviceClient
+    const { data: existingMember } = await serviceDb
       .from("organization_members")
       .select("id")
       .eq("org_id", invite.org_id)
@@ -68,7 +66,7 @@ export async function POST(request: Request) {
 
     if (existingMember) {
       // Already a member - just mark invite as accepted and redirect
-      await serviceClient.from("organization_invites").update({ status: "accepted" }).eq("id", invite.id)
+      await serviceDb.from("organization_invites").update({ status: "accepted" }).eq("id", invite.id)
 
       return NextResponse.json({
         success: true,
@@ -78,7 +76,7 @@ export async function POST(request: Request) {
     }
 
     // Add user to organization
-    const { error: memberError } = await serviceClient.from("organization_members").insert({
+    const { error: memberError } = await serviceDb.from("organization_members").insert({
       org_id: invite.org_id,
       user_id: user.id,
       role: invite.role,
@@ -92,7 +90,7 @@ export async function POST(request: Request) {
     }
 
     // Mark invite as accepted
-    await serviceClient.from("organization_invites").update({ status: "accepted" }).eq("id", invite.id)
+    await serviceDb.from("organization_invites").update({ status: "accepted" }).eq("id", invite.id)
 
     console.log("[v0] User joined organization:", invite.org_id)
 

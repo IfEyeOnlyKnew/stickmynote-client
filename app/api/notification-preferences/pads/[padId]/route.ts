@@ -1,12 +1,12 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { createClient } from "@/lib/supabase/server"
+import { createDatabaseClient } from "@/lib/database/database-adapter"
 import { getCachedAuthUser } from "@/lib/auth/cached-auth"
 
 export async function PATCH(req: NextRequest, { params }: { params: { padId: string } }) {
   try {
-    const supabase = await createClient()
+    const db = await createDatabaseClient()
 
-    const authResult = await getCachedAuthUser(supabase)
+    const authResult = await getCachedAuthUser()
     if (authResult.rateLimited) {
       return NextResponse.json(
         { error: "Rate limit exceeded. Please try again in a moment." },
@@ -23,7 +23,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { padId: str
     const { muted, digest_only } = body
 
     // Get current preferences
-    const { data: currentPrefs, error: fetchError } = await supabase
+    const { data: currentPrefs, error: fetchError } = await db
       .from("notification_preferences")
       .select("pad_preferences")
       .eq("user_id", user.id)
@@ -42,7 +42,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { padId: str
       ...(typeof digest_only === "boolean" && { digest_only }),
     }
 
-    const { data: updatedPrefs, error: updateError } = await supabase
+    const { data: updatedPrefs, error: updateError } = await db
       .from("notification_preferences")
       .upsert({
         user_id: user.id,

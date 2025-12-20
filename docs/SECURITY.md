@@ -26,7 +26,7 @@ The application implements a hierarchical role system:
 ### Hub Mode Restrictions
 Users can be configured with different access levels:
 - `full_access` - Access to all features including social hub
-- `personal_only` - Limited to `/notes` and `/panel` routes only
+- `personal_only` - Limited to `/personal` and `/panel` routes only
 
 ### Organization Context
 - `getOrgContext()` validates user membership in organizations

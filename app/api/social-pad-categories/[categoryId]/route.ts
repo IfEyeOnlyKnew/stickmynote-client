@@ -1,12 +1,12 @@
-import { createServerClient } from "@/lib/supabase/server"
+import { createDatabaseClient } from "@/lib/database/database-adapter"
 import { NextResponse } from "next/server"
 import { getCachedAuthUser } from "@/lib/auth/cached-auth"
 
 export async function PATCH(request: Request, { params }: { params: { categoryId: string } }) {
   try {
-    const supabase = await createServerClient()
+    const db = await createDatabaseClient()
 
-    const authResult = await getCachedAuthUser(supabase)
+    const authResult = await getCachedAuthUser()
     if (authResult.rateLimited) {
       return NextResponse.json(
         { error: "Rate limit exceeded. Please try again in a moment." },
@@ -21,7 +21,7 @@ export async function PATCH(request: Request, { params }: { params: { categoryId
     const body = await request.json()
     const { name, description } = body
 
-    const { data: category, error } = await supabase
+    const { data: category, error } = await db
       .from("social_pad_categories")
       .update({
         name: name?.trim(),
@@ -46,9 +46,9 @@ export async function PATCH(request: Request, { params }: { params: { categoryId
 
 export async function DELETE(request: Request, { params }: { params: { categoryId: string } }) {
   try {
-    const supabase = await createServerClient()
+    const db = await createDatabaseClient()
 
-    const authResult = await getCachedAuthUser(supabase)
+    const authResult = await getCachedAuthUser()
     if (authResult.rateLimited) {
       return NextResponse.json(
         { error: "Rate limit exceeded. Please try again in a moment." },
@@ -60,7 +60,7 @@ export async function DELETE(request: Request, { params }: { params: { categoryI
     }
     const user = authResult.user
 
-    const { error } = await supabase
+    const { error } = await db
       .from("social_pad_categories")
       .delete()
       .eq("id", params.categoryId)

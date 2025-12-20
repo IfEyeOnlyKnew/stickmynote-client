@@ -1,12 +1,12 @@
 import { NextResponse } from "next/server"
-import { createClient } from "@/lib/supabase/server"
+import { createDatabaseClient } from "@/lib/database/database-adapter"
 import { GrokService } from "@/lib/ai/grok-service"
 import { getCachedAuthUser } from "@/lib/auth/cached-auth"
 
 export async function POST(request: Request) {
   try {
-    const supabase = await createClient()
-    const authResult = await getCachedAuthUser(supabase)
+    await createDatabaseClient()
+    const authResult = await getCachedAuthUser()
 
     if (authResult.rateLimited) {
       return NextResponse.json(
@@ -30,6 +30,7 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ suggestions })
   } catch (error) {
+    console.error("[suggest-replies] Error:", error)
     return NextResponse.json({ error: "Failed to suggest replies" }, { status: 500 })
   }
 }

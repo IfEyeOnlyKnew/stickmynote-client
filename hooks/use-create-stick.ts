@@ -2,7 +2,6 @@
 
 import { useState } from "react"
 import { useRouter } from "next/navigation"
-import { createClient } from "@/lib/supabase/client"
 
 interface StickForm {
   topic: string
@@ -41,8 +40,6 @@ export function useCreateStick(padId: string) {
     setError(null)
 
     try {
-      const supabase = createClient()
-
       const response = await fetch("/api/social-sticks", {
         method: "POST",
         headers: {

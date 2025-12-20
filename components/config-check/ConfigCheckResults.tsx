@@ -4,7 +4,7 @@ import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { CheckCircle, XCircle, AlertTriangle } from "lucide-react"
-import type { ConfigCheck } from "@/hooks/use-supabase-config"
+import type { ConfigCheck } from "@/hooks/use-system-config"
 
 interface ConfigCheckResultsProps {
   checks: ConfigCheck[]

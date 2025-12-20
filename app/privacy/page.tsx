@@ -47,7 +47,7 @@ export default function PrivacyPage() {
                 Introduction
               </h2>
               <p className="text-muted-foreground">
-                At Stick My Note ("we", "our", or "us"), we are committed to protecting your privacy and ensuring the
+                At Stick My Note (&quot;we&quot;, &quot;our&quot;, or &quot;us&quot;), we are committed to protecting your privacy and ensuring the
                 security of your personal information. This Privacy Policy explains how we collect, use, disclose, and
                 safeguard your information when you use our service at stickmynote.com.
               </p>
@@ -211,8 +211,8 @@ export default function PrivacyPage() {
                 We use the following third-party services that may collect information:
               </p>
               <ul className="list-disc list-inside space-y-1 text-muted-foreground ml-4">
-                <li>Supabase (authentication and database hosting)</li>
-                <li>Vercel (hosting and deployment)</li>
+                <li>PostgreSQL (database hosting)</li>
+                <li>LDAP/Active Directory (authentication)</li>
                 <li>Analytics providers (only with your consent)</li>
               </ul>
               <p className="text-muted-foreground mt-2">
@@ -221,7 +221,7 @@ export default function PrivacyPage() {
             </section>
 
             <section>
-              <h2 className="text-xl font-semibold mb-3">Children's Privacy</h2>
+              <h2 className="text-xl font-semibold mb-3">Children&apos;s Privacy</h2>
               <p className="text-muted-foreground">
                 Our service is not intended for children under 13 years of age. We do not knowingly collect personal
                 information from children under 13. If you believe we have collected information from a child under 13,
@@ -233,7 +233,7 @@ export default function PrivacyPage() {
               <h2 className="text-xl font-semibold mb-3">Changes to This Policy</h2>
               <p className="text-muted-foreground">
                 We may update this Privacy Policy from time to time. We will notify you of any changes by posting the
-                new Privacy Policy on this page and updating the "Last updated" date. We encourage you to review this
+                new Privacy Policy on this page and updating the &quot;Last updated&quot; date. We encourage you to review this
                 Privacy Policy periodically.
               </p>
             </section>

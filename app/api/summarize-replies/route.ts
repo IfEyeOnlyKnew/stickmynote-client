@@ -1,8 +1,12 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { createServerClient } from "@supabase/ssr"
-import { cookies } from "next/headers"
+import { createDatabaseClient, createServiceDatabaseClient } from "@/lib/database/database-adapter"
 import { applyRateLimit } from "@/lib/rate-limiter-enhanced"
 import { getCachedAuthUser } from "@/lib/auth/cached-auth"
+
+// ============================================================================
+// Dynamic Module Loading
+// ============================================================================
+
 let put: any, Document: any, Packer: any, Paragraph: any, TextRun: any, HeadingLevel: any
 
 const initializeModules = async () => {
@@ -10,6 +14,7 @@ const initializeModules = async () => {
     const blobModule = await import("@vercel/blob")
     put = blobModule.put
   } catch (error) {
+    console.error("[summarize-replies] Blob module load error:", error)
     put = async () => ({ url: "" })
   }
 
@@ -21,6 +26,7 @@ const initializeModules = async () => {
     TextRun = docxModule.TextRun
     HeadingLevel = docxModule.HeadingLevel
   } catch (error) {
+    console.error("[summarize-replies] Docx module load error:", error)
     Document = class {
       constructor() {}
     }
@@ -35,290 +41,406 @@ const initializeModules = async () => {
   }
 }
 
-export async function POST(request: NextRequest) {
-  await initializeModules()
+// ============================================================================
+// Types
+// ============================================================================
 
-  try {
-    const cookieStore = await cookies()
-    const supabase = createServerClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!, {
-      cookies: {
-        get(name: string) {
-          return cookieStore.get(name)?.value
-        },
-      },
+interface Reply {
+  id: string
+  content: string
+  created_at: string
+  updated_at?: string
+  user_id: string
+  user?: UserInfo | string
+}
+
+interface UserInfo {
+  id?: string
+  username?: string
+  email?: string
+}
+
+interface SummarizeRequest {
+  noteId: string
+  tone?: string
+  replies?: any[]
+  isTeamNote?: boolean
+  generateDocx?: boolean
+}
+
+// ============================================================================
+// Constants
+// ============================================================================
+
+const LOG_PREFIX = "[SummarizeReplies]"
+const DEFAULT_TONE = "formal"
+
+const TONE_INSTRUCTIONS: Record<string, string> = {
+  cinematic:
+    "Write this summary as if it were a movie script scene description. Use dramatic language, visual imagery, and narrative flow. Focus on the emotional arc and character dynamics.",
+  formal:
+    "Provide a professional, structured summary suitable for a business report. Use clear, objective language and organize key points logically.",
+  casual:
+    "Write this summary in a conversational, friendly tone as if explaining to a friend. Use everyday language and focus on the main takeaways.",
+  dramatic:
+    "Write this summary as a compelling narrative with rich descriptions and emotional depth, like a chapter from a novel. Emphasize the human elements and story arc.",
+}
+
+// ============================================================================
+// Error Responses
+// ============================================================================
+
+const Errors = {
+  rateLimit: () => NextResponse.json(
+    { error: "Too many requests. Please try again later." },
+    { status: 429, headers: { "Retry-After": "30" } }
+  ),
+  summarizeRateLimit: (headers: Record<string, string>) => NextResponse.json(
+    { error: "Too many summarization requests. Please try again later." },
+    { status: 429, headers: { "Retry-After": "60", ...headers } }
+  ),
+  noteIdRequired: () => NextResponse.json({ error: "Note ID is required" }, { status: 400 }),
+  aiNotConfigured: () => NextResponse.json({ error: "AI service not configured" }, { status: 500 }),
+  fetchTeamRepliesFailed: () => NextResponse.json({ error: "Failed to fetch team note replies" }, { status: 500 }),
+  fetchRepliesFailed: () => NextResponse.json({ error: "Failed to fetch replies" }, { status: 500 }),
+  fetchUsersFailed: () => NextResponse.json({ error: "Failed to fetch user data" }, { status: 500 }),
+  summaryFailed: () => NextResponse.json({ error: "Failed to generate summary" }, { status: 500 }),
+}
+
+// ============================================================================
+// Helpers
+// ============================================================================
+
+function getTonePrompt(tone: string): string {
+  return TONE_INSTRUCTIONS[tone] || TONE_INSTRUCTIONS.formal
+}
+
+function formatRepliesText(replies: Reply[], userMap: Map<string, UserInfo>): string {
+  return replies
+    .map((reply, index) => {
+      const user = reply.user || userMap.get(reply.user_id)
+      const author = getAuthorName(user)
+      const timestamp = new Date(reply.created_at).toLocaleDateString()
+      return `Reply ${index + 1} by ${author} (${timestamp}):\n${reply.content}`
     })
+    .join("\n\n")
+}
 
-    const authResult = await getCachedAuthUser(supabase)
-    if (authResult.rateLimited) {
-      return NextResponse.json(
-        { error: "Too many requests. Please try again later." },
-        { status: 429, headers: { "Retry-After": "30" } },
-      )
+function getAuthorName(user: UserInfo | string | undefined): string {
+  if (!user) return "Anonymous"
+  if (typeof user === "string") return user
+  return user.username || user.email || "Anonymous"
+}
+
+// ============================================================================
+// Data Fetching
+// ============================================================================
+
+function transformProvidedReplies(providedReplies: any[]): Reply[] {
+  return providedReplies.map((reply, index) => ({
+    id: `reply-${index}`,
+    content: reply.content,
+    created_at: reply.created_at || new Date().toISOString(),
+    user_id: "team-user",
+    user: reply.user || "User",
+  }))
+}
+
+async function fetchTeamNoteReplies(db: any, noteId: string): Promise<{ replies: Reply[] | null; error: any }> {
+  const { data, error } = await db
+    .from("team_note_replies")
+    .select(`
+      id, content, created_at, updated_at, user_id,
+      user:users(username, email)
+    `)
+    .eq("team_note_id", noteId)
+    .order("created_at", { ascending: true })
+
+  return { replies: data, error }
+}
+
+async function fetchPersonalReplies(db: any, noteId: string): Promise<{ replies: Reply[] | null; error: any }> {
+  const { data, error } = await db
+    .from("personal_sticks_replies")
+    .select("id, content, created_at, updated_at, user_id")
+    .eq("personal_stick_id", noteId)
+    .order("created_at", { ascending: true })
+
+  return { replies: data, error }
+}
+
+async function fetchUserMap(db: any, userIds: string[]): Promise<{ userMap: Map<string, UserInfo>; error: any }> {
+  if (userIds.length === 0) {
+    return { userMap: new Map<string, UserInfo>(), error: null }
+  }
+
+  const { data: users, error } = await db
+    .from("users")
+    .select("id, username, email")
+    .in("id", userIds)
+
+  const userMap = new Map<string, UserInfo>(
+    (users as UserInfo[] | null)?.map((user) => [user.id!, user] as [string, UserInfo]) || []
+  )
+  return { userMap, error }
+}
+
+type FetchRepliesResult =
+  | { success: true; replies: Reply[]; userIds: string[] }
+  | { success: false; response: NextResponse }
+
+async function fetchReplies(
+  db: any,
+  noteId: string,
+  providedReplies: any[] | undefined,
+  isTeamNote: boolean | undefined
+): Promise<FetchRepliesResult> {
+  // Use provided replies if available
+  if (providedReplies && Array.isArray(providedReplies)) {
+    return {
+      success: true,
+      replies: transformProvidedReplies(providedReplies),
+      userIds: [],
     }
-    const user = authResult.user
+  }
 
-    const rateLimitResult = await applyRateLimit(request, user?.id, "ai_summarize")
-    if (!rateLimitResult.success) {
-      return NextResponse.json(
-        { error: "Too many summarization requests. Please try again later." },
+  // Fetch team note replies
+  if (isTeamNote) {
+    const { replies, error } = await fetchTeamNoteReplies(db, noteId)
+    if (error) {
+      return { success: false, response: Errors.fetchTeamRepliesFailed() }
+    }
+    return { success: true, replies: replies || [], userIds: [] }
+  }
+
+  // Fetch personal replies
+  const { replies, error } = await fetchPersonalReplies(db, noteId)
+  if (error) {
+    return { success: false, response: Errors.fetchRepliesFailed() }
+  }
+  const fetchedReplies = replies || []
+  const userIds = [...new Set(fetchedReplies.map((reply) => reply.user_id))] as string[]
+  return { success: true, replies: fetchedReplies, userIds }
+}
+
+// ============================================================================
+// AI Summary Generation
+// ============================================================================
+
+async function generateAISummary(repliesText: string, tone: string): Promise<{ summary: string | null; error: boolean }> {
+  const response = await fetch("https://api.x.ai/v1/chat/completions", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${process.env.XAI_API_KEY}`,
+    },
+    body: JSON.stringify({
+      model: "grok-4",
+      messages: [
         {
-          status: 429,
-          headers: {
-            "Retry-After": "60",
-            ...rateLimitResult.headers,
-          },
-        },
-      )
-    }
-
-    const requestBody = await request.json()
-    const { noteId, tone = "formal", replies: providedReplies, isTeamNote, generateDocx = false } = requestBody
-
-    if (!noteId) {
-      return NextResponse.json({ error: "Note ID is required" }, { status: 400 })
-    }
-
-    if (!process.env.XAI_API_KEY || process.env.XAI_API_KEY.trim() === "") {
-      return NextResponse.json({ error: "AI service not configured" }, { status: 500 })
-    }
-
-    let replies: any[] = []
-    let userIds: string[] = []
-
-    if (providedReplies && Array.isArray(providedReplies)) {
-      replies = providedReplies.map((reply: any, index: number) => ({
-        id: `reply-${index}`,
-        content: reply.content,
-        created_at: reply.created_at || new Date().toISOString(),
-        user_id: "team-user",
-        user: reply.user || "User",
-      }))
-    } else if (isTeamNote) {
-      const { data: fetchedReplies, error } = await supabase
-        .from("team_note_replies")
-        .select(`
-          id, content, created_at, updated_at, user_id,
-          user:users(username, email)
-        `)
-        .eq("team_note_id", noteId)
-        .order("created_at", { ascending: true })
-
-      if (error) {
-        return NextResponse.json({ error: "Failed to fetch team note replies" }, { status: 500 })
-      }
-
-      replies = fetchedReplies || []
-    } else {
-      const { data: fetchedReplies, error } = await supabase
-        .from("personal_sticks_replies")
-        .select("id, content, created_at, updated_at, user_id")
-        .eq("personal_stick_id", noteId)
-        .order("created_at", { ascending: true })
-
-      if (error) {
-        return NextResponse.json({ error: "Failed to fetch replies" }, { status: 500 })
-      }
-
-      replies = fetchedReplies || []
-      userIds = [...new Set(replies.map((reply) => reply.user_id))]
-    }
-
-    if (!replies || replies.length === 0) {
-      return NextResponse.json({ summary: "No replies to summarize." })
-    }
-
-    // Fetch user data if we have user IDs
-    let userMap = new Map()
-    if (userIds.length > 0) {
-      const { data: users, error: usersError } = await supabase
-        .from("users")
-        .select("id, username, email")
-        .in("id", userIds)
-
-      if (usersError) {
-        return NextResponse.json({ error: "Failed to fetch user data" }, { status: 500 })
-      }
-
-      userMap = new Map(users?.map((user) => [user.id, user]) || [])
-    }
-
-    // Format replies for summarization
-    const repliesText = replies
-      .map((reply, index) => {
-        const user = reply.user || userMap.get(reply.user_id)
-        const author = user?.username || user?.email || user || "Anonymous"
-        const timestamp = new Date(reply.created_at).toLocaleDateString()
-        return `Reply ${index + 1} by ${author} (${timestamp}):\n${reply.content}`
-      })
-      .join("\n\n")
-
-    const getTonePrompt = (selectedTone: string) => {
-      const toneInstructions = {
-        cinematic:
-          "Write this summary as if it were a movie script scene description. Use dramatic language, visual imagery, and narrative flow. Focus on the emotional arc and character dynamics.",
-        formal:
-          "Provide a professional, structured summary suitable for a business report. Use clear, objective language and organize key points logically.",
-        casual:
-          "Write this summary in a conversational, friendly tone as if explaining to a friend. Use everyday language and focus on the main takeaways.",
-        dramatic:
-          "Write this summary as a compelling narrative with rich descriptions and emotional depth, like a chapter from a novel. Emphasize the human elements and story arc.",
-      }
-      return toneInstructions[selectedTone as keyof typeof toneInstructions] || toneInstructions.formal
-    }
-
-    const response = await fetch("https://api.x.ai/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${process.env.XAI_API_KEY}`,
-      },
-      body: JSON.stringify({
-        model: "grok-4",
-        messages: [
-          {
-            role: "user",
-            content: `${getTonePrompt(tone)}
+          role: "user",
+          content: `${getTonePrompt(tone)}
 
 Please summarize the following replies to a note:
 
 ${repliesText}
 
 Summary:`,
-          },
-        ],
-        max_tokens: 500,
-      }),
-    })
+        },
+      ],
+      max_tokens: 500,
+    }),
+  })
 
-    if (!response.ok) {
-      return NextResponse.json({ error: "Failed to generate summary" }, { status: 500 })
+  if (!response.ok) {
+    return { summary: null, error: true }
+  }
+
+  const data = await response.json()
+  const summary = data.choices?.[0]?.message?.content || "Unable to generate summary"
+  return { summary, error: false }
+}
+
+// ============================================================================
+// DOCX Generation
+// ============================================================================
+
+async function generateDocxDocument(
+  summary: string,
+  replies: Reply[],
+  tone: string,
+  noteId: string
+): Promise<{ url: string; filename: string }> {
+  const summaryParagraphs = summary
+    .split(/\n\n+/)
+    .filter((paragraph: string) => paragraph.trim().length > 0)
+    .map((paragraph: string) => paragraph.trim())
+
+  const doc = new Document({
+    sections: [
+      {
+        children: [
+          new Paragraph({
+            text: "REPLY SUMMARY",
+            heading: HeadingLevel.TITLE,
+            spacing: { after: 400 },
+          }),
+          new Paragraph({
+            children: [
+              new TextRun({
+                text: `Generated on ${new Date().toLocaleDateString()} | Tone: ${tone.charAt(0).toUpperCase() + tone.slice(1)} | ${replies.length} Replies`,
+                italics: true,
+                size: 20,
+              }),
+            ],
+            spacing: { after: 600 },
+          }),
+          new Paragraph({
+            text: "SUMMARY",
+            heading: HeadingLevel.HEADING_1,
+            spacing: { before: 400, after: 200 },
+          }),
+          ...summaryParagraphs.map(
+            (paragraphText: string) =>
+              new Paragraph({
+                children: [new TextRun({ text: paragraphText, size: 24 })],
+                spacing: { after: 300 },
+              })
+          ),
+          new Paragraph({
+            text: "ORIGINAL REPLIES",
+            heading: HeadingLevel.HEADING_1,
+            spacing: { before: 400, after: 200 },
+          }),
+          ...replies.flatMap((reply) => [
+            new Paragraph({
+              children: [
+                new TextRun({
+                  text: getAuthorName(reply.user),
+                  bold: true,
+                  size: 26,
+                }),
+                new TextRun({
+                  text: ` (${new Date(reply.created_at).toLocaleDateString()})`,
+                  italics: true,
+                  size: 22,
+                }),
+              ],
+              spacing: { after: 100 },
+            }),
+            new Paragraph({
+              children: [new TextRun({ text: reply.content, size: 24 })],
+              spacing: { after: 400 },
+            }),
+          ]),
+        ],
+      },
+    ],
+  })
+
+  const buffer = await Packer.toBuffer(doc)
+  const docxBlob = new Blob([buffer], {
+    type: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  })
+
+  const filename = `reply-summary-${noteId}-${Date.now()}.docx`
+  const blob = await put(filename, docxBlob, { access: "public" })
+
+  return { url: blob.url, filename }
+}
+
+async function tryCleanupDocx(blobUrl: string, filename: string): Promise<string | null> {
+  try {
+    const cleanupResponse = await fetch(
+      `${process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000"}/api/cleanup-docx`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ blobUrl, filename }),
+      }
+    )
+
+    if (cleanupResponse.ok) {
+      const cleanupResult = await cleanupResponse.json()
+      return cleanupResult.cleanedUrl
+    }
+  } catch (cleanupError) {
+    console.error("[summarize-replies] Cleanup error:", cleanupError)
+    // Fall back to original document if cleanup fails
+  }
+  return null
+}
+
+// ============================================================================
+// Route Handler
+// ============================================================================
+
+export async function POST(request: NextRequest) {
+  await initializeModules()
+
+  try {
+    const db = await createDatabaseClient()
+    const serviceDb = await createServiceDatabaseClient()
+
+    // Auth check
+    const authResult = await getCachedAuthUser()
+    if (authResult.rateLimited) {
+      return Errors.rateLimit()
     }
 
-    const data = await response.json()
-    const summary = data.choices?.[0]?.message?.content || "Unable to generate summary"
+    // Rate limit check
+    const rateLimitResult = await applyRateLimit(request, authResult.user?.id, "ai_summarize")
+    if (!rateLimitResult.success) {
+      return Errors.summarizeRateLimit(rateLimitResult.headers || {})
+    }
 
+    // Parse and validate request
+    const { noteId, tone = DEFAULT_TONE, replies: providedReplies, isTeamNote, generateDocx = false }: SummarizeRequest = await request.json()
+
+    if (!noteId) {
+      return Errors.noteIdRequired()
+    }
+
+    if (!process.env.XAI_API_KEY?.trim()) {
+      return Errors.aiNotConfigured()
+    }
+
+    // Fetch replies
+    const repliesResult = await fetchReplies(db, noteId, providedReplies, isTeamNote)
+    if (!repliesResult.success) {
+      return repliesResult.response
+    }
+
+    const { replies, userIds } = repliesResult
+
+    if (replies.length === 0) {
+      return NextResponse.json({ summary: "No replies to summarize." })
+    }
+
+    // Fetch user data if needed
+    const { userMap, error: usersError } = await fetchUserMap(serviceDb, userIds)
+    if (usersError) {
+      return Errors.fetchUsersFailed()
+    }
+
+    // Generate AI summary
+    const repliesText = formatRepliesText(replies, userMap)
+    const { summary, error: aiError } = await generateAISummary(repliesText, tone)
+
+    if (aiError || !summary) {
+      return Errors.summaryFailed()
+    }
+
+    // Generate DOCX if requested
     if (generateDocx) {
-      const summaryParagraphs = summary
-        .split(/\n\n+/)
-        .filter((paragraph: string) => paragraph.trim().length > 0)
-        .map((paragraph: string) => paragraph.trim())
-
-      const doc = new Document({
-        sections: [
-          {
-            children: [
-              new Paragraph({
-                text: "REPLY SUMMARY",
-                heading: HeadingLevel.TITLE,
-                spacing: { after: 400 },
-              }),
-              new Paragraph({
-                children: [
-                  new TextRun({
-                    text: `Generated on ${new Date().toLocaleDateString()} | Tone: ${tone.charAt(0).toUpperCase() + tone.slice(1)} | ${replies.length} Replies`,
-                    italics: true,
-                    size: 20,
-                  }),
-                ],
-                spacing: { after: 600 },
-              }),
-              new Paragraph({
-                text: "SUMMARY",
-                heading: HeadingLevel.HEADING_1,
-                spacing: { before: 400, after: 200 },
-              }),
-              ...summaryParagraphs.map(
-                (paragraphText: string) =>
-                  new Paragraph({
-                    children: [
-                      new TextRun({
-                        text: paragraphText,
-                        size: 24,
-                      }),
-                    ],
-                    spacing: { after: 300 },
-                  }),
-              ),
-              new Paragraph({
-                text: "ORIGINAL REPLIES",
-                heading: HeadingLevel.HEADING_1,
-                spacing: { before: 400, after: 200 },
-              }),
-              ...replies.flatMap((reply) => [
-                new Paragraph({
-                  children: [
-                    new TextRun({
-                      text: `${reply.user?.username || reply.user?.email || reply.user || "Anonymous"}`,
-                      bold: true,
-                      size: 26,
-                    }),
-                    new TextRun({
-                      text: ` (${new Date(reply.created_at).toLocaleDateString()})`,
-                      italics: true,
-                      size: 22,
-                    }),
-                  ],
-                  spacing: { after: 100 },
-                }),
-                new Paragraph({
-                  children: [
-                    new TextRun({
-                      text: reply.content,
-                      size: 24,
-                    }),
-                  ],
-                  spacing: { after: 400 },
-                }),
-              ]),
-            ],
-          },
-        ],
-      })
-
-      const buffer = await Packer.toBuffer(doc)
-      const docxBlob = new Blob([buffer], {
-        type: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-      })
-
-      const filename = `reply-summary-${noteId}-${Date.now()}.docx`
-      const blob = await put(filename, docxBlob, {
-        access: "public",
-      })
-
-      try {
-        const cleanupResponse = await fetch(
-          `${process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000"}/api/cleanup-docx`,
-          {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify({
-              blobUrl: blob.url,
-              filename: filename,
-            }),
-          },
-        )
-
-        if (cleanupResponse.ok) {
-          const cleanupResult = await cleanupResponse.json()
-          return NextResponse.json({
-            summary,
-            replyCount: replies.length,
-            tone,
-            docxUrl: cleanupResult.cleanedUrl,
-            filename,
-          })
-        }
-      } catch (cleanupError) {
-        // Fall back to original document if cleanup fails
-      }
+      const { url: docxUrl, filename } = await generateDocxDocument(summary, replies, tone, noteId)
+      const cleanedUrl = await tryCleanupDocx(docxUrl, filename)
 
       return NextResponse.json({
         summary,
         replyCount: replies.length,
         tone,
-        docxUrl: blob.url,
+        docxUrl: cleanedUrl || docxUrl,
         filename,
       })
     }
@@ -329,6 +451,7 @@ Summary:`,
       tone,
     })
   } catch (error) {
-    return NextResponse.json({ error: "Failed to generate summary" }, { status: 500 })
+    console.error(`${LOG_PREFIX} POST error:`, error)
+    return Errors.summaryFailed()
   }
 }

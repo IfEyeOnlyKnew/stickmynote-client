@@ -1,6 +1,5 @@
-import { createClient } from "@/lib/supabase/server"
+import { getSession } from "@/lib/auth/local-auth"
 import { cookies } from "next/headers"
-import type { SupabaseClient } from "@supabase/supabase-js"
 import { NextResponse } from "next/server"
 
 export interface CachedAuthUser {
@@ -20,7 +19,7 @@ interface AuthCacheEntry {
   timestamp: number
 }
 
-// In-memory cache for auth results to reduce Supabase auth endpoint calls
+// In-memory cache for auth results to reduce auth endpoint calls
 const authCache = new Map<string, AuthCacheEntry>()
 const CACHE_TTL = 30000 // 30 seconds
 const MAX_CACHE_SIZE = 1000
@@ -61,10 +60,8 @@ function cleanupCache() {
 }
 
 /**
- * Get authenticated user with caching to reduce Supabase auth endpoint calls.
+ * Get authenticated user with caching to reduce auth endpoint calls.
  * This prevents rate limiting errors when multiple API calls happen quickly.
- *
- * @param supabaseClient - Optional: Pass an existing supabase client to reuse, otherwise one will be created
  *
  * Returns:
  * - { user, error: null, rateLimited: false } - Successfully authenticated user
@@ -72,9 +69,9 @@ function cleanupCache() {
  * - { user: null, error: "rate_limited", rateLimited: true } - Rate limited with no stale cache
  * - { user, error: "rate_limited", rateLimited: true } - Rate limited but using stale cache
  */
-export async function getCachedAuthUser(supabaseClient?: SupabaseClient): Promise<CachedAuthResult> {
+export async function getCachedAuthUser(): Promise<CachedAuthResult> {
   try {
-    const cookieStore = await cookies()
+    const cookieStore = cookies()
     const cacheKey = getCacheKey(cookieStore.toString())
     const now = Date.now()
 
@@ -84,12 +81,10 @@ export async function getCachedAuthUser(supabaseClient?: SupabaseClient): Promis
       return { user: cached.user, userId: cached.user.id, error: null, rateLimited: false }
     }
 
-    // Cache miss or expired - fetch from Supabase
-    const supabase = supabaseClient || (await createClient())
-
-    let authResult
+    // Cache miss or expired - fetch from local auth
+    let session
     try {
-      authResult = await supabase.auth.getUser()
+      session = await getSession()
     } catch (fetchError) {
       const errorMessage = fetchError instanceof Error ? fetchError.message : String(fetchError)
 
@@ -111,34 +106,11 @@ export async function getCachedAuthUser(supabaseClient?: SupabaseClient): Promis
       return { user: null, userId: null, error: "auth_error", rateLimited: false }
     }
 
-    const {
-      data: { user },
-      error: authError,
-    } = authResult
-
-    if (authError) {
-      const errorMessage = authError.message || String(authError)
-
-      // Check for rate limiting in error response
-      if (errorMessage.includes("Too Many") || errorMessage.includes("429")) {
-        console.error("[SERVER] getCachedAuthUser: Rate limited")
-
-        // Try stale cache as fallback
-        const stale = staleCache.get(cacheKey)
-        if (stale && now - stale.timestamp < STALE_CACHE_TTL) {
-          console.log("[SERVER] getCachedAuthUser: Using stale cache during rate limit")
-          return { user: stale.user, userId: stale.user.id, error: "rate_limited", rateLimited: true }
-        }
-
-        return { user: null, userId: null, error: "rate_limited", rateLimited: true }
-      }
-
-      return { user: null, userId: null, error: "auth_error", rateLimited: false }
-    }
-
-    if (!user) {
+    if (!session) {
       return { user: null, userId: null, error: null, rateLimited: false }
     }
+
+    const user = session.user
 
     // Update caches
     const cacheEntry: AuthCacheEntry = {

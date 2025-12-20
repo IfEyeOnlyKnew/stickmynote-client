@@ -141,11 +141,13 @@ export function StickDetailModal({ open, onOpenChange, stickId, onUpdate }: Stic
     throw lastError || new Error("Max retries exceeded")
   }
 
+  /* eslint-disable react-hooks/exhaustive-deps */
   useEffect(() => {
     if (open && stickId) {
       fetchStick()
     }
   }, [open, stickId])
+  /* eslint-enable react-hooks/exhaustive-deps */
 
   useEffect(() => {
     if (stick) {
@@ -156,45 +158,51 @@ export function StickDetailModal({ open, onOpenChange, stickId, onUpdate }: Stic
     }
   }, [stick])
 
+  const fetchPadMemberRole = async (padId: string): Promise<void> => {
+    try {
+      const memberResponse = await fetchWithRetry(`/api/social-pads/${padId}/members`)
+      const contentType = memberResponse.headers.get("content-type")
+      
+      if (!contentType?.includes("application/json")) {
+        const text = await memberResponse.text()
+        console.error("[v0] Non-JSON response from members API:", text.substring(0, 100))
+        return
+      }
+      
+      if (!memberResponse.ok) {
+        console.error("[v0] Failed to fetch members:", memberResponse.status)
+        return
+      }
+      
+      const memberData = await memberResponse.json()
+      const userMembership = memberData.members?.find((m: any) => m.user_id === user?.id)
+      setIsAdmin(userMembership?.role === "admin")
+    } catch (memberError) {
+      console.error("[v0] Error fetching members:", memberError)
+    }
+  }
+
+  const fetchPadOwnership = async (padId: string): Promise<void> => {
+    const padResponse = await fetchWithRetry(`/api/social-pads/${padId}`)
+    if (padResponse.ok) {
+      const padData = await padResponse.json()
+      setIsPadOwner(padData.pad.owner_id === user?.id)
+      await fetchPadMemberRole(padId)
+    }
+  }
+
   const fetchStick = async () => {
     try {
       setLoading(true)
       const response = await fetchWithRetry(`/api/social-sticks/${stickId}`)
-      if (response.ok) {
-        const data = await response.json()
-        setStick(data.stick)
-        setEditDetails(data.stick.details || "")
+      if (!response.ok) return
 
-        if (user && data.stick.social_pad_id) {
-          const padResponse = await fetchWithRetry(`/api/social-pads/${data.stick.social_pad_id}`)
-          if (padResponse.ok) {
-            const padData = await padResponse.json()
-            setIsPadOwner(padData.pad.owner_id === user.id)
+      const data = await response.json()
+      setStick(data.stick)
+      setEditDetails(data.stick.details || "")
 
-            try {
-              const memberResponse = await fetchWithRetry(`/api/social-pads/${data.stick.social_pad_id}/members`)
-
-              // Check if response is JSON before parsing
-              const contentType = memberResponse.headers.get("content-type")
-              if (contentType && contentType.includes("application/json")) {
-                if (memberResponse.ok) {
-                  const memberData = await memberResponse.json()
-                  const userMembership = memberData.members?.find((m: any) => m.user_id === user.id)
-                  setIsAdmin(userMembership?.role === "admin")
-                } else {
-                  console.error("[v0] Failed to fetch members:", memberResponse.status)
-                }
-              } else {
-                // Response is not JSON, log the text for debugging
-                const text = await memberResponse.text()
-                console.error("[v0] Non-JSON response from members API:", text.substring(0, 100))
-              }
-            } catch (memberError) {
-              console.error("[v0] Error fetching members:", memberError)
-              // Continue without member data - don't block the modal from opening
-            }
-          }
-        }
+      if (user && data.stick.social_pad_id) {
+        await fetchPadOwnership(data.stick.social_pad_id)
       }
     } catch (error) {
       console.error("[v0] Error fetching stick:", error)
@@ -203,12 +211,14 @@ export function StickDetailModal({ open, onOpenChange, stickId, onUpdate }: Stic
     }
   }
 
+  /* eslint-disable react-hooks/exhaustive-deps */
   useEffect(() => {
     if (stick?.social_pad_id) {
       setPadId(stick.social_pad_id)
       fetchCitations()
     }
   }, [stick])
+  /* eslint-enable react-hooks/exhaustive-deps */
 
   const fetchCitations = async () => {
     if (!stickId) return
@@ -667,11 +677,12 @@ export function StickDetailModal({ open, onOpenChange, stickId, onUpdate }: Stic
             </div>
 
             <div className="flex-1 overflow-y-auto min-h-0">
-              {loading ? (
+              {loading && (
                 <div className="flex items-center justify-center h-full">
                   <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600" />
                 </div>
-              ) : stick ? (
+              )}
+              {!loading && stick && (
                 <div className="p-6 bg-gray-50">
                   <div className="max-w-4xl mx-auto space-y-6">
                     <Card className="bg-white border-2 shadow-lg">
@@ -875,7 +886,7 @@ export function StickDetailModal({ open, onOpenChange, stickId, onUpdate }: Stic
                     </div>
                   </div>
                 </div>
-              ) : null}
+              )}
             </div>
           </div>
         </DialogContent>

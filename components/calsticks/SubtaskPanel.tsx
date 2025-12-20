@@ -10,6 +10,13 @@ import { format, parseISO } from "date-fns"
 import type { CalStick } from "@/types/calstick"
 import { toast } from "@/hooks/use-toast"
 
+// Helper function to get priority badge color
+function getPriorityBadgeColor(priority: string): string {
+  if (priority === "urgent") return "bg-red-100 text-red-700"
+  if (priority === "high") return "bg-orange-100 text-orange-700"
+  return ""
+}
+
 interface SubtaskPanelProps {
   parentCalstick: CalStick
   onSubtaskClick: (subtask: CalStick) => void
@@ -25,6 +32,7 @@ export function SubtaskPanel({ parentCalstick, onSubtaskClick, onRefresh }: Subt
 
   useEffect(() => {
     fetchSubtasks()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [parentCalstick.id])
 
   const fetchSubtasks = async () => {
@@ -182,8 +190,11 @@ export function SubtaskPanel({ parentCalstick, onSubtaskClick, onRefresh }: Subt
           {subtasks.map((subtask) => (
             <div
               key={subtask.id}
+              role="button"
+              tabIndex={0}
               className="flex items-start gap-3 p-3 rounded-lg border hover:bg-muted/50 cursor-pointer transition-colors"
               onClick={() => onSubtaskClick(subtask)}
+              onKeyDown={(e) => e.key === "Enter" && onSubtaskClick(subtask)}
             >
               <button
                 onClick={(e) => {
@@ -211,13 +222,7 @@ export function SubtaskPanel({ parentCalstick, onSubtaskClick, onRefresh }: Subt
                   {subtask.calstick_priority && (
                     <Badge
                       variant="secondary"
-                      className={`text-xs ${
-                        subtask.calstick_priority === "urgent"
-                          ? "bg-red-100 text-red-700"
-                          : subtask.calstick_priority === "high"
-                            ? "bg-orange-100 text-orange-700"
-                            : ""
-                      }`}
+                      className={`text-xs ${getPriorityBadgeColor(subtask.calstick_priority)}`}
                     >
                       {subtask.calstick_priority}
                     </Badge>
@@ -254,6 +259,7 @@ export function SubtaskPanel({ parentCalstick, onSubtaskClick, onRefresh }: Subt
                 setNewSubtaskContent("")
               }
             }}
+            // eslint-disable-next-line jsx-a11y/no-autofocus
             autoFocus
             className="text-sm"
           />

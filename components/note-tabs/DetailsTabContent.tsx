@@ -125,7 +125,7 @@ export const DetailsTabContent = memo(function DetailsTabContent({
   return (
     <div className="space-y-4">
       <div>
-        <label className="text-sm font-medium text-gray-700 mb-2 block">Additional Details</label>
+        <span className="text-sm font-medium text-gray-700 mb-2 block">Additional Details</span>
         <CollaborativeRichTextEditor
           key={editorKey}
           documentId={`${noteId}-details`}
@@ -182,7 +182,7 @@ export const DetailsTabContent = memo(function DetailsTabContent({
 
       {exportLinks.length > 0 ? (
         <div className="space-y-2">
-          <label className="text-sm font-medium text-gray-700 block">Export Links</label>
+          <span className="text-sm font-medium text-gray-700 block">Export Links</span>
           <div className="space-y-2">
             {exportLinks.map((exportLink: any, index: number) => (
               <div

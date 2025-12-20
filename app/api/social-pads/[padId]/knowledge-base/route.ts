@@ -1,13 +1,13 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { createServerClient } from "@/lib/supabase/server"
+import { createDatabaseClient } from "@/lib/database/database-adapter"
 import { getCachedAuthUser } from "@/lib/auth/cached-auth"
 
 async function attachAuthorToArticle(
-  supabase: Awaited<ReturnType<typeof createServerClient>>,
+  db: Awaited<ReturnType<typeof createDatabaseClient>>,
   article: Record<string, unknown>,
 ) {
   if (article.author_id) {
-    const { data: author } = await supabase
+    const { data: author } = await db
       .from("users")
       .select("id, full_name, email, avatar_url")
       .eq("id", article.author_id as string)
@@ -20,10 +20,10 @@ async function attachAuthorToArticle(
 // GET: Fetch all KB articles for a pad
 export async function GET(request: NextRequest, { params }: { params: { padId: string } }) {
   try {
-    const supabase = await createServerClient()
+    const db = await createDatabaseClient()
     const { padId } = params
 
-    const authResult = await getCachedAuthUser(supabase)
+    const authResult = await getCachedAuthUser()
     if (authResult.rateLimited) {
       return NextResponse.json(
         { error: "Rate limit exceeded. Please try again in a moment." },
@@ -34,7 +34,7 @@ export async function GET(request: NextRequest, { params }: { params: { padId: s
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
-    const { data: articles, error } = await supabase
+    const { data: articles, error } = await db
       .from("social_pad_knowledge_base")
       .select("*")
       .eq("social_pad_id", padId)
@@ -48,7 +48,7 @@ export async function GET(request: NextRequest, { params }: { params: { padId: s
     }
 
     const articlesWithAuthors = await Promise.all(
-      (articles || []).map((article) => attachAuthorToArticle(supabase, article)),
+      (articles || []).map((article) => attachAuthorToArticle(db, article)),
     )
 
     return NextResponse.json({ articles: articlesWithAuthors })
@@ -61,10 +61,10 @@ export async function GET(request: NextRequest, { params }: { params: { padId: s
 // POST: Create a new KB article
 export async function POST(request: NextRequest, { params }: { params: { padId: string } }) {
   try {
-    const supabase = await createServerClient()
+    const db = await createDatabaseClient()
     const { padId } = params
 
-    const authResult = await getCachedAuthUser(supabase)
+    const authResult = await getCachedAuthUser()
     if (authResult.rateLimited) {
       return NextResponse.json(
         { error: "Rate limit exceeded. Please try again in a moment." },
@@ -83,7 +83,7 @@ export async function POST(request: NextRequest, { params }: { params: { padId: 
       return NextResponse.json({ error: "Title and content are required" }, { status: 400 })
     }
 
-    const { data: article, error } = await supabase
+    const { data: article, error } = await db
       .from("social_pad_knowledge_base")
       .insert({
         social_pad_id: padId,
@@ -105,7 +105,7 @@ export async function POST(request: NextRequest, { params }: { params: { padId: 
       return NextResponse.json({ error: "Failed to create article" }, { status: 500 })
     }
 
-    const articleWithAuthor = await attachAuthorToArticle(supabase, article)
+    const articleWithAuthor = await attachAuthorToArticle(db, article)
 
     return NextResponse.json({ article: articleWithAuthor })
   } catch (error) {
@@ -117,10 +117,10 @@ export async function POST(request: NextRequest, { params }: { params: { padId: 
 // PATCH: Update a KB article
 export async function PATCH(request: NextRequest, { params }: { params: { padId: string } }) {
   try {
-    const supabase = await createServerClient()
+    const db = await createDatabaseClient()
     const { padId } = params
 
-    const authResult = await getCachedAuthUser(supabase)
+    const authResult = await getCachedAuthUser()
     if (authResult.rateLimited) {
       return NextResponse.json(
         { error: "Rate limit exceeded. Please try again in a moment." },
@@ -146,7 +146,7 @@ export async function PATCH(request: NextRequest, { params }: { params: { padId:
     if (is_pinned !== undefined) updateData.is_pinned = is_pinned
     if (pin_order !== undefined) updateData.pin_order = pin_order
 
-    const { data: article, error } = await supabase
+    const { data: article, error } = await db
       .from("social_pad_knowledge_base")
       .update(updateData)
       .eq("id", articleId)
@@ -163,7 +163,7 @@ export async function PATCH(request: NextRequest, { params }: { params: { padId:
       return NextResponse.json({ error: "Article not found" }, { status: 404 })
     }
 
-    const articleWithAuthor = await attachAuthorToArticle(supabase, article)
+    const articleWithAuthor = await attachAuthorToArticle(db, article)
 
     return NextResponse.json({ article: articleWithAuthor })
   } catch (error) {
@@ -175,10 +175,10 @@ export async function PATCH(request: NextRequest, { params }: { params: { padId:
 // DELETE: Delete a KB article
 export async function DELETE(request: NextRequest, { params }: { params: { padId: string } }) {
   try {
-    const supabase = await createServerClient()
+    const db = await createDatabaseClient()
     const { padId } = params
 
-    const authResult = await getCachedAuthUser(supabase)
+    const authResult = await getCachedAuthUser()
     if (authResult.rateLimited) {
       return NextResponse.json(
         { error: "Rate limit exceeded. Please try again in a moment." },
@@ -196,7 +196,7 @@ export async function DELETE(request: NextRequest, { params }: { params: { padId
       return NextResponse.json({ error: "Article ID is required" }, { status: 400 })
     }
 
-    const { error } = await supabase
+    const { error } = await db
       .from("social_pad_knowledge_base")
       .delete()
       .eq("id", articleId)

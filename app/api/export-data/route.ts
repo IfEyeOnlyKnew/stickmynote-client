@@ -1,13 +1,13 @@
-import { createClient } from "@/lib/supabase/server"
+import { createDatabaseClient } from "@/lib/database/database-adapter"
 import { NextResponse } from "next/server"
 import { getCachedAuthUser } from "@/lib/auth/cached-auth"
 import { getOrgContext } from "@/lib/auth/get-org-context"
 
 export async function GET() {
   try {
-    const supabase = await createClient()
+    const db = await createDatabaseClient()
 
-    const authResult = await getCachedAuthUser(supabase)
+    const authResult = await getCachedAuthUser()
     if (authResult.rateLimited) {
       return NextResponse.json(
         { error: "Rate limit exceeded. Please try again in a moment." },
@@ -27,12 +27,12 @@ export async function GET() {
     const userId = user.id
 
     const [profileData, notesData, repliesData, tagsData, padsData, sticksData] = await Promise.all([
-      supabase.from("users").select("*").eq("id", userId).maybeSingle(),
-      supabase.from("notes").select("*").eq("user_id", userId).eq("org_id", orgContext.orgId),
-      supabase.from("replies").select("*").eq("user_id", userId).eq("org_id", orgContext.orgId),
-      supabase.from("tags").select("*").eq("user_id", userId).eq("org_id", orgContext.orgId),
-      supabase.from("paks_pads").select("*").eq("owner_id", userId).eq("org_id", orgContext.orgId),
-      supabase.from("paks_pad_sticks").select("*").eq("owner_id", userId).eq("org_id", orgContext.orgId),
+      db.from("users").select("*").eq("id", userId).maybeSingle(),
+      db.from("notes").select("*").eq("user_id", userId).eq("org_id", orgContext.orgId),
+      db.from("replies").select("*").eq("user_id", userId).eq("org_id", orgContext.orgId),
+      db.from("tags").select("*").eq("user_id", userId).eq("org_id", orgContext.orgId),
+      db.from("paks_pads").select("*").eq("owner_id", userId).eq("org_id", orgContext.orgId),
+      db.from("paks_pad_sticks").select("*").eq("owner_id", userId).eq("org_id", orgContext.orgId),
     ])
 
     const exportData = {

@@ -10,10 +10,10 @@ import { AttachmentPreviewModal } from "./AttachmentPreviewModal"
 import { CloudPickerModal } from "./CloudPickerModal"
 
 interface AttachmentPanelProps {
-  calstickId: string
+  readonly calstickId: string
 }
 
-export function AttachmentPanel({ calstickId }: AttachmentPanelProps) {
+export function AttachmentPanel({ calstickId }: Readonly<AttachmentPanelProps>) {
   const [attachments, setAttachments] = useState<Attachment[]>([])
   const [loading, setLoading] = useState(true)
   const [uploading, setUploading] = useState(false)
@@ -22,6 +22,7 @@ export function AttachmentPanel({ calstickId }: AttachmentPanelProps) {
 
   useEffect(() => {
     fetchAttachments()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [calstickId])
 
   const fetchAttachments = async () => {

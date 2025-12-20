@@ -18,7 +18,7 @@ export async function GET() {
     <priority>0.8</priority>
   </url>
   <url>
-    <loc>${baseUrl}/notes</loc>
+    <loc>${baseUrl}/personal</loc>
     <lastmod>${new Date().toISOString()}</lastmod>
     <changefreq>daily</changefreq>
     <priority>0.9</priority>

@@ -1,4 +1,4 @@
-import { createClient } from "@/lib/supabase/client"
+import { createDatabaseClient } from "@/lib/database/database-adapter"
 import type { Note as BaseNote, Reply, VideoItem, ImageItem } from "@/types/note"
 
 // Extend Note type to include 'tags', 'images', 'videos', and 'replies' if not present
@@ -77,6 +77,209 @@ interface ReplyInsertPayload {
 }
 
 // ============================================================================
+// HELPER FUNCTIONS
+// ============================================================================
+
+interface TabDataContent {
+  tags?: string[]
+  images?: ImageItem[]
+  videos?: VideoItem[]
+}
+
+interface ExtractedTabData {
+  tags: string[]
+  images: ImageItem[]
+  videos: VideoItem[]
+}
+
+/**
+ * Extract tags, images, and videos from note tabs
+ */
+function extractDataFromTabs(noteTabs: any[] | null): ExtractedTabData {
+  const result: ExtractedTabData = { tags: [], images: [], videos: [] }
+  if (!noteTabs) return result
+
+  for (const tab of noteTabs) {
+    if (!tab.tab_data) continue
+    const tabData: TabDataContent = typeof tab.tab_data === "string" ? JSON.parse(tab.tab_data) : tab.tab_data
+    if (Array.isArray(tabData.tags)) result.tags.push(...tabData.tags)
+    if (Array.isArray(tabData.images)) result.images.push(...tabData.images)
+    if (Array.isArray(tabData.videos)) result.videos.push(...tabData.videos)
+  }
+  return result
+}
+
+/**
+ * Transform a database reply row to a Reply object
+ */
+function transformReply(reply: DatabaseReplyRow): Reply {
+  return {
+    id: reply.id,
+    content: reply.content || "",
+    color: reply.color || "#ffffff",
+    created_at: reply.created_at,
+    updated_at: reply.updated_at || reply.created_at,
+    user_id: reply.user_id,
+    note_id: reply.personal_stick_id,
+  }
+}
+
+/**
+ * Transform raw reply data with safe type handling
+ */
+function transformReplyFromRaw(r: any): Reply {
+  const now = new Date().toISOString()
+  const createdAt = typeof r.created_at === "string" && r.created_at ? r.created_at : now
+  const updatedAt = typeof r.updated_at === "string" && r.updated_at ? r.updated_at : createdAt
+  
+  return {
+    id: typeof r.id === "string" && r.id ? r.id : "unknown-reply-id",
+    content: r.content || "",
+    color: r.color || "#ffffff",
+    created_at: createdAt,
+    updated_at: updatedAt,
+    user_id: typeof r.user_id === "string" && r.user_id ? r.user_id : "unknown-user",
+    note_id: typeof r.personal_stick_id === "string" && r.personal_stick_id ? r.personal_stick_id : "unknown-note-id",
+  }
+}
+
+/**
+ * Transform a database note row to a Note object
+ */
+function transformDatabaseNote(
+  note: DatabaseNoteRow,
+  tabData: ExtractedTabData,
+  replies: Reply[]
+): Note {
+  return {
+    id: note.id,
+    title: note.title || note.topic || "Untitled Note",
+    topic: note.topic || "",
+    content: note.content || "",
+    color: note.color || "#fef3c7",
+    position_x: note.position_x || 0,
+    position_y: note.position_y || 0,
+    is_shared: Boolean(note.is_shared),
+    z_index: note.z_index || undefined,
+    is_pinned: note.is_pinned || undefined,
+    tags: tabData.tags,
+    images: tabData.images,
+    videos: tabData.videos,
+    created_at: note.created_at,
+    updated_at: note.updated_at,
+    user_id: note.user_id,
+    replies,
+  }
+}
+
+/**
+ * Transform a partial note with safe type handling
+ */
+function transformPartialNote(
+  note: Partial<Note>,
+  tabData: ExtractedTabData,
+  replies: Reply[]
+): Note {
+  const now = new Date().toISOString()
+  return {
+    id: typeof note.id === "string" && note.id ? note.id : "unknown-id",
+    topic: note.topic || "",
+    title: note.title || note.topic || "Untitled Note",
+    content: note.content || "",
+    color: note.color || "#fef3c7",
+    position_x: note.position_x || 0,
+    position_y: note.position_y || 0,
+    is_shared: Boolean(note.is_shared),
+    z_index: note.z_index || undefined,
+    is_pinned: note.is_pinned || undefined,
+    tags: tabData.tags,
+    images: tabData.images,
+    videos: tabData.videos,
+    created_at: typeof note.created_at === "string" && note.created_at ? note.created_at : now,
+    updated_at: typeof note.updated_at === "string" && note.updated_at ? note.updated_at : now,
+    user_id: typeof note.user_id === "string" && note.user_id ? note.user_id : "unknown-user",
+    replies,
+  }
+}
+
+/**
+ * Get authenticated user from database client
+ */
+async function getAuthenticatedUser(db: any): Promise<{ id: string; email?: string }> {
+  const { data: { user }, error: authError } = await db.auth.getUser()
+  if (authError || !user) {
+    throw new Error("User not authenticated")
+  }
+  return user
+}
+
+/**
+ * Upsert note tab data (tags, images, videos)
+ */
+async function upsertNoteTabData(
+  db: any,
+  noteId: string,
+  userId: string,
+  updateData: { tags?: string[]; images?: string[]; videos?: string[] }
+): Promise<void> {
+  if (!updateData.tags && !updateData.images && !updateData.videos) {
+    return
+  }
+
+  const tabData = {
+    tags: updateData.tags || [],
+    images: updateData.images || [],
+    videos: updateData.videos || [],
+  }
+
+  const { data: existingTab } = await db
+    .from("personal_sticks_tabs")
+    .select("id")
+    .eq("personal_stick_id", noteId)
+    .eq("user_id", userId)
+    .eq("tab_type", "main")
+    .single()
+
+  if (existingTab?.id) {
+    await db
+      .from("personal_sticks_tabs")
+      .update({ tab_data: tabData, updated_at: new Date().toISOString() })
+      .eq("id", existingTab.id)
+  } else {
+    await db.from("personal_sticks_tabs").insert([{
+      personal_stick_id: noteId,
+      user_id: userId,
+      tab_type: "main",
+      tab_name: "Main",
+      tab_content: "",
+      tab_data: tabData,
+      tab_order: 1,
+    }])
+  }
+}
+
+/**
+ * Build update payload for note updates
+ */
+function buildNoteUpdatePayload(updateData: Partial<CreateNoteData>): Record<string, unknown> {
+  const payload: Record<string, unknown> = {
+    updated_at: new Date().toISOString(),
+  }
+
+  if (updateData.topic !== undefined) {
+    payload.topic = updateData.topic
+    payload.title = updateData.topic || "Untitled Note"
+  }
+  if (updateData.content !== undefined) payload.content = updateData.content
+  if (updateData.color !== undefined) payload.color = updateData.color
+  if (updateData.position_x !== undefined) payload.position_x = updateData.position_x
+  if (updateData.position_y !== undefined) payload.position_y = updateData.position_y
+  if (updateData.is_shared !== undefined) payload.is_shared = Boolean(updateData.is_shared)
+
+  return payload
+}
+
+// ============================================================================
 // NOTES FUNCTIONS
 // ============================================================================
 
@@ -89,21 +292,14 @@ export async function getNotes(
   filter: "all" | "personal" | "shared" = "all",
 ): Promise<NotesResponse> {
   try {
-    const supabase = createClient()
-    if (!supabase) {
-      throw new Error("Supabase client not initialized")
+    const db = await createDatabaseClient()
+    if (!db) {
+      throw new Error("Database client not initialized")
     }
 
-    const {
-      data: { user },
-      error: authError,
-    } = await supabase.auth.getUser()
-    if (authError || !user) {
-      console.error("Authentication error:", authError)
-      throw new Error("User not authenticated")
-    }
+    const user = await getAuthenticatedUser(db)
 
-    let notesQuery = supabase
+    let notesQuery = db
       .from("personal_sticks")
       .select(
         `
@@ -136,95 +332,35 @@ export async function getNotes(
     const { data: notes, error: notesError } = await notesQuery
 
     if (notesError) {
-      console.error("Database error fetching notes:", notesError)
       throw new Error(`Failed to fetch notes: ${notesError.message}`)
     }
 
-    const notesWithReplies: Note[] = []
+    const notesWithReplies = await Promise.all(
+      ((notes || []) as DatabaseNoteRow[]).map(async (note) => {
+        const { data: replies, error: repliesError } = await db
+          .from("personal_sticks_replies")
+          .select(`id, content, color, created_at, updated_at, user_id, personal_stick_id`)
+          .eq("personal_stick_id", note.id)
+          .order("created_at", { ascending: true })
 
-    for (const note of (notes || []) as DatabaseNoteRow[]) {
-      const { data: replies, error: repliesError } = await supabase
-        .from("personal_sticks_replies")
-        .select(
-          `
-          id,
-          content,
-          color,
-          created_at,
-          updated_at,
-          user_id,
-          personal_stick_id
-        `,
-        )
-        .eq("personal_stick_id", note.id)
-        .order("created_at", { ascending: true })
-
-      if (repliesError) {
-        console.error("Error fetching replies for note:", note.id, repliesError)
-      }
-
-      const typedReplies = (replies || []) as DatabaseReplyRow[]
-
-      // Changed from "note_tabs" to "personal_sticks_tabs"
-      const { data: noteTabs } = await supabase
-        .from("personal_sticks_tabs")
-        .select("*")
-        .eq("personal_stick_id", note.id)
-        .eq("user_id", user.id)
-
-      let tags: string[] = []
-      let images: ImageItem[] = []
-      let videos: VideoItem[] = []
-
-      if (noteTabs) {
-        for (const tab of noteTabs as any[]) {
-          if (tab.tab_data) {
-            const tabData = typeof tab.tab_data === "string" ? JSON.parse(tab.tab_data) : tab.tab_data
-            if (tabData.tags && Array.isArray(tabData.tags)) {
-              tags = [...tags, ...tabData.tags]
-            }
-            if (tabData.images && Array.isArray(tabData.images)) {
-              images = [...images, ...tabData.images]
-            }
-            if (tabData.videos && Array.isArray(tabData.videos)) {
-              videos = [...videos, ...tabData.videos]
-            }
-          }
+        if (repliesError) {
+          console.error("Error fetching replies for note:", note.id, repliesError)
         }
-      }
 
-      const transformedNote: Note = {
-        id: note.id,
-        title: note.title || note.topic || "Untitled Note",
-        topic: note.topic || "",
-        content: note.content || "",
-        color: note.color || "#fef3c7",
-        position_x: note.position_x || 0,
-        position_y: note.position_y || 0,
-        is_shared: Boolean(note.is_shared),
-        z_index: note.z_index || undefined,
-        is_pinned: note.is_pinned || undefined,
-        tags: tags,
-        images: images,
-        videos: videos,
-        created_at: note.created_at,
-        updated_at: note.updated_at,
-        user_id: note.user_id,
-        replies: typedReplies.map((reply) => ({
-          id: reply.id,
-          content: reply.content || "",
-          color: reply.color || "#ffffff",
-          created_at: reply.created_at,
-          updated_at: reply.updated_at || reply.created_at,
-          user_id: reply.user_id,
-          note_id: reply.personal_stick_id, // Keep note_id for backwards compatibility
-        })),
-      }
+        const { data: noteTabs } = await db
+          .from("personal_sticks_tabs")
+          .select("*")
+          .eq("personal_stick_id", note.id)
+          .eq("user_id", user.id)
 
-      notesWithReplies.push(transformedNote)
-    }
+        const tabData = extractDataFromTabs(noteTabs as any[] | null)
+        const typedReplies = ((replies || []) as DatabaseReplyRow[]).map(transformReply)
 
-    const { count: totalCount } = await supabase
+        return transformDatabaseNote(note, tabData, typedReplies)
+      })
+    )
+
+    const { count: totalCount } = await db
       .from("personal_sticks")
       .select("*", { count: "exact", head: true })
       .eq("user_id", user.id)
@@ -245,16 +381,8 @@ export async function getNotes(
  */
 export async function createNote(noteData: CreateNoteData): Promise<Note> {
   try {
-    const supabase = createClient()
-
-    const {
-      data: { user },
-      error: authError,
-    } = await supabase.auth.getUser()
-    if (authError || !user) {
-      console.error("Authentication error:", authError)
-      throw new Error("User not authenticated")
-    }
+    const db = await createDatabaseClient()
+    const user = await getAuthenticatedUser(db)
 
     interface NotesInsertPayload {
       user_id: string
@@ -282,7 +410,7 @@ export async function createNote(noteData: CreateNoteData): Promise<Note> {
       is_pinned: false,
     }
 
-    const { data: noteRaw, error } = await (supabase as any)
+    const { data: noteRaw, error } = await (db as any)
       .from("personal_sticks")
       .insert([noteToCreate])
       .select(
@@ -307,7 +435,6 @@ export async function createNote(noteData: CreateNoteData): Promise<Note> {
     const note = noteRaw as DatabaseNoteRow | null
 
     if (error) {
-      console.error("Database error creating note:", error)
       throw new Error(`Failed to create note: ${error.message}`)
     }
 
@@ -316,47 +443,32 @@ export async function createNote(noteData: CreateNoteData): Promise<Note> {
     }
 
     if (noteData.tags || noteData.images || noteData.videos) {
-      const tabData = {
+      const tabDataPayload = {
         tags: noteData.tags || [],
         images: noteData.images || [],
         videos: noteData.videos || [],
       }
 
-      // Changed from "note_tabs" to "personal_sticks_tabs", note_id to personal_stick_id
-      await (supabase as any).from("personal_sticks_tabs").insert([
+      await (db as any).from("personal_sticks_tabs").insert([
         {
           personal_stick_id: note.id,
           user_id: user.id,
           tab_type: "main",
           tab_name: "Main",
           tab_content: "",
-          tab_data: tabData,
+          tab_data: tabDataPayload,
           tab_order: 1,
         },
       ])
     }
 
-    const transformedNote: Note = {
-      id: note.id,
-      title: note.title || note.topic || "Untitled Note",
-      topic: note.topic || "",
-      content: note.content || "",
-      color: note.color || "#fef3c7",
-      position_x: note.position_x || 0,
-      position_y: note.position_y || 0,
-      is_shared: Boolean(note.is_shared),
-      z_index: note.z_index || undefined,
-      is_pinned: note.is_pinned || undefined,
+    const tabData: ExtractedTabData = {
       tags: noteData.tags || [],
       images: [],
       videos: [],
-      created_at: note.created_at,
-      updated_at: note.updated_at,
-      user_id: note.user_id,
-      replies: [],
     }
 
-    return transformedNote
+    return transformDatabaseNote(note, tabData, [])
   } catch (error) {
     console.error("Error in createNote:", error)
     throw error
@@ -368,48 +480,16 @@ export async function createNote(noteData: CreateNoteData): Promise<Note> {
  */
 export async function updateNote(noteData: UpdateNoteData): Promise<Note> {
   try {
-    const supabase = createClient()
-    if (!supabase) {
-      throw new Error("Supabase client not initialized")
+    const db = await createDatabaseClient()
+    if (!db) {
+      throw new Error("Database client not initialized")
     }
 
-    const {
-      data: { user },
-      error: authError,
-    } = await supabase.auth.getUser()
-    if (authError || !user) {
-      console.error("Authentication error:", authError)
-      throw new Error("User not authenticated")
-    }
-
+    const user = await getAuthenticatedUser(db)
     const { id, ...updateData } = noteData
+    const updatePayload = buildNoteUpdatePayload(updateData)
 
-    const updatePayload: Partial<{
-      title: string
-      topic: string
-      content: string
-      color: string
-      position_x: number
-      position_y: number
-      is_shared: boolean
-      z_index: number
-      is_pinned: boolean
-      updated_at: string
-    }> = {
-      updated_at: new Date().toISOString(),
-    }
-
-    if (updateData.topic !== undefined) {
-      updatePayload.topic = updateData.topic
-      updatePayload.title = updateData.topic || "Untitled Note"
-    }
-    if (updateData.content !== undefined) updatePayload.content = updateData.content
-    if (updateData.color !== undefined) updatePayload.color = updateData.color
-    if (updateData.position_x !== undefined) updatePayload.position_x = updateData.position_x
-    if (updateData.position_y !== undefined) updatePayload.position_y = updateData.position_y
-    if (updateData.is_shared !== undefined) updatePayload.is_shared = Boolean(updateData.is_shared)
-
-    const { data: noteRaw, error } = await (supabase as any)
+    const { data: noteRaw, error } = await (db as any)
       .from("personal_sticks")
       .update(updatePayload)
       .eq("id", id)
@@ -436,7 +516,6 @@ export async function updateNote(noteData: UpdateNoteData): Promise<Note> {
     const note = (noteRaw ?? {}) as Partial<Note>
 
     if (error) {
-      console.error("Database error updating note:", error)
       throw new Error(`Failed to update note: ${error.message}`)
     }
 
@@ -444,125 +523,24 @@ export async function updateNote(noteData: UpdateNoteData): Promise<Note> {
       throw new Error("Note not found or you don't have permission to update it")
     }
 
-    if (updateData.tags || updateData.images || updateData.videos) {
-      const tabData = {
-        tags: updateData.tags || [],
-        images: updateData.images || [],
-        videos: updateData.videos || [],
-      }
+    await upsertNoteTabData(db, id, user.id, updateData)
 
-      // Changed from "note_tabs" to "personal_sticks_tabs", note_id to personal_stick_id
-      const { data: existingTab } = await (supabase as any)
-        .from("personal_sticks_tabs")
-        .select("id")
-        .eq("personal_stick_id", id)
-        .eq("user_id", user.id)
-        .eq("tab_type", "main")
-        .single()
-
-      if (existingTab && existingTab.id) {
-        await (supabase as any)
-          .from("personal_sticks_tabs")
-          .update({ tab_data: tabData, updated_at: new Date().toISOString() })
-          .eq("id", existingTab.id)
-      } else {
-        await (supabase as any).from("personal_sticks_tabs").insert([
-          {
-            personal_stick_id: id,
-            user_id: user.id,
-            tab_type: "main",
-            tab_name: "Main",
-            tab_content: "",
-            tab_data: tabData,
-            tab_order: 1,
-          },
-        ])
-      }
-    }
-
-    const { data: repliesData } = await supabase
+    const { data: repliesData } = await db
       .from("personal_sticks_replies")
-      .select(
-        `
-        id,
-        content,
-        color,
-        created_at,
-        updated_at,
-        user_id,
-        personal_stick_id
-      `,
-      )
+      .select(`id, content, color, created_at, updated_at, user_id, personal_stick_id`)
       .eq("personal_stick_id", typeof note.id === "string" && note.id ? note.id : "")
       .order("created_at", { ascending: true })
-    const replies = repliesData || []
 
-    // Changed from "note_tabs" to "personal_sticks_tabs"
-    const { data: noteTabs } = await supabase
+    const { data: noteTabs } = await db
       .from("personal_sticks_tabs")
       .select("*")
       .eq("personal_stick_id", id)
       .eq("user_id", user.id)
 
-    let tags: string[] = []
-    let images: ImageItem[] = []
-    let videos: VideoItem[] = []
+    const tabData = extractDataFromTabs(noteTabs as any[] | null)
+    const typedReplies = ((repliesData || []) as any[]).map(transformReplyFromRaw)
 
-    if (noteTabs) {
-      for (const tab of noteTabs as any[]) {
-        if (tab.tab_data) {
-          const tabData = typeof tab.tab_data === "string" ? JSON.parse(tab.tab_data) : tab.tab_data
-          if (tabData.tags && Array.isArray(tabData.tags)) {
-            tags = [...tags, ...tabData.tags]
-          }
-          if (tabData.images && Array.isArray(tabData.images)) {
-            images = [...images, ...tabData.images]
-          }
-          if (tabData.videos && Array.isArray(tabData.videos)) {
-            videos = [...videos, ...tabData.videos]
-          }
-        }
-      }
-    }
-
-    const transformedNote: Note = {
-      id: typeof note.id === "string" && note.id ? note.id : "unknown-id",
-      topic: note.topic || "",
-      title: note.title || note.topic || "Untitled Note",
-      content: note.content || "",
-      color: note.color || "#fef3c7",
-      position_x: note.position_x || 0,
-      position_y: note.position_y || 0,
-      is_shared: Boolean(note.is_shared),
-      z_index: note.z_index || undefined,
-      is_pinned: note.is_pinned || undefined,
-      tags: tags,
-      images: images,
-      videos: videos,
-      created_at: typeof note.created_at === "string" && note.created_at ? note.created_at : new Date().toISOString(),
-      updated_at: typeof note.updated_at === "string" && note.updated_at ? note.updated_at : new Date().toISOString(),
-      user_id: typeof note.user_id === "string" && note.user_id ? note.user_id : "unknown-user",
-      replies: (replies || []).map((reply: unknown) => {
-        const r = reply as any
-        return {
-          id: typeof r.id === "string" && r.id ? r.id : "unknown-reply-id",
-          content: r.content || "",
-          color: r.color || "#ffffff",
-          created_at: typeof r.created_at === "string" && r.created_at ? r.created_at : new Date().toISOString(),
-          updated_at:
-            typeof r.updated_at === "string" && r.updated_at
-              ? r.updated_at
-              : typeof r.created_at === "string" && r.created_at
-                ? r.created_at
-                : new Date().toISOString(),
-          user_id: typeof r.user_id === "string" && r.user_id ? r.user_id : "unknown-user",
-          note_id:
-            typeof r.personal_stick_id === "string" && r.personal_stick_id ? r.personal_stick_id : "unknown-note-id",
-        }
-      }),
-    }
-
-    return transformedNote
+    return transformPartialNote(note, tabData, typedReplies)
   } catch (error) {
     console.error("Error in updateNote:", error)
     throw error
@@ -574,21 +552,14 @@ export async function updateNote(noteData: UpdateNoteData): Promise<Note> {
  */
 export async function updateNotePosition(noteId: string, x: number, y: number): Promise<Note> {
   try {
-    const supabase = createClient()
-    if (!supabase) {
-      throw new Error("Supabase client not initialized")
+    const db = await createDatabaseClient()
+    if (!db) {
+      throw new Error("Database client not initialized")
     }
 
-    const {
-      data: { user },
-      error: authError,
-    } = await supabase.auth.getUser()
-    if (authError || !user) {
-      console.error("Authentication error:", authError)
-      throw new Error("User not authenticated")
-    }
+    const user = await getAuthenticatedUser(db)
 
-    const { data: noteRaw, error } = await (supabase as any)
+    const { data: noteRaw, error } = await (db as any)
       .from("personal_sticks")
       .update({
         position_x: x,
@@ -619,7 +590,6 @@ export async function updateNotePosition(noteId: string, x: number, y: number): 
     const note = (noteRaw ?? {}) as Partial<Note>
 
     if (error) {
-      console.error("Database error updating note position:", error)
       throw new Error(`Failed to update note position: ${error.message}`)
     }
 
@@ -627,90 +597,24 @@ export async function updateNotePosition(noteId: string, x: number, y: number): 
       throw new Error("Note not found or you don't have permission to update it")
     }
 
-    const { data: replies } = await supabase
+    const noteIdStr = typeof note.id === "string" && note.id ? note.id : ""
+
+    const { data: replies } = await db
       .from("personal_sticks_replies")
-      .select(
-        `
-        id,
-        content,
-        color,
-        created_at,
-        updated_at,
-        user_id,
-        personal_stick_id
-      `,
-      )
-      .eq("personal_stick_id", typeof note.id === "string" && note.id ? note.id : "")
+      .select(`id, content, color, created_at, updated_at, user_id, personal_stick_id`)
+      .eq("personal_stick_id", noteIdStr)
       .order("created_at", { ascending: true })
 
-    const repliesArray: any[] = replies || []
-
-    // Changed from "note_tabs" to "personal_sticks_tabs"
-    const { data: noteTabs } = await supabase
+    const { data: noteTabs } = await db
       .from("personal_sticks_tabs")
       .select("*")
-      .eq("personal_stick_id", typeof note.id === "string" && note.id ? note.id : "")
+      .eq("personal_stick_id", noteIdStr)
       .eq("user_id", user.id)
 
-    let tags: string[] = []
-    let images: ImageItem[] = []
-    let videos: VideoItem[] = []
+    const tabData = extractDataFromTabs(noteTabs as any[] | null)
+    const typedReplies = ((replies || []) as any[]).map(transformReplyFromRaw)
 
-    if (noteTabs) {
-      for (const tab of noteTabs as any[]) {
-        if (tab.tab_data) {
-          const tabData = typeof tab.tab_data === "string" ? JSON.parse(tab.tab_data) : tab.tab_data
-          if (tabData.tags && Array.isArray(tabData.tags)) {
-            tags = [...tags, ...tabData.tags]
-          }
-          if (tabData.images && Array.isArray(tabData.images)) {
-            images = [...images, ...tabData.images]
-          }
-          if (tabData.videos && Array.isArray(tabData.videos)) {
-            videos = [...videos, ...tabData.videos]
-          }
-        }
-      }
-    }
-
-    const transformedNote: Note = {
-      id: typeof note.id === "string" && note.id ? note.id : "unknown-id",
-      topic: note.topic || "",
-      title: note.title || note.topic || "Untitled Note",
-      content: note.content || "",
-      color: note.color || "#fef3c7",
-      position_x: note.position_x || 0,
-      position_y: note.position_y || 0,
-      is_shared: Boolean(note.is_shared),
-      z_index: note.z_index || undefined,
-      is_pinned: note.is_pinned || undefined,
-      tags: tags,
-      images: images,
-      videos: videos,
-      created_at: typeof note.created_at === "string" && note.created_at ? note.created_at : new Date().toISOString(),
-      updated_at: typeof note.updated_at === "string" && note.updated_at ? note.updated_at : new Date().toISOString(),
-      user_id: typeof note.user_id === "string" && note.user_id ? note.user_id : "unknown-user",
-      replies: repliesArray.map((reply: unknown) => {
-        const r = reply as any
-        return {
-          id: typeof r.id === "string" && r.id ? r.id : "unknown-reply-id",
-          content: r.content || "",
-          color: r.color || "#ffffff",
-          created_at: typeof r.created_at === "string" && r.created_at ? r.created_at : new Date().toISOString(),
-          updated_at:
-            typeof r.updated_at === "string" && r.updated_at
-              ? r.updated_at
-              : typeof r.created_at === "string" && r.created_at
-                ? r.created_at
-                : new Date().toISOString(),
-          user_id: typeof r.user_id === "string" && r.user_id ? r.user_id : "unknown-user",
-          note_id:
-            typeof r.personal_stick_id === "string" && r.personal_stick_id ? r.personal_stick_id : "unknown-note-id",
-        }
-      }),
-    }
-
-    return transformedNote
+    return transformPartialNote(note, tabData, typedReplies)
   } catch (error) {
     console.error("Error in updateNotePosition:", error)
     throw error
@@ -722,24 +626,16 @@ export async function updateNotePosition(noteId: string, x: number, y: number): 
  */
 export async function deleteNote(noteId: string): Promise<void> {
   try {
-    const supabase = createClient()
-    if (!supabase) {
-      throw new Error("Supabase client not initialized")
+    const db = await createDatabaseClient()
+    if (!db) {
+      throw new Error("Database client not initialized")
     }
 
-    const {
-      data: { user },
-      error: authError,
-    } = await supabase.auth.getUser()
-    if (authError || !user) {
-      console.error("Authentication error:", authError)
-      throw new Error("User not authenticated")
-    }
+    const user = await getAuthenticatedUser(db)
 
-    const { error } = await supabase.from("personal_sticks").delete().eq("id", noteId).eq("user_id", user.id)
+    const { error } = await db.from("personal_sticks").delete().eq("id", noteId).eq("user_id", user.id)
 
     if (error) {
-      console.error("Database error deleting note:", error)
       throw new Error(`Failed to delete note: ${error.message}`)
     }
   } catch (error) {
@@ -753,22 +649,15 @@ export async function deleteNote(noteId: string): Promise<void> {
  */
 export async function createReply(replyData: CreateReplyData): Promise<Reply> {
   try {
-    const supabase = createClient()
-    if (!supabase) {
-      throw new Error("Supabase client not initialized")
+    const db = await createDatabaseClient()
+    if (!db) {
+      throw new Error("Database client not initialized")
     }
 
-    const {
-      data: { user },
-      error: authError,
-    } = await supabase.auth.getUser()
-    if (authError || !user) {
-      console.error("Authentication error:", authError)
-      throw new Error("User not authenticated")
-    }
+    const user = await getAuthenticatedUser(db)
 
     const replyToCreate: ReplyInsertPayload = {
-      personal_stick_id: replyData.note_id, // Map note_id to personal_stick_id
+      personal_stick_id: replyData.note_id,
       user_id: user.id,
       content: replyData.content || "",
       color: replyData.color || "#ffffff",
@@ -776,26 +665,15 @@ export async function createReply(replyData: CreateReplyData): Promise<Reply> {
       updated_at: new Date().toISOString(),
     }
 
-    const { data: replyRaw, error } = await (supabase as any)
+    const { data: replyRaw, error } = await (db as any)
       .from("personal_sticks_replies")
       .insert([replyToCreate])
-      .select(
-        `
-        id,
-        content,
-        color,
-        created_at,
-        updated_at,
-        user_id,
-        personal_stick_id
-      `,
-      )
+      .select(`id, content, color, created_at, updated_at, user_id, personal_stick_id`)
       .single()
 
     const reply = replyRaw as DatabaseReplyRow | null
 
     if (error) {
-      console.error("Database error creating reply:", error)
       throw new Error(`Failed to create reply: ${error.message}`)
     }
 
@@ -803,15 +681,7 @@ export async function createReply(replyData: CreateReplyData): Promise<Reply> {
       throw new Error("Reply was not created")
     }
 
-    return {
-      id: reply.id,
-      content: reply.content || "",
-      color: reply.color || "#ffffff",
-      created_at: reply.created_at,
-      updated_at: reply.updated_at || reply.created_at,
-      user_id: reply.user_id,
-      note_id: reply.personal_stick_id,
-    }
+    return transformReply(reply)
   } catch (error) {
     console.error("Error in createReply:", error)
     throw error

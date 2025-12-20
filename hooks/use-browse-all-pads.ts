@@ -40,9 +40,11 @@ export function useBrowseAllPads(open: boolean) {
     }
   }
 
+  /* eslint-disable react-hooks/exhaustive-deps */
   useEffect(() => {
     fetchAllPads()
   }, [open])
+  /* eslint-enable react-hooks/exhaustive-deps */
 
   return { pads, isLoading, error, refetch: fetchAllPads }
 }

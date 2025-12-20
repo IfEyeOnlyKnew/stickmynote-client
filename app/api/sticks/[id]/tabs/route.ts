@@ -1,5 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { createSupabaseServer } from "@/lib/supabase-server"
+import { createServiceDatabaseClient } from "@/lib/database/database-adapter"
+import type { DatabaseClient } from "@/lib/database/database-adapter"
 import { validateUUID } from "@/lib/input-validation-enhanced"
 import { applyRateLimit } from "@/lib/rate-limiter-enhanced"
 import { getOrgContext } from "@/lib/auth/get-org-context"
@@ -65,6 +66,28 @@ async function safeRateLimit(request: NextRequest, userId: string, action: strin
   }
 }
 
+// Helper: Get tab name based on tab_type
+function getTabName(tabType: string): string {
+  const tabNames: Record<string, string> = {
+    videos: "Videos",
+    images: "Images",
+    tags: "Tags",
+    links: "Links",
+  }
+  return tabNames[tabType] || "Details"
+}
+
+// Helper: Get tab order based on tab_type
+function getTabOrder(tabType: string): number {
+  const tabOrders: Record<string, number> = {
+    videos: 1,
+    images: 2,
+    tags: 3,
+    links: 4,
+  }
+  return tabOrders[tabType] ?? 5
+}
+
 function normalizeTabData(input: any): {
   videos?: VideoInfo[]
   images?: ImageInfo[]
@@ -91,14 +114,14 @@ function normalizeTabData(input: any): {
 }
 
 async function checkStickPermissions(
-  supabase: any,
+  db: DatabaseClient,
   stickId: string,
   userId: string,
   orgId: string,
   action: "read" | "write",
 ) {
   // Get stick and pad info with org_id filter
-  const { data: stick, error: stickError } = await supabase
+  const { data: stick, error: stickError } = await db
     .from("paks_pad_sticks")
     .select("id, user_id, pad_id, org_id")
     .eq("id", stickId)
@@ -115,7 +138,7 @@ async function checkStickPermissions(
   }
 
   // Check pad permissions with org_id filter
-  const { data: pad } = await supabase
+  const { data: pad } = await db
     .from("paks_pads")
     .select("owner_id")
     .eq("id", stick.pad_id)
@@ -128,7 +151,7 @@ async function checkStickPermissions(
   }
 
   // Check pad membership
-  const { data: membership } = await supabase
+  const { data: membership } = await db
     .from("paks_pad_members")
     .select("role")
     .eq("pad_id", stick.pad_id)
@@ -163,7 +186,7 @@ export async function GET(request: NextRequest, context: { params: Promise<{ id:
       return createUnauthorizedResponse()
     }
 
-    const supabase = await createSupabaseServer()
+    const db = await createServiceDatabaseClient()
 
     const orgContext = await getOrgContext(user.id)
     if (!orgContext) {
@@ -181,7 +204,7 @@ export async function GET(request: NextRequest, context: { params: Promise<{ id:
     }
 
     const { hasPermission, error: permError } = await checkStickPermissions(
-      supabase,
+      db,
       stickId,
       user.id,
       orgContext.orgId,
@@ -191,7 +214,7 @@ export async function GET(request: NextRequest, context: { params: Promise<{ id:
       return NextResponse.json({ error: permError || "Permission denied" }, { status: 403 })
     }
 
-    const { data, error } = await supabase
+    const { data, error } = await db
       .from("paks_pad_stick_tabs")
       .select("id, stick_id, tab_name, tab_type, tab_content, tab_data, tab_order, created_at, updated_at, org_id")
       .eq("stick_id", stickId)
@@ -232,7 +255,7 @@ export async function GET(request: NextRequest, context: { params: Promise<{ id:
         },
       ]
 
-      const { data: createdTabs, error: createError } = await supabase
+      const { data: createdTabs, error: createError } = await db
         .from("paks_pad_stick_tabs")
         .insert(defaultTabs)
         .select("id, stick_id, tab_name, tab_type, tab_content, tab_data, tab_order, created_at, updated_at, org_id")
@@ -254,6 +277,55 @@ export async function GET(request: NextRequest, context: { params: Promise<{ id:
   }
 }
 
+// Helper: Create tab item based on type
+function createTabItem(
+  tabType: string,
+  url: string | undefined,
+  title: string | undefined,
+  type: string | undefined,
+  thumbnail: string | undefined,
+  metadata: Record<string, any> | undefined,
+): { key: string; item: any } | null {
+  const now = Date.now()
+  const isoNow = new Date().toISOString()
+
+  if (tabType === "videos" && url) {
+    return {
+      key: "videos",
+      item: {
+        id: `video_${now}`,
+        url,
+        title: title || `Video ${now}`,
+        thumbnail,
+        added_at: isoNow,
+        ...metadata,
+      } as VideoInfo,
+    }
+  }
+
+  if (tabType === "images" && url) {
+    return {
+      key: "images",
+      item: {
+        id: `image_${now}`,
+        url,
+        title: title || `Image ${now}`,
+        ...metadata,
+      } as ImageInfo,
+    }
+  }
+
+  if (tabType === "tags" && type) {
+    return { key: "tags", item: type }
+  }
+
+  if (tabType === "links" && url) {
+    return { key: "links", item: url }
+  }
+
+  return null
+}
+
 // POST /api/sticks/[id]/tabs
 export async function POST(request: NextRequest, context: { params: Promise<{ id: string }> }) {
   try {
@@ -267,7 +339,7 @@ export async function POST(request: NextRequest, context: { params: Promise<{ id
       return createUnauthorizedResponse()
     }
 
-    const supabase = await createSupabaseServer()
+    const db = await createServiceDatabaseClient()
 
     const orgContext = await getOrgContext(user.id)
     if (!orgContext) {
@@ -285,7 +357,7 @@ export async function POST(request: NextRequest, context: { params: Promise<{ id
     }
 
     const { hasPermission, error: permError } = await checkStickPermissions(
-      supabase,
+      db,
       stickId,
       user.id,
       orgContext.orgId,
@@ -298,7 +370,7 @@ export async function POST(request: NextRequest, context: { params: Promise<{ id
     const body = await request.json()
     const { tab_type, type, url, title, thumbnail, metadata } = body
 
-    const { data: existingTab } = await supabase
+    const { data: existingTab } = await db
       .from("paks_pad_stick_tabs")
       .select("id, tab_data")
       .eq("stick_id", stickId)
@@ -308,33 +380,16 @@ export async function POST(request: NextRequest, context: { params: Promise<{ id
 
     const tabData = normalizeTabData(existingTab?.tab_data || {})
 
-    // Add new item based on type
-    if (tab_type === "videos" && url) {
-      const videoItem: VideoInfo = {
-        id: `video_${Date.now()}`,
-        url,
-        title: title || `Video ${Date.now()}`,
-        thumbnail,
-        added_at: new Date().toISOString(),
-        ...metadata,
-      }
-      tabData.videos = [...(tabData.videos || []), videoItem]
-    } else if (tab_type === "images" && url) {
-      const imageItem: ImageInfo = {
-        id: `image_${Date.now()}`,
-        url,
-        title: title || `Image ${Date.now()}`,
-        ...metadata,
-      }
-      tabData.images = [...(tabData.images || []), imageItem]
-    } else if (tab_type === "tags" && type) {
-      tabData.tags = [...(tabData.tags || []), type]
-    } else if (tab_type === "links" && url) {
-      tabData.links = [...(tabData.links || []), url]
+    // Add new item based on type using helper
+    const newItem = createTabItem(tab_type, url, title, type, thumbnail, metadata)
+    if (newItem) {
+      const key = newItem.key as keyof typeof tabData
+      const currentItems = (tabData[key] as any[]) || []
+      ;(tabData as any)[key] = [...currentItems, newItem.item]
     }
 
     if (existingTab) {
-      const { data: updatedTab, error } = await supabase
+      const { data: updatedTab, error } = await db
         .from("paks_pad_stick_tabs")
         .update({
           tab_data: tabData,
@@ -352,35 +407,17 @@ export async function POST(request: NextRequest, context: { params: Promise<{ id
 
       return NextResponse.json({ tab: updatedTab })
     } else {
-      const { data: newTab, error } = await supabase
+      const { data: newTab, error } = await db
         .from("paks_pad_stick_tabs")
         .insert({
           stick_id: stickId,
           user_id: user.id,
           org_id: orgContext.orgId,
-          tab_name:
-            tab_type === "videos"
-              ? "Videos"
-              : tab_type === "images"
-                ? "Images"
-                : tab_type === "tags"
-                  ? "Tags"
-                  : tab_type === "links"
-                    ? "Links"
-                    : "Details",
+          tab_name: getTabName(tab_type),
           tab_type,
           tab_content: "",
           tab_data: tabData,
-          tab_order:
-            tab_type === "videos"
-              ? 1
-              : tab_type === "images"
-                ? 2
-                : tab_type === "tags"
-                  ? 3
-                  : tab_type === "links"
-                    ? 4
-                    : 5,
+          tab_order: getTabOrder(tab_type),
         })
         .select()
         .single()
@@ -411,7 +448,7 @@ export async function PUT(request: NextRequest, context: { params: Promise<{ id:
       return createUnauthorizedResponse()
     }
 
-    const supabase = await createSupabaseServer()
+    const db = await createServiceDatabaseClient()
 
     const orgContext = await getOrgContext(user.id)
     if (!orgContext) {
@@ -429,7 +466,7 @@ export async function PUT(request: NextRequest, context: { params: Promise<{ id:
     }
 
     const { hasPermission, error: permError } = await checkStickPermissions(
-      supabase,
+      db,
       stickId,
       user.id,
       orgContext.orgId,
@@ -442,7 +479,7 @@ export async function PUT(request: NextRequest, context: { params: Promise<{ id:
     const body = await request.json()
     const { tab_type, tab_data } = body
 
-    const { data: existingTab } = await supabase
+    const { data: existingTab } = await db
       .from("paks_pad_stick_tabs")
       .select("id, tab_data")
       .eq("stick_id", stickId)
@@ -451,7 +488,7 @@ export async function PUT(request: NextRequest, context: { params: Promise<{ id:
       .maybeSingle()
 
     if (existingTab) {
-      const { data: updatedTab, error } = await supabase
+      const { data: updatedTab, error } = await db
         .from("paks_pad_stick_tabs")
         .update({
           tab_data: normalizeTabData(tab_data),
@@ -469,35 +506,17 @@ export async function PUT(request: NextRequest, context: { params: Promise<{ id:
 
       return NextResponse.json({ tab: { ...updatedTab, tab_data: normalizeTabData(updatedTab.tab_data) } })
     } else {
-      const { data: newTab, error } = await supabase
+      const { data: newTab, error } = await db
         .from("paks_pad_stick_tabs")
         .insert({
           stick_id: stickId,
           user_id: user.id,
           org_id: orgContext.orgId,
-          tab_name:
-            tab_type === "videos"
-              ? "Videos"
-              : tab_type === "images"
-                ? "Images"
-                : tab_type === "tags"
-                  ? "Tags"
-                  : tab_type === "links"
-                    ? "Links"
-                    : "Details",
+          tab_name: getTabName(tab_type),
           tab_type,
           tab_content: "",
           tab_data: normalizeTabData(tab_data),
-          tab_order:
-            tab_type === "videos"
-              ? 1
-              : tab_type === "images"
-                ? 2
-                : tab_type === "tags"
-                  ? 3
-                  : tab_type === "links"
-                    ? 4
-                    : 5,
+          tab_order: getTabOrder(tab_type),
         })
         .select("id, stick_id, tab_name, tab_type, tab_content, tab_data, tab_order, created_at, updated_at, org_id")
         .single()

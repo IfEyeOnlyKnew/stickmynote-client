@@ -6,6 +6,7 @@ import { useToast } from "@/hooks/use-toast"
 import { useAccessCode } from "@/hooks/use-access-code"
 import { useAuthModal } from "@/hooks/use-auth-modal"
 import { useAuthForm } from "@/hooks/use-auth-form"
+import { useUser } from "@/contexts/user-context"
 import { AccessCodeForm } from "@/components/auth/AccessCodeForm"
 import { SignInForm } from "@/components/auth/SignInForm"
 import { SignUpForm } from "@/components/auth/SignUpForm"
@@ -17,9 +18,10 @@ interface AuthFormModalProps {
   onSuccess?: () => void
 }
 
-export function AuthFormModal({ mode = "signin", onSuccess }: AuthFormModalProps) {
+export function AuthFormModal({ mode = "signin", onSuccess }: Readonly<AuthFormModalProps>) {
   const { toast } = useToast()
   const initialFocusRef = useRef<HTMLDivElement>(null)
+  const { reloadUser } = useUser()
 
   const { activeTab, handleTabChange, handleAuthSuccess } = useAuthModal({
     initialMode: mode,
@@ -108,6 +110,7 @@ export function AuthFormModal({ mode = "signin", onSuccess }: AuthFormModalProps
               onSubmit={async (data) => {
                 const success = await signIn(data)
                 if (success) {
+                  await reloadUser()
                   handleAuthSuccess()
                 }
                 return success

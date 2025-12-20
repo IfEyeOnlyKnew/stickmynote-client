@@ -66,6 +66,7 @@ export function ManageMembersDialog({ open, onOpenChange, padId, padName }: Mana
       fetchMembers()
       fetchPendingInvites()
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, padId])
 
   const fetchMembers = async () => {
@@ -401,7 +402,7 @@ export function ManageMembersDialog({ open, onOpenChange, padId, padName }: Mana
                     <strong>Viewer:</strong> Can only reply to sticks (read-only for pad/stick content)
                   </p>
                   <p className="text-xs text-purple-600 mt-2">
-                    💡 If the user doesn't have an account, they'll receive an email invitation to sign up.
+                    💡 If the user doesn&apos;t have an account, they&apos;ll receive an email invitation to sign up.
                   </p>
                 </div>
               </div>

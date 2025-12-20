@@ -1,13 +1,13 @@
-import { createClient } from "@/lib/supabase/server"
+import { createDatabaseClient } from "@/lib/database/database-adapter"
 import { type NextRequest, NextResponse } from "next/server"
 import { getCachedAuthUser } from "@/lib/auth/cached-auth"
 
 export async function GET(request: NextRequest, { params }: { params: { stickId: string } }) {
   try {
     const { stickId } = params
-    const supabase = await createClient()
+    const db = await createDatabaseClient()
 
-    const authResult = await getCachedAuthUser(supabase)
+    const authResult = await getCachedAuthUser()
     if (authResult.rateLimited) {
       return NextResponse.json(
         { error: "Too many requests. Please try again later." },
@@ -19,7 +19,7 @@ export async function GET(request: NextRequest, { params }: { params: { stickId:
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
-    const query = supabase.from("social_stick_tabs").select("*").eq("social_stick_id", stickId)
+    const query = db.from("social_stick_tabs").select("*").eq("social_stick_id", stickId)
 
     const { data: tabs, error } = await query
 
@@ -46,9 +46,9 @@ export async function GET(request: NextRequest, { params }: { params: { stickId:
 export async function POST(request: NextRequest, { params }: { params: { stickId: string } }) {
   try {
     const { stickId } = params
-    const supabase = await createClient()
+    const db = await createDatabaseClient()
 
-    const authResult = await getCachedAuthUser(supabase)
+    const authResult = await getCachedAuthUser()
     if (authResult.rateLimited) {
       return NextResponse.json(
         { error: "Too many requests. Please try again later." },
@@ -71,7 +71,7 @@ export async function POST(request: NextRequest, { params }: { params: { stickId
 
     const tabTitle = title || tabName || tabType
 
-    const { data: existingTabs } = await supabase
+    const { data: existingTabs } = await db
       .from("social_stick_tabs")
       .select("*")
       .eq("social_stick_id", stickId)
@@ -80,7 +80,7 @@ export async function POST(request: NextRequest, { params }: { params: { stickId
 
     if (existingTabs) {
       // Update existing tab
-      const { data: tab, error } = await supabase
+      const { data: tab, error } = await db
         .from("social_stick_tabs")
         .update({
           tab_data: finalTabData,
@@ -105,7 +105,7 @@ export async function POST(request: NextRequest, { params }: { params: { stickId
         tab_order: tabOrder,
       }
 
-      const { data: tab, error } = await supabase.from("social_stick_tabs").insert(insertData).select().single()
+      const { data: tab, error } = await db.from("social_stick_tabs").insert(insertData).select().single()
 
       if (error) {
         console.error("[POST /api/social-sticks/tabs] Insert Error:", error)
@@ -123,9 +123,9 @@ export async function POST(request: NextRequest, { params }: { params: { stickId
 export async function DELETE(request: NextRequest, { params }: { params: { stickId: string } }) {
   try {
     const { stickId } = params
-    const supabase = await createClient()
+    const db = await createDatabaseClient()
 
-    const authResult = await getCachedAuthUser(supabase)
+    const authResult = await getCachedAuthUser()
     if (authResult.rateLimited) {
       return NextResponse.json(
         { error: "Too many requests. Please try again later." },
@@ -142,7 +142,7 @@ export async function DELETE(request: NextRequest, { params }: { params: { stick
 
     if (tabId) {
       // Delete entire tab
-      const { error } = await supabase.from("social_stick_tabs").delete().eq("id", tabId)
+      const { error } = await db.from("social_stick_tabs").delete().eq("id", tabId)
 
       if (error) {
         console.error("[DELETE /api/social-sticks/tabs] Error:", error)
@@ -152,7 +152,7 @@ export async function DELETE(request: NextRequest, { params }: { params: { stick
       return NextResponse.json({ success: true })
     } else if (tabType && itemId) {
       // Delete specific item from tab
-      const { data: existingTab, error: selectError } = await supabase
+      const { data: existingTab, error: selectError } = await db
         .from("social_stick_tabs")
         .select("*")
         .eq("social_stick_id", stickId)
@@ -172,7 +172,7 @@ export async function DELETE(request: NextRequest, { params }: { params: { stick
       const items = tabData?.[tabType] || []
       const updatedItems = items.filter((item: unknown) => (item as Record<string, unknown>).id !== itemId)
 
-      const { error } = await supabase
+      const { error } = await db
         .from("social_stick_tabs")
         .update({
           tab_data: { [tabType]: updatedItems },

@@ -14,61 +14,33 @@ export const COLORS = [
   { name: "Lime", value: "#ecfccb", class: "bg-lime-100" },
 ] as const
 
-// Timestamp formatting
-export function getTimestampDisplay(createdAt: string, updatedAt?: string): string {
-  // Handle missing or invalid timestamps
-  if (!createdAt) {
-    return "Just now"
-  }
-
-  const created = new Date(createdAt)
-
-  // Check if date is valid
-  if (isNaN(created.getTime())) {
-    return "Just now"
-  }
-
-  const updated = updatedAt ? new Date(updatedAt) : null
-  const now = new Date()
-
-  const diffMs = now.getTime() - created.getTime()
+// Helper function to format relative time display
+function formatRelativeTime(date: Date, now: Date, capitalize = true): string {
+  const diffMs = now.getTime() - date.getTime()
   const diffMinutes = Math.floor(diffMs / (1000 * 60))
   const diffHours = Math.floor(diffMs / (1000 * 60 * 60))
   const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24))
 
-  let timeDisplay = ""
+  if (diffMinutes < 1) return capitalize ? "Just now" : "just now"
+  if (diffMinutes < 60) return `${diffMinutes}m ago`
+  if (diffHours < 24) return `${diffHours}h ago`
+  if (diffDays < 7) return `${diffDays}d ago`
+  return date.toLocaleDateString()
+}
 
-  if (diffMinutes < 1) {
-    timeDisplay = "Just now"
-  } else if (diffMinutes < 60) {
-    timeDisplay = `${diffMinutes}m ago`
-  } else if (diffHours < 24) {
-    timeDisplay = `${diffHours}h ago`
-  } else if (diffDays < 7) {
-    timeDisplay = `${diffDays}d ago`
-  } else {
-    timeDisplay = created.toLocaleDateString()
-  }
+// Timestamp formatting
+export function getTimestampDisplay(createdAt: string, updatedAt?: string): string {
+  if (!createdAt) return "Just now"
 
+  const created = new Date(createdAt)
+  if (isNaN(created.getTime())) return "Just now"
+
+  const now = new Date()
+  const timeDisplay = formatRelativeTime(created, now)
+
+  const updated = updatedAt ? new Date(updatedAt) : null
   if (updated && updated.getTime() !== created.getTime()) {
-    const updatedDiffMs = now.getTime() - updated.getTime()
-    const updatedDiffMinutes = Math.floor(updatedDiffMs / (1000 * 60))
-    const updatedDiffHours = Math.floor(updatedDiffMs / (1000 * 60 * 60))
-    const updatedDiffDays = Math.floor(updatedDiffMs / (1000 * 60 * 60 * 24))
-
-    let updatedDisplay = ""
-    if (updatedDiffMinutes < 1) {
-      updatedDisplay = "just now"
-    } else if (updatedDiffMinutes < 60) {
-      updatedDisplay = `${updatedDiffMinutes}m ago`
-    } else if (updatedDiffHours < 24) {
-      updatedDisplay = `${updatedDiffHours}h ago`
-    } else if (updatedDiffDays < 7) {
-      updatedDisplay = `${updatedDiffDays}d ago`
-    } else {
-      updatedDisplay = updated.toLocaleDateString()
-    }
-
+    const updatedDisplay = formatRelativeTime(updated, now, false)
     return `Created ${timeDisplay}, updated ${updatedDisplay}`
   }
 
@@ -150,8 +122,10 @@ export function generateEmbedUrl(
       return `https://rumble.com/embed/${videoId}/`
     case "loom":
       return `https://www.loom.com/embed/${videoId}`
-    case "figma":
-      return `https://www.figma.com/embed?embed_host=share&url=${encodeURIComponent(url || `https://www.figma.com/file/${videoId}`)}`
+    case "figma": {
+      const figmaUrl = url || `https://www.figma.com/file/${videoId}`
+      return `https://www.figma.com/embed?embed_host=share&url=${encodeURIComponent(figmaUrl)}`
+    }
     case "google-docs":
       return url?.replace("/edit", "/preview") || `https://docs.google.com/document/d/${videoId}/preview`
     default:
@@ -357,9 +331,11 @@ export function getVideoEmbedUrl(video: { platform: string; embed_id: string; ur
     case "loom":
       embedUrl = `https://www.loom.com/embed/${video.embed_id}`
       break
-    case "figma":
-      embedUrl = `https://www.figma.com/embed?embed_host=share&url=${encodeURIComponent(video.url || `https://www.figma.com/file/${video.embed_id}`)}`
+    case "figma": {
+      const figmaUrl = video.url || `https://www.figma.com/file/${video.embed_id}`
+      embedUrl = `https://www.figma.com/embed?embed_host=share&url=${encodeURIComponent(figmaUrl)}`
       break
+    }
     case "google-docs":
       embedUrl =
         video.url?.replace("/edit", "/preview") || `https://docs.google.com/document/d/${video.embed_id}/preview`
@@ -677,7 +653,7 @@ export function normalizeVideoData(video: any): VideoItem | null {
 }
 
 // Export enhanced default object with new utilities
-export default {
+const noteUtils = {
   COLORS,
   getTimestampDisplay,
   formatFileSize,
@@ -711,3 +687,5 @@ export default {
   validateReplyContent,
   normalizeVideoData,
 }
+
+export default noteUtils

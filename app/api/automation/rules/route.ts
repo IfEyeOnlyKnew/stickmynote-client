@@ -1,13 +1,13 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { createClient } from "@/lib/supabase/server"
+import { createDatabaseClient } from "@/lib/database/database-adapter"
 import { automationRuleSchema } from "@/types/automation"
 import { getOrgContext } from "@/lib/auth/get-org-context"
 import { getCachedAuthUser } from "@/lib/auth/cached-auth"
 
 export async function GET(req: NextRequest) {
   try {
-    const supabase = await createClient()
-    const authResult = await getCachedAuthUser(supabase)
+    const db = await createDatabaseClient()
+    const authResult = await getCachedAuthUser()
 
     if (authResult.rateLimited) {
       return NextResponse.json(
@@ -27,7 +27,7 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: "No organization context" }, { status: 403 })
     }
 
-    const { data: rules, error } = await supabase
+    const { data: rules, error } = await db
       .from("automation_rules")
       .select("*")
       .eq("user_id", user.id)
@@ -38,14 +38,15 @@ export async function GET(req: NextRequest) {
 
     return NextResponse.json({ rules })
   } catch (error) {
+    console.error("[rules GET] Error:", error)
     return NextResponse.json({ error: "Internal Server Error" }, { status: 500 })
   }
 }
 
 export async function POST(req: NextRequest) {
   try {
-    const supabase = await createClient()
-    const authResult = await getCachedAuthUser(supabase)
+    const db = await createDatabaseClient()
+    const authResult = await getCachedAuthUser()
 
     if (authResult.rateLimited) {
       return NextResponse.json(
@@ -72,7 +73,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: validation.error.errors }, { status: 400 })
     }
 
-    const { data: rule, error } = await supabase
+    const { data: rule, error } = await db
       .from("automation_rules")
       .insert({ ...validation.data, user_id: user.id, org_id: orgContext.orgId })
       .select()

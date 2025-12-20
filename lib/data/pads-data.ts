@@ -1,4 +1,4 @@
-import { createSupabaseServer } from "@/lib/supabase-server"
+import { createDatabaseClient } from "@/lib/database/database-adapter"
 
 export interface PadWithRole {
   id: string
@@ -17,12 +17,11 @@ function mapRoleFromDatabase(dbRole: string): "admin" | "editor" | "viewer" {
 }
 
 export async function fetchUserPads(userId: string): Promise<PadWithRole[]> {
-  const supabase = await createSupabaseServer()
+  const db = await createDatabaseClient()
 
   const {
     data: { user },
-    error: authError,
-  } = await supabase.auth.getUser()
+  } = await db.auth.getUser()
 
   if (!user) {
     return []
@@ -32,13 +31,13 @@ export async function fetchUserPads(userId: string): Promise<PadWithRole[]> {
     return []
   }
 
-  const { data: ownedPads, error: ownedError } = await supabase
+  const { data: ownedPads, error: ownedError } = await db
     .from("paks_pads")
     .select("id, name, description, owner_id, created_at")
     .eq("owner_id", userId)
     .order("created_at", { ascending: false })
 
-  const { data: memberPads, error: memberError } = await supabase
+  const { data: memberPads, error: memberError } = await db
     .from("paks_pad_members")
     .select(`
       role,

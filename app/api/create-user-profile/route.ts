@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server"
-import { createSupabaseServer } from "@/lib/supabase-server"
+import { createServiceDatabaseClient } from "@/lib/database/database-adapter"
 
 export async function POST(request: Request) {
   try {
@@ -9,9 +9,9 @@ export async function POST(request: Request) {
       return NextResponse.json({ success: false, error: "User ID and email are required" }, { status: 400 })
     }
 
-    const supabase = await createSupabaseServer()
+    const db = await createServiceDatabaseClient()
 
-    const { data: existingProfile, error: selectError } = await supabase
+    const { data: existingProfile, error: selectError } = await db
       .from("users")
       .select("id")
       .eq("id", userId)
@@ -22,17 +22,9 @@ export async function POST(request: Request) {
         return NextResponse.json(
           {
             success: false,
-            error: "Profile not found. Database trigger should create it automatically.",
+            error: "Profile not found. User should be created first.",
           },
           { status: 404 },
-        )
-      } else if (selectError.code === "42501" || selectError.message?.includes("policy")) {
-        return NextResponse.json(
-          {
-            success: false,
-            error: "Access temporarily restricted. Please try again in a moment.",
-          },
-          { status: 403 },
         )
       } else {
         return NextResponse.json({ success: false, error: selectError.message }, { status: 500 })
@@ -43,7 +35,7 @@ export async function POST(request: Request) {
       return NextResponse.json(
         {
           success: false,
-          error: "Profile not found. Database trigger should create it automatically.",
+          error: "Profile not found. User should be created first.",
         },
         { status: 404 },
       )
@@ -60,7 +52,7 @@ export async function POST(request: Request) {
       updated_at: new Date().toISOString(),
     }
 
-    const { data, error } = await supabase.from("users").update(profileData).eq("id", userId).select().single()
+    const { data, error } = await db.from("users").update(profileData).eq("id", userId).select().single()
 
     if (error) {
       return NextResponse.json({ success: false, error: error.message }, { status: 500 })

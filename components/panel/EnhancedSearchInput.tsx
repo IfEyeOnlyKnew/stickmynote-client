@@ -2,7 +2,7 @@
 
 import type React from "react"
 
-import { useState, useEffect, useRef, useCallback } from "react"
+import { useState, useEffect, useRef, useCallback, useMemo } from "react"
 import { Search, X, Clock, TrendingUp, Hash, User, Command } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
@@ -37,44 +37,48 @@ export function EnhancedSearchInput({
   const inputRef = useRef<HTMLInputElement>(null)
   const suggestionsRef = useRef<HTMLDivElement>(null)
 
-  // Build suggestions list based on input
-  const suggestions: SearchSuggestion[] = []
+  // Build suggestions list based on input - memoized to avoid dependency issues
+  const suggestions = useMemo(() => {
+    const result: SearchSuggestion[] = []
 
-  if (!value.trim()) {
-    // Show recent searches when input is empty
-    recentSearches.slice(0, 3).forEach((search) => {
-      suggestions.push({
-        type: "recent",
-        value: search,
-        label: search,
-      })
-    })
-
-    // Show trending tags
-    trendingTags.slice(0, 5).forEach((tag) => {
-      suggestions.push({
-        type: "trending",
-        value: tag,
-        label: tag,
-        metadata: "Trending",
-      })
-    })
-  } else {
-    // Show autocomplete suggestions based on input
-    const lowerValue = value.toLowerCase()
-
-    // Filter trending tags that match
-    trendingTags
-      .filter((tag) => tag.toLowerCase().includes(lowerValue))
-      .slice(0, 3)
-      .forEach((tag) => {
-        suggestions.push({
-          type: "tag",
-          value: tag,
-          label: tag,
+    if (!value.trim()) {
+      // Show recent searches when input is empty
+      recentSearches.slice(0, 3).forEach((search) => {
+        result.push({
+          type: "recent",
+          value: search,
+          label: search,
         })
       })
-  }
+
+      // Show trending tags
+      trendingTags.slice(0, 5).forEach((tag) => {
+        result.push({
+          type: "trending",
+          value: tag,
+          label: tag,
+          metadata: "Trending",
+        })
+      })
+    } else {
+      // Show autocomplete suggestions based on input
+      const lowerValue = value.toLowerCase()
+
+      // Filter trending tags that match
+      trendingTags
+        .filter((tag) => tag.toLowerCase().includes(lowerValue))
+        .slice(0, 3)
+        .forEach((tag) => {
+          result.push({
+            type: "tag",
+            value: tag,
+            label: tag,
+          })
+        })
+    }
+
+    return result
+  }, [value, recentSearches, trendingTags])
 
   // Handle keyboard shortcuts
   useEffect(() => {

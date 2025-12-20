@@ -1,17 +1,17 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { createServerClient } from "@/lib/supabase/server"
+import { createDatabaseClient } from "@/lib/database/database-adapter"
 import { getCachedAuthUser } from "@/lib/auth/cached-auth"
 
 // GET: Search KB articles by tags for semantic matching
 export async function GET(request: NextRequest, { params }: { params: { padId: string } }) {
   try {
-    const supabase = await createServerClient()
+    const db = await createDatabaseClient()
     const { padId } = params
     const { searchParams } = new URL(request.url)
     const tags = searchParams.get("tags")?.split(",") || []
     const query = searchParams.get("query") || ""
 
-    const authResult = await getCachedAuthUser(supabase)
+    const authResult = await getCachedAuthUser()
     if (authResult.rateLimited) {
       return NextResponse.json({ error: "Rate limited" }, { status: 429, headers: { "Retry-After": "30" } })
     }
@@ -19,7 +19,7 @@ export async function GET(request: NextRequest, { params }: { params: { padId: s
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
-    let queryBuilder = supabase.from("social_pad_knowledge_base").select("*").eq("social_pad_id", padId)
+    let queryBuilder = db.from("social_pad_knowledge_base").select("*").eq("social_pad_id", padId)
 
     // Search by tags (semantic similarity)
     if (tags.length > 0) {
@@ -44,7 +44,7 @@ export async function GET(request: NextRequest, { params }: { params: { padId: s
     const articlesWithAuthors = await Promise.all(
       (articles || []).map(async (article) => {
         if (article.author_id) {
-          const { data: author } = await supabase
+          const { data: author } = await db
             .from("users")
             .select("id, full_name, email, avatar_url")
             .eq("id", article.author_id)

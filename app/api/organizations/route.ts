@@ -1,51 +1,56 @@
 import { NextResponse } from "next/server"
-import { createClient } from "@/lib/supabase/server"
-import { createServiceClient } from "@/lib/supabase/server"
-import { getCachedAuthUser, createRateLimitResponse, createUnauthorizedResponse } from "@/lib/auth/cached-auth"
+import { getSession } from "@/lib/auth/local-auth"
+import { db } from "@/lib/database/pg-client"
 
 // GET /api/organizations - Get all organizations for current user
 export async function GET() {
   try {
-    const supabase = await createClient()
-    const authResult = await getCachedAuthUser(supabase)
+    const session = await getSession()
 
-    if (authResult.rateLimited) {
-      return createRateLimitResponse()
+    if (!session) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
-    if (!authResult.user) {
-      return createUnauthorizedResponse()
-    }
+    const user = session.user
 
-    const user = authResult.user
+    const result = await db.query(
+      `SELECT 
+        om.id,
+        om.org_id,
+        om.role,
+        om.accepted_at,
+        om.created_at,
+        o.id as org_id,
+        o.name as org_name,
+        o.slug as org_slug,
+        o.type as org_type,
+        o.settings as org_settings,
+        o.created_at as org_created_at,
+        o.updated_at as org_updated_at
+       FROM organization_members om
+       INNER JOIN organizations o ON o.id = om.org_id
+       WHERE om.user_id = $1
+       ORDER BY om.created_at ASC`,
+      [user.id]
+    )
 
-    const serviceClient = createServiceClient()
-
-    const { data: memberships, error } = await serviceClient
-      .from("organization_members")
-      .select(`
-        id,
-        org_id,
-        role,
-        accepted_at,
-        created_at,
-        organizations (
-          id,
-          name,
-          slug,
-          type,
-          settings,
-          created_at,
-          updated_at
-        )
-      `)
-      .eq("user_id", user.id)
-      .order("created_at", { ascending: true })
-
-    if (error) {
-      console.error("[v0] Error fetching organizations:", error)
-      return NextResponse.json({ error: "Failed to fetch organizations" }, { status: 500 })
-    }
+    // Transform to match expected format
+    const memberships = result.rows.map(row => ({
+      id: row.id,
+      org_id: row.org_id,
+      role: row.role,
+      accepted_at: row.accepted_at,
+      created_at: row.created_at,
+      organizations: {
+        id: row.org_id,
+        name: row.org_name,
+        slug: row.org_slug,
+        type: row.org_type,
+        settings: row.org_settings,
+        created_at: row.org_created_at,
+        updated_at: row.org_updated_at,
+      }
+    }))
 
     return NextResponse.json({ memberships })
   } catch (err) {
@@ -57,18 +62,13 @@ export async function GET() {
 // POST /api/organizations - Create a new organization
 export async function POST(req: Request) {
   try {
-    const supabase = await createClient()
-    const authResult = await getCachedAuthUser(supabase)
+    const session = await getSession()
 
-    if (authResult.rateLimited) {
-      return createRateLimitResponse()
+    if (!session) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
-    if (!authResult.user) {
-      return createUnauthorizedResponse()
-    }
-
-    const user = authResult.user
+    const user = session.user
 
     const body = await req.json()
     const { name, type = "team" } = body
@@ -81,8 +81,6 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Invalid organization type" }, { status: 400 })
     }
 
-    const serviceClient = createServiceClient()
-
     // Generate unique slug
     const baseSlug = name
       .toLowerCase()
@@ -90,39 +88,37 @@ export async function POST(req: Request) {
       .replace(/^-|-$/g, "")
     const slug = `${baseSlug}-${Math.random().toString(36).substring(2, 7)}`
 
-    // Create organization
-    const { data: newOrg, error: createError } = await serviceClient
-      .from("organizations")
-      .insert({
-        name: name.trim(),
-        slug,
-        type,
-        settings: {},
-      })
-      .select()
-      .single()
+    // Create organization and add owner in a transaction
+    const client = await db.getClient()
+    try {
+      await client.query("BEGIN")
 
-    if (createError) {
-      console.error("[v0] Error creating organization:", createError)
-      return NextResponse.json({ error: "Failed to create organization" }, { status: 500 })
+      // Create organization
+      const orgResult = await client.query(
+        `INSERT INTO organizations (name, slug, type, settings, created_at, updated_at)
+         VALUES ($1, $2, $3, $4, NOW(), NOW())
+         RETURNING id, name, slug, type, settings, created_at, updated_at`,
+        [name.trim(), slug, type, JSON.stringify({})]
+      )
+
+      const newOrg = orgResult.rows[0]
+
+      // Add creator as owner
+      await client.query(
+        `INSERT INTO organization_members (org_id, user_id, role, accepted_at, created_at)
+         VALUES ($1, $2, 'owner', NOW(), NOW())`,
+        [newOrg.id, user.id]
+      )
+
+      await client.query("COMMIT")
+
+      return NextResponse.json({ organization: newOrg }, { status: 201 })
+    } catch (error) {
+      await client.query("ROLLBACK")
+      throw error
+    } finally {
+      client.release()
     }
-
-    // Add creator as owner
-    const { error: memberError } = await serviceClient.from("organization_members").insert({
-      org_id: newOrg.id,
-      user_id: user.id,
-      role: "owner",
-      accepted_at: new Date().toISOString(),
-    })
-
-    if (memberError) {
-      console.error("[v0] Error adding owner:", memberError)
-      // Clean up org
-      await serviceClient.from("organizations").delete().eq("id", newOrg.id)
-      return NextResponse.json({ error: "Failed to create organization" }, { status: 500 })
-    }
-
-    return NextResponse.json({ organization: newOrg }, { status: 201 })
   } catch (err) {
     console.error("[v0] Unexpected error in POST /api/organizations:", err)
     return NextResponse.json({ error: "Internal server error" }, { status: 500 })

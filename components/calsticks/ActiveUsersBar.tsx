@@ -4,11 +4,11 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Users } from "lucide-react"
 
 interface ActiveUsersBarProps {
-  activeUsers: Map<string, { userId: string; username: string; taskId?: string }>
-  currentUserId: string
+  readonly activeUsers: Map<string, { userId: string; username: string; taskId?: string }>
+  readonly currentUserId: string
 }
 
-export function ActiveUsersBar({ activeUsers, currentUserId }: ActiveUsersBarProps) {
+export function ActiveUsersBar({ activeUsers, currentUserId }: Readonly<ActiveUsersBarProps>) {
   const otherUsers = Array.from(activeUsers.values()).filter((user) => user.userId !== currentUserId)
 
   if (otherUsers.length === 0) return null

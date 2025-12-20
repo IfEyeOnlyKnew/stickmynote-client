@@ -1,15 +1,15 @@
-import { createServerClient } from "@/lib/supabase/server"
+import { createDatabaseClient } from "@/lib/database/database-adapter"
 import { NextResponse } from "next/server"
 
 export async function POST(request: Request) {
   try {
-    const supabase = await createServerClient()
+    const db = await createDatabaseClient()
 
     // Get current user
     const {
       data: { user },
       error: userError,
-    } = await supabase.auth.getUser()
+    } = await db.auth.getUser()
 
     if (userError || !user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
@@ -22,7 +22,7 @@ export async function POST(request: Request) {
     }
 
     // Check if user already has access
-    const { data: existingMember } = await supabase
+    const { data: existingMember } = await db
       .from("paks_pad_members")
       .select("id")
       .eq("pad_id", padId)
@@ -34,14 +34,14 @@ export async function POST(request: Request) {
     }
 
     // Check if user is the owner
-    const { data: pad } = await supabase.from("paks_pads").select("owner_id").eq("id", padId).single()
+    const { data: pad } = await db.from("paks_pads").select("owner_id").eq("id", padId).single()
 
     if (pad && pad.owner_id === user.id) {
       return NextResponse.json({ error: "You are the owner of this Pad" }, { status: 400 })
     }
 
     // Check if there's already a pending request
-    const { data: existingRequest } = await supabase
+    const { data: existingRequest } = await db
       .from("paks_pad_access_requests")
       .select("id, status")
       .eq("pad_id", padId)
@@ -53,7 +53,7 @@ export async function POST(request: Request) {
     }
 
     // Create or update access request
-    const { data: accessRequest, error: requestError } = await supabase
+    const { error: requestError } = await db
       .from("paks_pad_access_requests")
       .upsert(
         {
@@ -75,7 +75,7 @@ export async function POST(request: Request) {
     }
 
     // Get Pad details and owner/admin information
-    const { data: padDetails, error: padError } = await supabase
+    const { data: padDetails, error: padError } = await db
       .from("paks_pads")
       .select(
         `
@@ -99,7 +99,7 @@ export async function POST(request: Request) {
     }
 
     // Get admin members
-    const { data: adminMembers } = await supabase
+    const { data: adminMembers } = await db
       .from("paks_pad_members")
       .select(
         `
@@ -114,7 +114,7 @@ export async function POST(request: Request) {
       .eq("accepted", true)
 
     // Get requester details
-    const { data: requester } = await supabase.from("users").select("email, username").eq("id", user.id).single()
+    const { data: requester } = await db.from("users").select("email, username").eq("id", user.id).single()
 
     // Collect all recipients (owner + admins)
     const recipients: Array<{ email: string; username: string }> = []

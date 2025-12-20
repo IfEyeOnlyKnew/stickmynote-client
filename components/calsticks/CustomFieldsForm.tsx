@@ -28,6 +28,7 @@ export function CustomFieldsForm({ taskId }: CustomFieldsFormProps) {
 
   useEffect(() => {
     fetchData()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [taskId])
 
   const fetchData = async () => {

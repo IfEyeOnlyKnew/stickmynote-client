@@ -26,16 +26,15 @@ export function useProductionChecks() {
       const data = await response.json()
 
       checks.push({
-        name: "Environment: Supabase",
-        status: data?.hasSupabaseUrl && data?.hasSupabaseAnonKey ? "success" : "error",
+        name: "Environment: Database",
+        status: data?.hasDatabaseUrl || data?.hasPostgresHost ? "success" : "error",
         message:
-          data?.hasSupabaseUrl && data?.hasSupabaseAnonKey
-            ? "Supabase env vars found"
-            : "Missing Supabase url/anon key env vars",
+          data?.hasDatabaseUrl || data?.hasPostgresHost
+            ? "Database env vars found"
+            : "Missing database connection env vars",
         details: {
-          hasSupabaseUrl: data?.hasSupabaseUrl,
-          hasSupabaseAnonKey: data?.hasSupabaseAnonKey,
-          hasSupabaseServiceRole: data?.hasSupabaseServiceRole,
+          hasDatabaseUrl: data?.hasDatabaseUrl,
+          hasPostgresHost: data?.hasPostgresHost,
           nodeEnv: data?.nodeEnv,
         },
       })
@@ -126,7 +125,7 @@ export function useProductionChecks() {
       checks.push({
         name: "Database Health",
         status: response.ok && data.ok ? "success" : response.ok ? "warning" : "error",
-        message: data.ok ? "Supabase connectivity looks good" : "DB health returned warnings",
+        message: data.ok ? "Database connectivity looks good" : "DB health returned warnings",
         details: data,
       })
 

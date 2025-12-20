@@ -1,11 +1,11 @@
-import { createServerClient } from "@/lib/supabase/server"
+import { createDatabaseClient } from "@/lib/database/database-adapter"
 import { NextResponse } from "next/server"
 import { getCachedAuthUser } from "@/lib/auth/cached-auth"
 
 export async function PUT(request: Request, { params }: { params: { id: string } }) {
   try {
-    const supabase = await createServerClient()
-    const authResult = await getCachedAuthUser(supabase)
+    const db = await createDatabaseClient()
+    const authResult = await getCachedAuthUser()
     if (authResult.rateLimited) {
       return NextResponse.json({ error: "Rate limited" }, { status: 429, headers: { "Retry-After": "30" } })
     }
@@ -17,7 +17,7 @@ export async function PUT(request: Request, { params }: { params: { id: string }
     const body = await request.json()
     const { key_results, ...objectiveData } = body
 
-    const { data: objective, error: objError } = await supabase
+    const { data: objective, error: objError } = await db
       .from("objectives")
       .update(objectiveData)
       .eq("id", params.id)
@@ -28,7 +28,7 @@ export async function PUT(request: Request, { params }: { params: { id: string }
     if (objError) throw objError
 
     // Delete existing key results
-    await supabase.from("key_results").delete().eq("objective_id", params.id)
+    await db.from("key_results").delete().eq("objective_id", params.id)
 
     // Create new key results
     if (key_results && key_results.length > 0) {
@@ -38,7 +38,7 @@ export async function PUT(request: Request, { params }: { params: { id: string }
         progress: Math.round(((kr.current_value - kr.start_value) / (kr.target_value - kr.start_value)) * 100),
       }))
 
-      const { error: krError } = await supabase.from("key_results").insert(keyResultsData)
+      const { error: krError } = await db.from("key_results").insert(keyResultsData)
 
       if (krError) throw krError
     }
@@ -52,8 +52,8 @@ export async function PUT(request: Request, { params }: { params: { id: string }
 
 export async function DELETE(request: Request, { params }: { params: { id: string } }) {
   try {
-    const supabase = await createServerClient()
-    const authResult = await getCachedAuthUser(supabase)
+    const db = await createDatabaseClient()
+    const authResult = await getCachedAuthUser()
     if (authResult.rateLimited) {
       return NextResponse.json({ error: "Rate limited" }, { status: 429, headers: { "Retry-After": "30" } })
     }
@@ -62,7 +62,7 @@ export async function DELETE(request: Request, { params }: { params: { id: strin
     }
     const user = { id: authResult.userId }
 
-    const { error } = await supabase.from("objectives").delete().eq("id", params.id).eq("user_id", user.id)
+    const { error } = await db.from("objectives").delete().eq("id", params.id).eq("user_id", user.id)
 
     if (error) throw error
 

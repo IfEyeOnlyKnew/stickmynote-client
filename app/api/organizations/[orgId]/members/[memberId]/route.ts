@@ -1,14 +1,12 @@
 import { NextResponse } from "next/server"
-import { createClient } from "@/lib/supabase/server"
-import { createServiceClient } from "@/lib/supabase/server"
+import { createServiceDatabaseClient } from "@/lib/database/database-adapter"
 import { getCachedAuthUser } from "@/lib/auth/cached-auth"
 
 // PATCH /api/organizations/[orgId]/members/[memberId] - Update member role
 export async function PATCH(req: Request, { params }: { params: Promise<{ orgId: string; memberId: string }> }) {
   try {
     const { orgId, memberId } = await params
-    const supabase = await createClient()
-    const authResult = await getCachedAuthUser(supabase)
+    const authResult = await getCachedAuthUser()
 
     if (authResult.rateLimited) {
       return NextResponse.json(
@@ -22,10 +20,10 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ orgId:
     }
 
     const user = authResult.user
-    const serviceClient = createServiceClient()
+    const serviceDb = await createServiceDatabaseClient()
 
     // Check admin/owner role
-    const { data: myMembership, error: memberError } = await serviceClient
+    const { data: myMembership, error: memberError } = await serviceDb
       .from("organization_members")
       .select("role")
       .eq("org_id", orgId)
@@ -41,7 +39,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ orgId:
     }
 
     // Get target member
-    const { data: targetMember, error: targetError } = await serviceClient
+    const { data: targetMember, error: targetError } = await serviceDb
       .from("organization_members")
       .select("role, user_id")
       .eq("id", memberId)
@@ -74,7 +72,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ orgId:
       return NextResponse.json({ error: "Only owners can promote to admin" }, { status: 403 })
     }
 
-    const { error: updateError } = await serviceClient
+    const { error: updateError } = await serviceDb
       .from("organization_members")
       .update({ role, updated_at: new Date().toISOString() })
       .eq("id", memberId)
@@ -95,8 +93,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ orgId:
 export async function DELETE(req: Request, { params }: { params: Promise<{ orgId: string; memberId: string }> }) {
   try {
     const { orgId, memberId } = await params
-    const supabase = await createClient()
-    const authResult = await getCachedAuthUser(supabase)
+    const authResult = await getCachedAuthUser()
 
     if (authResult.rateLimited) {
       return NextResponse.json(
@@ -110,10 +107,10 @@ export async function DELETE(req: Request, { params }: { params: Promise<{ orgId
     }
 
     const user = authResult.user
-    const serviceClient = createServiceClient()
+    const serviceDb = await createServiceDatabaseClient()
 
     // Check admin/owner role
-    const { data: myMembership, error: memberError } = await serviceClient
+    const { data: myMembership, error: memberError } = await serviceDb
       .from("organization_members")
       .select("role")
       .eq("org_id", orgId)
@@ -129,7 +126,7 @@ export async function DELETE(req: Request, { params }: { params: Promise<{ orgId
     }
 
     // Get target member
-    const { data: targetMember, error: targetError } = await serviceClient
+    const { data: targetMember, error: targetError } = await serviceDb
       .from("organization_members")
       .select("role, user_id")
       .eq("id", memberId)
@@ -155,7 +152,7 @@ export async function DELETE(req: Request, { params }: { params: Promise<{ orgId
       return NextResponse.json({ error: "Admins cannot remove other admins" }, { status: 403 })
     }
 
-    const { error: deleteError } = await serviceClient.from("organization_members").delete().eq("id", memberId)
+    const { error: deleteError } = await serviceDb.from("organization_members").delete().eq("id", memberId)
 
     if (deleteError) {
       console.error("[v0] Error removing member:", deleteError)

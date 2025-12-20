@@ -1,9 +1,8 @@
 /**
- * Database Adapter - Unified interface for Supabase and PostgreSQL
+ * Database Adapter - PostgreSQL database client
  *
- * This adapter provides a single API that works with both cloud (Supabase)
- * and local (PostgreSQL) deployments. The application code doesn't need to
- * know which backend is being used.
+ * This adapter provides a query builder API for the local PostgreSQL database.
+ * The application code uses familiar .from().select() patterns.
  *
  * Usage:
  * import { createDatabaseClient } from '@/lib/database/database-adapter'
@@ -11,13 +10,8 @@
  * const { data, error } = await db.from('users').select('*')
  */
 
-import { cookies } from "next/headers"
-import { createServerClient as createSupabaseClient } from "@supabase/ssr"
 import { db as pgClient } from "./pg-client"
 import { getSession } from "../auth/local-auth"
-
-// Detect which database mode to use
-const USE_LOCAL_DATABASE = process.env.USE_LOCAL_DATABASE === "true"
 
 export interface DatabaseClient {
   from: (table: string) => QueryBuilder
@@ -25,13 +19,26 @@ export interface DatabaseClient {
   auth: AuthClient
 }
 
+export interface SelectOptions {
+  count?: "exact" | "planned" | "estimated"
+  head?: boolean
+}
+
+export interface QueryResult {
+  data: any
+  error: any
+  count?: number | null
+}
+
 export interface QueryBuilder {
-  select: (columns?: string) => QueryBuilder
+  select: (columns?: string, options?: SelectOptions) => QueryBuilder
   insert: (data: any) => QueryBuilder
   update: (data: any) => QueryBuilder
+  upsert: (data: any, options?: { onConflict?: string; ignoreDuplicates?: boolean }) => QueryBuilder
   delete: () => QueryBuilder
   eq: (column: string, value: any) => QueryBuilder
   neq: (column: string, value: any) => QueryBuilder
+  not: (column: string, operator: string, value: any) => QueryBuilder
   in: (column: string, values: any[]) => QueryBuilder
   is: (column: string, value: any) => QueryBuilder
   like: (column: string, pattern: string) => QueryBuilder
@@ -41,11 +48,16 @@ export interface QueryBuilder {
   gt: (column: string, value: any) => QueryBuilder
   lt: (column: string, value: any) => QueryBuilder
   or: (condition: string) => QueryBuilder
-  order: (column: string, options?: { ascending?: boolean }) => QueryBuilder
+  overlaps: (column: string, values: any[]) => QueryBuilder
+  contains: (column: string, value: any) => QueryBuilder
+  containedBy: (column: string, value: any) => QueryBuilder
+  order: (column: string, options?: { ascending?: boolean; nullsFirst?: boolean }) => QueryBuilder
   limit: (count: number) => QueryBuilder
-  single: () => Promise<{ data: any; error: any }>
-  maybeSingle: () => Promise<{ data: any; error: any }>
-  then: (resolve: (value: { data: any; error: any }) => void) => Promise<{ data: any; error: any }>
+  range: (from: number, to: number) => QueryBuilder
+  returns: <T>() => QueryBuilder
+  single: () => Promise<QueryResult>
+  maybeSingle: () => Promise<QueryResult>
+  then: (resolve: (value: QueryResult) => void) => Promise<QueryResult>
 }
 
 export interface AuthClient {
@@ -62,12 +74,17 @@ export interface AuthClient {
 class PostgreSQLQueryBuilder implements QueryBuilder {
   private table: string
   private selectColumns = "*"
+  private selectCalled = false
+  private selectOptions: SelectOptions = {}
   private whereConditions: string[] = []
   private whereValues: any[] = []
   private orderByClause = ""
   private limitValue: number | null = null
+  private offsetValue: number | null = null
   private insertData: any = null
   private updateData: any = null
+  private upsertData: any = null
+  private upsertConflict: string | null = null
   private isDelete = false
   private paramIndex = 1
 
@@ -75,8 +92,10 @@ class PostgreSQLQueryBuilder implements QueryBuilder {
     this.table = table
   }
 
-  select(columns?: string): QueryBuilder {
+  select(columns?: string, options?: SelectOptions): QueryBuilder {
     this.selectColumns = columns || "*"
+    this.selectCalled = true
+    this.selectOptions = options || {}
     return this
   }
 
@@ -87,6 +106,13 @@ class PostgreSQLQueryBuilder implements QueryBuilder {
 
   update(data: any): QueryBuilder {
     this.updateData = data
+    return this
+  }
+
+  upsert(data: any, options?: { onConflict?: string; ignoreDuplicates?: boolean }): QueryBuilder {
+    this.upsertData = data
+    this.upsertConflict = options?.onConflict || null
+    // ignoreDuplicates is accepted for compatibility but PostgreSQL ON CONFLICT DO UPDATE handles this
     return this
   }
 
@@ -104,6 +130,25 @@ class PostgreSQLQueryBuilder implements QueryBuilder {
   neq(column: string, value: any): QueryBuilder {
     this.whereConditions.push(`${column} != $${this.paramIndex++}`)
     this.whereValues.push(value)
+    return this
+  }
+
+  not(column: string, operator: string, value: any): QueryBuilder {
+    // Handle NOT conditions like .not("column", "is", null)
+    if (operator === "is" && value === null) {
+      this.whereConditions.push(`${column} IS NOT NULL`)
+    } else if (operator === "eq") {
+      this.whereConditions.push(`${column} != $${this.paramIndex++}`)
+      this.whereValues.push(value)
+    } else if (operator === "in") {
+      const placeholders = (value as any[]).map(() => `$${this.paramIndex++}`).join(", ")
+      this.whereConditions.push(`${column} NOT IN (${placeholders})`)
+      this.whereValues.push(...(value as any[]))
+    } else {
+      // Generic NOT handling
+      this.whereConditions.push(`NOT (${column} ${operator} $${this.paramIndex++})`)
+      this.whereValues.push(value)
+    }
     return this
   }
 
@@ -160,8 +205,29 @@ class PostgreSQLQueryBuilder implements QueryBuilder {
     return this
   }
 
+  overlaps(column: string, values: any[]): QueryBuilder {
+    // PostgreSQL array overlap operator &&
+    this.whereConditions.push(`${column} && $${this.paramIndex++}`)
+    this.whereValues.push(values)
+    return this
+  }
+
+  contains(column: string, value: any): QueryBuilder {
+    // PostgreSQL array contains operator @>
+    this.whereConditions.push(`${column} @> $${this.paramIndex++}`)
+    this.whereValues.push(Array.isArray(value) ? value : [value])
+    return this
+  }
+
+  containedBy(column: string, value: any): QueryBuilder {
+    // PostgreSQL array contained by operator <@
+    this.whereConditions.push(`${column} <@ $${this.paramIndex++}`)
+    this.whereValues.push(Array.isArray(value) ? value : [value])
+    return this
+  }
+
   or(condition: string): QueryBuilder {
-    // Parse Supabase OR syntax: "column1.eq.value1,column2.eq.value2"
+    // Parse OR syntax: "column1.eq.value1,column2.eq.value2"
     const orConditions = condition.split(",").map((cond) => {
       const parts = cond.split(".")
       if (parts.length >= 3) {
@@ -193,14 +259,32 @@ class PostgreSQLQueryBuilder implements QueryBuilder {
     return this
   }
 
-  order(column: string, options?: { ascending?: boolean }): QueryBuilder {
+  order(column: string, options?: { ascending?: boolean; nullsFirst?: boolean }): QueryBuilder {
     const direction = options?.ascending === false ? "DESC" : "ASC"
-    this.orderByClause = `ORDER BY ${column} ${direction}`
+    let nullsHandling = ""
+    if (options?.nullsFirst === true) {
+      nullsHandling = " NULLS FIRST"
+    } else if (options?.nullsFirst === false) {
+      nullsHandling = " NULLS LAST"
+    }
+    this.orderByClause = `ORDER BY ${column} ${direction}${nullsHandling}`
     return this
   }
 
   limit(count: number): QueryBuilder {
     this.limitValue = count
+    return this
+  }
+
+  range(from: number, to: number): QueryBuilder {
+    this.offsetValue = from
+    this.limitValue = to - from + 1
+    return this
+  }
+
+  returns<T>(): QueryBuilder {
+    // This is a type hint - doesn't affect actual query execution
+    // Just return this for compatibility
     return this
   }
 
@@ -212,6 +296,14 @@ class PostgreSQLQueryBuilder implements QueryBuilder {
       const values = Object.values(this.insertData)
       const placeholders = values.map((_, i) => `$${i + 1}`).join(", ")
       query = `INSERT INTO ${this.table} (${keys.join(", ")}) VALUES (${placeholders}) RETURNING *`
+      this.whereValues = values
+    } else if (this.upsertData) {
+      const keys = Object.keys(this.upsertData)
+      const values = Object.values(this.upsertData)
+      const placeholders = values.map((_, i) => `$${i + 1}`).join(", ")
+      const updateClause = keys.map((key, i) => `${key} = $${i + 1}`).join(", ")
+      const conflictColumns = this.upsertConflict || "id"
+      query = `INSERT INTO ${this.table} (${keys.join(", ")}) VALUES (${placeholders}) ON CONFLICT (${conflictColumns}) DO UPDATE SET ${updateClause} RETURNING *`
       this.whereValues = values
     } else if (this.updateData) {
       const keys = Object.keys(this.updateData)
@@ -233,6 +325,11 @@ class PostgreSQLQueryBuilder implements QueryBuilder {
       query += ` WHERE ${this.whereConditions.join(" AND ")}`
     }
 
+    // Add RETURNING clause for UPDATE/DELETE if select() was explicitly called
+    if ((this.updateData || this.isDelete) && this.selectCalled) {
+      query += ` RETURNING ${this.selectColumns}`
+    }
+
     if (this.orderByClause) {
       query += ` ${this.orderByClause}`
     }
@@ -241,41 +338,89 @@ class PostgreSQLQueryBuilder implements QueryBuilder {
       query += ` LIMIT ${this.limitValue}`
     }
 
+    if (this.offsetValue !== null) {
+      query += ` OFFSET ${this.offsetValue}`
+    }
+
     return query
   }
 
-  async single(): Promise<{ data: any; error: any }> {
+  private buildCountQuery(): string {
+    let query = `SELECT COUNT(*) as count FROM ${this.table}`
+
+    if (this.whereConditions.length > 0) {
+      query += ` WHERE ${this.whereConditions.join(" AND ")}`
+    }
+
+    return query
+  }
+
+  async single(): Promise<QueryResult> {
     try {
       const query = this.buildQuery()
       const result = await pgClient.query(query, this.whereValues)
+      
+      // Handle count option
+      let count: number | null = null
+      if (this.selectOptions.count === "exact") {
+        const countQuery = this.buildCountQuery()
+        const countResult = await pgClient.query(countQuery, this.whereValues)
+        count = parseInt(countResult.rows[0]?.count || "0", 10)
+      }
+
       return {
         data: result.rows[0] || null,
         error: result.rows.length === 0 ? { message: "No rows found" } : null,
+        count,
       }
     } catch (error: any) {
-      return { data: null, error: { message: error.message } }
+      return { data: null, error: { message: error.message }, count: null }
     }
   }
 
-  async maybeSingle(): Promise<{ data: any; error: any }> {
+  async maybeSingle(): Promise<QueryResult> {
     try {
       const query = this.buildQuery()
       const result = await pgClient.query(query, this.whereValues)
-      return { data: result.rows[0] || null, error: null }
+      
+      // Handle count option
+      let count: number | null = null
+      if (this.selectOptions.count === "exact") {
+        const countQuery = this.buildCountQuery()
+        const countResult = await pgClient.query(countQuery, this.whereValues)
+        count = parseInt(countResult.rows[0]?.count || "0", 10)
+      }
+
+      return { data: result.rows[0] || null, error: null, count }
     } catch (error: any) {
-      return { data: null, error: { message: error.message } }
+      return { data: null, error: { message: error.message }, count: null }
     }
   }
 
-  async then(resolve: (value: { data: any; error: any }) => void): Promise<{ data: any; error: any }> {
+  async then(resolve: (value: QueryResult) => void): Promise<QueryResult> {
     try {
+      // Handle count option
+      let count: number | null = null
+      if (this.selectOptions.count === "exact") {
+        const countQuery = this.buildCountQuery()
+        const countResult = await pgClient.query(countQuery, this.whereValues)
+        count = parseInt(countResult.rows[0]?.count || "0", 10)
+      }
+
+      // If head: true, don't fetch actual data
+      if (this.selectOptions.head) {
+        const response: QueryResult = { data: null, error: null, count }
+        resolve(response)
+        return response
+      }
+
       const query = this.buildQuery()
       const result = await pgClient.query(query, this.whereValues)
-      const response = { data: result.rows, error: null }
+      const response: QueryResult = { data: result.rows, error: null, count }
       resolve(response)
       return response
     } catch (error: any) {
-      const response = { data: null, error: { message: error.message } }
+      const response: QueryResult = { data: null, error: { message: error.message }, count: null }
       resolve(response)
       return response
     }
@@ -348,58 +493,17 @@ class PostgreSQLDatabaseClient implements DatabaseClient {
 }
 
 /**
- * Create a database client based on environment configuration
- *
- * If USE_LOCAL_DATABASE=true, returns PostgreSQL adapter
- * Otherwise, returns Supabase client
+ * Create a database client
+ * Returns PostgreSQL adapter with compatible query builder API
  */
 export async function createDatabaseClient(): Promise<DatabaseClient> {
-  if (USE_LOCAL_DATABASE) {
-    return new PostgreSQLDatabaseClient()
-  }
-
-  // Return Supabase client with standard interface
-  const cookieStore = await cookies()
-  return createSupabaseClient(process.env.SUPABASE_URL!, process.env.SUPABASE_ANON_KEY!, {
-    cookies: {
-      getAll() {
-        return cookieStore.getAll()
-      },
-      setAll(cookiesToSet) {
-        try {
-          cookiesToSet.forEach(({ name, value, options }) => {
-            const secureOptions = {
-              ...options,
-              httpOnly: true,
-              secure: process.env.NODE_ENV === "production",
-              sameSite: "lax" as const,
-              path: "/",
-              domain: undefined,
-            }
-            cookieStore.set(name, value, secureOptions)
-          })
-        } catch (error) {
-          console.error("[Database] Error setting cookies:", error)
-        }
-      },
-    },
-  }) as unknown as DatabaseClient
+  return new PostgreSQLDatabaseClient()
 }
 
 /**
  * Create a service/admin database client
+ * For local database, this is the same as the regular client (already has admin access)
  */
 export async function createServiceDatabaseClient(): Promise<DatabaseClient> {
-  if (USE_LOCAL_DATABASE) {
-    // For local database, use the same client (already has admin access)
-    return new PostgreSQLDatabaseClient()
-  }
-
-  const { createClient } = await import("@supabase/supabase-js")
-  return createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!, {
-    auth: {
-      autoRefreshToken: false,
-      persistSession: false,
-    },
-  }) as unknown as DatabaseClient
+  return new PostgreSQLDatabaseClient()
 }

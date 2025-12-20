@@ -1,13 +1,13 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { createSupabaseServer } from "@/lib/supabase-server"
+import { createServiceDatabaseClient } from "@/lib/database/database-adapter"
 import { getOrgContext } from "@/lib/auth/get-org-context"
 import { getCachedAuthUser } from "@/lib/auth/cached-auth"
 import type { TaskProgress } from "@/types/checklist"
 
 export async function GET(request: NextRequest, { params }: { params: { id: string } }) {
   try {
-    const supabase = await createSupabaseServer()
-    const authResult = await getCachedAuthUser(supabase)
+    const db = await createServiceDatabaseClient()
+    const authResult = await getCachedAuthUser()
 
     if (authResult.rateLimited) {
       return NextResponse.json(
@@ -27,7 +27,7 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
 
     const calstickId = params.id
 
-    const { data: parentTask, error: parentError } = await supabase
+    const { data: parentTask, error: parentError } = await db
       .from("paks_pad_stick_replies")
       .select("calstick_checklist_items, calstick_progress, org_id")
       .eq("id", calstickId)
@@ -43,7 +43,7 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
       return NextResponse.json({ error: "Task not found" }, { status: 404 })
     }
 
-    const { data: subtasks, error: subtasksError } = await supabase
+    const { data: subtasks, error: subtasksError } = await db
       .from("paks_pad_stick_replies")
       .select("calstick_completed")
       .eq("calstick_parent_id", calstickId)

@@ -14,6 +14,9 @@ export interface User {
   email_verified: boolean
   created_at: string
   updated_at: string
+  org_id?: string
+  is_admin?: boolean
+  memberships?: Array<{ organization_id: string; role?: string }>
 }
 
 export interface Session {
@@ -183,8 +186,8 @@ export async function updateUser(
   userId: string,
   updates: Partial<Pick<User, "full_name" | "avatar_url">>,
 ): Promise<User | null> {
-  const fields = []
-  const values = []
+  const fields: string[] = []
+  const values: any[] = []
   let paramIndex = 1
 
   if (updates.full_name !== undefined) {

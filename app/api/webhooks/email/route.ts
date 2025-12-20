@@ -1,14 +1,12 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { createClient } from "@supabase/supabase-js"
-
-// Initialize Supabase admin client for writing tasks without user session
-const supabaseAdmin = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!)
+import { createServiceDatabaseClient } from "@/lib/database/database-adapter"
 
 // Generic Email Webhook Handler
 // Expects standard fields often provided by services like SendGrid/Postmark/Mailgun
 // or a simplified JSON payload: { sender, recipient, subject, body }
 export async function POST(request: NextRequest) {
   try {
+    const db = await createServiceDatabaseClient()
     // Authenticate webhook?
     // In production, verify signatures from provider (e.g. Stripe/SendGrid signatures).
     // For now, we'll accept open POSTs but could rely on a secret query param.
@@ -34,7 +32,7 @@ export async function POST(request: NextRequest) {
       userId = uuidMatch[1]
     } else {
       // Method B: Match sender address to a registered user
-      const { data: user } = await supabaseAdmin.from("users").select("id").eq("email", sender).single()
+      const { data: user } = await db.from("users").select("id").eq("email", sender).single()
 
       if (user) userId = user.id
     }
@@ -54,7 +52,7 @@ export async function POST(request: NextRequest) {
     let stickId: string | null = null
 
     // Search for existing "Inbox" stick
-    const { data: existingStick } = await supabaseAdmin
+    const { data: existingStick } = await db
       .from("paks_pad_sticks")
       .select("id")
       .eq("user_id", userId)
@@ -68,13 +66,13 @@ export async function POST(request: NextRequest) {
       // Need a pad... assume first pad or create one?
       // For simplicity, let's try to find ANY pad owned by user, or create a "Personal" pad
 
-      const { data: pads } = await supabaseAdmin.from("paks_pads").select("id").eq("owner_id", userId).limit(1)
+      const { data: pads } = await db.from("paks_pads").select("id").eq("owner_id", userId).limit(1)
 
       let padId = pads?.[0]?.id
 
       if (!padId) {
         // Create Personal Pad
-        const { data: newPad } = await supabaseAdmin
+        const { data: newPad } = await db
           .from("paks_pads")
           .insert({ name: "Personal", owner_id: userId })
           .select()
@@ -83,7 +81,7 @@ export async function POST(request: NextRequest) {
       }
 
       if (padId) {
-        const { data: newStick } = await supabaseAdmin
+        const { data: newStick } = await db
           .from("paks_pad_sticks")
           .insert({
             user_id: userId,
@@ -105,7 +103,7 @@ export async function POST(request: NextRequest) {
     // Create the Task (CalStick)
     const content = `${subject}\n\n${text || html || ""}`.trim()
 
-    const { data: newTask, error: taskError } = await supabaseAdmin
+    const { data: newTask, error: taskError } = await db
       .from("paks_pad_stick_replies")
       .insert({
         stick_id: stickId,
@@ -142,7 +140,8 @@ async function logEmail(
   taskId?: string,
 ) {
   try {
-    await supabaseAdmin.from("inbound_email_logs").insert({
+    const db = await createServiceDatabaseClient()
+    await db.from("inbound_email_logs").insert({
       sender_email: sender,
       recipient_email: recipient,
       subject: subject,

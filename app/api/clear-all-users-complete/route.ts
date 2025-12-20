@@ -1,123 +1,118 @@
 import { NextResponse } from "next/server"
-import { getSupabaseServiceClient } from "@/lib/supabase-server"
+import { createServiceDatabaseClient, type DatabaseClient } from "@/lib/database/database-adapter"
 import { validateCSRFMiddleware } from "@/lib/csrf"
 import type { NextRequest } from "next/server"
 
+// Tables to delete in order (respects foreign key constraints)
+const TABLES_TO_DELETE = ["note_tabs", "replies", "notes", "users"] as const
+type TableName = (typeof TABLES_TO_DELETE)[number]
+
+// Placeholder UUID that won't exist - used for "delete all" pattern
+const DUMMY_UUID = "00000000-0000-0000-0000-000000000000"
+
+interface DeletionDetails {
+  noteTabs: number
+  replies: number
+  notes: number
+  publicUsers: number
+  authUsers: number
+}
+
+interface CleanupResults {
+  publicDataCleared: boolean
+  authUsersDeleted: boolean
+  errors: string[]
+  details: DeletionDetails
+}
+
+function createInitialResults(): CleanupResults {
+  return {
+    publicDataCleared: false,
+    authUsersDeleted: false,
+    errors: [],
+    details: {
+      noteTabs: 0,
+      replies: 0,
+      notes: 0,
+      publicUsers: 0,
+      authUsers: 0,
+    },
+  }
+}
+
+function getDetailsKey(table: TableName): keyof DeletionDetails {
+  const mapping: Record<TableName, keyof DeletionDetails> = {
+    note_tabs: "noteTabs",
+    replies: "replies",
+    notes: "notes",
+    users: "publicUsers",
+  }
+  return mapping[table]
+}
+
+async function deleteFromTable(
+  db: DatabaseClient,
+  table: TableName,
+  results: CleanupResults,
+): Promise<void> {
+  const { error, count } = await db
+    .from(table)
+    .delete()
+    .neq("id", DUMMY_UUID)
+
+  if (error) {
+    results.errors.push(`${table} deletion error: ${error.message}`)
+  } else {
+    const key = getDetailsKey(table)
+    results.details[key] = count || 0
+
+    // For local auth, users table is the auth table
+    if (table === "users") {
+      results.details.authUsers = count || 0
+    }
+  }
+}
+
+function calculateTotalDeleted(details: DeletionDetails): number {
+  return details.noteTabs + details.replies + details.notes + details.publicUsers
+}
+
+function buildResponse(results: CleanupResults) {
+  const success = results.publicDataCleared && results.authUsersDeleted && results.errors.length === 0
+
+  return NextResponse.json({
+    success,
+    message: "Complete user cleanup attempted",
+    results,
+    summary: {
+      totalDeleted: calculateTotalDeleted(results.details),
+      errorsCount: results.errors.length,
+    },
+  })
+}
+
 export async function DELETE(request: NextRequest) {
-  // Validate CSRF token for destructive admin operation
   const isCSRFValid = await validateCSRFMiddleware(request)
   if (!isCSRFValid) {
     return NextResponse.json({ error: "Invalid or missing CSRF token" }, { status: 403 })
   }
 
   try {
-    const supabase = await getSupabaseServiceClient()
+    const db = await createServiceDatabaseClient()
+    const results = createInitialResults()
 
-    const results = {
-      publicDataCleared: false,
-      authUsersDeleted: false,
-      errors: [] as string[],
-      details: {
-        noteTabs: 0,
-        replies: 0,
-        notes: 0,
-        publicUsers: 0,
-        authUsers: 0,
-      },
-    }
-
-    // Step 1: Clear public data in correct order
     try {
-      // Delete note_tabs first
-      const { error: noteTabsError, count: noteTabsCount } = await supabase
-        .from("note_tabs")
-        .delete()
-        .neq("id", "00000000-0000-0000-0000-000000000000") // Delete all
-
-      if (noteTabsError) {
-        results.errors.push(`Note tabs deletion error: ${noteTabsError.message}`)
-      } else {
-        results.details.noteTabs = noteTabsCount || 0
-      }
-
-      // Delete replies
-      const { error: repliesError, count: repliesCount } = await supabase
-        .from("replies")
-        .delete()
-        .neq("id", "00000000-0000-0000-0000-000000000000") // Delete all
-
-      if (repliesError) {
-        results.errors.push(`Replies deletion error: ${repliesError.message}`)
-      } else {
-        results.details.replies = repliesCount || 0
-      }
-
-      // Delete notes
-      const { error: notesError, count: notesCount } = await supabase
-        .from("notes")
-        .delete()
-        .neq("id", "00000000-0000-0000-0000-000000000000") // Delete all
-
-      if (notesError) {
-        results.errors.push(`Notes deletion error: ${notesError.message}`)
-      } else {
-        results.details.notes = notesCount || 0
-      }
-
-      // Delete public users
-      const { error: usersError, count: usersCount } = await supabase
-        .from("users")
-        .delete()
-        .neq("id", "00000000-0000-0000-0000-000000000000") // Delete all
-
-      if (usersError) {
-        results.errors.push(`Public users deletion error: ${usersError.message}`)
-      } else {
-        results.details.publicUsers = usersCount || 0
+      for (const table of TABLES_TO_DELETE) {
+        await deleteFromTable(db, table, results)
       }
 
       results.publicDataCleared = true
+      results.authUsersDeleted = true
     } catch (error) {
       results.errors.push(`Public data cleanup error: ${error instanceof Error ? error.message : "Unknown error"}`)
     }
 
-    // Step 2: Delete auth users
-    try {
-      const { data: authUsers, error: fetchError } = await supabase.auth.admin.listUsers()
-
-      if (fetchError) {
-        results.errors.push(`Failed to fetch auth users: ${fetchError.message}`)
-      } else {
-        let deletedCount = 0
-        for (const user of authUsers.users) {
-          const { error: deleteError } = await supabase.auth.admin.deleteUser(user.id)
-          if (deleteError) {
-            results.errors.push(`Failed to delete auth user ${user.email}: ${deleteError.message}`)
-          } else {
-            deletedCount++
-          }
-        }
-        results.details.authUsers = deletedCount
-        results.authUsersDeleted = true
-      }
-    } catch (error) {
-      results.errors.push(`Auth users cleanup error: ${error instanceof Error ? error.message : "Unknown error"}`)
-    }
-
-    return NextResponse.json({
-      success: results.publicDataCleared && results.authUsersDeleted && results.errors.length === 0,
-      message: "Complete user cleanup attempted",
-      results,
-      summary: {
-        totalDeleted:
-          results.details.noteTabs +
-          results.details.replies +
-          results.details.notes +
-          results.details.publicUsers +
-          results.details.authUsers,
-        errorsCount: results.errors.length,
-      },
-    })
+    return buildResponse(results)
   } catch (error) {
     return NextResponse.json(
       {

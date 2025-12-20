@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useCallback } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
@@ -8,102 +8,213 @@ import { Search, Zap } from "lucide-react"
 import { UserMenu } from "@/components/user-menu"
 import { BreadcrumbNav } from "@/components/breadcrumb-nav"
 import { PermissionBasedStickFullscreen } from "@/components/permission-based/PermissionBasedStickFullscreen"
-import type { User } from "@supabase/supabase-js"
 import type { Stick } from "@/types/pad"
 
+// ============================================================================
+// Types
+// ============================================================================
+
+interface PadInfo {
+  id: string
+  name: string
+  owner_id: string
+}
+
 interface QuickStick extends Stick {
-  pads: {
-    id: string
-    name: string
-    owner_id: string
-  }
+  pads: PadInfo
 }
 
 interface QuickSticksPageClientProps {
-  user: User
+  user: {
+    id: string
+    email?: string
+  }
 }
 
-export function QuickSticksPageClient({ user }: QuickSticksPageClientProps) {
-  const [sticks, setSticks] = useState<QuickStick[]>([])
-  const [loading, setLoading] = useState(true)
-  const [searchQuery, setSearchQuery] = useState("")
-  const [debouncedSearch, setDebouncedSearch] = useState("")
-  const [selectedStick, setSelectedStick] = useState<QuickStick | null>(null)
-  const [isFullscreenOpen, setIsFullscreenOpen] = useState(false)
+interface QuickSticksState {
+  sticks: QuickStick[]
+  loading: boolean
+  searchQuery: string
+  debouncedSearch: string
+}
+
+interface FullscreenState {
+  selectedStick: QuickStick | null
+  isOpen: boolean
+}
+
+// ============================================================================
+// Constants
+// ============================================================================
+
+const LOG_PREFIX = "[QuickSticks]"
+const DEBOUNCE_DELAY_MS = 300
+
+const BREADCRUMB_ITEMS = [
+  { label: "Dashboard", href: "/dashboard" },
+  { label: "Paks-Hub", href: "/paks" },
+  { label: "QuickSticks", current: true },
+]
+
+const FULL_PERMISSIONS = {
+  canView: true,
+  canEdit: true,
+  canAdmin: true,
+}
+
+// ============================================================================
+// Helpers
+// ============================================================================
+
+function buildApiUrl(search: string): string {
+  const base = "/api/quicksticks"
+  return search ? `${base}?search=${encodeURIComponent(search)}` : base
+}
+
+function formatDate(dateString: string): string {
+  return new Date(dateString).toLocaleDateString()
+}
+
+// ============================================================================
+// StickCard Component
+// ============================================================================
+
+interface StickCardProps {
+  stick: QuickStick
+  onClick: (stick: QuickStick) => void
+}
+
+function StickCard({ stick, onClick }: Readonly<StickCardProps>) {
+  const handleClick = useCallback(() => {
+    onClick(stick)
+  }, [onClick, stick])
+
+  return (
+    <Card
+      className="cursor-pointer hover:shadow-lg transition-shadow"
+      style={{ borderLeft: `4px solid ${stick.color}` }}
+      onClick={handleClick}
+    >
+      <CardHeader>
+        <CardTitle className="text-lg line-clamp-2">
+          {stick.topic || "Untitled Stick"}
+        </CardTitle>
+        <div className="flex items-center gap-2 mt-2">
+          <Badge variant="secondary" className="text-xs">
+            {stick.pads.name}
+          </Badge>
+          <Badge variant="outline" className="text-xs">
+            <Zap className="h-3 w-3 mr-1" />
+            QuickStick
+          </Badge>
+        </div>
+      </CardHeader>
+      <CardContent>
+        <p className="text-sm text-gray-600 line-clamp-3">{stick.content}</p>
+        <p className="text-xs text-gray-400 mt-2">
+          Updated {formatDate(stick.updated_at)}
+        </p>
+      </CardContent>
+    </Card>
+  )
+}
+
+// ============================================================================
+// Component
+// ============================================================================
+
+export function QuickSticksPageClient({ user }: Readonly<QuickSticksPageClientProps>) {
+  // State
+  const [state, setState] = useState<QuickSticksState>({
+    sticks: [],
+    loading: true,
+    searchQuery: "",
+    debouncedSearch: "",
+  })
+
+  const [fullscreenState, setFullscreenState] = useState<FullscreenState>({
+    selectedStick: null,
+    isOpen: false,
+  })
 
   // Debounce search
   useEffect(() => {
     const timer = setTimeout(() => {
-      setDebouncedSearch(searchQuery)
-    }, 300)
+      setState((prev) => ({ ...prev, debouncedSearch: prev.searchQuery }))
+    }, DEBOUNCE_DELAY_MS)
 
     return () => clearTimeout(timer)
-  }, [searchQuery])
+  }, [state.searchQuery])
 
   // Fetch QuickSticks
-  useEffect(() => {
-    async function fetchQuickSticks() {
-      try {
-        setLoading(true)
-        const url = `/api/quicksticks${debouncedSearch ? `?search=${encodeURIComponent(debouncedSearch)}` : ""}`
-        const response = await fetch(url)
+  const fetchQuickSticks = useCallback(async (search: string) => {
+    try {
+      setState((prev) => ({ ...prev, loading: true }))
 
-        if (!response.ok) {
-          throw new Error("Failed to fetch QuickSticks")
-        }
+      const url = buildApiUrl(search)
+      const response = await fetch(url)
 
-        const data = await response.json()
-        setSticks(data.sticks || [])
-      } catch (error) {
-        console.error("Error fetching QuickSticks:", error)
-      } finally {
-        setLoading(false)
+      if (!response.ok) {
+        throw new Error("Failed to fetch QuickSticks")
       }
+
+      const data = await response.json()
+      setState((prev) => ({
+        ...prev,
+        sticks: data.sticks || [],
+        loading: false,
+      }))
+    } catch (error) {
+      console.error(`${LOG_PREFIX} Error fetching:`, error)
+      setState((prev) => ({ ...prev, loading: false }))
     }
+  }, [])
 
-    fetchQuickSticks()
-  }, [debouncedSearch])
+  useEffect(() => {
+    fetchQuickSticks(state.debouncedSearch)
+  }, [state.debouncedSearch, fetchQuickSticks])
 
-  const handleStickClick = (stick: QuickStick) => {
-    setSelectedStick(stick)
-    setIsFullscreenOpen(true)
-  }
+  // Handlers
+  const handleSearchChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    setState((prev) => ({ ...prev, searchQuery: e.target.value }))
+  }, [])
 
-  const handleCloseFullscreen = () => {
-    setIsFullscreenOpen(false)
-    setSelectedStick(null)
-  }
+  const handleStickClick = useCallback((stick: QuickStick) => {
+    setFullscreenState({ selectedStick: stick, isOpen: true })
+  }, [])
 
-  const handleUpdateStick = (updatedStick: Stick) => {
-    setSticks((prevSticks) =>
-      prevSticks.map((stick) => {
-        if (stick.id === updatedStick.id) {
-          return {
-            ...updatedStick,
-            pads: stick.pads,
-          }
-        }
-        return stick
-      }),
-    )
-  }
+  const handleCloseFullscreen = useCallback(() => {
+    setFullscreenState({ selectedStick: null, isOpen: false })
+  }, [])
 
-  const handleDeleteStick = (stickId: string) => {
-    setSticks((prevSticks) => prevSticks.filter((stick) => stick.id !== stickId))
+  const handleUpdateStick = useCallback((updatedStick: Stick) => {
+    setState((prev) => ({
+      ...prev,
+      sticks: prev.sticks.map((stick) =>
+        stick.id === updatedStick.id
+          ? { ...updatedStick, pads: stick.pads }
+          : stick
+      ),
+    }))
+  }, [])
+
+  const handleDeleteStick = useCallback((stickId: string) => {
+    setState((prev) => ({
+      ...prev,
+      sticks: prev.sticks.filter((stick) => stick.id !== stickId),
+    }))
     handleCloseFullscreen()
-  }
+  }, [handleCloseFullscreen])
+
+  // Derived state
+  const hasSticks = state.sticks.length > 0
+  const showEmptyState = !state.loading && !hasSticks
 
   return (
     <div className="container mx-auto px-4 py-8 max-w-6xl">
       {/* Breadcrumb Navigation */}
       <div className="mb-6">
-        <BreadcrumbNav
-          items={[
-            { label: "Dashboard", href: "/dashboard" },
-            { label: "Paks-Hub", href: "/paks" },
-            { label: "QuickSticks", current: true },
-          ]}
-        />
+        <BreadcrumbNav items={BREADCRUMB_ITEMS} />
       </div>
 
       {/* Header */}
@@ -127,28 +238,28 @@ export function QuickSticksPageClient({ user }: QuickSticksPageClientProps) {
           <Input
             type="text"
             placeholder="Search QuickSticks by topic or content..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
+            value={state.searchQuery}
+            onChange={handleSearchChange}
             className="pl-10"
           />
         </div>
       </div>
 
       {/* Loading State */}
-      {loading && (
+      {state.loading && (
         <div className="flex items-center justify-center py-12">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900" />
         </div>
       )}
 
       {/* Empty State */}
-      {!loading && sticks.length === 0 && (
+      {showEmptyState && (
         <Card className="text-center py-12">
           <CardContent>
             <Zap className="h-12 w-12 text-gray-400 mx-auto mb-4" />
             <h3 className="text-lg font-semibold text-gray-900 mb-2">No QuickSticks Found</h3>
             <p className="text-gray-600">
-              {searchQuery
+              {state.searchQuery
                 ? "No sticks match your search. Try a different query."
                 : "Mark sticks as QuickSticks to see them here for quick access."}
             </p>
@@ -157,45 +268,23 @@ export function QuickSticksPageClient({ user }: QuickSticksPageClientProps) {
       )}
 
       {/* Sticks Grid */}
-      {!loading && sticks.length > 0 && (
+      {!state.loading && hasSticks && (
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {sticks.map((stick) => (
-            <Card
+          {state.sticks.map((stick) => (
+            <StickCard
               key={stick.id}
-              className="cursor-pointer hover:shadow-lg transition-shadow"
-              style={{ borderLeft: `4px solid ${stick.color}` }}
-              onClick={() => handleStickClick(stick)}
-            >
-              <CardHeader>
-                <CardTitle className="text-lg line-clamp-2">{stick.topic || "Untitled Stick"}</CardTitle>
-                <div className="flex items-center gap-2 mt-2">
-                  <Badge variant="secondary" className="text-xs">
-                    {stick.pads.name}
-                  </Badge>
-                  <Badge variant="outline" className="text-xs">
-                    <Zap className="h-3 w-3 mr-1" />
-                    QuickStick
-                  </Badge>
-                </div>
-              </CardHeader>
-              <CardContent>
-                <p className="text-sm text-gray-600 line-clamp-3">{stick.content}</p>
-                <p className="text-xs text-gray-400 mt-2">Updated {new Date(stick.updated_at).toLocaleDateString()}</p>
-              </CardContent>
-            </Card>
+              stick={stick}
+              onClick={handleStickClick}
+            />
           ))}
         </div>
       )}
 
       {/* Fullscreen Modal Component */}
-      {selectedStick && isFullscreenOpen && (
+      {fullscreenState.selectedStick && fullscreenState.isOpen && (
         <PermissionBasedStickFullscreen
-          stick={selectedStick}
-          permissions={{
-            canView: true,
-            canEdit: true,
-            canAdmin: true,
-          }}
+          stick={fullscreenState.selectedStick}
+          permissions={FULL_PERMISSIONS}
           onClose={handleCloseFullscreen}
           onUpdate={handleUpdateStick}
           onDelete={handleDeleteStick}

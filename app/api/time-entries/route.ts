@@ -1,11 +1,11 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { getCachedAuthUser } from "@/lib/auth/cached-auth"
-import { createServerClient } from "@/lib/supabase/server"
+import { createDatabaseClient } from "@/lib/database/database-adapter"
 
 export async function GET(request: NextRequest) {
   try {
-    const supabase = await createServerClient()
-    const authResult = await getCachedAuthUser(supabase)
+    const db = await createDatabaseClient()
+    const authResult = await getCachedAuthUser()
     if (authResult.rateLimited) {
       return NextResponse.json(
         { error: "Rate limit exceeded. Please try again in a moment." },
@@ -22,7 +22,7 @@ export async function GET(request: NextRequest) {
     const end = searchParams.get("end")
     const taskId = searchParams.get("taskId")
 
-    let query = supabase
+    let query = db
       .from("paks_time_entries")
       .select(`
         *,
@@ -71,8 +71,8 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const supabase = await createServerClient()
-    const authResult = await getCachedAuthUser(supabase)
+    const db = await createDatabaseClient()
+    const authResult = await getCachedAuthUser()
     if (authResult.rateLimited) {
       return NextResponse.json(
         { error: "Rate limit exceeded. Please try again in a moment." },
@@ -90,7 +90,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Task ID and start time are required" }, { status: 400 })
     }
 
-    const { data: task, error: taskError } = await supabase
+    const { data: task, error: taskError } = await db
       .from("paks_pad_stick_replies")
       .select(`
         id,
@@ -107,7 +107,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Task not found" }, { status: 404 })
     }
 
-    const { data: entry, error } = await supabase
+    const { data: entry, error } = await db
       .from("paks_time_entries")
       .insert({
         task_id: taskId,

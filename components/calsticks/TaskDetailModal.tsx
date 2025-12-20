@@ -120,6 +120,7 @@ export function TaskDetailModal({ task, isOpen, onClose, onSave }: TaskDetailMod
     if (task.stick?.pad_id) {
       fetchMembers(task.stick.pad_id)
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [task, editor])
 
   const fetchProgress = async () => {

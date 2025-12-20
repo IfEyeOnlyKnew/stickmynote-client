@@ -41,11 +41,13 @@ export function RelatedKBArticles({
   const [loading, setLoading] = useState(false)
   const [isExpanded, setIsExpanded] = useState(true)
 
+  /* eslint-disable react-hooks/exhaustive-deps */
   useEffect(() => {
     if (padId && (stickTags.length > 0 || stickContent)) {
       fetchRelatedArticles()
     }
   }, [padId, stickTags, stickContent])
+  /* eslint-enable react-hooks/exhaustive-deps */
 
   const fetchRelatedArticles = async () => {
     try {

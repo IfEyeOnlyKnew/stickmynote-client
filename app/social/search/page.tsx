@@ -89,7 +89,6 @@ export default function SocialSearchPage() {
   const [replyResults, setReplyResults] = useState<ReplyResult[]>([])
   const [metadata, setMetadata] = useState<SearchMetadata | null>(null)
   const [loading, setLoading] = useState(false)
-  const [showFilters, setShowFilters] = useState(false)
   const [activeTab, setActiveTab] = useState<"sticks" | "replies">("sticks")
 
   // Filter states
@@ -108,6 +107,7 @@ export default function SocialSearchPage() {
       setQuery(q)
       performSearch(q)
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams])
 
   const performSearch = async (searchQuery = query) => {
@@ -174,6 +174,173 @@ export default function SocialSearchPage() {
 
   const hasActiveFilters =
     dateFrom || dateTo || visibility !== "all" || selectedAuthor || selectedPad || sortBy !== "created_at"
+
+  const renderStickResults = () => {
+    if (loading) {
+      return (
+        <div className="flex items-center justify-center py-12">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600" />
+        </div>
+      )
+    }
+
+    if (stickResults.length > 0) {
+      return stickResults.map((stick) => (
+        <Card
+          key={stick.id}
+          className="cursor-pointer hover:shadow-lg transition-shadow"
+          onClick={() => router.push(`/social/sticks/${stick.id}`)}
+        >
+          <CardHeader>
+            <div className="flex items-start justify-between gap-4">
+              <div className="flex-1 min-w-0">
+                <CardTitle className="text-lg mb-2 flex items-center gap-2">
+                  <div className="w-1 h-6 rounded" style={{ backgroundColor: stick.color }} />
+                  {stick.topic}
+                </CardTitle>
+                <p className="text-sm text-gray-600 line-clamp-2">{stick.content}</p>
+              </div>
+              <Badge
+                variant={stick.social_pads.is_public ? "default" : "secondary"}
+                className="flex-shrink-0"
+              >
+                {stick.social_pads.is_public ? (
+                  <>
+                    <Globe className="h-3 w-3 mr-1" />
+                    Public
+                  </>
+                ) : (
+                  <>
+                    <Lock className="h-3 w-3 mr-1" />
+                    Private
+                  </>
+                )}
+              </Badge>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="flex flex-wrap items-center gap-4 text-sm text-gray-500">
+              <div className="flex items-center gap-1">
+                <User className="h-4 w-4" />
+                {stick.users?.full_name || stick.users?.email}
+              </div>
+              <div className="flex items-center gap-1">
+                <MessageSquare className="h-4 w-4" />
+                {stick.reply_count} {stick.reply_count === 1 ? "reply" : "replies"}
+              </div>
+              <div className="flex items-center gap-1">
+                <Calendar className="h-4 w-4" />
+                {formatDistanceToNow(new Date(stick.created_at), { addSuffix: true })}
+              </div>
+              <div className="flex items-center gap-1">
+                <Folder className="h-4 w-4" />
+                <span className="font-medium">{stick.social_pads.name}</span>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      ))
+    }
+
+    if (query || hasActiveFilters) {
+      return (
+        <Card className="text-center py-12">
+          <CardContent>
+            <Search className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+            <h3 className="text-lg font-semibold mb-2">No sticks found</h3>
+            <p className="text-gray-600">Try adjusting your search terms or filters</p>
+          </CardContent>
+        </Card>
+      )
+    }
+
+    return (
+      <Card className="text-center py-12">
+        <CardContent>
+          <Search className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+          <h3 className="text-lg font-semibold mb-2">Start Searching</h3>
+          <p className="text-gray-600">Enter a search query or apply filters to find sticks</p>
+        </CardContent>
+      </Card>
+    )
+  }
+
+  const renderReplyResults = () => {
+    if (loading) {
+      return (
+        <div className="flex items-center justify-center py-12">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600" />
+        </div>
+      )
+    }
+
+    if (replyResults.length > 0) {
+      return replyResults.map((reply) => (
+        <Card
+          key={reply.id}
+          className="cursor-pointer hover:shadow-lg transition-shadow"
+          onClick={() => router.push(`/social/sticks/${reply.social_stick_id}`)}
+        >
+          <CardHeader>
+            <div className="flex items-start justify-between">
+              <div className="flex-1">
+                <p className="text-sm text-gray-600 mb-2">{reply.content}</p>
+                <Badge variant="outline" className="text-xs">
+                  {reply.category}
+                </Badge>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="flex flex-wrap items-center gap-4 text-xs text-gray-500">
+              <div className="flex items-center gap-1">
+                <User className="h-3 w-3" />
+                {reply.users?.full_name || reply.users?.email}
+              </div>
+              <div className="flex items-center gap-1">
+                <Clock className="h-3 w-3" />
+                {formatDistanceToNow(new Date(reply.created_at), { addSuffix: true })}
+              </div>
+              <div className="flex items-center gap-1">
+                <MessageSquare className="h-3 w-3" />
+                On: <span className="font-medium">{reply.social_sticks.topic}</span>
+              </div>
+              <div className="flex items-center gap-1">
+                <Folder className="h-3 w-3" />
+                <span className="font-medium">{reply.social_sticks.social_pads.name}</span>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      ))
+    }
+
+    if (query && includeReplies) {
+      return (
+        <Card className="text-center py-12">
+          <CardContent>
+            <MessageSquare className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+            <h3 className="text-lg font-semibold mb-2">No replies found</h3>
+            <p className="text-gray-600">No matching replies for your search query</p>
+          </CardContent>
+        </Card>
+      )
+    }
+
+    return (
+      <Card className="text-center py-12">
+        <CardContent>
+          <MessageSquare className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+          <h3 className="text-lg font-semibold mb-2">Reply Search</h3>
+          <p className="text-gray-600">
+            {includeReplies
+              ? "Enter a search query to find matching replies"
+              : "Enable 'Search in replies' to search reply content"}
+          </p>
+        </CardContent>
+      </Card>
+    )
+  }
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -400,150 +567,11 @@ export default function SocialSearchPage() {
               </TabsList>
 
               <TabsContent value="sticks" className="space-y-4 mt-6">
-                {loading ? (
-                  <div className="flex items-center justify-center py-12">
-                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600" />
-                  </div>
-                ) : stickResults.length > 0 ? (
-                  stickResults.map((stick) => (
-                    <Card
-                      key={stick.id}
-                      className="cursor-pointer hover:shadow-lg transition-shadow"
-                      onClick={() => router.push(`/social/sticks/${stick.id}`)}
-                    >
-                      <CardHeader>
-                        <div className="flex items-start justify-between gap-4">
-                          <div className="flex-1 min-w-0">
-                            <CardTitle className="text-lg mb-2 flex items-center gap-2">
-                              <div className="w-1 h-6 rounded" style={{ backgroundColor: stick.color }} />
-                              {stick.topic}
-                            </CardTitle>
-                            <p className="text-sm text-gray-600 line-clamp-2">{stick.content}</p>
-                          </div>
-                          <Badge
-                            variant={stick.social_pads.is_public ? "default" : "secondary"}
-                            className="flex-shrink-0"
-                          >
-                            {stick.social_pads.is_public ? (
-                              <>
-                                <Globe className="h-3 w-3 mr-1" />
-                                Public
-                              </>
-                            ) : (
-                              <>
-                                <Lock className="h-3 w-3 mr-1" />
-                                Private
-                              </>
-                            )}
-                          </Badge>
-                        </div>
-                      </CardHeader>
-                      <CardContent>
-                        <div className="flex flex-wrap items-center gap-4 text-sm text-gray-500">
-                          <div className="flex items-center gap-1">
-                            <User className="h-4 w-4" />
-                            {stick.users?.full_name || stick.users?.email}
-                          </div>
-                          <div className="flex items-center gap-1">
-                            <MessageSquare className="h-4 w-4" />
-                            {stick.reply_count} {stick.reply_count === 1 ? "reply" : "replies"}
-                          </div>
-                          <div className="flex items-center gap-1">
-                            <Calendar className="h-4 w-4" />
-                            {formatDistanceToNow(new Date(stick.created_at), { addSuffix: true })}
-                          </div>
-                          <div className="flex items-center gap-1">
-                            <Folder className="h-4 w-4" />
-                            <span className="font-medium">{stick.social_pads.name}</span>
-                          </div>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  ))
-                ) : query || hasActiveFilters ? (
-                  <Card className="text-center py-12">
-                    <CardContent>
-                      <Search className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                      <h3 className="text-lg font-semibold mb-2">No sticks found</h3>
-                      <p className="text-gray-600">Try adjusting your search terms or filters</p>
-                    </CardContent>
-                  </Card>
-                ) : (
-                  <Card className="text-center py-12">
-                    <CardContent>
-                      <Search className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                      <h3 className="text-lg font-semibold mb-2">Start Searching</h3>
-                      <p className="text-gray-600">Enter a search query or apply filters to find sticks</p>
-                    </CardContent>
-                  </Card>
-                )}
+                {renderStickResults()}
               </TabsContent>
 
               <TabsContent value="replies" className="space-y-4 mt-6">
-                {loading ? (
-                  <div className="flex items-center justify-center py-12">
-                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600" />
-                  </div>
-                ) : replyResults.length > 0 ? (
-                  replyResults.map((reply) => (
-                    <Card
-                      key={reply.id}
-                      className="cursor-pointer hover:shadow-lg transition-shadow"
-                      onClick={() => router.push(`/social/sticks/${reply.social_stick_id}`)}
-                    >
-                      <CardHeader>
-                        <div className="flex items-start justify-between">
-                          <div className="flex-1">
-                            <p className="text-sm text-gray-600 mb-2">{reply.content}</p>
-                            <Badge variant="outline" className="text-xs">
-                              {reply.category}
-                            </Badge>
-                          </div>
-                        </div>
-                      </CardHeader>
-                      <CardContent>
-                        <div className="flex flex-wrap items-center gap-4 text-xs text-gray-500">
-                          <div className="flex items-center gap-1">
-                            <User className="h-3 w-3" />
-                            {reply.users?.full_name || reply.users?.email}
-                          </div>
-                          <div className="flex items-center gap-1">
-                            <Clock className="h-3 w-3" />
-                            {formatDistanceToNow(new Date(reply.created_at), { addSuffix: true })}
-                          </div>
-                          <div className="flex items-center gap-1">
-                            <MessageSquare className="h-3 w-3" />
-                            On: <span className="font-medium">{reply.social_sticks.topic}</span>
-                          </div>
-                          <div className="flex items-center gap-1">
-                            <Folder className="h-3 w-3" />
-                            <span className="font-medium">{reply.social_sticks.social_pads.name}</span>
-                          </div>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  ))
-                ) : query && includeReplies ? (
-                  <Card className="text-center py-12">
-                    <CardContent>
-                      <MessageSquare className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                      <h3 className="text-lg font-semibold mb-2">No replies found</h3>
-                      <p className="text-gray-600">No matching replies for your search query</p>
-                    </CardContent>
-                  </Card>
-                ) : (
-                  <Card className="text-center py-12">
-                    <CardContent>
-                      <MessageSquare className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                      <h3 className="text-lg font-semibold mb-2">Reply Search</h3>
-                      <p className="text-gray-600">
-                        {includeReplies
-                          ? "Enter a search query to find matching replies"
-                          : "Enable 'Search in replies' to search reply content"}
-                      </p>
-                    </CardContent>
-                  </Card>
-                )}
+                {renderReplyResults()}
               </TabsContent>
             </Tabs>
           </div>

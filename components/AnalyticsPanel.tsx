@@ -14,8 +14,8 @@ export function AnalyticsPanel() {
     return (
       <div className="space-y-6">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          {[...Array(4)].map((_, i) => (
-            <Card key={i}>
+          {["skeleton-1", "skeleton-2", "skeleton-3", "skeleton-4"].map((id) => (
+            <Card key={id}>
               <CardContent className="p-6">
                 <div className="animate-pulse">
                   <div className="h-4 bg-gray-200 rounded w-3/4 mb-2"></div>

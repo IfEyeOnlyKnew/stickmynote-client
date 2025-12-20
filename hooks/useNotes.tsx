@@ -38,6 +38,7 @@ interface UseNotesReturn {
   clearAllNotes: () => void
   handleGenerateTags: (noteId: string, topic: string) => Promise<void>
   hasMore: boolean
+  markInitialized: () => void
 }
 
 // ============================================================================
@@ -79,6 +80,7 @@ export function useNotes(userId: string | null, shouldLoad = true): UseNotesRetu
           })
         })
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [userId, shouldLoad])
 
   const loadMoreNotes = useCallback(async () => {
@@ -94,8 +96,11 @@ export function useNotes(userId: string | null, shouldLoad = true): UseNotesRetu
         variant: "destructive",
       })
     }
+    /* eslint-disable react-hooks/exhaustive-deps */
   }, [data.hasMore, data.isLoadingMore, data.loadNotes, toast])
+  /* eslint-enable react-hooks/exhaustive-deps */
 
+  /* eslint-disable react-hooks/exhaustive-deps */
   const handleCreateNote = useCallback(
     async (color: string, windowSize: { width: number; height: number }): Promise<Note> => {
       try {
@@ -118,7 +123,9 @@ export function useNotes(userId: string | null, shouldLoad = true): UseNotesRetu
     },
     [data.handleCreateNote, state.highestZIndex, state.setHighestZIndex, toast],
   )
+  /* eslint-enable react-hooks/exhaustive-deps */
 
+  /* eslint-disable react-hooks/exhaustive-deps */
   const handleUndoDelete = useCallback(() => {
     const restoredNotes = state.handleUndoDelete()
     data.setAllNotes((prev) => [...restoredNotes, ...prev])
@@ -127,7 +134,9 @@ export function useNotes(userId: string | null, shouldLoad = true): UseNotesRetu
       description: `${restoredNotes.length} note(s) have been restored.`,
     })
   }, [state.handleUndoDelete, data.setAllNotes, toast])
+  /* eslint-enable react-hooks/exhaustive-deps */
 
+  /* eslint-disable react-hooks/exhaustive-deps */
   const clearAllNotes = useCallback(async () => {
     try {
       await data.clearAllNotes()
@@ -145,7 +154,9 @@ export function useNotes(userId: string | null, shouldLoad = true): UseNotesRetu
       })
     }
   }, [data.clearAllNotes, state.handleClearUndo, toast])
+  /* eslint-enable react-hooks/exhaustive-deps */
 
+  /* eslint-disable react-hooks/exhaustive-deps */
   const handleGenerateTags = useCallback(
     async (noteId: string, topic: string): Promise<void> => {
       try {
@@ -164,6 +175,7 @@ export function useNotes(userId: string | null, shouldLoad = true): UseNotesRetu
     },
     [data.handleGenerateTags, state.setGeneratingTags, toast],
   )
+  /* eslint-enable react-hooks/exhaustive-deps */
 
   return {
     allNotes: data.allNotes,
@@ -190,5 +202,6 @@ export function useNotes(userId: string | null, shouldLoad = true): UseNotesRetu
     clearAllNotes,
     handleGenerateTags,
     hasMore: data.hasMore, // Expose hasMore
+    markInitialized: data.markInitialized, // Mark as initialized when using SSR data
   }
 }

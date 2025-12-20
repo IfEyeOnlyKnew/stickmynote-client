@@ -1,7 +1,7 @@
 "use client"
 
-import { useEffect, useState, useCallback } from "react"
-import { createSupabaseBrowser } from "@/lib/supabase-browser"
+import { useEffect, useState, useCallback, useRef } from "react"
+import { useUser } from "@/contexts/user-context"
 
 export interface ActivityMetadata {
   stick_id?: string
@@ -35,18 +35,16 @@ export interface SocialActivity {
 }
 
 export function useSocialActivityFeed() {
+  const { user } = useUser()
   const [activities, setActivities] = useState<SocialActivity[]>([])
   const [loading, setLoading] = useState(true)
   const [hasMore, setHasMore] = useState(false)
   const [offset, setOffset] = useState(0)
-  const supabase = createSupabaseBrowser()
+  const pollIntervalRef = useRef<NodeJS.Timeout | null>(null)
 
   const fetchActivities = useCallback(
     async (reset = false) => {
       try {
-        const {
-          data: { user },
-        } = await supabase.auth.getUser()
         if (!user) return
 
         const currentOffset = reset ? 0 : offset
@@ -68,30 +66,23 @@ export function useSocialActivityFeed() {
         setLoading(false)
       }
     },
-    [offset, supabase],
+    [offset, user],
   )
 
   useEffect(() => {
     fetchActivities(true)
 
-    const channel = supabase
-      .channel("social-activity-feed")
-      .on(
-        "postgres_changes",
-        {
-          event: "*",
-          schema: "public",
-          table: "personal_sticks_activities",
-        },
-        () => {
-          fetchActivities(true)
-        },
-      )
-      .subscribe()
+    // Poll every 30 seconds for new activities
+    pollIntervalRef.current = setInterval(() => {
+      fetchActivities(true)
+    }, 30000)
 
     return () => {
-      supabase.removeChannel(channel)
+      if (pollIntervalRef.current) {
+        clearInterval(pollIntervalRef.current)
+      }
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   const loadMore = () => {

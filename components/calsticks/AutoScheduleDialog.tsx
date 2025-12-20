@@ -8,13 +8,13 @@ import { useToast } from "@/hooks/use-toast"
 import type { CalStick } from "@/types/calstick"
 
 interface AutoScheduleDialogProps {
-  isOpen: boolean
-  onClose: () => void
-  unscheduledTasks: CalStick[]
-  onTasksScheduled: (updates: { id: string; startDate: string; endDate: string }[]) => Promise<void>
+  readonly isOpen: boolean
+  readonly onClose: () => void
+  readonly unscheduledTasks: CalStick[]
+  readonly onTasksScheduled: (updates: { id: string; startDate: string; endDate: string }[]) => Promise<void>
 }
 
-export function AutoScheduleDialog({ isOpen, onClose, unscheduledTasks, onTasksScheduled }: AutoScheduleDialogProps) {
+export function AutoScheduleDialog({ isOpen, onClose, unscheduledTasks, onTasksScheduled }: Readonly<AutoScheduleDialogProps>) {
   const [loading, setLoading] = useState(false)
   const { toast } = useToast()
 

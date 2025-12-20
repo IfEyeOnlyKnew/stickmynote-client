@@ -1,33 +1,25 @@
-import { createClient } from "@/lib/supabase/server"
+import { getSession } from "@/lib/auth/local-auth"
 import { NextResponse } from "next/server"
-import { getCachedAuthUser } from "@/lib/auth/cached-auth"
+import { db } from "@/lib/database/pg-client"
 
 // POST /api/search/advanced - Advanced search with filters
 export async function POST(request: Request) {
   try {
-    const supabase = await createClient()
-    const authResult = await getCachedAuthUser(supabase)
+    const session = await getSession()
 
-    if (authResult.rateLimited) {
-      return NextResponse.json(
-        { error: "Rate limit exceeded. Please try again in a moment." },
-        { status: 429, headers: { "Retry-After": "30" } },
-      )
-    }
-
-    if (!authResult.user) {
+    if (!session) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
-    const user = authResult.user
+    const user = session.user
 
     const body = await request.json()
     const { query, filters, page = 1, limit = 20, sortBy = "created_at", sortOrder = "desc" } = body
 
-    let notesQuery = supabase
-      .from("notes")
-      .select("*, replies:replies(count)", { count: "exact" })
-      .eq("user_id", user.id)
+    // Build WHERE conditions
+    const conditions: string[] = ["user_id = $1"]
+    const params: any[] = [user.id]
+    let paramIndex = 2
 
     // Apply text search
     if (query && query.trim()) {
@@ -39,51 +31,71 @@ export async function POST(request: Request) {
           .map((w: string) => w.trim())
           .filter((w: string) => w)
         keywords.forEach((keyword: string) => {
-          notesQuery = notesQuery.ilike("topic", `%${keyword}%`)
+          conditions.push(`LOWER(topic) LIKE $${paramIndex}`)
+          params.push(`%${keyword}%`)
+          paramIndex++
         })
       } else {
         // Search both topic and content
-        notesQuery = notesQuery.or(`topic.ilike.%${searchTerm}%,content.ilike.%${searchTerm}%`)
+        conditions.push(`(LOWER(topic) LIKE $${paramIndex} OR LOWER(content) LIKE $${paramIndex})`)
+        params.push(`%${searchTerm}%`)
+        paramIndex++
       }
     }
 
     // Apply date range filter
     if (filters?.dateRange?.from) {
-      notesQuery = notesQuery.gte("created_at", filters.dateRange.from)
+      conditions.push(`created_at >= $${paramIndex}`)
+      params.push(filters.dateRange.from)
+      paramIndex++
     }
     if (filters?.dateRange?.to) {
-      notesQuery = notesQuery.lte("created_at", filters.dateRange.to)
+      conditions.push(`created_at <= $${paramIndex}`)
+      params.push(filters.dateRange.to)
+      paramIndex++
     }
 
     // Apply shared filter
     if (filters?.shared !== null && filters?.shared !== undefined) {
-      notesQuery = notesQuery.eq("is_shared", filters.shared)
+      conditions.push(`is_shared = $${paramIndex}`)
+      params.push(filters.shared)
+      paramIndex++
     }
 
     // Apply color filter
     if (filters?.color) {
-      notesQuery = notesQuery.eq("color", filters.color)
+      conditions.push(`color = $${paramIndex}`)
+      params.push(filters.color)
+      paramIndex++
     }
 
-    // Apply sorting
-    notesQuery = notesQuery.order(sortBy, { ascending: sortOrder === "asc" })
+    const whereClause = conditions.join(" AND ")
 
-    // Apply pagination
+    // Get total count
+    const countQuery = `SELECT COUNT(*) FROM notes WHERE ${whereClause}`
+    const countResult = await db.query(countQuery, params)
+    const totalCount = Number.parseInt(countResult.rows[0].count)
+
+    // Get notes with replies count
     const offset = (page - 1) * limit
-    notesQuery = notesQuery.range(offset, offset + limit - 1)
+    const notesQuery = `
+      SELECT n.*, 
+             (SELECT COUNT(*) FROM replies WHERE note_id = n.id) as reply_count
+      FROM notes n
+      WHERE ${whereClause}
+      ORDER BY ${sortBy} ${sortOrder === "asc" ? "ASC" : "DESC"}
+      LIMIT $${paramIndex} OFFSET $${paramIndex + 1}
+    `
+    params.push(limit, offset)
 
-    const { data: notes, error: notesError, count } = await notesQuery
-
-    if (notesError) {
-      console.error("Error in advanced search:", notesError)
-      return NextResponse.json({ error: "Search failed" }, { status: 500 })
-    }
+    const notesResult = await db.query(notesQuery, params)
+    const notes = notesResult.rows
 
     return NextResponse.json({
       notes: notes || [],
-      totalCount: count || 0,
+      totalCount,
       page,
-      hasMore: (count || 0) > page * limit,
+      hasMore: totalCount > page * limit,
     })
   } catch (error) {
     console.error("Error in advanced search:", error)

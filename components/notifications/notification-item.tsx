@@ -42,11 +42,14 @@ export function NotificationItem({ notification }: NotificationItemProps) {
 
   return (
     <div
+      role="button"
+      tabIndex={0}
       className={cn(
         "flex items-start gap-3 p-4 hover:bg-muted/50 transition-colors cursor-pointer group",
         !notification.read && "bg-blue-50/50 dark:bg-blue-950/20",
       )}
       onClick={handleClick}
+      onKeyDown={(e) => e.key === "Enter" && handleClick()}
     >
       <div
         className={cn(

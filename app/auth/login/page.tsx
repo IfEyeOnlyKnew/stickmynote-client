@@ -3,7 +3,7 @@ import { AuthForm } from "@/components/auth-form"
 import { Loader2 } from "lucide-react"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 
-function LoginContent({ sessionExpired }: { sessionExpired: boolean }) {
+function LoginContent({ sessionExpired }: Readonly<{ sessionExpired: boolean }>) {
   return (
     <div className="flex flex-col gap-4">
       {sessionExpired && (
@@ -18,9 +18,9 @@ function LoginContent({ sessionExpired }: { sessionExpired: boolean }) {
 
 export default function LoginPage({
   searchParams,
-}: {
+}: Readonly<{
   searchParams: { session_expired?: string; redirect?: string }
-}) {
+}>) {
   const sessionExpired = searchParams?.session_expired === "true"
 
   return (

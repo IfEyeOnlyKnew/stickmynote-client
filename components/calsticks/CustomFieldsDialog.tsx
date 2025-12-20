@@ -43,6 +43,7 @@ export function CustomFieldsDialog({ open, onOpenChange }: CustomFieldsDialogPro
     if (open) {
       fetchFields()
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open])
 
   const fetchFields = async () => {

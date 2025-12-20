@@ -1,23 +1,26 @@
 import { type NextRequest, NextResponse } from "next/server"
 import type { ZodSchema } from "zod"
-import { createSupabaseServer } from "@/lib/supabase-server"
 import { applyRateLimit } from "@/lib/rate-limiter-enhanced"
 import { validateCSRFMiddleware } from "@/lib/csrf"
-import type { User } from "@supabase/supabase-js"
-import type { SupabaseClient } from "@supabase/supabase-js"
+import { getSession } from "@/lib/auth/local-auth"
+import { createDatabaseClient, type DatabaseClient } from "@/lib/database/database-adapter"
 
-/**
- * Context provided to action handlers
- */
+// ============================================================================
+// Types
+// ============================================================================
+
+interface SessionUser {
+  id: string
+  email?: string
+  [key: string]: unknown
+}
+
 export interface ActionContext {
-  user: User
-  supabase: SupabaseClient
+  user: SessionUser | null
+  db: DatabaseClient
   request: NextRequest
 }
 
-/**
- * Options for creating a safe action
- */
 export interface SafeActionOptions<TInput, TOutput> {
   /** Zod schema for input validation */
   input?: ZodSchema<TInput>
@@ -29,31 +32,153 @@ export interface SafeActionOptions<TInput, TOutput> {
   requireAuth?: boolean
 }
 
-/**
- * Result type for safe actions
- */
 export type SafeActionResult<TOutput> =
   | { success: true; data: TOutput }
   | { success: false; error: string; status?: number; details?: unknown }
 
-/**
- * Handler function type
- */
 export type SafeActionHandler<TInput, TOutput> = (
   input: TInput,
   context: ActionContext,
 ) => Promise<SafeActionResult<TOutput>>
 
+// ============================================================================
+// Constants
+// ============================================================================
+
+const DEFAULT_ERROR_STATUS = 500
+const RATE_LIMIT_RETRY_SECONDS = "60"
+
+const ErrorMessages = {
+  CSRF_INVALID: "Invalid or missing CSRF token",
+  UNAUTHORIZED: "Unauthorized",
+  RATE_LIMITED: "Rate limit exceeded",
+  INVALID_JSON: "Invalid JSON body",
+  INVALID_INPUT: "Invalid input",
+  INTERNAL: "Internal server error",
+} as const
+
+const StatusCodes = {
+  BAD_REQUEST: 400,
+  UNAUTHORIZED: 401,
+  FORBIDDEN: 403,
+  TOO_MANY_REQUESTS: 429,
+  INTERNAL_ERROR: 500,
+} as const
+
+// ============================================================================
+// Response Helpers
+// ============================================================================
+
+function jsonResponse<T>(data: T, status = 200, headers?: Record<string, string>): NextResponse {
+  return NextResponse.json(data, { status, headers })
+}
+
+function errorResponse(
+  message: string,
+  status: number,
+  details?: unknown,
+  headers?: Record<string, string>,
+): NextResponse {
+  const body = details ? { error: message, details } : { error: message }
+  return jsonResponse(body, status, headers)
+}
+
+const Errors = {
+  csrf: () => errorResponse(ErrorMessages.CSRF_INVALID, StatusCodes.FORBIDDEN),
+  unauthorized: () => errorResponse(ErrorMessages.UNAUTHORIZED, StatusCodes.UNAUTHORIZED),
+  rateLimited: () => errorResponse(
+    ErrorMessages.RATE_LIMITED,
+    StatusCodes.TOO_MANY_REQUESTS,
+    undefined,
+    { "Retry-After": RATE_LIMIT_RETRY_SECONDS }
+  ),
+  invalidJson: () => errorResponse(ErrorMessages.INVALID_JSON, StatusCodes.BAD_REQUEST),
+  validation: (fieldErrors: Record<string, string[] | undefined>) =>
+    errorResponse(ErrorMessages.INVALID_INPUT, StatusCodes.BAD_REQUEST, fieldErrors),
+  internal: () => errorResponse(ErrorMessages.INTERNAL, StatusCodes.INTERNAL_ERROR),
+  custom: (message: string, status = DEFAULT_ERROR_STATUS, details?: unknown) =>
+    errorResponse(message, status, details),
+} as const
+
+// ============================================================================
+// Validation Helpers
+// ============================================================================
+
+interface ValidationSuccess<T> {
+  valid: true
+  data: T
+}
+
+interface ValidationFailure {
+  valid: false
+  response: NextResponse
+}
+
+type ValidationResult<T> = ValidationSuccess<T> | ValidationFailure
+
+async function parseAndValidateInput<TInput>(
+  request: NextRequest,
+  schema: ZodSchema<TInput>,
+): Promise<ValidationResult<TInput>> {
+  let body: unknown
+  try {
+    body = await request.json()
+  } catch {
+    return { valid: false, response: Errors.invalidJson() }
+  }
+
+  const result = schema.safeParse(body)
+  if (!result.success) {
+    return { valid: false, response: Errors.validation(result.error.flatten().fieldErrors) }
+  }
+
+  return { valid: true, data: result.data }
+}
+
+function validateOutput<TOutput>(data: unknown, schema: ZodSchema<TOutput>): boolean {
+  const result = schema.safeParse(data)
+  if (!result.success) {
+    console.error("[SafeAction] Output validation failed:", result.error)
+    return false
+  }
+  return true
+}
+
+// ============================================================================
+// Middleware Helpers
+// ============================================================================
+
+async function checkRateLimit(request: NextRequest, userId: string, actionName: string): Promise<boolean> {
+  try {
+    const result = await applyRateLimit(request, userId, actionName)
+    return result.success
+  } catch (err) {
+    console.warn("[SafeAction] Rate limit provider error, allowing request:", err)
+    return true
+  }
+}
+
+async function getAuthContext(): Promise<{ user: SessionUser | null; db: DatabaseClient }> {
+  const session = await getSession()
+  const user = session?.user ? (session.user as unknown as SessionUser) : null
+  const db = await createDatabaseClient()
+  return { user, db }
+}
+
+// ============================================================================
+// Main Factory
+// ============================================================================
+
 /**
  * Creates a type-safe, validated, and authenticated API route handler
  *
  * @example
- * \`\`\`typescript
+ * ```typescript
  * const createNoteAction = createSafeAction({
  *   input: createNoteSchema,
  *   rateLimit: "notes_create",
- * }, async (input, { user, supabase }) => {
- *   const { data, error } = await supabase
+ * }, async (input, { user, db }) => {
+ *   const { data, error } = await db
  *     .from("notes")
  *     .insert({ ...input, user_id: user.id })
  *     .select()
@@ -69,103 +194,73 @@ export type SafeActionHandler<TInput, TOutput> = (
  * export async function POST(request: NextRequest) {
  *   return createNoteAction(request)
  * }
- * \`\`\`
+ * ```
  */
 export function createSafeAction<TInput = unknown, TOutput = unknown>(
   options: SafeActionOptions<TInput, TOutput>,
   handler: SafeActionHandler<TInput, TOutput>,
-) {
+): (request: NextRequest) => Promise<NextResponse> {
+  const { input: inputSchema, output: outputSchema, rateLimit, requireAuth = true } = options
+
   return async (request: NextRequest): Promise<NextResponse> => {
     try {
+      // 1. CSRF validation
       const isCSRFValid = await validateCSRFMiddleware(request)
       if (!isCSRFValid) {
-        return NextResponse.json({ error: "Invalid or missing CSRF token" }, { status: 403 })
+        return Errors.csrf()
       }
 
       // 2. Authentication check
-      const supabase = await createSupabaseServer()
-      const {
-        data: { user },
-        error: authError,
-      } = await supabase.auth.getUser()
-
-      const requireAuth = options.requireAuth !== false
-
-      if (requireAuth && (authError || !user)) {
-        return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+      const { user, db } = await getAuthContext()
+      if (requireAuth && !user) {
+        return Errors.unauthorized()
       }
 
-      // 3. Rate limiting (if configured)
-      if (options.rateLimit && user) {
-        try {
-          const rateLimitResult = await applyRateLimit(request, user.id, options.rateLimit)
-          if (!rateLimitResult.success) {
-            return NextResponse.json(
-              { error: "Rate limit exceeded" },
-              { status: 429, headers: { "Retry-After": "60" } },
-            )
-          }
-        } catch (err) {
-          console.warn("Rate limit provider error, allowing request:", err)
+      // 3. Rate limiting (only for authenticated users)
+      if (rateLimit && user) {
+        const allowed = await checkRateLimit(request, user.id, rateLimit)
+        if (!allowed) {
+          return Errors.rateLimited()
         }
       }
 
-      // 4. Input validation (if schema provided)
+      // 4. Input validation
       let validatedInput: TInput
-      if (options.input) {
-        try {
-          const body = await request.json()
-          const result = options.input.safeParse(body)
-
-          if (!result.success) {
-            return NextResponse.json(
-              {
-                error: "Invalid input",
-                details: result.error.flatten().fieldErrors,
-              },
-              { status: 400 },
-            )
-          }
-
-          validatedInput = result.data
-        } catch (err) {
-          return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 })
+      if (inputSchema) {
+        const validation = await parseAndValidateInput(request, inputSchema)
+        if (!validation.valid) {
+          return validation.response
         }
+        validatedInput = validation.data
       } else {
-        // No input validation, pass empty object
         validatedInput = {} as TInput
       }
 
       // 5. Execute handler
-      const context: ActionContext = {
-        user: user!,
-        supabase,
-        request,
-      }
-
+      const context: ActionContext = { user, db, request }
       const result = await handler(validatedInput, context)
 
-      // 6. Handle result
+      // 6. Handle error result
       if (!result.success) {
-        return NextResponse.json({ error: result.error, details: result.details }, { status: result.status || 500 })
+        return Errors.custom(result.error, result.status, result.details)
       }
 
-      // 7. Output validation (optional, for type safety)
-      if (options.output) {
-        const outputResult = options.output.safeParse(result.data)
-        if (!outputResult.success) {
-          console.error("Output validation failed:", outputResult.error)
-          return NextResponse.json({ error: "Internal server error" }, { status: 500 })
-        }
+      // 7. Output validation (optional)
+      if (outputSchema && !validateOutput(result.data, outputSchema)) {
+        return Errors.internal()
       }
 
-      return NextResponse.json(result.data)
+      return jsonResponse(result.data)
     } catch (error) {
-      console.error("Safe action error:", error)
-      return NextResponse.json({ error: "Internal server error" }, { status: 500 })
+      console.error("[SafeAction] Unhandled error:", error)
+      return Errors.internal()
     }
   }
 }
+
+// ============================================================================
+// Result Helpers
+// ============================================================================
 
 /**
  * Helper to create a success result

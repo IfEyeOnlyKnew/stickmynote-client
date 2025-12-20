@@ -1,5 +1,5 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { createClient } from "@/lib/supabase/server"
+import { createDatabaseClient } from "@/lib/database/database-adapter"
 import { getOrgContext } from "@/lib/auth/get-org-context"
 import { getCachedAuthUser } from "@/lib/auth/cached-auth"
 
@@ -7,9 +7,9 @@ const ACTIVITY_RETENTION_DAYS = 90
 
 export async function GET(req: NextRequest) {
   try {
-    const supabase = await createClient()
+    const db = await createDatabaseClient()
 
-    const authResult = await getCachedAuthUser(supabase)
+    const authResult = await getCachedAuthUser()
     if (authResult.rateLimited) {
       return NextResponse.json(
         { error: "Rate limit exceeded. Please try again in a moment." },
@@ -34,12 +34,12 @@ export async function GET(req: NextRequest) {
     retentionDate.setDate(retentionDate.getDate() - ACTIVITY_RETENTION_DAYS)
     const retentionCutoff = retentionDate.toISOString()
 
-    const { data: memberPads } = await supabase
+    const { data: memberPads } = await db
       .from("social_pad_members")
       .select("social_pad_id")
       .eq("user_id", user.id)
 
-    const { data: ownedPads } = await supabase
+    const { data: ownedPads } = await db
       .from("social_pads")
       .select("id")
       .eq("owner_id", user.id)
@@ -56,7 +56,7 @@ export async function GET(req: NextRequest) {
 
     const fetchLimit = Math.max(limit * 3, 50)
 
-    const { data: stickActivities } = await supabase
+    const { data: stickActivities } = await db
       .from("social_sticks")
       .select(
         `
@@ -76,7 +76,7 @@ export async function GET(req: NextRequest) {
       .order("created_at", { ascending: false })
       .limit(fetchLimit)
 
-    const { data: replyActivities } = await supabase
+    const { data: replyActivities } = await db
       .from("social_stick_replies")
       .select(
         `
@@ -115,7 +115,7 @@ export async function GET(req: NextRequest) {
     stickActivities?.forEach((stick: any) => userIds.add(stick.user_id))
     deduplicatedReplies.forEach((reply: any) => userIds.add(reply.user_id))
 
-    const { data: users } = await supabase
+    const { data: users } = await db
       .from("users")
       .select("id, full_name, email, avatar_url")
       .in("id", Array.from(userIds))

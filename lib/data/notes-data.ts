@@ -1,4 +1,4 @@
-import { createSupabaseServer } from "@/lib/supabase-server"
+import { createDatabaseClient } from "@/lib/database/database-adapter"
 import type { Note } from "@/types/note"
 import { unstable_cache } from "next/cache"
 import { CACHE_TAGS, CACHE_DURATIONS } from "@/lib/cache-config"
@@ -6,9 +6,9 @@ import { CACHE_TAGS, CACHE_DURATIONS } from "@/lib/cache-config"
 export async function fetchUserNotes(userId: string, limit = 50): Promise<Note[]> {
   return unstable_cache(
     async () => {
-      const supabase = await createSupabaseServer()
+      const db = await createDatabaseClient()
 
-      const { data, error } = await supabase
+      const { data, error } = await db
         .from("notes")
         .select(`
           id, topic, content, color, position_x, position_y, is_shared, 
@@ -36,9 +36,9 @@ export async function fetchUserNotes(userId: string, limit = 50): Promise<Note[]
 export async function fetchNoteStats(userId: string) {
   return unstable_cache(
     async () => {
-      const supabase = await createSupabaseServer()
+      const db = await createDatabaseClient()
 
-      const { data: allNotes } = await supabase.from("notes").select("id, is_shared").eq("user_id", userId)
+      const { data: allNotes } = await db.from("notes").select("id, is_shared").eq("user_id", userId)
 
       const total = allNotes?.length || 0
       const personal = allNotes?.filter((n) => !n.is_shared).length || 0

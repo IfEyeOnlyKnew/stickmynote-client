@@ -1,7 +1,8 @@
-import { createSupabaseServer, getSupabaseServiceClient } from "@/lib/supabase-server"
+import { createDatabaseClient } from "@/lib/database/database-adapter"
 import { NextResponse, type NextRequest } from "next/server"
 import { validateCSRFMiddleware } from "@/lib/csrf"
 import { getCachedAuthUser } from "@/lib/auth/cached-auth"
+import { clearSession } from "@/lib/auth/local-auth"
 
 export async function DELETE(request: NextRequest) {
   try {
@@ -10,9 +11,9 @@ export async function DELETE(request: NextRequest) {
       return NextResponse.json({ error: "Invalid or missing CSRF token" }, { status: 403 })
     }
 
-    const supabase = await createSupabaseServer()
+    const db = await createDatabaseClient()
 
-    const authResult = await getCachedAuthUser(supabase)
+    const authResult = await getCachedAuthUser()
     if (authResult.rateLimited) {
       return NextResponse.json(
         { error: "Rate limit exceeded. Please try again in a moment." },
@@ -28,29 +29,25 @@ export async function DELETE(request: NextRequest) {
     // Delete user data in the correct order (respecting foreign key constraints)
 
     // 1. Delete tags first (if they reference notes)
-    const { error: tagsError } = await supabase.from("tags").delete().eq("user_id", userId)
+    await db.from("tags").delete().eq("user_id", userId)
 
     // 2. Delete replies (if they reference notes)
-    const { error: repliesError } = await supabase.from("replies").delete().eq("user_id", userId)
+    await db.from("replies").delete().eq("user_id", userId)
 
     // 3. Delete note tabs (if they reference notes)
-    const { error: noteTabsError } = await supabase.from("note_tabs").delete().eq("user_id", userId)
+    await db.from("note_tabs").delete().eq("user_id", userId)
 
     // 4. Delete notes
-    const { error: notesError } = await supabase.from("notes").delete().eq("user_id", userId)
+    await db.from("notes").delete().eq("user_id", userId)
 
-    // 5. Delete user profile
-    const { error: userProfileError } = await supabase.from("users").delete().eq("id", userId)
-
-    // 6. Delete from auth.users table using admin client
-    const adminSupabase = await getSupabaseServiceClient()
-    const { error: authDeleteError } = await adminSupabase.auth.admin.deleteUser(userId)
-    if (authDeleteError) {
-      return NextResponse.json({ error: "Failed to delete authentication record" }, { status: 500 })
+    // 5. Delete user profile - For local auth, this also deletes the auth record
+    const { error: userProfileError } = await db.from("users").delete().eq("id", userId)
+    if (userProfileError) {
+      return NextResponse.json({ error: "Failed to delete user account" }, { status: 500 })
     }
 
-    // 7. Sign out the user (this will happen automatically after auth deletion)
-    await supabase.auth.signOut()
+    // 6. Clear the session
+    await clearSession()
 
     return NextResponse.json({ success: true })
   } catch (error) {

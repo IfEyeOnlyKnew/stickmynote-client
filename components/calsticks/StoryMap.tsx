@@ -189,12 +189,15 @@ function SortableTaskCard({
     <div
       ref={setNodeRef}
       style={style}
+      role="button"
+      tabIndex={0}
       className={cn(
         "group bg-card border rounded-lg p-2 shadow-sm hover:shadow-md transition-all cursor-pointer",
         isDragging && "ring-2 ring-primary",
         task.calstick_completed && "opacity-60",
       )}
       onClick={() => onClick?.(task)}
+      onKeyDown={(e) => e.key === "Enter" && onClick?.(task)}
     >
       <div className="flex items-start gap-2">
         <button {...attributes} {...listeners} className="mt-1 cursor-grab active:cursor-grabbing">
@@ -272,8 +275,11 @@ function EpicRow({
     <div className="border-b last:border-b-0">
       {/* Epic Header */}
       <div
+        role="button"
+        tabIndex={0}
         className="flex items-center gap-2 px-3 py-2 bg-muted/50 cursor-pointer hover:bg-muted/80 transition-colors"
         onClick={onToggle}
+        onKeyDown={(e) => e.key === "Enter" && onToggle()}
         style={{ borderLeft: `4px solid ${epic.color}` }}
       >
         {isExpanded ? (

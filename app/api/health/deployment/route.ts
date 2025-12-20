@@ -45,8 +45,8 @@ export async function GET() {
     } else {
       checks.services.database = {
         healthy: true,
-        message: "Using Supabase cloud database",
-        details: { provider: "Supabase" },
+        message: "Using cloud PostgreSQL database",
+        details: { provider: "PostgreSQL" },
       }
     }
   } catch (error: any) {

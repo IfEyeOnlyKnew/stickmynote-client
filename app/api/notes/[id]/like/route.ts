@@ -1,13 +1,13 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { createClient } from "@/lib/supabase/server"
+import { createDatabaseClient } from "@/lib/database/database-adapter"
 import { getCachedAuthUser } from "@/lib/auth/cached-auth"
 
 export async function POST(request: NextRequest, { params }: { params: { id: string } }) {
   try {
-    const supabase = await createClient()
+    const db = await createDatabaseClient()
     const noteId = params.id
 
-    const authResult = await getCachedAuthUser(supabase)
+    const authResult = await getCachedAuthUser()
     if (authResult.rateLimited) {
       return NextResponse.json(
         { error: "Rate limit exceeded. Please try again in a moment." },
@@ -19,7 +19,7 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
-    const { data: note, error: noteError } = await supabase
+    const { data: note, error: noteError } = await db
       .from("personal_sticks")
       .select("id, user_id, is_shared")
       .eq("id", noteId)
@@ -34,7 +34,7 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
       return NextResponse.json({ error: "Cannot like private notes" }, { status: 403 })
     }
 
-    const { data: existingReaction } = await supabase
+    const { data: existingReaction } = await db
       .from("personal_sticks_reactions")
       .select("id")
       .eq("personal_stick_id", noteId)
@@ -44,13 +44,13 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
 
     if (existingReaction) {
       // Unlike - delete the reaction
-      const { error } = await supabase.from("personal_sticks_reactions").delete().eq("id", existingReaction.id)
+      const { error } = await db.from("personal_sticks_reactions").delete().eq("id", existingReaction.id)
 
       if (error) throw error
 
       return NextResponse.json({ success: true, liked: false })
     } else {
-      const { error } = await supabase.from("personal_sticks_reactions").insert({
+      const { error } = await db.from("personal_sticks_reactions").insert({
         personal_stick_id: noteId,
         user_id: user.id,
         reaction_type: "like",
@@ -69,13 +69,13 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
 
 export async function GET(request: NextRequest, { params }: { params: { id: string } }) {
   try {
-    const supabase = await createClient()
+    const db = await createDatabaseClient()
     const noteId = params.id
 
-    const authResult = await getCachedAuthUser(supabase)
+    const authResult = await getCachedAuthUser()
     const user = authResult.user
 
-    const { count, error } = await supabase
+    const { count, error } = await db
       .from("personal_sticks_reactions")
       .select("*", { count: "exact", head: true })
       .eq("personal_stick_id", noteId)
@@ -86,7 +86,7 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
     let isLiked = false
 
     if (user) {
-      const { data: userReaction } = await supabase
+      const { data: userReaction } = await db
         .from("personal_sticks_reactions")
         .select("id")
         .eq("personal_stick_id", noteId)

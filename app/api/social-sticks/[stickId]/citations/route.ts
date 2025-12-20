@@ -1,14 +1,14 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { createServerClient } from "@/lib/supabase/server"
+import { createDatabaseClient } from "@/lib/database/database-adapter"
 import { getCachedAuthUser, createRateLimitResponse, createUnauthorizedResponse } from "@/lib/auth/cached-auth"
 
 // GET: Fetch citations for a stick
 export async function GET(request: NextRequest, { params }: { params: { stickId: string } }) {
   try {
-    const supabase = await createServerClient()
+    const db = await createDatabaseClient()
     const { stickId } = params
 
-    const authResult = await getCachedAuthUser(supabase)
+    const authResult = await getCachedAuthUser()
     if (authResult.rateLimited) {
       return createRateLimitResponse()
     }
@@ -16,7 +16,7 @@ export async function GET(request: NextRequest, { params }: { params: { stickId:
       return createUnauthorizedResponse()
     }
 
-    const { data: citations, error } = await supabase
+    const { data: citations, error } = await db
       .from("social_stick_citations")
       .select(
         `
@@ -44,7 +44,7 @@ export async function GET(request: NextRequest, { params }: { params: { stickId:
     > = {}
 
     if (citedByIds.length > 0) {
-      const { data: users } = await supabase
+      const { data: users } = await db
         .from("users")
         .select("id, full_name, email, avatar_url")
         .in("id", citedByIds)
@@ -76,10 +76,10 @@ export async function GET(request: NextRequest, { params }: { params: { stickId:
 // POST: Add a citation to a stick
 export async function POST(request: NextRequest, { params }: { params: { stickId: string } }) {
   try {
-    const supabase = await createServerClient()
+    const db = await createDatabaseClient()
     const { stickId } = params
 
-    const authResult = await getCachedAuthUser(supabase)
+    const authResult = await getCachedAuthUser()
     if (authResult.rateLimited) {
       return createRateLimitResponse()
     }
@@ -95,7 +95,7 @@ export async function POST(request: NextRequest, { params }: { params: { stickId
       return NextResponse.json({ error: "Either KB article or external URL is required" }, { status: 400 })
     }
 
-    const { data: citation, error } = await supabase
+    const { data: citation, error } = await db
       .from("social_stick_citations")
       .insert({
         stick_id: stickId,
@@ -124,7 +124,7 @@ export async function POST(request: NextRequest, { params }: { params: { stickId
       return NextResponse.json({ error: error.message }, { status: 500 })
     }
 
-    const { data: citedByUser } = await supabase
+    const { data: citedByUser } = await db
       .from("users")
       .select("id, full_name, email, avatar_url")
       .eq("id", user.id)
@@ -145,10 +145,10 @@ export async function POST(request: NextRequest, { params }: { params: { stickId
 // DELETE: Remove a citation
 export async function DELETE(request: NextRequest, { params }: { params: { stickId: string } }) {
   try {
-    const supabase = await createServerClient()
+    const db = await createDatabaseClient()
     const { stickId } = params
 
-    const authResult = await getCachedAuthUser(supabase)
+    const authResult = await getCachedAuthUser()
     if (authResult.rateLimited) {
       return createRateLimitResponse()
     }
@@ -163,7 +163,7 @@ export async function DELETE(request: NextRequest, { params }: { params: { stick
       return NextResponse.json({ error: "Citation ID is required" }, { status: 400 })
     }
 
-    const { error } = await supabase
+    const { error } = await db
       .from("social_stick_citations")
       .delete()
       .eq("id", citationId)

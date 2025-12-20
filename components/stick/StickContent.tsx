@@ -68,7 +68,7 @@ export function StickContent({
       <div className="space-y-4">
         {/* Topic Field */}
         <div>
-          <label className="block text-sm font-medium mb-1">Topic</label>
+          <span className="block text-sm font-medium mb-1">Topic</span>
           <textarea
             value={editedStick.topic || ""}
             onChange={(e) => onTopicChange(e.target.value)}
@@ -94,7 +94,7 @@ export function StickContent({
 
         {/* Content Field */}
         <div>
-          <label className="block text-sm font-medium mb-1">Content</label>
+          <span className="block text-sm font-medium mb-1">Content</span>
           <textarea
             value={editedStick.content || ""}
             onChange={(e) => onContentChange(e.target.value)}
@@ -120,7 +120,7 @@ export function StickContent({
 
         {/* Details Field */}
         <div>
-          <label className="block text-sm font-medium mb-1">Details</label>
+          <span className="block text-sm font-medium mb-1">Details</span>
           <textarea
             value={editedStick.details || ""}
             onChange={(e) => onDetailsChange(e.target.value)}

@@ -25,6 +25,7 @@ export function OrgBrandedHeader({ className = "", showLogo = true, showName = t
       {showLogo && (
         <>
           {logoUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element
             <img src={logoUrl || "/placeholder.svg"} alt={displayName} className="h-8 w-auto object-contain" />
           ) : (
             <div className="h-8 w-8 rounded-lg bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center">

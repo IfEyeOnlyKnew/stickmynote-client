@@ -68,6 +68,7 @@ export function PadInviteModal({ open, onOpenChange, padId, onInviteSubmit }: Pa
       loadPadData()
       loadSavedEmails()
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, padId])
 
   const loadPadData = async () => {
@@ -373,12 +374,15 @@ export function PadInviteModal({ open, onOpenChange, padId, onInviteSubmit }: Pa
                     {searchResults.map((user) => (
                       <div
                         key={user.id}
+                        role="button"
+                        tabIndex={0}
                         className={`p-2 rounded cursor-pointer transition-colors ${
                           selectedUsers.find((u) => u.id === user.id)
                             ? "bg-blue-100 border border-blue-300"
                             : "hover:bg-gray-100 border border-transparent"
                         }`}
                         onClick={() => toggleUserSelection(user)}
+                        onKeyDown={(e) => e.key === "Enter" && toggleUserSelection(user)}
                       >
                         <div className="flex items-center justify-between">
                           <div>
@@ -402,12 +406,15 @@ export function PadInviteModal({ open, onOpenChange, padId, onInviteSubmit }: Pa
                     {filteredSavedEmails.map((savedEmail) => (
                       <div
                         key={savedEmail.id}
+                        role="button"
+                        tabIndex={0}
                         className={`p-2 rounded cursor-pointer transition-colors ${
                           selectedEmails.includes(savedEmail.email)
                             ? "bg-green-100 border border-green-300"
                             : "hover:bg-gray-100 border border-transparent"
                         }`}
                         onClick={() => toggleEmailSelection(savedEmail.email)}
+                        onKeyDown={(e) => e.key === "Enter" && toggleEmailSelection(savedEmail.email)}
                       >
                         <div className="flex items-center justify-between">
                           <div>
@@ -455,7 +462,8 @@ export function PadInviteModal({ open, onOpenChange, padId, onInviteSubmit }: Pa
                 Close
               </Button>
               <Button onClick={handleSubmit} disabled={totalSelected === 0 || isLoading}>
-                {isLoading ? "Sending..." : `Send ${totalSelected} Invite${totalSelected !== 1 ? "s" : ""}`}
+                {isLoading && "Sending..."}
+                {!isLoading && `Send ${totalSelected} Invite${totalSelected !== 1 ? "s" : ""}`}
               </Button>
             </div>
           </TabsContent>
@@ -544,12 +552,15 @@ export function PadInviteModal({ open, onOpenChange, padId, onInviteSubmit }: Pa
                       {savedEmails.map((savedEmail) => (
                         <div
                           key={savedEmail.id}
+                          role="button"
+                          tabIndex={0}
                           className={`p-2 rounded cursor-pointer transition-colors ${
                             selectedEmails.includes(savedEmail.email)
                               ? "bg-green-100 border border-green-300"
                               : "hover:bg-gray-100 border border-transparent"
                           }`}
                           onClick={() => toggleEmailSelection(savedEmail.email)}
+                          onKeyDown={(e) => e.key === "Enter" && toggleEmailSelection(savedEmail.email)}
                         >
                           <div className="flex items-center justify-between">
                             <div>
@@ -599,9 +610,8 @@ export function PadInviteModal({ open, onOpenChange, padId, onInviteSubmit }: Pa
                 variant="default"
                 className="min-w-[140px]"
               >
-                {isLoading
-                  ? "Sending..."
-                  : `Send ${selectedEmails.length} Invite${selectedEmails.length !== 1 ? "s" : ""}`}
+                {isLoading && "Sending..."}
+                {!isLoading && `Send ${selectedEmails.length} Invite${selectedEmails.length !== 1 ? "s" : ""}`}
               </Button>
             </div>
           </TabsContent>

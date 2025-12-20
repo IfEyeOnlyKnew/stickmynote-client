@@ -1,12 +1,12 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { createServerClient } from "@/lib/supabase/server"
+import { createDatabaseClient } from "@/lib/database/database-adapter"
 import { getCachedAuthUser } from "@/lib/auth/cached-auth"
 
 export async function GET(request: NextRequest) {
   try {
-    const supabase = await createServerClient()
+    const db = await createDatabaseClient()
 
-    const authResult = await getCachedAuthUser(supabase)
+    const authResult = await getCachedAuthUser()
     if (authResult.rateLimited) {
       return NextResponse.json(
         { error: "Rate limit exceeded. Please try again in a moment." },
@@ -18,7 +18,7 @@ export async function GET(request: NextRequest) {
     }
     const user = authResult.user
 
-    const { data, error } = await supabase
+    const { data, error } = await db
       .from("custom_field_definitions")
       .select("*")
       .eq("owner_id", user.id)
@@ -30,15 +30,16 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({ fields: data })
   } catch (error) {
+    console.error("[custom-fields GET] Error:", error)
     return NextResponse.json({ error: "Internal server error" }, { status: 500 })
   }
 }
 
 export async function POST(request: NextRequest) {
   try {
-    const supabase = await createServerClient()
+    const db = await createDatabaseClient()
 
-    const authResult = await getCachedAuthUser(supabase)
+    const authResult = await getCachedAuthUser()
     if (authResult.rateLimited) {
       return NextResponse.json(
         { error: "Rate limit exceeded. Please try again in a moment." },
@@ -66,7 +67,7 @@ export async function POST(request: NextRequest) {
       insertData.pad_id = pad_id
     }
 
-    const { data, error } = await supabase.from("custom_field_definitions").insert(insertData).select().single()
+    const { data, error } = await db.from("custom_field_definitions").insert(insertData).select().single()
 
     if (error) {
       return NextResponse.json({ error: "Failed to create custom field" }, { status: 500 })
@@ -74,15 +75,16 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ field: data })
   } catch (error) {
+    console.error("[custom-fields POST] Error:", error)
     return NextResponse.json({ error: "Internal server error" }, { status: 500 })
   }
 }
 
 export async function DELETE(request: NextRequest) {
   try {
-    const supabase = await createServerClient()
+    const db = await createDatabaseClient()
 
-    const authResult = await getCachedAuthUser(supabase)
+    const authResult = await getCachedAuthUser()
     if (authResult.rateLimited) {
       return NextResponse.json(
         { error: "Rate limit exceeded. Please try again in a moment." },
@@ -101,7 +103,7 @@ export async function DELETE(request: NextRequest) {
       return NextResponse.json({ error: "Missing id" }, { status: 400 })
     }
 
-    const { error } = await supabase.from("custom_field_definitions").delete().eq("id", id).eq("owner_id", user.id)
+    const { error } = await db.from("custom_field_definitions").delete().eq("id", id).eq("owner_id", user.id)
 
     if (error) {
       return NextResponse.json({ error: "Failed to delete custom field" }, { status: 500 })
@@ -109,6 +111,7 @@ export async function DELETE(request: NextRequest) {
 
     return NextResponse.json({ success: true })
   } catch (error) {
+    console.error("[custom-fields DELETE] Error:", error)
     return NextResponse.json({ error: "Internal server error" }, { status: 500 })
   }
 }

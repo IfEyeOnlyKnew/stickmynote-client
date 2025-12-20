@@ -12,9 +12,9 @@ import { isDiagnosticAccessible } from "@/lib/is-production"
 import { BreadcrumbNav } from "@/components/breadcrumb-nav"
 
 type EnvStatus = {
-  hasSupabaseUrl?: boolean
-  hasSupabaseAnonKey?: boolean
-  hasSupabaseServiceRole?: boolean
+  hasPostgresHost?: boolean
+  hasPostgresDatabase?: boolean
+  hasPostgresUser?: boolean
   hasXaiKey?: boolean
   hasAiFallback?: boolean
   nodeEnv?: string
@@ -145,15 +145,15 @@ export default function DeployGuidePage() {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="border rounded p-3">
                     <div className="flex items-center justify-between">
-                      <span className="font-medium">Supabase env</span>
-                      <Badge variant={env?.hasSupabaseUrl && env?.hasSupabaseAnonKey ? "default" : "secondary"}>
-                        {env?.hasSupabaseUrl && env?.hasSupabaseAnonKey ? "Present" : "Missing"}
+                      <span className="font-medium">PostgreSQL env</span>
+                      <Badge variant={env?.hasPostgresHost && env?.hasPostgresDatabase ? "default" : "secondary"}>
+                        {env?.hasPostgresHost && env?.hasPostgresDatabase ? "Present" : "Missing"}
                       </Badge>
                     </div>
                     <ul className="mt-2 text-sm text-gray-600 space-y-1">
-                      <li>URL: {ok(env?.hasSupabaseUrl)}</li>
-                      <li>Anon Key: {ok(env?.hasSupabaseAnonKey)}</li>
-                      <li>Service Role (server only): {ok(env?.hasSupabaseServiceRole)}</li>
+                      <li>Host: {ok(env?.hasPostgresHost)}</li>
+                      <li>Database: {ok(env?.hasPostgresDatabase)}</li>
+                      <li>User: {ok(env?.hasPostgresUser)}</li>
                     </ul>
                   </div>
 
@@ -269,14 +269,15 @@ export default function DeployGuidePage() {
                 <li>
                   Project → Settings → Environment Variables → Add:
                   <ul className="list-disc pl-5 mt-1 space-y-1">
-                    <li>NEXT_PUBLIC_SUPABASE_URL (client)</li>
-                    <li>NEXT_PUBLIC_SUPABASE_ANON_KEY (client)</li>
-                    <li>SUPABASE_SERVICE_ROLE_KEY (server only)</li>
+                    <li>POSTGRES_HOST (database host)</li>
+                    <li>POSTGRES_DATABASE (database name)</li>
+                    <li>POSTGRES_USER (database user)</li>
+                    <li>POSTGRES_PASSWORD (database password)</li>
                     <li>
                       UPSTASH_REDIS_REST_URL and UPSTASH_REDIS_REST_TOKEN, or KV_REST_API_URL and KV_REST_API_TOKEN
                     </li>
                     <li>XAI_API_KEY (optional; for Generate Tags)</li>
-                    <li>RESEND_API_KEY (optional; email)</li>
+                    <li>SMTP_HOST, SMTP_PORT, SMTP_USER (email; or RESEND_API_KEY)</li>
                     <li>CSRF_SECRET, NEXT_PUBLIC_SITE_URL</li>
                   </ul>
                 </li>
@@ -295,8 +296,8 @@ export default function DeployGuidePage() {
               </h3>
               <ul className="list-disc pl-5 text-sm text-gray-700 mt-2 space-y-1">
                 <li>In Vercel Project → Settings → Domains → Add stickmynote.com.</li>
-                <li>Follow Vercel's DNS instructions to create the A/ALIAS or CNAME record in GoDaddy DNS.</li>
-                <li>Wait for DNS to propagate; Vercel will show the domain as "Verified".</li>
+                <li>Follow Vercel&apos;s DNS instructions to create the A/ALIAS or CNAME record in GoDaddy DNS.</li>
+                <li>Wait for DNS to propagate; Vercel will show the domain as &quot;Verified&quot;.</li>
               </ul>
             </section>
 
@@ -317,8 +318,8 @@ export default function DeployGuidePage() {
                   Post-deploy, verify:
                   <ul className="list-disc pl-5 mt-1">
                     <li>
-                      <Link href="/notes" className="text-blue-600 hover:underline">
-                        /notes
+                      <Link href="/personal" className="text-blue-600 hover:underline">
+                        /personal
                       </Link>{" "}
                       fully renders
                     </li>

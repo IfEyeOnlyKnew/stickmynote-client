@@ -1,12 +1,12 @@
-import { createClient } from "@/lib/supabase/server"
+import { createDatabaseClient } from "@/lib/database/database-adapter"
 import { NextResponse } from "next/server"
 import { getCachedAuthUser } from "@/lib/auth/cached-auth"
 
-export async function GET(request: Request, { params }: { params: Promise<{ webhookId: string }> }) {
+export async function GET(_request: Request, { params }: { params: Promise<{ webhookId: string }> }) {
   const { webhookId } = await params
-  const supabase = await createClient()
+  const db = await createDatabaseClient()
 
-  const { user, rateLimited } = await getCachedAuthUser(supabase)
+  const { user, rateLimited } = await getCachedAuthUser()
 
   if (rateLimited) {
     return NextResponse.json({ error: "Too many requests" }, { status: 429 })
@@ -16,7 +16,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ webh
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
   }
 
-  const { data: webhook, error } = await supabase
+  const { data: webhook, error } = await db
     .from("webhook_configurations")
     .select("*")
     .eq("id", webhookId)
@@ -32,9 +32,9 @@ export async function GET(request: Request, { params }: { params: Promise<{ webh
 
 export async function PATCH(request: Request, { params }: { params: Promise<{ webhookId: string }> }) {
   const { webhookId } = await params
-  const supabase = await createClient()
+  const db = await createDatabaseClient()
 
-  const { user, rateLimited } = await getCachedAuthUser(supabase)
+  const { user, rateLimited } = await getCachedAuthUser()
 
   if (rateLimited) {
     return NextResponse.json({ error: "Too many requests" }, { status: 429 })
@@ -50,7 +50,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ we
     // Don't allow updating signing_secret through this endpoint
     const { signing_secret: _, ...updateData } = body
 
-    const { data: webhook, error } = await supabase
+    const { data: webhook, error } = await db
       .from("webhook_configurations")
       .update({
         ...updateData,
@@ -72,11 +72,11 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ we
   }
 }
 
-export async function DELETE(request: Request, { params }: { params: Promise<{ webhookId: string }> }) {
+export async function DELETE(_request: Request, { params }: { params: Promise<{ webhookId: string }> }) {
   const { webhookId } = await params
-  const supabase = await createClient()
+  const db = await createDatabaseClient()
 
-  const { user, rateLimited } = await getCachedAuthUser(supabase)
+  const { user, rateLimited } = await getCachedAuthUser()
 
   if (rateLimited) {
     return NextResponse.json({ error: "Too many requests" }, { status: 429 })
@@ -86,7 +86,7 @@ export async function DELETE(request: Request, { params }: { params: Promise<{ w
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
   }
 
-  const { error } = await supabase.from("webhook_configurations").delete().eq("id", webhookId).eq("user_id", user.id)
+  const { error } = await db.from("webhook_configurations").delete().eq("id", webhookId).eq("user_id", user.id)
 
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 })

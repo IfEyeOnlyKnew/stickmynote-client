@@ -1,4 +1,4 @@
-import { createServerClient } from "@/lib/supabase/server"
+import { createDatabaseClient } from "@/lib/database/database-adapter"
 
 export interface SearchEvent {
   user_id: string
@@ -18,9 +18,9 @@ export interface SearchClickEvent {
 export class SearchAnalytics {
   static async trackSearch(event: SearchEvent): Promise<void> {
     try {
-      const supabase = await createServerClient()
+      const db = await createDatabaseClient()
 
-      await supabase.from("search_history").insert({
+      await db.from("search_history").insert({
         user_id: event.user_id,
         query: event.query,
         filters: event.filters || {},
@@ -34,10 +34,10 @@ export class SearchAnalytics {
 
   static async trackClick(event: SearchClickEvent): Promise<void> {
     try {
-      const supabase = await createServerClient()
+      const db = await createDatabaseClient()
 
       // Find the most recent search for this query by this user
-      const { data: recentSearch } = await supabase
+      const { data: recentSearch } = await db
         .from("search_history")
         .select("id")
         .eq("user_id", event.user_id)
@@ -48,7 +48,7 @@ export class SearchAnalytics {
 
       if (recentSearch) {
         // Update the search history entry with the clicked note
-        await supabase.from("search_history").update({ clicked_note_id: event.note_id }).eq("id", recentSearch.id)
+        await db.from("search_history").update({ clicked_note_id: event.note_id }).eq("id", recentSearch.id)
       }
     } catch (error) {
       console.error("[v0] Failed to track click:", error)
@@ -58,9 +58,9 @@ export class SearchAnalytics {
   // Get trending searches
   static async getTrendingSearches(limit = 10): Promise<string[]> {
     try {
-      const supabase = await createServerClient()
+      const db = await createDatabaseClient()
 
-      const { data } = await supabase
+      const { data } = await db
         .from("search_history")
         .select("query")
         .gte("created_at", new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString())
@@ -77,7 +77,7 @@ export class SearchAnalytics {
 
       // Sort by frequency and return top results
       return Object.entries(queryCounts)
-        .sort(([, a], [, b]) => b - a)
+        .sort(([, a], [, b]) => (b as number) - (a as number))
         .slice(0, limit)
         .map(([query]) => query)
     } catch (error) {
@@ -88,9 +88,9 @@ export class SearchAnalytics {
 
   static async getPopularNotes(limit = 10): Promise<string[]> {
     try {
-      const supabase = await createServerClient()
+      const db = await createDatabaseClient()
 
-      const { data } = await supabase
+      const { data } = await db
         .from("search_history")
         .select("clicked_note_id")
         .not("clicked_note_id", "is", null)
@@ -109,7 +109,7 @@ export class SearchAnalytics {
 
       // Sort by frequency and return top results
       return Object.entries(noteCounts)
-        .sort(([, a], [, b]) => b - a)
+        .sort(([, a], [, b]) => (b as number) - (a as number))
         .slice(0, limit)
         .map(([noteId]) => noteId)
     } catch (error) {

@@ -6,7 +6,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { useAccessCode } from "@/hooks/use-access-code"
 import { useAuthForm } from "@/hooks/use-auth-form"
-import { createClient } from "@/lib/supabase/client"
+import { useUser } from "@/contexts/user-context"
 import { AccessCodeForm } from "@/components/auth/AccessCodeForm"
 import { SignInForm } from "@/components/auth/SignInForm"
 import { SignUpForm } from "@/components/auth/SignUpForm"
@@ -17,13 +17,13 @@ interface AuthFormProps {
   mode?: "signin" | "signup" | "reset"
 }
 
-export function AuthForm({ mode = "signin" }: AuthFormProps) {
+export function AuthForm({ mode = "signin" }: Readonly<AuthFormProps>) {
   const [activeTab, setActiveTab] = useState(mode)
   const [isCheckingAuth, setIsCheckingAuth] = useState(true)
   const [isAlreadyAuthenticated, setIsAlreadyAuthenticated] = useState(false)
   const searchParams = useSearchParams()
   const redirectTo = searchParams.get("redirectTo") || searchParams.get("redirect") || "/dashboard"
-  const supabase = createClient()
+  const { user, reloadUser } = useUser()
 
   const {
     accessCode,
@@ -38,13 +38,14 @@ export function AuthForm({ mode = "signin" }: AuthFormProps) {
   useEffect(() => {
     const checkAuth = async () => {
       try {
-        const {
-          data: { user },
-        } = await supabase.auth.getUser()
-
-        if (user) {
-          setIsAlreadyAuthenticated(true)
-          window.location.href = redirectTo
+        const response = await fetch("/api/user/current")
+        
+        if (response.ok) {
+          const data = await response.json()
+          if (data.user) {
+            setIsAlreadyAuthenticated(true)
+            window.location.href = redirectTo
+          }
         }
       } catch (error) {
       } finally {
@@ -53,7 +54,7 @@ export function AuthForm({ mode = "signin" }: AuthFormProps) {
     }
 
     checkAuth()
-  }, [supabase, redirectTo])
+  }, [redirectTo])
 
   const handleTabChange = (value: string) => {
     if (value === "signin" || value === "signup" || value === "reset") {
@@ -100,7 +101,16 @@ export function AuthForm({ mode = "signin" }: AuthFormProps) {
             )}
 
             <TabsContent value="signin">
-              <SignInForm onSubmit={signIn} isLoading={isLoading} />
+              <SignInForm
+                onSubmit={async (data) => {
+                  const success = await signIn(data)
+                  if (success) {
+                    await reloadUser()
+                  }
+                  return success
+                }}
+                isLoading={isLoading}
+              />
             </TabsContent>
 
             <TabsContent value="signup">

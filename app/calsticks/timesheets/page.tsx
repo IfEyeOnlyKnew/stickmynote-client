@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useCallback } from "react"
 import { format, startOfWeek, endOfWeek, eachDayOfInterval, addWeeks, subWeeks } from "date-fns"
 import { ChevronLeft, ChevronRight, Download, Clock, AlertCircle, Plus } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -22,11 +22,7 @@ export default function TimesheetsPage() {
   const weekEnd = endOfWeek(currentDate, { weekStartsOn: 1 })
   const weekDays = eachDayOfInterval({ start: weekStart, end: weekEnd })
 
-  useEffect(() => {
-    fetchTimeEntries()
-  }, [currentDate])
-
-  const fetchTimeEntries = async () => {
+  const fetchTimeEntries = useCallback(async () => {
     setLoading(true)
     try {
       const params = new URLSearchParams({
@@ -50,7 +46,11 @@ export default function TimesheetsPage() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [weekStart, weekEnd])
+
+  useEffect(() => {
+    fetchTimeEntries()
+  }, [fetchTimeEntries])
 
   const handleManualEntrySaved = () => {
     fetchTimeEntries()
@@ -155,13 +155,15 @@ export default function TimesheetsPage() {
             <CardTitle>Time Entries</CardTitle>
           </CardHeader>
           <CardContent>
-            {loading ? (
+            {loading && (
               <div className="text-center py-8 text-muted-foreground">Loading entries...</div>
-            ) : timeEntries.length === 0 ? (
+            )}
+            {!loading && timeEntries.length === 0 && (
               <div className="text-center py-8 text-muted-foreground">
                 {tableNotFound ? "Database migration required" : "No time entries for this week"}
               </div>
-            ) : (
+            )}
+            {!loading && timeEntries.length > 0 && (
               <div className="space-y-4">
                 {timeEntries.map((entry) => (
                   <div key={entry.id} className="flex items-center justify-between p-4 border rounded-lg">

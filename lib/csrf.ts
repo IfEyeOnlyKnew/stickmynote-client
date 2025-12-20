@@ -8,7 +8,10 @@ if (!CSRF_SECRET) {
 function stringToArrayBuffer(str: string): ArrayBuffer {
   const encoder = new TextEncoder()
   const arr = encoder.encode(str)
-  return arr.buffer.slice(0) // Ensures ArrayBuffer, not SharedArrayBuffer
+  // Create a new ArrayBuffer and copy the bytes to guarantee the return type
+  const buffer = new ArrayBuffer(arr.byteLength)
+  new Uint8Array(buffer).set(arr)
+  return buffer
 }
 
 // Convert Uint8Array to hex string
@@ -22,7 +25,7 @@ function uint8ArrayToHex(arr: Uint8Array): string {
 function hexToUint8Array(hex: string): Uint8Array {
   const bytes = new Uint8Array(hex.length / 2)
   for (let i = 0; i < hex.length; i += 2) {
-    bytes[i / 2] = Number.parseInt(hex.substr(i, 2), 16)
+    bytes[i / 2] = Number.parseInt(hex.substring(i, i + 2), 16)
   }
   return bytes
 }

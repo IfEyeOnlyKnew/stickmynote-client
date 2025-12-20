@@ -1,7 +1,6 @@
 "use client"
 
 import { useState, useEffect, useCallback } from "react"
-import { createClient } from "@/lib/supabase/client"
 
 interface UserProfile {
   username: string | null
@@ -15,21 +14,22 @@ export function useUserProfile(userId: string | null) {
     if (!userId) return
 
     try {
-      const supabase = createClient()
+      const response = await fetch("/api/user/me", {
+        credentials: "include",
+      })
 
-      const { data, error } = await supabase.from("users").select("username, organize_notes").eq("id", userId).single()
-
-      if (error) {
-        console.error("Error refreshing user profile:", error)
+      if (!response.ok) {
+        console.error("Error refreshing user profile:", response.statusText)
         return
       }
 
-      const typedData = data as { username: string | null; organize_notes: boolean | null }
-
-      setUserProfile({
-        username: typedData.username,
-        organize_notes: typedData.organize_notes ?? false,
-      })
+      const data = await response.json()
+      if (data.profile) {
+        setUserProfile({
+          username: data.profile.username || null,
+          organize_notes: data.profile.organize_notes ?? false,
+        })
+      }
     } catch (err) {
       console.error("Error refreshing user profile:", err)
     }
@@ -40,14 +40,15 @@ export function useUserProfile(userId: string | null) {
       if (!userId) return
 
       try {
-        const supabase = createClient()
-        const { error } = await (supabase as any)
-          .from("users")
-          .update({ organize_notes: organizeNotes })
-          .eq("id", userId)
+        const response = await fetch("/api/user/profile", {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify({ organize_notes: organizeNotes }),
+        })
 
-        if (error) {
-          console.error("Error updating organize preference:", error)
+        if (!response.ok) {
+          console.error("Error updating organize preference:", response.statusText)
           return
         }
 
@@ -65,46 +66,27 @@ export function useUserProfile(userId: string | null) {
       if (!userId) return
 
       try {
-        const supabase = createClient()
+        const response = await fetch("/api/user/me", {
+          credentials: "include",
+        })
 
-        let retryCount = 0
-        const maxRetries = 4
-
-        while (retryCount < maxRetries) {
-          const { data, error } = await supabase
-            .from("users")
-            .select("username, organize_notes")
-            .eq("id", userId)
-            .maybeSingle()
-
-          const typedData = data as { username: string | null; organize_notes: boolean | null } | null
-
-          if (error && error.code !== "PGRST116") {
-            if (error.code === "42501" || error.message?.includes("policy")) {
-              console.log("RLS policy temporarily blocking access, retrying...")
-            } else {
-              console.error("Error loading user profile:", error)
-              return
-            }
+        if (!response.ok) {
+          // User might not be authenticated yet
+          if (response.status !== 401) {
+            console.error("Error loading user profile:", response.statusText)
           }
+          setUserProfile({ username: null, organize_notes: false })
+          return
+        }
 
-          if (typedData) {
-            setUserProfile({
-              username: typedData.username,
-              organize_notes: typedData.organize_notes ?? false,
-            })
-            return
-          }
-
-          if (retryCount < maxRetries - 1) {
-            const waitTime = 500 + retryCount * 300
-            await new Promise((resolve) => setTimeout(resolve, waitTime))
-            retryCount++
-          } else {
-            console.log("Profile not found after retries, using defaults (RLS policies may need time to propagate)")
-            setUserProfile({ username: null, organize_notes: false })
-            return
-          }
+        const data = await response.json()
+        if (data.profile) {
+          setUserProfile({
+            username: data.profile.username || null,
+            organize_notes: data.profile.organize_notes ?? false,
+          })
+        } else {
+          setUserProfile({ username: null, organize_notes: false })
         }
       } catch (err) {
         console.error("Error loading user profile:", err)

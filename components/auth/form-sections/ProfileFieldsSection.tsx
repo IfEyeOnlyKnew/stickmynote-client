@@ -355,6 +355,7 @@ export function ProfileFieldsSection({ formData, updateField, isLoading }: Profi
         {uploadError && <p className="text-sm text-destructive">{uploadError}</p>}
         {formData.avatarUrl && (
           <div className="mt-2 flex items-center gap-2">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               src={formData.avatarUrl || "/placeholder.svg"}
               alt="Avatar preview"

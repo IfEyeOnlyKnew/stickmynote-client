@@ -221,7 +221,7 @@ export function NotificationPreferencesModal({ open, onOpenChange }: Notificatio
                       <Label htmlFor="pad-invite" className="font-medium">
                         Pad Invites
                       </Label>
-                      <p className="text-sm text-muted-foreground">When you're invited to a pad</p>
+                      <p className="text-sm text-muted-foreground">When you&apos;re invited to a pad</p>
                     </div>
                   </div>
                   <Switch

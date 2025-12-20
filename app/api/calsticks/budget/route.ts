@@ -1,12 +1,12 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { createServerClient } from "@/lib/supabase/server"
+import { createDatabaseClient } from "@/lib/database/database-adapter"
 import { getOrgContext } from "@/lib/auth/get-org-context"
 import { getCachedAuthUser } from "@/lib/auth/cached-auth"
 
 export async function GET(request: NextRequest) {
   try {
-    const supabase = await createServerClient()
-    const authResult = await getCachedAuthUser(supabase)
+    const db = await createDatabaseClient()
+    const authResult = await getCachedAuthUser()
     if (authResult.rateLimited) {
       return NextResponse.json({ error: "Rate limited" }, { status: 429, headers: { "Retry-After": "30" } })
     }
@@ -20,7 +20,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "No organization context" }, { status: 403 })
     }
 
-    const { data: calstickReplies, error: repliesError } = await supabase
+    const { data: calstickReplies, error: repliesError } = await db
       .from("paks_pad_stick_replies")
       .select("stick_id")
       .eq("is_calstick", true)
@@ -31,13 +31,13 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "Failed to fetch calstick replies" }, { status: 500 })
     }
 
-    const stickIds = [...new Set(calstickReplies?.map((r) => r.stick_id) || [])]
+    const stickIds = [...new Set(calstickReplies?.map((r: { stick_id: string }) => r.stick_id) || [])]
 
     if (stickIds.length === 0) {
       return NextResponse.json({ projects: [] })
     }
 
-    const { data: sticks, error: sticksError } = await supabase
+    const { data: sticks, error: sticksError } = await db
       .from("paks_pad_sticks")
       .select("pad_id")
       .in("id", stickIds)
@@ -53,7 +53,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ projects: [] })
     }
 
-    const { data: memberPads } = await supabase
+    const { data: memberPads } = await db
       .from("paks_pad_members")
       .select("pad_id")
       .eq("user_id", user.id)
@@ -61,7 +61,7 @@ export async function GET(request: NextRequest) {
 
     const memberPadIds = memberPads?.map((mp) => mp.pad_id) || []
 
-    let query = supabase
+    let query = db
       .from("paks_pads")
       .select("id, name, budget_cents, hourly_rate_cents, is_billable")
       .in("id", padIdsWithCalSticks)
@@ -81,7 +81,7 @@ export async function GET(request: NextRequest) {
     }
 
     const padIds = pads.map((p) => p.id)
-    const { data: tasks, error: tasksError } = await supabase
+    const { data: tasks, error: tasksError } = await db
       .from("paks_pad_stick_replies")
       .select(`
         id,
@@ -103,15 +103,13 @@ export async function GET(request: NextRequest) {
     }
 
     const assigneeIds = [...new Set(tasks.map((t) => t.calstick_assignee_id).filter(Boolean))]
-    const { data: users, error: usersError } = await supabase
+    const { data: users } = await db
       .from("users")
       .select("id, full_name, email, hourly_rate_cents")
       .in("id", assigneeIds)
 
-    if (usersError) {
-    }
-
-    const userMap = new Map(users?.map((u) => [u.id, u]) || [])
+    type UserInfo = { id: string; full_name: string | null; email: string | null; hourly_rate_cents: number | null }
+    const userMap = new Map<string, UserInfo>(users?.map((u: UserInfo) => [u.id, u]) || [])
 
     const projects = pads.map((pad) => {
       const padTasks = tasks
@@ -154,14 +152,15 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({ projects })
   } catch (error) {
+    console.error("[calsticks/budget GET] Error:", error)
     return NextResponse.json({ error: "Internal server error" }, { status: 500 })
   }
 }
 
 export async function POST(request: NextRequest) {
   try {
-    const supabase = await createServerClient()
-    const authResult = await getCachedAuthUser(supabase)
+    const db = await createDatabaseClient()
+    const authResult = await getCachedAuthUser()
     if (authResult.rateLimited) {
       return NextResponse.json({ error: "Rate limited" }, { status: 429, headers: { "Retry-After": "30" } })
     }
@@ -178,7 +177,7 @@ export async function POST(request: NextRequest) {
     const body = await request.json()
     const { padId, budgetCents, hourlyRateCents, isBillable } = body
 
-    const { error: updateError } = await supabase
+    const { error: updateError } = await db
       .from("paks_pads")
       .update({
         budget_cents: budgetCents,
@@ -194,6 +193,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ success: true })
   } catch (error) {
+    console.error("[calsticks/budget POST] Error:", error)
     return NextResponse.json({ error: "Internal server error" }, { status: 500 })
   }
 }

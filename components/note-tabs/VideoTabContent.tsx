@@ -41,7 +41,7 @@ export function VideoTabContent({
       {!readOnly && (
         <div className="space-y-4">
           <div>
-            <label className="text-sm font-medium text-gray-700 mb-2 block">Video URL</label>
+            <span className="text-sm font-medium text-gray-700 mb-2 block">Video URL</span>
             <div className="flex gap-2">
               <Input
                 value={videoUrl}
@@ -77,7 +77,7 @@ export function VideoTabContent({
         <div className="text-center py-8 text-gray-500">
           <VideoIcon className="h-12 w-12 mx-auto mb-2 opacity-50" />
           <p>No videos added yet</p>
-          {!readOnly && <p className="text-sm">Click "Add Video" to get started</p>}
+          {!readOnly && <p className="text-sm">Click &quot;Add Video&quot; to get started</p>}
         </div>
       )}
     </div>

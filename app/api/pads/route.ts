@@ -1,5 +1,5 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { createSupabaseServer } from "@/lib/supabase-server"
+import { createDatabaseClient } from "@/lib/database/database-adapter"
 import { applyRateLimit } from "@/lib/rate-limiter-enhanced"
 import { createSafeAction, success, error } from "@/lib/safe-action"
 import { createPadSchema } from "@/types/schemas"
@@ -21,13 +21,17 @@ const createPadAction = createSafeAction(
     input: createPadSchema,
     rateLimit: "pads_create",
   },
-  async (input, { user, supabase }) => {
+  async (input, { user, db }) => {
+    if (!user) {
+      return error("Unauthorized", 401)
+    }
+
     const orgContext = await getOrgContext()
     if (!orgContext) {
       return error("No organization context", 403)
     }
 
-    const { data: newPad, error: dbError } = await supabase
+    const { data: newPad, error: dbError } = await db
       .from("paks_pads")
       .insert({
         name: input.name || "Untitled Pad",
@@ -63,14 +67,14 @@ export async function GET(request: NextRequest) {
       return createUnauthorizedResponse()
     }
 
-    const supabase = await createSupabaseServer()
+    const db = await createDatabaseClient()
 
     const orgContext = await getOrgContext()
     if (!orgContext) {
       return NextResponse.json({ error: "No organization context" }, { status: 403 })
     }
 
-    const { data: calstickReplies, error: repliesError } = await supabase
+    const { data: calstickReplies, error: repliesError } = await db
       .from("paks_pad_stick_replies")
       .select("stick_id")
       .eq("is_calstick", true)
@@ -88,7 +92,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ pads: [] })
     }
 
-    const { data: sticks, error: sticksError } = await supabase
+    const { data: sticks, error: sticksError } = await db
       .from("paks_pad_sticks")
       .select("pad_id")
       .in("id", stickIds)
@@ -105,7 +109,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ pads: [] })
     }
 
-    const { data: membershipData, error: membershipError } = await supabase
+    const { data: membershipData, error: membershipError } = await db
       .from("paks_pad_members")
       .select("pad_id")
       .eq("user_id", user.id)
@@ -117,7 +121,7 @@ export async function GET(request: NextRequest) {
 
     const memberPadIds = membershipData?.map((m) => m.pad_id) || []
 
-    let query = supabase
+    let query = db
       .from("paks_pads")
       .select("id, name, owner_id, org_id")
       .in("id", padIdsWithCalSticks)

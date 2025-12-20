@@ -1,7 +1,6 @@
 "use client"
 
 import { useState } from "react"
-import { useRouter } from "next/navigation"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -12,13 +11,12 @@ import { useBrowseAllPads } from "@/hooks/use-browse-all-pads"
 import { useToast } from "@/hooks/use-toast"
 
 interface BrowseAllPadsModalProps {
-  open: boolean
-  onOpenChange: (open: boolean) => void
-  onPadSelect: (padId: string) => void
+  readonly open: boolean
+  readonly onOpenChange: (open: boolean) => void
+  readonly onPadSelect: (padId: string) => void
 }
 
-export function BrowseAllPadsModal({ open, onOpenChange, onPadSelect }: BrowseAllPadsModalProps) {
-  const router = useRouter()
+export function BrowseAllPadsModal({ open, onOpenChange, onPadSelect }: Readonly<BrowseAllPadsModalProps>) {
   const { toast } = useToast()
   const { pads, isLoading, error, refetch } = useBrowseAllPads(open)
   const [searchQuery, setSearchQuery] = useState("")
@@ -69,7 +67,7 @@ export function BrowseAllPadsModal({ open, onOpenChange, onPadSelect }: BrowseAl
   const filteredPads = pads.filter(
     (pad) =>
       pad.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (pad.description && pad.description.toLowerCase().includes(searchQuery.toLowerCase())),
+      pad.description?.toLowerCase().includes(searchQuery.toLowerCase()),
   )
 
   return (
@@ -96,18 +94,20 @@ export function BrowseAllPadsModal({ open, onOpenChange, onPadSelect }: BrowseAl
         </div>
 
         <div className="flex-1 overflow-y-auto">
-          {isLoading ? (
+          {isLoading && (
             <div className="flex justify-center items-center py-8">
               <p>Loading Pads...</p>
             </div>
-          ) : error ? (
+          )}
+          {!isLoading && error && (
             <div className="text-center py-8">
               <p className="text-red-500">{error}</p>
               <Button variant="outline" size="sm" onClick={refetch} className="mt-2 bg-transparent">
                 Retry
               </Button>
             </div>
-          ) : filteredPads.length > 0 ? (
+          )}
+          {!isLoading && !error && filteredPads.length > 0 && (
             <div className="grid gap-3 md:grid-cols-2">
               {filteredPads.map((pad) => (
                 <Card
@@ -139,7 +139,7 @@ export function BrowseAllPadsModal({ open, onOpenChange, onPadSelect }: BrowseAl
                     <p className="text-xs text-gray-500">Created {new Date(pad.created_at).toLocaleDateString()}</p>
 
                     {/* Action buttons */}
-                    {pad.hasAccess ? (
+                    {pad.hasAccess && (
                       <Button
                         size="sm"
                         className="w-full bg-green-600 hover:bg-green-700"
@@ -150,13 +150,20 @@ export function BrowseAllPadsModal({ open, onOpenChange, onPadSelect }: BrowseAl
                       >
                         Open Pad
                       </Button>
-                    ) : pad.hasPendingRequest ? (
+                    )}
+                    {!pad.hasAccess && pad.hasPendingRequest && (
                       <Button size="sm" variant="outline" className="w-full bg-transparent" disabled>
                         <Clock className="h-4 w-4 mr-2" />
                         Pending Request
                       </Button>
-                    ) : requestingAccessFor === pad.id ? (
-                      <div className="space-y-2" onClick={(e) => e.stopPropagation()}>
+                    )}
+                    {!pad.hasAccess && !pad.hasPendingRequest && requestingAccessFor === pad.id && (
+                      /* eslint-disable-next-line jsx-a11y/no-static-element-interactions, jsx-a11y/click-events-have-key-events */
+                      <div
+                        className="space-y-2"
+                        onClick={(e) => e.stopPropagation()}
+                        onKeyDown={(e) => e.stopPropagation()}
+                      >
                         <Textarea
                           placeholder="Optional: Add a message to your request..."
                           value={accessMessage}
@@ -185,7 +192,8 @@ export function BrowseAllPadsModal({ open, onOpenChange, onPadSelect }: BrowseAl
                           </Button>
                         </div>
                       </div>
-                    ) : (
+                    )}
+                    {!pad.hasAccess && !pad.hasPendingRequest && requestingAccessFor !== pad.id && (
                       <Button
                         size="sm"
                         variant="outline"
@@ -203,7 +211,8 @@ export function BrowseAllPadsModal({ open, onOpenChange, onPadSelect }: BrowseAl
                 </Card>
               ))}
             </div>
-          ) : (
+          )}
+          {!isLoading && !error && filteredPads.length === 0 && (
             <div className="text-center py-8">
               <p className="text-gray-500">
                 {searchQuery ? `No Pads found matching "${searchQuery}"` : "No Pads found"}

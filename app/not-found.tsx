@@ -23,7 +23,7 @@ export default function NotFound() {
             Page Not Found
           </CardTitle>
           <CardDescription className="text-gray-600">
-            The page you're looking for doesn't exist or has been moved.
+            The page you&apos;re looking for doesn&apos;t exist or has been moved.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -36,9 +36,9 @@ export default function NotFound() {
               </Link>
             </Button>
             <Button variant="outline" asChild className="w-full bg-transparent">
-              <Link href="/notes">
+              <Link href="/personal">
                 <FileText className="mr-2 h-4 w-4" />
-                View Notes
+                View Personal
               </Link>
             </Button>
             <Button

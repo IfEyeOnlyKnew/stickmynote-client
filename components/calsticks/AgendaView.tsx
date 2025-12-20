@@ -8,15 +8,34 @@ import type { CalStick } from "@/types/calstick"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { useState } from "react"
 
+// Helper to get priority border color
+function getPriorityBorderColor(priority: string | undefined | null): string {
+  if (!priority || priority === "none") return "#9ca3af"
+  switch (priority) {
+    case "urgent": return "#ef4444"
+    case "high": return "#f97316"
+    case "medium": return "#eab308"
+    case "low": return "#3b82f6"
+    default: return "#9ca3af"
+  }
+}
+
+// Helper to get date badge variant
+function getDateBadgeVariant(isOverdue: boolean, isDueToday: boolean): "destructive" | "default" | "outline" {
+  if (isOverdue) return "destructive"
+  if (isDueToday) return "default"
+  return "outline"
+}
+
 interface AgendaViewProps {
-  calsticks: CalStick[]
-  onToggleComplete: (id: string, completed: boolean) => void
-  onStickClick: (calstick: CalStick) => void
+  readonly calsticks: CalStick[]
+  readonly onToggleComplete: (id: string, completed: boolean) => void
+  readonly onStickClick: (calstick: CalStick) => void
 }
 
 type AgendaFilter = "today" | "tomorrow" | "week" | "all"
 
-export function AgendaView({ calsticks, onToggleComplete, onStickClick }: AgendaViewProps) {
+export function AgendaView({ calsticks, onToggleComplete, onStickClick }: Readonly<AgendaViewProps>) {
   const [filter, setFilter] = useState<AgendaFilter>("today")
 
   const filterTasks = (tasks: CalStick[]): CalStick[] => {
@@ -27,7 +46,7 @@ export function AgendaView({ calsticks, onToggleComplete, onStickClick }: Agenda
         return tasks.filter((cs) => cs.calstick_date && isToday(parseISO(cs.calstick_date)))
       case "tomorrow":
         return tasks.filter((cs) => cs.calstick_date && isTomorrow(parseISO(cs.calstick_date)))
-      case "week":
+      case "week": {
         const weekStart = startOfWeek(now, { weekStartsOn: 1 })
         const weekEnd = endOfWeek(now, { weekStartsOn: 1 })
         return tasks.filter((cs) => {
@@ -35,6 +54,7 @@ export function AgendaView({ calsticks, onToggleComplete, onStickClick }: Agenda
           const taskDate = parseISO(cs.calstick_date)
           return isWithinInterval(taskDate, { start: weekStart, end: weekEnd })
         })
+      }
       case "all":
       default:
         return tasks
@@ -62,14 +82,6 @@ export function AgendaView({ calsticks, onToggleComplete, onStickClick }: Agenda
 
     return 0
   })
-
-  const priorityColors = {
-    urgent: "bg-red-500",
-    high: "bg-orange-500",
-    medium: "bg-yellow-500",
-    low: "bg-blue-500",
-    none: "bg-gray-400",
-  }
 
   const activeTasks = sortedTasks.filter((cs) => !cs.calstick_completed)
   const completedTasks = sortedTasks.filter((cs) => cs.calstick_completed)
@@ -127,16 +139,7 @@ export function AgendaView({ calsticks, onToggleComplete, onStickClick }: Agenda
                 key={task.id}
                 className="cursor-pointer active:scale-[0.98] transition-transform touch-manipulation border-l-4"
                 style={{
-                  borderLeftColor:
-                    task.calstick_priority && task.calstick_priority !== "none"
-                      ? task.calstick_priority === "urgent"
-                        ? "#ef4444"
-                        : task.calstick_priority === "high"
-                          ? "#f97316"
-                          : task.calstick_priority === "medium"
-                            ? "#eab308"
-                            : "#3b82f6"
-                      : "#9ca3af",
+                  borderLeftColor: getPriorityBorderColor(task.calstick_priority),
                 }}
                 onClick={() => onStickClick(task)}
               >
@@ -162,7 +165,7 @@ export function AgendaView({ calsticks, onToggleComplete, onStickClick }: Agenda
                         </Badge>
                         {task.calstick_date && (
                           <Badge
-                            variant={isOverdue ? "destructive" : isDueToday ? "default" : "outline"}
+                            variant={getDateBadgeVariant(!!isOverdue, !!isDueToday)}
                             className="text-xs flex items-center gap-1"
                           >
                             {isOverdue && <AlertCircle className="h-3 w-3" />}

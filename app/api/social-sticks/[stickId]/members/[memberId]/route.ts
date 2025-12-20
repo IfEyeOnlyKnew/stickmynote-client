@@ -1,11 +1,11 @@
-import { createClient } from "@/lib/supabase/server"
+import { createDatabaseClient } from "@/lib/database/database-adapter"
 import { NextResponse } from "next/server"
 import { getCachedAuthUser, createRateLimitResponse, createUnauthorizedResponse } from "@/lib/auth/cached-auth"
 
 export async function DELETE(request: Request, { params }: { params: { stickId: string; memberId: string } }) {
   try {
-    const supabase = await createClient()
-    const authResult = await getCachedAuthUser(supabase)
+    const db = await createDatabaseClient()
+    const authResult = await getCachedAuthUser()
 
     if (authResult.rateLimited) {
       return createRateLimitResponse()
@@ -17,7 +17,7 @@ export async function DELETE(request: Request, { params }: { params: { stickId: 
 
     const user = authResult.user
 
-    const { data: stick } = await supabase
+    const { data: stick } = await db
       .from("social_sticks")
       .select("social_pad_id, social_pads!inner(owner_id)")
       .eq("id", params.stickId)
@@ -31,7 +31,7 @@ export async function DELETE(request: Request, { params }: { params: { stickId: 
     const socialPads = stick.social_pads as unknown as { owner_id: string }
     const isOwner = socialPads.owner_id === user.id
 
-    const { data: padMember } = await supabase
+    const { data: padMember } = await db
       .from("social_pad_members")
       .select("role")
       .eq("social_pad_id", stick.social_pad_id)
@@ -45,7 +45,7 @@ export async function DELETE(request: Request, { params }: { params: { stickId: 
     }
 
     // Delete the member
-    const { error: deleteError } = await supabase
+    const { error: deleteError } = await db
       .from("social_stick_members")
       .delete()
       .eq("id", params.memberId)

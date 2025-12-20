@@ -1,332 +1,569 @@
-import { createClient } from "@/lib/supabase/server"
-import { createServiceClient } from "@/lib/supabase/service-client"
+import { createDatabaseClient, createServiceDatabaseClient, type DatabaseClient } from "@/lib/database/database-adapter"
 import { NextResponse } from "next/server"
 import { APICache, withCache } from "@/lib/api-cache"
 import { getOrgContext } from "@/lib/auth/get-org-context"
 import { getCachedAuthUser, createRateLimitResponse, createUnauthorizedResponse } from "@/lib/auth/cached-auth"
 import type { OrgContext } from "@/lib/auth/get-org-context"
 
-const ADMIN_EMAILS = ["chrisdoran63@outlook.com"]
+// ============================================================================
+// Types
+// ============================================================================
 
-type User = {
+interface User {
   id: string
   full_name: string | null
   email: string
   avatar_url: string | null
 }
 
+interface SocialStick {
+  id: string
+  topic: string
+  content: string
+  social_pad_id: string
+  user_id: string
+  org_id: string
+  color: string
+  created_at: string
+  updated_at: string
+  social_pads?: SocialPad | null
+}
+
+interface SocialPad {
+  id: string
+  name: string
+  is_public?: boolean
+  owner_id?: string
+  org_id?: string
+}
+
+interface EnrichedStick extends SocialStick {
+  users: User | null
+  reply_count: number
+}
+
+interface ReplyCount {
+  social_stick_id: string
+}
+
+interface PadId {
+  id: string
+}
+
+interface MemberPadId {
+  social_pad_id: string
+}
+
+interface Membership {
+  role: string
+}
+
+// ============================================================================
+// Constants
+// ============================================================================
+
+const LOG_PREFIX = "[SocialSticks]"
+const ADMIN_EMAILS = ["chrisdoran63@outlook.com"]
+const DEFAULT_STICK_COLOR = "#fef3c7"
+
+const CACHE_TTL_SHORT = 30
+const CACHE_TTL_MEDIUM = 60
+const CACHE_STALE_SHORT = 60
+const CACHE_STALE_LONG = 300
+
+const STICK_SELECT_FIELDS = `
+  *,
+  social_pads(id, name, is_public, owner_id)
+`
+
+const STICK_SELECT_WITH_PUBLIC_PAD = `
+  *,
+  social_pads!inner(id, name, is_public)
+`
+
+// ============================================================================
+// Error Responses
+// ============================================================================
+
+const Errors = {
+  rateLimit: () =>
+    NextResponse.json(
+      { error: "Too many requests. Please try again in a moment." },
+      { status: 429, headers: { "Retry-After": "5" } }
+    ),
+  unauthorized: (details?: string) =>
+    NextResponse.json(
+      { error: "Unauthorized", details: details || "Authentication required" },
+      { status: 401 }
+    ),
+  noOrgContext: () =>
+    NextResponse.json({ error: "No organization context" }, { status: 403 }),
+  forbidden: () =>
+    NextResponse.json({ error: "Forbidden" }, { status: 403 }),
+  noAccess: () =>
+    NextResponse.json({ error: "You don't have access to this pad" }, { status: 403 }),
+  missingFields: () =>
+    NextResponse.json({ error: "Topic and pad are required" }, { status: 400 }),
+  fetchFailed: () =>
+    NextResponse.json({ error: "Failed to fetch social sticks" }, { status: 500 }),
+  createFailed: () =>
+    NextResponse.json({ error: "Failed to create social stick" }, { status: 500 }),
+} as const
+
+// ============================================================================
+// Helpers
+// ============================================================================
+
+function isRateLimitError(error: unknown): boolean {
+  if (!(error instanceof Error)) return false
+  const message = error.message
+  return message.includes("Too Many") || message.includes("429") || message.includes("RATE_LIMITED")
+}
+
+function parseQueryParams(request: Request): {
+  isPublic: boolean
+  isAdmin: boolean
+  isPrivate: boolean
+  cacheInvalidation: string | null
+} {
+  const { searchParams } = new URL(request.url)
+  return {
+    isPublic: searchParams.get("public") === "true",
+    isAdmin: searchParams.get("admin") === "true",
+    isPrivate: searchParams.get("private") === "true",
+    cacheInvalidation: searchParams.get("_t"),
+  }
+}
+
+// ============================================================================
+// Database Operations
+// ============================================================================
+
+async function fetchUsersByIds(
+  db: DatabaseClient,
+  userIds: string[]
+): Promise<Map<string, User>> {
+  if (userIds.length === 0) return new Map()
+
+  const { data: users, error } = await db
+    .from("users")
+    .select("id, full_name, email, avatar_url")
+    .in("id", userIds)
+
+  if (error) {
+    console.error(`${LOG_PREFIX} Error fetching users:`, error)
+    return new Map()
+  }
+
+  return new Map((users as User[] || []).map((u) => [u.id, u]))
+}
+
+async function fetchReplyCounts(
+  db: DatabaseClient,
+  stickIds: string[]
+): Promise<Map<string, number>> {
+  if (stickIds.length === 0) return new Map()
+
+  const { data: replyCounts, error } = await db
+    .from("social_stick_replies")
+    .select("social_stick_id")
+    .in("social_stick_id", stickIds)
+
+  if (error) {
+    console.error(`${LOG_PREFIX} Error fetching reply counts:`, error)
+    return new Map()
+  }
+
+  const countMap = new Map<string, number>()
+  for (const reply of (replyCounts as ReplyCount[] || [])) {
+    countMap.set(reply.social_stick_id, (countMap.get(reply.social_stick_id) || 0) + 1)
+  }
+
+  return countMap
+}
+
+async function enrichSticksWithData(
+  db: DatabaseClient,
+  serviceDb: DatabaseClient,
+  sticks: SocialStick[]
+): Promise<EnrichedStick[]> {
+  if (!sticks || sticks.length === 0) {
+    return []
+  }
+
+  const userIds = [...new Set(sticks.map((stick) => stick.user_id).filter(Boolean))]
+  const stickIds = sticks.map((stick) => stick.id)
+
+  const [usersMap, replyCountMap] = await Promise.all([
+    fetchUsersByIds(serviceDb, userIds),
+    fetchReplyCounts(db, stickIds),
+  ])
+
+  return sticks.map((stick) => ({
+    ...stick,
+    users: stick.user_id ? usersMap.get(stick.user_id) || null : null,
+    reply_count: replyCountMap.get(stick.id) || 0,
+  }))
+}
+
+async function fetchPublicSticks(db: DatabaseClient): Promise<SocialStick[]> {
+  const { data, error } = await db
+    .from("social_sticks")
+    .select(STICK_SELECT_WITH_PUBLIC_PAD)
+    .eq("social_pads.is_public", true)
+    .order("created_at", { ascending: false })
+
+  if (error) {
+    console.error(`${LOG_PREFIX} Error fetching public sticks:`, error)
+    throw error
+  }
+
+  return (data || []) as SocialStick[]
+}
+
+async function fetchOwnedPadIds(
+  db: DatabaseClient,
+  userId: string,
+  orgId: string,
+  isPublicFilter?: boolean
+): Promise<string[]> {
+  let query = db
+    .from("social_pads")
+    .select("id")
+    .eq("owner_id", userId)
+    .eq("org_id", orgId)
+
+  if (isPublicFilter !== undefined) {
+    query = query.eq("is_public", isPublicFilter)
+  }
+
+  const { data } = await query
+  return (data as PadId[] || []).map((p) => p.id)
+}
+
+async function fetchMemberPadIds(
+  db: DatabaseClient,
+  userId: string,
+  orgId: string
+): Promise<string[]> {
+  const { data } = await db
+    .from("social_pad_members")
+    .select("social_pad_id")
+    .eq("user_id", userId)
+    .eq("org_id", orgId)
+    .eq("accepted", true)
+
+  return (data as MemberPadId[] || []).map((m) => m.social_pad_id)
+}
+
+async function fetchPrivateMemberPadIds(
+  db: DatabaseClient,
+  memberPadIds: string[],
+  orgId: string
+): Promise<string[]> {
+  if (memberPadIds.length === 0) return []
+
+  const { data } = await db
+    .from("social_pads")
+    .select("id, is_public")
+    .in("id", memberPadIds)
+    .eq("org_id", orgId)
+    .eq("is_public", false)
+
+  return (data as PadId[] || []).map((p) => p.id)
+}
+
+async function fetchPublicPadIds(db: DatabaseClient): Promise<string[]> {
+  const { data } = await db
+    .from("social_pads")
+    .select("id")
+    .eq("is_public", true)
+
+  return (data as PadId[] || []).map((p) => p.id)
+}
+
+async function fetchSticksByPadIds(
+  db: DatabaseClient,
+  padIds: string[],
+  orgId?: string
+): Promise<SocialStick[]> {
+  if (padIds.length === 0) return []
+
+  let query = db
+    .from("social_sticks")
+    .select(STICK_SELECT_FIELDS)
+    .in("social_pad_id", padIds)
+    .order("created_at", { ascending: false })
+
+  if (orgId) {
+    query = query.eq("org_id", orgId)
+  }
+
+  const { data, error } = await query
+
+  if (error) {
+    console.error(`${LOG_PREFIX} Error fetching sticks:`, error)
+    throw error
+  }
+
+  return (data || []) as SocialStick[]
+}
+
+async function fetchAllSticks(db: DatabaseClient): Promise<SocialStick[]> {
+  const { data, error } = await db
+    .from("social_sticks")
+    .select(`
+      *,
+      social_pads(id, name)
+    `)
+    .order("created_at", { ascending: false })
+
+  if (error) throw error
+  return (data || []) as SocialStick[]
+}
+
+async function checkPadAccess(
+  db: DatabaseClient,
+  padId: string,
+  userId: string,
+  orgId: string
+): Promise<{ hasAccess: boolean; pad: SocialPad | null }> {
+  const { data: membership } = await db
+    .from("social_pad_members")
+    .select("role")
+    .eq("social_pad_id", padId)
+    .eq("user_id", userId)
+    .eq("org_id", orgId)
+    .eq("accepted", true)
+    .maybeSingle()
+
+  const { data: pad } = await db
+    .from("social_pads")
+    .select("owner_id, org_id")
+    .eq("id", padId)
+    .maybeSingle()
+
+  const hasAccess = Boolean(membership) || pad?.owner_id === userId
+
+  return { hasAccess, pad: pad as SocialPad | null }
+}
+
+async function createStick(
+  db: DatabaseClient,
+  data: {
+    topic: string
+    content: string
+    social_pad_id: string
+    user_id: string
+    org_id: string
+    color: string
+  }
+): Promise<SocialStick> {
+  const { data: stick, error } = await db
+    .from("social_sticks")
+    .insert(data)
+    .select()
+    .single()
+
+  if (error) throw error
+  return stick as SocialStick
+}
+
+// ============================================================================
+// GET Request Handlers
+// ============================================================================
+
+async function handlePublicSticksRequest(
+  db: DatabaseClient,
+  serviceDb: DatabaseClient
+): Promise<Response> {
+  const cacheKey = APICache.getCacheKey("social-sticks", { public: true })
+
+  return withCache(
+    cacheKey,
+    async () => {
+      const publicSticks = await fetchPublicSticks(db)
+      const enrichedSticks = await enrichSticksWithData(db, serviceDb, publicSticks)
+      return { sticks: enrichedSticks }
+    },
+    { ttl: CACHE_TTL_MEDIUM, staleWhileRevalidate: CACHE_STALE_LONG }
+  )
+}
+
+async function handlePrivateSticksRequest(
+  db: DatabaseClient,
+  serviceDb: DatabaseClient,
+  user: { id: string; email?: string },
+  orgContext: OrgContext
+): Promise<Response> {
+  const cacheKey = APICache.getCacheKey("social-sticks", {
+    private: true,
+    userId: user.id,
+    orgId: orgContext.orgId,
+  })
+
+  return withCache(
+    cacheKey,
+    async () => {
+      const [ownedPrivatePadIds, memberPadIds] = await Promise.all([
+        fetchOwnedPadIds(db, user.id, orgContext.orgId, false),
+        fetchMemberPadIds(db, user.id, orgContext.orgId),
+      ])
+
+      const memberPrivatePadIds = await fetchPrivateMemberPadIds(
+        db,
+        memberPadIds,
+        orgContext.orgId
+      )
+
+      const privatePadIds = [...ownedPrivatePadIds, ...memberPrivatePadIds]
+
+      if (privatePadIds.length === 0) {
+        return { sticks: [] }
+      }
+
+      const privateSticks = await fetchSticksByPadIds(db, privatePadIds, orgContext.orgId)
+      const enrichedSticks = await enrichSticksWithData(db, serviceDb, privateSticks)
+      return { sticks: enrichedSticks }
+    },
+    {
+      ttl: CACHE_TTL_SHORT,
+      staleWhileRevalidate: CACHE_STALE_SHORT,
+      tags: [`social-sticks-${user.id}-${orgContext.orgId}`],
+    }
+  )
+}
+
+async function handleAdminSticksRequest(
+  db: DatabaseClient,
+  serviceDb: DatabaseClient,
+  user: { id: string; email?: string }
+): Promise<Response> {
+  const isUserAdmin = user.email && ADMIN_EMAILS.includes(user.email)
+  if (!isUserAdmin) {
+    return Errors.forbidden()
+  }
+
+  const allSticks = await fetchAllSticks(db)
+  const enrichedSticks = await enrichSticksWithData(db, serviceDb, allSticks)
+  return NextResponse.json({ sticks: enrichedSticks })
+}
+
+async function handleDefaultSticksRequest(
+  db: DatabaseClient,
+  serviceDb: DatabaseClient,
+  user: { id: string; email?: string },
+  orgContext: OrgContext,
+  cacheInvalidation: string | null
+): Promise<Response> {
+  const cacheKey = APICache.getCacheKey("social-sticks", {
+    userId: user.id,
+    orgId: orgContext.orgId,
+  })
+
+  if (cacheInvalidation) {
+    await APICache.invalidate(cacheKey)
+  }
+
+  return withCache(
+    cacheKey,
+    async () => {
+      const [ownedPadIds, memberPadIds, publicPadIds] = await Promise.all([
+        fetchOwnedPadIds(db, user.id, orgContext.orgId),
+        fetchMemberPadIds(db, user.id, orgContext.orgId),
+        fetchPublicPadIds(db),
+      ])
+
+      const uniquePadIds = [...new Set([...ownedPadIds, ...memberPadIds, ...publicPadIds])]
+
+      if (uniquePadIds.length === 0) {
+        return { sticks: [] }
+      }
+
+      const sticks = await fetchSticksByPadIds(db, uniquePadIds)
+      const enrichedSticks = await enrichSticksWithData(db, serviceDb, sticks)
+      return { sticks: enrichedSticks }
+    },
+    {
+      ttl: CACHE_TTL_SHORT,
+      staleWhileRevalidate: CACHE_STALE_SHORT,
+      tags: [`social-sticks-${user.id}-${orgContext.orgId}`],
+    }
+  )
+}
+
+async function getOrgContextSafe(user: { id: string }): Promise<OrgContext | null> {
+  try {
+    return await getOrgContext()
+  } catch (orgError) {
+    if (orgError instanceof Error && orgError.message === "RATE_LIMITED") {
+      throw orgError
+    }
+    console.error(`${LOG_PREFIX} Error getting org context:`, orgError)
+    return null
+  }
+}
+
+// ============================================================================
+// Route Handlers
+// ============================================================================
+
 export async function GET(request: Request) {
   try {
-    const { searchParams } = new URL(request.url)
-    const isPublic = searchParams.get("public") === "true"
-    const isAdmin = searchParams.get("admin") === "true"
-    const isPrivate = searchParams.get("private") === "true"
-
-    const supabase = await createClient()
+    const { isPublic, isAdmin, isPrivate, cacheInvalidation } = parseQueryParams(request)
+    const db = await createDatabaseClient()
+    const serviceDb = await createServiceDatabaseClient()
 
     const { user, error: authError } = await getCachedAuthUser()
 
     if (authError === "rate_limited") {
-      return NextResponse.json(
-        { error: "Too many requests. Please try again in a moment." },
-        { status: 429, headers: { "Retry-After": "5" } },
-      )
+      return Errors.rateLimit()
     }
 
-    let orgContext: OrgContext | null = null
-    if (user) {
-      try {
-        orgContext = await getOrgContext()
-      } catch (orgError) {
-        if (orgError instanceof Error && orgError.message === "RATE_LIMITED") {
-          return NextResponse.json(
-            { error: "Too many requests. Please try again in a moment." },
-            { status: 429, headers: { "Retry-After": "5" } },
-          )
-        }
-        console.error("[v0] Error getting org context:", orgError)
-      }
-    }
-
-    if (user && !orgContext) {
-      console.error("[v0] User authenticated but no orgContext:", user.email)
-    }
-
-    const enrichSticksWithData = async (sticks: any[]) => {
-      if (!sticks || sticks.length === 0) {
-        return []
-      }
-
-      const userIds = [...new Set(sticks.map((stick) => stick.user_id).filter(Boolean))]
-
-      const serviceClient = createServiceClient()
-      const { data: users, error: usersError } = await serviceClient
-        .from("users")
-        .select("id, full_name, email, avatar_url")
-        .in("id", userIds)
-        .returns<User[]>()
-
-      if (usersError) {
-        console.error("[v0] Error fetching users:", usersError)
-      }
-
-      const usersMap = new Map(users?.map((u) => [u.id, u]) || [])
-
-      const stickIds = sticks.map((stick) => stick.id)
-
-      const { data: replyCounts, error: replyError } = await supabase
-        .from("social_stick_replies")
-        .select("social_stick_id")
-        .in("social_stick_id", stickIds)
-
-      if (replyError) {
-        console.error("[v0] Error fetching reply counts:", replyError)
-      }
-
-      const replyCountMap = new Map<string, number>()
-      replyCounts?.forEach((reply) => {
-        replyCountMap.set(reply.social_stick_id, (replyCountMap.get(reply.social_stick_id) || 0) + 1)
-      })
-
-      const enrichedSticks = sticks.map((stick) => ({
-        ...stick,
-        users: stick.user_id ? usersMap.get(stick.user_id) || null : null,
-        reply_count: replyCountMap.get(stick.id) || 0,
-      }))
-
-      return enrichedSticks
-    }
-
+    // Handle public sticks request (no auth required)
     if (isPublic) {
-      const cacheKey = APICache.getCacheKey("social-sticks", { public: true })
-
-      return withCache(
-        cacheKey,
-        async () => {
-          const { data: publicSticks, error } = await supabase
-            .from("social_sticks")
-            .select(`
-              *,
-              social_pads!inner(id, name, is_public)
-            `)
-            .eq("social_pads.is_public", true)
-            .order("created_at", { ascending: false })
-
-          if (error) {
-            console.error("[v0] Error fetching public sticks:", error)
-            throw error
-          }
-
-          const enrichedSticks = await enrichSticksWithData(publicSticks || [])
-          return { sticks: enrichedSticks }
-        },
-        { ttl: 60, staleWhileRevalidate: 300 },
-      )
+      return handlePublicSticksRequest(db, serviceDb)
     }
 
-    if (isPrivate) {
-      if (!user || !orgContext) {
-        return NextResponse.json(
-          {
-            error: "Unauthorized",
-            details: !user ? "No authenticated user" : "No organization context",
-          },
-          { status: 401 },
-        )
-      }
-
-      const validatedUser = user
-      const validatedOrgContext = orgContext
-
-      const cacheKey = APICache.getCacheKey("social-sticks", {
-        private: true,
-        userId: validatedUser.id,
-        orgId: validatedOrgContext.orgId,
-      })
-
-      return withCache(
-        cacheKey,
-        async () => {
-          const { data: ownedPrivatePads } = await supabase
-            .from("social_pads")
-            .select("id")
-            .eq("owner_id", validatedUser.id)
-            .eq("org_id", validatedOrgContext.orgId)
-            .eq("is_public", false)
-
-          const { data: memberPadIds } = await supabase
-            .from("social_pad_members")
-            .select("social_pad_id")
-            .eq("user_id", validatedUser.id)
-            .eq("org_id", validatedOrgContext.orgId)
-            .eq("accepted", true)
-
-          const memberPadIdList = memberPadIds?.map((m) => m.social_pad_id) || []
-
-          let memberPrivatePadIds: string[] = []
-          if (memberPadIdList.length > 0) {
-            const { data: memberPads } = await supabase
-              .from("social_pads")
-              .select("id, is_public")
-              .in("id", memberPadIdList)
-              .eq("org_id", validatedOrgContext.orgId)
-              .eq("is_public", false)
-
-            memberPrivatePadIds = memberPads?.map((p) => p.id) || []
-          }
-
-          const privatePadIds = [...(ownedPrivatePads?.map((p) => p.id) || []), ...memberPrivatePadIds]
-
-          if (privatePadIds.length === 0) {
-            return { sticks: [] }
-          }
-
-          const { data: privateSticks, error } = await supabase
-            .from("social_sticks")
-            .select(`
-              *,
-              social_pads(id, name, is_public)
-            `)
-            .in("social_pad_id", privatePadIds)
-            .eq("org_id", validatedOrgContext.orgId)
-            .order("created_at", { ascending: false })
-
-          if (error) {
-            console.error("[v0] Error fetching private sticks:", error)
-            throw error
-          }
-
-          const enrichedSticks = await enrichSticksWithData(privateSticks || [])
-          return { sticks: enrichedSticks }
-        },
-        { ttl: 30, staleWhileRevalidate: 60, tags: [`social-sticks-${user.id}-${orgContext.orgId}`] },
-      )
-    }
-
-    if (isAdmin) {
-      if (!user) {
-        return createUnauthorizedResponse()
-      }
-
-      const isUserAdmin = user.email && ADMIN_EMAILS.includes(user.email)
-
-      if (!isUserAdmin) {
-        return NextResponse.json({ error: "Forbidden" }, { status: 403 })
-      }
-
-      const { data: allSticks, error } = await supabase
-        .from("social_sticks")
-        .select(`
-          *,
-          social_pads(id, name)
-        `)
-        .order("created_at", { ascending: false })
-
-      if (error) throw error
-
-      const enrichedSticks = await enrichSticksWithData(allSticks || [])
-      return NextResponse.json({ sticks: enrichedSticks })
-    }
-
+    // All other requests require authentication
     if (!user) {
-      return NextResponse.json({ error: "Unauthorized", details: "Authentication required" }, { status: 401 })
+      return Errors.unauthorized()
     }
 
-    if (!orgContext) {
-      console.warn("[v0] No org context for user, falling back to public sticks only:", user.email)
+    // Handle admin sticks request
+    if (isAdmin) {
+      return handleAdminSticksRequest(db, serviceDb, user)
+    }
 
-      const { data: publicSticks, error } = await supabase
-        .from("social_sticks")
-        .select(`
-          *,
-          social_pads!inner(id, name, is_public)
-        `)
-        .eq("social_pads.is_public", true)
-        .order("created_at", { ascending: false })
+    // Get org context for private/default requests
+    const orgContext = await getOrgContextSafe(user)
 
-      if (error) {
-        console.error("[v0] Error fetching public sticks fallback:", error)
-        return NextResponse.json({ sticks: [] })
+    // Handle private sticks request
+    if (isPrivate) {
+      if (!orgContext) {
+        return Errors.unauthorized("No organization context")
       }
+      return handlePrivateSticksRequest(db, serviceDb, user, orgContext)
+    }
 
-      const enrichedSticks = await enrichSticksWithData(publicSticks || [])
+    // Handle default request - fallback to public if no org context
+    if (!orgContext) {
+      console.warn(`${LOG_PREFIX} No org context for user, falling back to public sticks only:`, user.email)
+      const publicSticks = await fetchPublicSticks(db)
+      const enrichedSticks = await enrichSticksWithData(db, serviceDb, publicSticks)
       return NextResponse.json({ sticks: enrichedSticks })
     }
 
-    const url = new URL(request.url)
-    const cacheInvalidation = url.searchParams.get("_t")
-
-    const authenticatedUser = user
-    const validOrgContext = orgContext
-
-    const cacheKey = APICache.getCacheKey("social-sticks", {
-      userId: authenticatedUser.id,
-      orgId: validOrgContext.orgId,
-    })
-
-    if (cacheInvalidation) {
-      await APICache.invalidate(cacheKey)
-    }
-
-    return withCache(
-      cacheKey,
-      async () => {
-        const { data: ownedPads } = await supabase
-          .from("social_pads")
-          .select("id")
-          .eq("owner_id", authenticatedUser.id)
-          .eq("org_id", validOrgContext.orgId)
-
-        const { data: memberPadIds } = await supabase
-          .from("social_pad_members")
-          .select("social_pad_id")
-          .eq("user_id", authenticatedUser.id)
-          .eq("org_id", validOrgContext.orgId)
-          .eq("accepted", true)
-
-        const { data: publicPads } = await supabase.from("social_pads").select("id").eq("is_public", true)
-
-        const accessiblePadIds = [
-          ...(ownedPads?.map((p) => p.id) || []),
-          ...(memberPadIds?.map((m) => m.social_pad_id) || []),
-          ...(publicPads?.map((p) => p.id) || []),
-        ]
-
-        const uniquePadIds = [...new Set(accessiblePadIds)]
-
-        if (uniquePadIds.length === 0) {
-          return { sticks: [] }
-        }
-
-        const { data: sticks, error } = await supabase
-          .from("social_sticks")
-          .select(`
-            *,
-            social_pads(id, name, is_public, owner_id)
-          `)
-          .in("social_pad_id", uniquePadIds)
-          .order("created_at", { ascending: false })
-
-        if (error) {
-          console.error("[v0] Error fetching sticks:", error)
-          throw error
-        }
-
-        const enrichedSticks = await enrichSticksWithData(sticks || [])
-        return { sticks: enrichedSticks }
-      },
-      { ttl: 30, staleWhileRevalidate: 60, tags: [`social-sticks-${user.id}-${orgContext.orgId}`] },
-    )
+    return handleDefaultSticksRequest(db, serviceDb, user, orgContext, cacheInvalidation)
   } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : String(error)
-    if (errorMessage.includes("Too Many") || errorMessage.includes("429") || errorMessage.includes("RATE_LIMITED")) {
-      return NextResponse.json(
-        { error: "Too many requests. Please try again in a moment." },
-        { status: 429, headers: { "Retry-After": "5" } },
-      )
+    if (isRateLimitError(error)) {
+      return Errors.rateLimit()
     }
-    console.error("[v0] Error fetching social sticks:", error)
-    return NextResponse.json({ error: "Failed to fetch social sticks" }, { status: 500 })
+    if (error instanceof Error && error.message === "RATE_LIMITED") {
+      return Errors.rateLimit()
+    }
+    console.error(`${LOG_PREFIX} GET error:`, error)
+    return Errors.fetchFailed()
   }
 }
 
@@ -342,59 +579,45 @@ export async function POST(request: Request) {
       return createUnauthorizedResponse()
     }
 
-    const supabase = await createClient()
+    const db = await createDatabaseClient()
 
     const orgContext = await getOrgContext()
     if (!orgContext) {
-      return NextResponse.json({ error: "No organization context" }, { status: 403 })
+      return Errors.noOrgContext()
     }
 
     const { topic, content, social_pad_id, color } = await request.json()
 
     if (!topic?.trim() || !social_pad_id) {
-      return NextResponse.json({ error: "Topic and pad are required" }, { status: 400 })
+      return Errors.missingFields()
     }
 
-    const { data: membership } = await supabase
-      .from("social_pad_members")
-      .select("role")
-      .eq("social_pad_id", social_pad_id)
-      .eq("user_id", user.id)
-      .eq("org_id", orgContext.orgId)
-      .eq("accepted", true)
-      .maybeSingle()
+    // Check pad access
+    const { hasAccess, pad } = await checkPadAccess(db, social_pad_id, user.id, orgContext.orgId)
 
-    const { data: pad } = await supabase
-      .from("social_pads")
-      .select("owner_id, org_id")
-      .eq("id", social_pad_id)
-      .maybeSingle()
-
-    if (!membership && pad?.owner_id !== user.id) {
-      return NextResponse.json({ error: "You don't have access to this pad" }, { status: 403 })
+    if (!hasAccess) {
+      return Errors.noAccess()
     }
 
-    const { data: stick, error } = await supabase
-      .from("social_sticks")
-      .insert({
-        topic: topic.trim(),
-        content: content?.trim() || "",
-        social_pad_id,
-        user_id: user.id,
-        org_id: pad?.org_id || orgContext.orgId,
-        color: color || "#fef3c7",
-      })
-      .select()
-      .single()
+    // Create stick
+    const stick = await createStick(db, {
+      topic: topic.trim(),
+      content: content?.trim() || "",
+      social_pad_id,
+      user_id: user.id,
+      org_id: pad?.org_id || orgContext.orgId,
+      color: color || DEFAULT_STICK_COLOR,
+    })
 
-    if (error) throw error
-
-    await APICache.invalidate(`social-sticks:userId=${user.id}:orgId=${orgContext.orgId}`)
-    await APICache.invalidate(`social-sticks:public=true`)
+    // Invalidate caches
+    await Promise.all([
+      APICache.invalidate(`social-sticks:userId=${user.id}:orgId=${orgContext.orgId}`),
+      APICache.invalidate(`social-sticks:public=true`),
+    ])
 
     return NextResponse.json({ stick })
   } catch (error) {
-    console.error("Error creating social stick:", error)
-    return NextResponse.json({ error: "Failed to create social stick" }, { status: 500 })
+    console.error(`${LOG_PREFIX} POST error:`, error)
+    return Errors.createFailed()
   }
 }

@@ -1,18 +1,41 @@
 import { NextResponse } from "next/server"
-import { createClient } from "@/lib/supabase/server"
-import { createServiceClient } from "@/lib/supabase/server"
-import { put } from "@vercel/blob"
+import { createServiceDatabaseClient } from "@/lib/database/database-adapter"
 import { getCachedAuthUser } from "@/lib/auth/cached-auth"
+import { writeFile, mkdir } from "fs/promises"
+import path from "path"
 
 const MAX_FILE_SIZE = 5 * 1024 * 1024 // 5MB
 const ALLOWED_TYPES = ["image/png", "image/jpeg", "image/jpg", "image/webp", "image/svg+xml"]
+
+// Helper to save file locally or to Vercel Blob
+async function saveFile(file: File, filename: string): Promise<string> {
+  // Check if Vercel Blob is available
+  if (process.env.BLOB_READ_WRITE_TOKEN) {
+    const { put } = await import("@vercel/blob")
+    const blob = await put(filename, file, { access: "public" })
+    return blob.url
+  }
+
+  // Fall back to local file storage
+  const uploadDir = path.join(process.cwd(), "public", "uploads", "branding")
+  await mkdir(uploadDir, { recursive: true })
+
+  const localFilename = filename.replace(/\//g, "-")
+  const filePath = path.join(uploadDir, localFilename)
+  
+  const arrayBuffer = await file.arrayBuffer()
+  const buffer = Buffer.from(arrayBuffer)
+  await writeFile(filePath, buffer)
+
+  // Return URL path for local file
+  return `/uploads/branding/${localFilename}`
+}
 
 // POST /api/organizations/[orgId]/branding/upload - Upload logo
 export async function POST(req: Request, { params }: { params: Promise<{ orgId: string }> }) {
   try {
     const { orgId } = await params
-    const supabase = await createClient()
-    const authResult = await getCachedAuthUser(supabase)
+    const authResult = await getCachedAuthUser()
 
     if (authResult.rateLimited) {
       return NextResponse.json(
@@ -26,10 +49,10 @@ export async function POST(req: Request, { params }: { params: Promise<{ orgId: 
     }
 
     const user = authResult.user
-    const serviceClient = createServiceClient()
+    const serviceDb = await createServiceDatabaseClient()
 
     // Check admin/owner role
-    const { data: membership, error: memberError } = await serviceClient
+    const { data: membership, error: memberError } = await serviceDb
       .from("organization_members")
       .select("role")
       .eq("org_id", orgId)
@@ -67,13 +90,11 @@ export async function POST(req: Request, { params }: { params: Promise<{ orgId: 
     const sanitizedName = file.name.replace(/[^a-zA-Z0-9._-]/g, "_")
     const filename = `orgs/${orgId}/branding/${type || "logo"}-${timestamp}-${sanitizedName}`
 
-    // Upload to Vercel Blob
-    const blob = await put(filename, file, {
-      access: "public",
-    })
+    // Upload to storage (Vercel Blob or local)
+    const fileUrl = await saveFile(file, filename)
 
     // Update organization settings with new URL
-    const { data: org, error: fetchError } = await serviceClient
+    const { data: org, error: fetchError } = await serviceDb
       .from("organizations")
       .select("settings")
       .eq("id", orgId)
@@ -89,13 +110,13 @@ export async function POST(req: Request, { params }: { params: Promise<{ orgId: 
     let updatedBranding = { ...currentBranding }
 
     if (type === "logo_dark") {
-      updatedBranding = { ...updatedBranding, logo_dark_url: blob.url }
+      updatedBranding = { ...updatedBranding, logo_dark_url: fileUrl }
     } else if (type === "favicon") {
-      updatedBranding = { ...updatedBranding, favicon_url: blob.url }
+      updatedBranding = { ...updatedBranding, favicon_url: fileUrl }
     } else if (type === "page_logo") {
-      updatedBranding = { ...updatedBranding, page_logo_url: blob.url }
+      updatedBranding = { ...updatedBranding, page_logo_url: fileUrl }
     } else {
-      updatedBranding = { ...updatedBranding, logo_url: blob.url }
+      updatedBranding = { ...updatedBranding, logo_url: fileUrl }
     }
 
     const updatedSettings = {
@@ -103,7 +124,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ orgId: 
       branding: updatedBranding,
     }
 
-    const { error: updateError } = await serviceClient
+    const { error: updateError } = await serviceDb
       .from("organizations")
       .update({ settings: updatedSettings, updated_at: new Date().toISOString() })
       .eq("id", orgId)
@@ -113,7 +134,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ orgId: 
       return NextResponse.json({ error: "Failed to save branding" }, { status: 500 })
     }
 
-    return NextResponse.json({ url: blob.url, type })
+    return NextResponse.json({ url: fileUrl, type })
   } catch (err) {
     console.error("[v0] Unexpected error in POST /api/organizations/[orgId]/branding/upload:", err)
     return NextResponse.json({ error: "Internal server error" }, { status: 500 })

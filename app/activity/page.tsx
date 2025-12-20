@@ -49,7 +49,7 @@ export default function ActivityPage() {
         <Card>
           <CardHeader>
             <CardTitle className="text-base">Recent Activity</CardTitle>
-            <CardDescription>See what's been happening across your workspace</CardDescription>
+            <CardDescription>See what&apos;s been happening across your workspace</CardDescription>
           </CardHeader>
           <CardContent className="p-0">
             <ActivityFeedList userId={user.id} />

@@ -8,7 +8,7 @@ import { useOrgTheme } from "@/lib/hooks/use-org-theme"
  * Component that applies organization branding theme to the application
  * Should be mounted once in the layout
  */
-export function OrgThemeProvider({ children }: { children: React.ReactNode }) {
+export function OrgThemeProvider({ children }: Readonly<{ children: React.ReactNode }>) {
   const { currentOrg } = useOrganization()
 
   // Apply theme whenever org changes

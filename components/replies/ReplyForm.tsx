@@ -29,7 +29,9 @@ export const ReplyForm: React.FC<ReplyFormProps> = ({
     return (
       <div
         className="reply-form-container space-y-3 p-4 bg-white rounded-md border-2 border-blue-300 shadow-lg"
+        role="presentation"
         onClick={(e) => e.stopPropagation()}
+        onKeyDown={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between">
           <h4 className="text-sm font-medium text-gray-900">Add Reply</h4>

@@ -78,7 +78,12 @@ export function CSVImportDialog({ organizationId, onImportComplete }: CSVImportD
   }
 
   const handleImport = async () => {
-    const textToProcess = activeTab === "paste" ? pastedText : file ? await file.text() : ""
+    let textToProcess = ""
+    if (activeTab === "paste") {
+      textToProcess = pastedText
+    } else if (file) {
+      textToProcess = await file.text()
+    }
 
     if (!textToProcess.trim()) {
       toast({
@@ -218,8 +223,11 @@ david.wilson@magna.com, David Wilson"
               </Button>
 
               <div
+                role="button"
+                tabIndex={0}
                 className="border-2 border-dashed rounded-lg p-6 text-center cursor-pointer hover:bg-muted/50 transition-colors"
                 onClick={() => fileInputRef.current?.click()}
+                onKeyDown={(e) => e.key === "Enter" && fileInputRef.current?.click()}
               >
                 <input ref={fileInputRef} type="file" accept=".csv" onChange={handleFileChange} className="hidden" />
                 {file ? (

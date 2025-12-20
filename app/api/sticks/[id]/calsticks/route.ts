@@ -1,4 +1,4 @@
-import { createClient } from "@/lib/supabase/server"
+import { createDatabaseClient } from "@/lib/database/database-adapter"
 import { getCachedAuthUser } from "@/lib/auth/cached-auth"
 import { type NextRequest, NextResponse } from "next/server"
 
@@ -6,9 +6,9 @@ import { type NextRequest, NextResponse } from "next/server"
 export async function GET(request: NextRequest, { params }: { params: { id: string } }) {
   try {
     const { id: stickId } = params
-    const supabase = await createClient()
+    const db = await createDatabaseClient()
 
-    const { user, error: authError, rateLimited } = await getCachedAuthUser(supabase)
+    const { user, error: authError, rateLimited } = await getCachedAuthUser()
 
     if (rateLimited) {
       return NextResponse.json({ error: "Too many requests" }, { status: 429 })
@@ -19,7 +19,7 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
     }
 
     // Fetch all replies for this stick that have CalStick enabled
-    const { data: replies, error } = await supabase
+    const { data: replies, error } = await db
       .from("paks_pad_stick_replies")
       .select("id, content, is_calstick, calstick_date, calstick_completed, created_at, stick_id")
       .eq("stick_id", stickId)

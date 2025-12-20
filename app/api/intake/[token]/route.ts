@@ -1,13 +1,13 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { createServerClient } from "@/lib/supabase/server"
+import { createDatabaseClient } from "@/lib/database/database-adapter"
 
 export async function GET(request: NextRequest, { params }: { params: { token: string } }) {
   try {
-    const supabase = await createServerClient()
+    const db = await createDatabaseClient()
     const { token } = params
 
     // Fetch form by token (public access)
-    const { data: form, error: formError } = await supabase
+    const { data: form, error: formError } = await db
       .from("intake_forms")
       .select("id, title, description, success_message, is_active")
       .eq("share_token", token)
@@ -19,7 +19,7 @@ export async function GET(request: NextRequest, { params }: { params: { token: s
     }
 
     // Fetch form fields
-    const { data: fields, error: fieldsError } = await supabase
+    const { data: fields, error: fieldsError } = await db
       .from("intake_form_fields")
       .select("*")
       .eq("form_id", form.id)

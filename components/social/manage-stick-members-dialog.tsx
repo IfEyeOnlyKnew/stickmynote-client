@@ -58,11 +58,13 @@ export function ManageStickMembersDialog({
   const [activeTab, setActiveTab] = useState("invite")
   const [bulkEmails, setBulkEmails] = useState("")
 
+  /* eslint-disable react-hooks/exhaustive-deps */
   useEffect(() => {
     if (open) {
       fetchMembers()
     }
   }, [open, stickId])
+  /* eslint-enable react-hooks/exhaustive-deps */
 
   const fetchMembers = async () => {
     try {
@@ -224,7 +226,7 @@ export function ManageStickMembersDialog({
       <DialogContent className="sm:max-w-[600px] max-h-[85vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Manage Stick Members</DialogTitle>
-          <DialogDescription>Add or remove members who can access "{stickTopic}"</DialogDescription>
+          <DialogDescription>Add or remove members who can access &quot;{stickTopic}&quot;</DialogDescription>
         </DialogHeader>
 
         {error && <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded text-sm">{error}</div>}
@@ -284,7 +286,7 @@ export function ManageStickMembersDialog({
 
               <p className="text-xs text-purple-600">
                 <Mail className="h-3 w-3 inline mr-1" />
-                If the user doesn't have an account, they'll receive an email invitation to sign up.
+                If the user doesn&apos;t have an account, they&apos;ll receive an email invitation to sign up.
               </p>
             </div>
 

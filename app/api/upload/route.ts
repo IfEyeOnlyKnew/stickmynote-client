@@ -1,14 +1,14 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { put, del } from "@vercel/blob"
-import { createClient } from "@/lib/supabase/server"
+import { createDatabaseClient } from "@/lib/database/database-adapter"
 import { getOrgContext } from "@/lib/auth/get-org-context"
 import { encryptFileForOrg, getOrgPrefixedPath, isEncryptionEnabled } from "@/lib/encryption"
 import { getCachedAuthUser, createRateLimitResponse, createUnauthorizedResponse } from "@/lib/auth/cached-auth"
 
 export async function POST(request: NextRequest) {
   try {
-    const supabase = await createClient()
-    const authResult = await getCachedAuthUser(supabase)
+    await createDatabaseClient()
+    const authResult = await getCachedAuthUser()
 
     if (authResult.rateLimited) {
       return createRateLimitResponse()
@@ -38,7 +38,7 @@ export async function POST(request: NextRequest) {
 
     const formData = await request.formData()
     const file = formData.get("file") as File
-    const type = formData.get("type") as string // "avatar", "attachment", "media"
+    formData.get("type") // "avatar", "attachment", "media"
 
     if (!file) {
       return NextResponse.json({ error: "No file provided" }, { status: 400 })
@@ -103,8 +103,8 @@ export async function POST(request: NextRequest) {
 
 export async function DELETE(request: NextRequest) {
   try {
-    const supabase = await createClient()
-    const authResult = await getCachedAuthUser(supabase)
+    await createDatabaseClient()
+    const authResult = await getCachedAuthUser()
 
     if (authResult.rateLimited) {
       return createRateLimitResponse()

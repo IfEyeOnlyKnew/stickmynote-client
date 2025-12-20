@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server"
-import { createServiceClient } from "@/lib/supabase/server"
+import { createServiceDatabaseClient } from "@/lib/database/database-adapter"
 import { isDiagnosticAccessible } from "@/lib/is-production"
 
 export async function GET() {
@@ -9,29 +9,28 @@ export async function GET() {
 
   const startedAt = Date.now()
   try {
-    const supabase = createServiceClient()
+    const db = await createServiceDatabaseClient()
 
-    const results: Record<string, { ok: boolean; status?: number; error?: string }> = {}
+    const results: Record<string, { ok: boolean; count?: number; error?: string }> = {}
 
     try {
-      const notes = await supabase.from("notes").select("id", { head: true, count: "exact" })
-      results.notes = { ok: !notes.error, status: notes.status, error: notes.error?.message }
+      const notes = await db.from("notes").select("id", { head: true, count: "exact" })
+      results.notes = { ok: !notes.error, count: notes.count ?? undefined, error: notes.error?.message }
     } catch (e) {
       results.notes = { ok: false, error: e instanceof Error ? e.message : String(e) }
     }
 
     try {
-      const tabs = await supabase.from("note_tabs").select("id", { head: true, count: "exact" })
-      results.note_tabs = { ok: !tabs.error, status: tabs.status, error: tabs.error?.message }
+      const tabs = await db.from("note_tabs").select("id", { head: true, count: "exact" })
+      results.note_tabs = { ok: !tabs.error, count: tabs.count ?? undefined, error: tabs.error?.message }
     } catch (e) {
       results.note_tabs = { ok: false, error: e instanceof Error ? e.message : String(e) }
     }
 
-    const connectivityOk = Object.values(results).some((r) => typeof r.status === "number")
-    const allOk = connectivityOk
+    const connectivityOk = Object.values(results).every((r) => r.ok)
 
     return NextResponse.json({
-      ok: allOk,
+      ok: connectivityOk,
       connectivityOk,
       results,
       tookMs: Date.now() - startedAt,

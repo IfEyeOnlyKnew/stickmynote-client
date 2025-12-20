@@ -1,18 +1,18 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { createSupabaseServer } from "@/lib/supabase-server"
+import { createServiceDatabaseClient } from "@/lib/database/database-adapter"
 import { getCachedAuthUser } from "@/lib/auth/cached-auth"
 
 export async function GET(request: NextRequest) {
   try {
     console.log("[v0] Saved emails API - GET request started")
-    const supabase = await createSupabaseServer()
+    const db = await createServiceDatabaseClient()
 
-    if (!supabase || !supabase.auth) {
-      console.error("[v0] Saved emails API - Supabase client not properly initialized")
+    if (!db) {
+      console.error("[v0] Saved emails API - Database client not properly initialized")
       return NextResponse.json({ error: "Server configuration error" }, { status: 500 })
     }
 
-    const authResult = await getCachedAuthUser(supabase)
+    const authResult = await getCachedAuthUser()
     if (authResult.rateLimited) {
       return NextResponse.json(
         { error: "Rate limit exceeded. Please try again in a moment." },
@@ -33,7 +33,7 @@ export async function GET(request: NextRequest) {
     const actualTeamId = teamId === "global-multipaks" ? null : teamId
     console.log("[v0] Saved emails API - Team ID:", teamId, "-> Actual team ID:", actualTeamId)
 
-    let query = supabase
+    let query = db
       .from("saved_emails")
       .select("*")
       .eq("user_id", user.id)
@@ -73,14 +73,14 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     console.log("[v0] Saved emails API - POST request started")
-    const supabase = await createSupabaseServer()
+    const db = await createServiceDatabaseClient()
 
-    if (!supabase || !supabase.auth) {
-      console.error("[v0] Saved emails API - Supabase client not properly initialized")
+    if (!db) {
+      console.error("[v0] Saved emails API - Database client not properly initialized")
       return NextResponse.json({ error: "Server configuration error" }, { status: 500 })
     }
 
-    const authResult = await getCachedAuthUser(supabase)
+    const authResult = await getCachedAuthUser()
     if (authResult.rateLimited) {
       return NextResponse.json(
         { error: "Rate limit exceeded. Please try again in a moment." },
@@ -148,7 +148,7 @@ export async function POST(request: NextRequest) {
     console.log("[v0] Saved emails API - Inserting", emailsToInsert.length, "emails into database")
 
     const teamCondition = emailsToInsert[0].team_id
-    const existingEmailsQuery = supabase
+    const existingEmailsQuery = db
       .from("saved_emails")
       .select("email")
       .eq("user_id", user.id)
@@ -182,7 +182,7 @@ export async function POST(request: NextRequest) {
       })
     }
 
-    const { data: insertedEmails, error: insertError } = await supabase.from("saved_emails").insert(newEmails).select()
+    const { data: insertedEmails, error: insertError } = await db.from("saved_emails").insert(newEmails).select()
 
     if (insertError) {
       console.error("[v0] Saved emails API - Database error saving emails:", insertError)
@@ -205,14 +205,14 @@ export async function POST(request: NextRequest) {
 export async function DELETE(request: NextRequest) {
   try {
     console.log("[v0] Saved emails API - DELETE request started")
-    const supabase = await createSupabaseServer()
+    const db = await createServiceDatabaseClient()
 
-    if (!supabase || !supabase.auth) {
-      console.error("[v0] Saved emails API - Supabase client not properly initialized")
+    if (!db) {
+      console.error("[v0] Saved emails API - Database client not properly initialized")
       return NextResponse.json({ error: "Server configuration error" }, { status: 500 })
     }
 
-    const authResult = await getCachedAuthUser(supabase)
+    const authResult = await getCachedAuthUser()
     if (authResult.rateLimited) {
       return NextResponse.json(
         { error: "Rate limit exceeded. Please try again in a moment." },
@@ -233,7 +233,7 @@ export async function DELETE(request: NextRequest) {
       return NextResponse.json({ error: "Email ID or email address required" }, { status: 400 })
     }
 
-    let query = supabase.from("saved_emails").delete().eq("user_id", user.id)
+    let query = db.from("saved_emails").delete().eq("user_id", user.id)
 
     if (emailId) {
       query = query.eq("id", emailId)

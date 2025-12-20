@@ -9,37 +9,13 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
   })
 
   /*
-  try {
-    const supabase = await createClient()
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
-
-    if (!user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
-    }
-
-    const noteId = params.id
-
-    // Track view in personal_sticks_activities table
-    const { error } = await supabase.from("personal_sticks_activities").insert({
-      note_id: noteId,
-      user_id: user.id,
-      activity_type: "view",
-      metadata: {
-        viewed_at: new Date().toISOString(),
-      },
-    })
-
-    if (error) {
-      console.error("Error tracking view:", error)
-      return NextResponse.json({ error: "Failed to track view" }, { status: 500 })
-    }
-
-    return NextResponse.json({ success: true })
-  } catch (error) {
-    console.error("Error in view tracking:", error)
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 })
-  }
+  // NOTE: If re-enabling, use local auth and PostgreSQL:
+  // import { getSession } from "@/lib/auth/session"
+  // import { createDatabaseClient } from "@/lib/database/database-adapter"
+  //
+  // const session = await getSession()
+  // if (!session?.user) { return Response.json({ error: "Unauthorized" }, { status: 401 }) }
+  // const db = await createDatabaseClient()
+  // const { error } = await db.from("personal_sticks_activities").insert({...})
   */
 }

@@ -1,4 +1,4 @@
-import { createClient } from "@/lib/supabase/server"
+import { createDatabaseClient } from "@/lib/database/database-adapter"
 import { NextResponse } from "next/server"
 import { getCachedAuthUser } from "@/lib/auth/cached-auth"
 
@@ -7,8 +7,8 @@ export async function POST(req: Request, { params }: { params: Promise<{ qaId: s
     const { qaId } = await params
     const { was_helpful, feedback_text } = await req.json()
 
-    const supabase = await createClient()
-    const authResult = await getCachedAuthUser(supabase)
+    const db = await createDatabaseClient()
+    const authResult = await getCachedAuthUser()
     if (authResult.rateLimited) {
       return new NextResponse(JSON.stringify({ error: "Rate limited" }), {
         status: 429,
@@ -21,7 +21,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ qaId: s
     const user = authResult.user
 
     // Update the Q&A record with feedback
-    const { error } = await supabase
+    const { error } = await db
       .from("social_qa_history")
       .update({
         was_helpful,

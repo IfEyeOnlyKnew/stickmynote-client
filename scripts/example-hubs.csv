@@ -1,0 +1,5 @@
+Name,HubType,HubEmail,OwnerEmail,Description,AccessMode,IsPublic
+"Engineering Team",organization,engineering@stickmynote.com,chris.doran@mangoint.com,"Central hub for engineering team collaboration",individual_sticks,false
+"Marketing Team",organization,marketing@stickmynote.com,chris.doran@mangoint.com,"Marketing team announcements and resources",individual_sticks,false
+"HR Department",organization,hr@stickmynote.com,chris.doran@mangoint.com,"HR policies and employee resources",all_sticks,false
+"IT Support",organization,it@stickmynote.com,chris.doran@mangoint.com,"IT support tickets and documentation",individual_sticks,false

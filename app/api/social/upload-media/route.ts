@@ -1,5 +1,5 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { createClient } from "@/lib/supabase/server"
+import { createDatabaseClient } from "@/lib/database/database-adapter"
 import { getCachedAuthUser } from "@/lib/auth/cached-auth"
 
 let put: any
@@ -10,6 +10,7 @@ const initializeModules = async () => {
     const blobModule = await import("@vercel/blob")
     put = blobModule.put
   } catch (error) {
+    console.error("[upload-media] Blob module load error:", error)
     console.warn("[v0] @vercel/blob not available")
     put = async () => ({ url: "", pathname: "" })
   }
@@ -18,6 +19,7 @@ const initializeModules = async () => {
     const sharpModule = await import("sharp")
     sharp = sharpModule.default
   } catch (error) {
+    console.error("[upload-media] Sharp module load error:", error)
     console.warn("[v0] sharp not available, image optimization disabled")
     sharp = null
   }
@@ -69,9 +71,9 @@ export async function POST(request: NextRequest) {
   await initializeModules()
 
   try {
-    const supabase = await createClient()
+    await createDatabaseClient()
 
-    const { user, error: authError, rateLimited } = await getCachedAuthUser(supabase)
+    const { user, error: authError, rateLimited } = await getCachedAuthUser()
 
     if (rateLimited) {
       return NextResponse.json({ error: "Too many requests" }, { status: 429 })
