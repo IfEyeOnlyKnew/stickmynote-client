@@ -9,7 +9,8 @@ import { handleApiError } from '@/lib/api/handle-api-error'
 export const dynamic = 'force-dynamic'
 
 // PATCH /api/v2/calsticks/[id] - Update a calstick
-export async function PATCH(request: NextRequest, { params }: { params: { id: string } }) {
+export async function PATCH(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params
   try {
     const authResult = await getCachedAuthUser()
 
@@ -32,7 +33,6 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
     }
 
     const body = await request.json()
-    const { id } = params
 
     // Build dynamic update query
     const updates: string[] = []

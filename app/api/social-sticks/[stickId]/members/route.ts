@@ -135,8 +135,9 @@ async function inviteNewUser(email: string, stickTopic: string, padName: string,
   }
 }
 
-export async function GET(request: Request, { params }: { params: { stickId: string } }) {
+export async function GET(request: Request, { params }: { params: Promise<{ stickId: string }> }) {
   try {
+    const { stickId } = await params
     const db = await createDatabaseClient()
     const auth = await validateAuth()
     if (auth.error) return auth.error
@@ -144,7 +145,7 @@ export async function GET(request: Request, { params }: { params: { stickId: str
     const { data: members, error } = await db
       .from("social_stick_members")
       .select("*")
-      .eq("social_stick_id", params.stickId)
+      .eq("social_stick_id", stickId)
       .order("granted_at", { ascending: false })
 
     if (error) throw error
@@ -175,7 +176,7 @@ export async function GET(request: Request, { params }: { params: { stickId: str
   }
 }
 
-export async function POST(request: Request, { params }: { params: { stickId: string } }) {
+export async function POST(request: Request, { params }: { params: Promise<{ stickId: string }> }) {
   try {
     const db = await createDatabaseClient()
     const auth = await validateAuth()
@@ -188,17 +189,30 @@ export async function POST(request: Request, { params }: { params: { stickId: st
       return NextResponse.json({ error: "Email is required" }, { status: 400 })
     }
 
+    const { stickId } = await params
+
     const { data: stick } = await db
       .from("social_sticks")
-      .select("social_pad_id, topic, social_pads!inner(owner_id, name)")
-      .eq("id", params.stickId)
+      .select("social_pad_id, topic")
+      .eq("id", stickId)
       .maybeSingle()
 
     if (!stick) {
       return NextResponse.json({ error: "Stick not found" }, { status: 404 })
     }
 
-    const isOwner = (stick.social_pads as any).owner_id === user.id
+    // Fetch pad owner and name separately
+    const { data: pad } = await db
+      .from("social_pads")
+      .select("owner_id, name")
+      .eq("id", stick.social_pad_id)
+      .maybeSingle()
+
+    if (!pad) {
+      return NextResponse.json({ error: "Pad not found" }, { status: 404 })
+    }
+
+    const isOwner = pad.owner_id === user.id
     const { data: padMember } = await db
       .from("social_pad_members")
       .select("role")
@@ -221,14 +235,14 @@ export async function POST(request: Request, { params }: { params: { stickId: st
       return NextResponse.json({ error: "Failed to look up user" }, { status: 500 })
     }
 
-    const padName = (stick.social_pads as any).name
+    const padName = pad.name
     const stickTopic = stick.topic
 
     if (targetUser) {
-      return addExistingUserToStick(db, params.stickId, targetUser, user.id, email, stickTopic, padName)
+      return addExistingUserToStick(db, stickId, targetUser, user.id, email, stickTopic, padName)
     }
 
-    return inviteNewUser(email, stickTopic, padName, params.stickId)
+    return inviteNewUser(email, stickTopic, padName, stickId)
   } catch (error) {
     console.error("Error adding stick member:", error)
     return NextResponse.json({ error: "Failed to add stick member" }, { status: 500 })

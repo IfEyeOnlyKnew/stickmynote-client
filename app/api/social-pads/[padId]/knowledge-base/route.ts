@@ -18,10 +18,10 @@ async function attachAuthorToArticle(
 }
 
 // GET: Fetch all KB articles for a pad
-export async function GET(request: NextRequest, { params }: { params: { padId: string } }) {
+export async function GET(request: NextRequest, { params }: { params: Promise<{ padId: string }> }) {
   try {
+    const { padId } = await params
     const db = await createDatabaseClient()
-    const { padId } = params
 
     const authResult = await getCachedAuthUser()
     if (authResult.rateLimited) {
@@ -59,10 +59,10 @@ export async function GET(request: NextRequest, { params }: { params: { padId: s
 }
 
 // POST: Create a new KB article
-export async function POST(request: NextRequest, { params }: { params: { padId: string } }) {
+export async function POST(request: NextRequest, { params }: { params: Promise<{ padId: string }> }) {
   try {
+    const { padId } = await params
     const db = await createDatabaseClient()
-    const { padId } = params
 
     const authResult = await getCachedAuthUser()
     if (authResult.rateLimited) {
@@ -115,10 +115,10 @@ export async function POST(request: NextRequest, { params }: { params: { padId: 
 }
 
 // PATCH: Update a KB article
-export async function PATCH(request: NextRequest, { params }: { params: { padId: string } }) {
+export async function PATCH(request: NextRequest, { params }: { params: Promise<{ padId: string }> }) {
   try {
+    const { padId } = await params
     const db = await createDatabaseClient()
-    const { padId } = params
 
     const authResult = await getCachedAuthUser()
     if (authResult.rateLimited) {
@@ -173,10 +173,10 @@ export async function PATCH(request: NextRequest, { params }: { params: { padId:
 }
 
 // DELETE: Delete a KB article
-export async function DELETE(request: NextRequest, { params }: { params: { padId: string } }) {
+export async function DELETE(request: NextRequest, { params }: { params: Promise<{ padId: string }> }) {
   try {
+    const { padId } = await params
     const db = await createDatabaseClient()
-    const { padId } = params
 
     const authResult = await getCachedAuthUser()
     if (authResult.rateLimited) {

@@ -109,8 +109,13 @@ async function fetchUserMemberships(
  * Get the user's currently selected org_id from cookie or default to personal org
  */
 export async function getCurrentOrgId(): Promise<string | undefined> {
-  const cookieStore = cookies()
-  return cookieStore.get(CURRENT_ORG_COOKIE)?.value ?? undefined
+  try {
+    const cookieStore = await cookies()
+    return cookieStore.get(CURRENT_ORG_COOKIE)?.value ?? undefined
+  } catch (error) {
+    console.error("[SERVER] getCurrentOrgId: Error reading cookies:", error)
+    return undefined
+  }
 }
 
 /**

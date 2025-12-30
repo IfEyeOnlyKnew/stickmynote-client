@@ -3,8 +3,9 @@ import { type NextRequest, NextResponse } from "next/server"
 import { createDatabaseClient, createServiceDatabaseClient } from "@/lib/database/database-adapter"
 
 // GET /api/organizations/[orgId]/contacts - Get support contacts
-export async function GET(request: NextRequest, { params }: { params: { orgId: string } }) {
+export async function GET(request: NextRequest, { params }: { params: Promise<{ orgId: string }> }) {
   try {
+    const { orgId } = await params
     const db = await createDatabaseClient()
     const authResult = await getCachedAuthUser()
 
@@ -18,8 +19,6 @@ export async function GET(request: NextRequest, { params }: { params: { orgId: s
     if (!authResult.user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
-
-    const { orgId } = params
 
     // Anyone can view contact info if they need to request access
     const { data: org, error } = await db
@@ -58,8 +57,9 @@ export async function GET(request: NextRequest, { params }: { params: { orgId: s
 }
 
 // PATCH /api/organizations/[orgId]/contacts - Update support contacts
-export async function PATCH(request: NextRequest, { params }: { params: { orgId: string } }) {
+export async function PATCH(request: NextRequest, { params }: { params: Promise<{ orgId: string }> }) {
   try {
+    const { orgId } = await params
     const db = await createDatabaseClient()
     const serviceDb = await createServiceDatabaseClient()
     const authResult = await getCachedAuthUser()
@@ -76,7 +76,6 @@ export async function PATCH(request: NextRequest, { params }: { params: { orgId:
     }
 
     const user = authResult.user
-    const { orgId } = params
     const body = await request.json()
     const { contact1, contact2 } = body
 

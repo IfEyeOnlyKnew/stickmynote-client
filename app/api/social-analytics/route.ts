@@ -218,14 +218,14 @@ export async function GET() {
 
     const { data: allMemberPads } = await db
       .from("social_pad_members")
-      .select("social_pad_id, social_pads(is_public)")
+      .select("social_pad_id")
       .eq("user_id", authResult.user.id)
       .eq("accepted", true)
       .eq("org_id", orgContext.orgId)
 
     const ownedPadIds = new Set(ownedPads?.map((p) => p.id) || [])
-    const memberPads = allMemberPads?.filter((m) => !ownedPadIds.has(m.social_pad_id)) || []
-    const uniquePadIds = new Set([...(ownedPads?.map((p) => p.id) || []), ...(memberPads?.map((m) => m.social_pad_id) || [])])
+    const memberPads = allMemberPads?.filter((m: any) => !ownedPadIds.has(m.social_pad_id)) || []
+    const uniquePadIds = new Set([...(ownedPads?.map((p) => p.id) || []), ...(memberPads?.map((m: any) => m.social_pad_id) || [])])
     const padIds = Array.from(uniquePadIds)
 
     if (padIds.length === 0) {
@@ -238,12 +238,28 @@ export async function GET() {
 
     const { data: sticks } = await db
       .from("social_sticks")
-      .select(`id, social_pad_id, topic, content, created_at, user_id, social_pads(name)`)
+      .select("id, social_pad_id, topic, content, created_at, user_id")
       .in("social_pad_id", padIds)
       .eq("org_id", orgContext.orgId)
       .order("created_at", { ascending: false })
 
-    const sticksData = (sticks || []) as StickData[]
+    // Fetch pad names separately
+    let padNameMap = new Map<string, string>()
+    if (padIds.length > 0) {
+      const { data: pads } = await db
+        .from("social_pads")
+        .select("id, name")
+        .in("id", padIds)
+      for (const p of pads || []) {
+        padNameMap.set(p.id, p.name)
+      }
+    }
+
+    // Attach pad names to sticks
+    const sticksData = ((sticks || []) as any[]).map((s) => ({
+      ...s,
+      social_pads: s.social_pad_id ? { name: padNameMap.get(s.social_pad_id) } : null,
+    })) as StickData[]
     const totalSticks = sticksData.length
     const stickIds = sticksData.map((s) => s.id)
 

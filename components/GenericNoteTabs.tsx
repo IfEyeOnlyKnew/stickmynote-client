@@ -1,5 +1,6 @@
 "use client"
 import { useState, useEffect, useMemo } from "react"
+import dynamic from "next/dynamic"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Badge } from "@/components/ui/badge"
 import { Play, ImageIcon, FileText } from "lucide-react"
@@ -13,7 +14,12 @@ import { useFileUpload } from "@/hooks/use-file-upload"
 import { NoteContentEditor } from "@/components/note-tabs/NoteContentEditor"
 import { VideoTabContent } from "@/components/note-tabs/VideoTabContent"
 import { ImageTabContent } from "@/components/note-tabs/ImageTabContent"
-import { DetailsTabContent } from "@/components/note-tabs/DetailsTabContent"
+
+// DetailsTabContent uses Tiptap which requires client-side only rendering
+const DetailsTabContent = dynamic(
+  () => import("@/components/note-tabs/DetailsTabContent").then((mod) => mod.DetailsTabContent),
+  { ssr: false }
+)
 
 interface GenericNoteTabsProps {
   noteId: string

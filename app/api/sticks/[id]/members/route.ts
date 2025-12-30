@@ -2,8 +2,9 @@ import { getCachedAuthUser, createRateLimitResponse, createUnauthorizedResponse 
 import { createDatabaseClient } from "@/lib/database/database-adapter"
 import { type NextRequest, NextResponse } from "next/server"
 
-export async function POST(request: NextRequest, { params }: { params: { id: string } }) {
+export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
+    const { id: stickId } = await params
     const db = await createDatabaseClient()
     const authResult = await getCachedAuthUser()
 
@@ -16,8 +17,6 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
     }
 
     const user = authResult.user
-
-    const stickId = params.id
     const body = await request.json()
     const { email, role = "viewer" } = body
 
@@ -106,8 +105,9 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
   }
 }
 
-export async function DELETE(request: NextRequest, { params }: { params: { id: string } }) {
+export async function DELETE(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
+    const { id: stickId } = await params
     const db = await createDatabaseClient()
     const authResult = await getCachedAuthUser()
 
@@ -120,8 +120,6 @@ export async function DELETE(request: NextRequest, { params }: { params: { id: s
     }
 
     const user = authResult.user
-
-    const stickId = params.id
     const { searchParams } = new URL(request.url)
     const userId = searchParams.get("userId")
 
@@ -153,8 +151,9 @@ export async function DELETE(request: NextRequest, { params }: { params: { id: s
   }
 }
 
-export async function GET(request: NextRequest, { params }: { params: { id: string } }) {
+export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
+    const { id: stickId } = await params
     const db = await createDatabaseClient()
     const authResult = await getCachedAuthUser()
 
@@ -165,8 +164,6 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
     if (!authResult.user) {
       return createUnauthorizedResponse()
     }
-
-    const stickId = params.id
 
     const { data: members, error } = await db
       .from("paks_pad_stick_members")

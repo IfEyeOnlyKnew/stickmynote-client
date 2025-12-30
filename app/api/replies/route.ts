@@ -54,10 +54,7 @@ export async function GET(request: NextRequest) {
 
     const { data: replies, error } = await db
       .from("personal_sticks_replies")
-      .select(`
-        *,
-        user:users(username, email)
-      `)
+      .select("*")
       .eq("personal_stick_id", noteId)
       .eq("org_id", orgContext.orgId)
       .order("created_at", { ascending: true })
@@ -67,7 +64,24 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "Failed to fetch replies" }, { status: 500 })
     }
 
-    return NextResponse.json({ replies })
+    // Fetch user data separately
+    const userIds = [...new Set((replies || []).map((r: any) => r.user_id).filter(Boolean))]
+    let userMap: Record<string, { username?: string; email?: string }> = {}
+    if (userIds.length > 0) {
+      const { data: users } = await db
+        .from("users")
+        .select("id, username, email")
+        .in("id", userIds)
+      if (users) {
+        userMap = Object.fromEntries(users.map((u: any) => [u.id, { username: u.username, email: u.email }]))
+      }
+    }
+    const repliesWithUsers = (replies || []).map((reply: any) => ({
+      ...reply,
+      user: userMap[reply.user_id] || null,
+    }))
+
+    return NextResponse.json({ replies: repliesWithUsers })
   } catch (error) {
     console.error("Unexpected error in GET /api/replies:", error)
     return NextResponse.json({ error: "Internal server error" }, { status: 500 })

@@ -48,9 +48,28 @@ const REPLY_SELECT_FIELDS = `
   is_calstick,
   calstick_date,
   calstick_completed,
-  calstick_completed_at,
-  user:users(username, email, full_name)
+  calstick_completed_at
 `
+
+// Helper to attach user data to replies
+async function attachUsersToReplies(db: DatabaseClient, replies: any[]) {
+  if (!replies.length) return replies
+
+  const userIds = [...new Set(replies.map((r: any) => r.user_id).filter(Boolean))]
+  if (userIds.length === 0) return replies.map(r => ({ ...r, user: null }))
+
+  const { data: users } = await db
+    .from("users")
+    .select("id, username, email, full_name")
+    .in("id", userIds)
+
+  const userMap = Object.fromEntries((users || []).map((u: any) => [u.id, u]))
+
+  return replies.map((r: any) => ({
+    ...r,
+    user: userMap[r.user_id] || null,
+  }))
+}
 
 // Helper functions
 async function safeGetOrgContext(userId: string): Promise<OrgContext | { rateLimited: true } | null> {
@@ -196,13 +215,13 @@ function handleRateLimitError(error: unknown): NextResponse | null {
 }
 
 // Route handlers
-export async function GET(request: NextRequest, { params }: { params: { id: string } }) {
+export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
+    const { id: stickId } = await params
     const auth = await getAuthenticatedContext()
     if (auth.response) return auth.response
 
     const { user, orgContext } = auth
-    const stickId = params.id
     const db = await createServiceDatabaseClient()
 
     const stick = await fetchStick(db, stickId, orgContext!.orgId)
@@ -227,7 +246,10 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
       return NextResponse.json({ error: "Failed to fetch replies" }, { status: 500 })
     }
 
-    return NextResponse.json({ replies: replies || [] })
+    // Attach user data to replies
+    const repliesWithUsers = await attachUsersToReplies(db, replies || [])
+
+    return NextResponse.json({ replies: repliesWithUsers })
   } catch (error) {
     const rateLimitResponse = handleRateLimitError(error)
     if (rateLimitResponse) return rateLimitResponse
@@ -237,13 +259,13 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
   }
 }
 
-export async function POST(request: NextRequest, { params }: { params: { id: string } }) {
+export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
+    const { id: stickId } = await params
     const auth = await getAuthenticatedContext()
     if (auth.response) return auth.response
 
     const { user, orgContext } = auth
-    const stickId = params.id
 
     const body: ReplyInput = await request.json()
     const {
@@ -296,7 +318,10 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
       return NextResponse.json({ error: "Failed to create reply" }, { status: 500 })
     }
 
-    return NextResponse.json({ reply })
+    // Attach user data to the reply
+    const [replyWithUser] = await attachUsersToReplies(db, [reply])
+
+    return NextResponse.json({ reply: replyWithUser })
   } catch (error) {
     const rateLimitResponse = handleRateLimitError(error)
     if (rateLimitResponse) return rateLimitResponse
@@ -306,8 +331,9 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
   }
 }
 
-export async function PUT(request: NextRequest, { params }: { params: { id: string } }) {
+export async function PUT(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
+    const { id: stickId } = await params
     const auth = await getAuthenticatedContext()
     if (auth.response) return auth.response
 
@@ -356,7 +382,10 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
       return NextResponse.json({ error: "Failed to update reply" }, { status: 500 })
     }
 
-    return NextResponse.json({ reply })
+    // Attach user data to the reply
+    const [replyWithUser] = await attachUsersToReplies(db, [reply])
+
+    return NextResponse.json({ reply: replyWithUser })
   } catch (error) {
     const rateLimitResponse = handleRateLimitError(error)
     if (rateLimitResponse) return rateLimitResponse
@@ -366,13 +395,13 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
   }
 }
 
-export async function DELETE(request: NextRequest, { params }: { params: { id: string } }) {
+export async function DELETE(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
+    const { id: stickId } = await params
     const auth = await getAuthenticatedContext()
     if (auth.response) return auth.response
 
     const { user, orgContext } = auth
-    const stickId = params.id
 
     const body: DeleteReplyInput = await request.json()
     const { replyId } = body

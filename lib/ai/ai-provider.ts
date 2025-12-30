@@ -1,0 +1,315 @@
+/**
+ * AI Provider Configuration
+ *
+ * This module provides a unified interface for AI text generation that supports
+ * multiple providers. Use Azure OpenAI for enterprise privacy - your data stays
+ * within your Azure tenant and is not used for model training.
+ *
+ * Supported providers:
+ * - ollama: Local Ollama models (Maximum privacy - runs on your own hardware)
+ * - azure: Azure OpenAI Service (Enterprise, private, data stays in your tenant)
+ * - anthropic: Anthropic Claude (High-quality, safety-focused)
+ * - xai: xAI Grok (External API)
+ *
+ * Priority order:
+ * 1. Ollama (if configured) - Maximum privacy, runs locally
+ * 2. Azure OpenAI (if configured) - Recommended for enterprise/privacy
+ * 3. Anthropic Claude (if configured)
+ * 4. xAI Grok (fallback)
+ */
+
+import { generateText as aiGenerateText } from "ai"
+import { createAzure } from "@ai-sdk/azure"
+import { createAnthropic } from "@ai-sdk/anthropic"
+import { createOllama } from "ai-sdk-ollama"
+
+export type AIProvider = "ollama" | "azure" | "anthropic" | "xai" | "auto"
+
+interface AIProviderConfig {
+  provider: AIProvider
+  ollama?: {
+    /** Ollama server URL (default: http://localhost:11434) */
+    baseURL: string
+    /** Model to use (e.g., llama3.2, mistral, codellama) */
+    model: string
+  }
+  azure?: {
+    resourceName: string
+    deploymentName: string
+    apiKey: string
+    apiVersion?: string
+    /** Custom endpoint URL for private endpoints (e.g., https://your-resource.openai.azure.com) */
+    endpoint?: string
+  }
+  anthropic?: {
+    apiKey: string
+    model?: string
+  }
+  xai?: {
+    apiKey: string
+    model?: string
+  }
+}
+
+/**
+ * Get the current AI provider configuration from environment variables
+ */
+export function getAIProviderConfig(): AIProviderConfig {
+  const preferredProvider = (process.env.AI_PROVIDER || "auto") as AIProvider
+
+  const config: AIProviderConfig = {
+    provider: preferredProvider,
+  }
+
+  // Ollama (local) configuration - maximum privacy
+  if (process.env.OLLAMA_BASE_URL || process.env.OLLAMA_MODEL) {
+    config.ollama = {
+      baseURL: process.env.OLLAMA_BASE_URL || "http://localhost:11434",
+      model: process.env.OLLAMA_MODEL || "llama3.2",
+    }
+  }
+
+  // Azure OpenAI configuration
+  if (process.env.AZURE_OPENAI_API_KEY && process.env.AZURE_OPENAI_RESOURCE_NAME) {
+    config.azure = {
+      resourceName: process.env.AZURE_OPENAI_RESOURCE_NAME,
+      deploymentName: process.env.AZURE_OPENAI_DEPLOYMENT_NAME || "gpt-4o",
+      apiKey: process.env.AZURE_OPENAI_API_KEY,
+      apiVersion: process.env.AZURE_OPENAI_API_VERSION || "2024-08-01-preview",
+      // Custom endpoint for private endpoints - overrides resourceName-based URL
+      endpoint: process.env.AZURE_OPENAI_ENDPOINT,
+    }
+  }
+
+  // Anthropic Claude configuration
+  if (process.env.ANTHROPIC_API_KEY) {
+    config.anthropic = {
+      apiKey: process.env.ANTHROPIC_API_KEY,
+      model: process.env.ANTHROPIC_MODEL || "claude-sonnet-4-20250514",
+    }
+  }
+
+  // xAI configuration
+  if (process.env.XAI_API_KEY) {
+    config.xai = {
+      apiKey: process.env.XAI_API_KEY,
+      model: process.env.XAI_MODEL || "xai/grok-3",
+    }
+  }
+
+  return config
+}
+
+/**
+ * Determine which provider to use based on configuration and availability
+ */
+export function getActiveProvider(): AIProvider {
+  const config = getAIProviderConfig()
+
+  if (config.provider === "ollama" && config.ollama) {
+    return "ollama"
+  }
+
+  if (config.provider === "azure" && config.azure) {
+    return "azure"
+  }
+
+  if (config.provider === "anthropic" && config.anthropic) {
+    return "anthropic"
+  }
+
+  if (config.provider === "xai" && config.xai) {
+    return "xai"
+  }
+
+  // Auto mode: prefer Ollama for maximum privacy, then Azure, Anthropic, fall back to xAI
+  if (config.provider === "auto") {
+    if (config.ollama) return "ollama"
+    if (config.azure) return "azure"
+    if (config.anthropic) return "anthropic"
+    if (config.xai) return "xai"
+  }
+
+  throw new Error("No AI provider configured. Set OLLAMA_MODEL, AZURE_OPENAI_API_KEY, ANTHROPIC_API_KEY, or XAI_API_KEY.")
+}
+
+/**
+ * Check if AI services are available
+ */
+export function isAIAvailable(): boolean {
+  const config = getAIProviderConfig()
+  return !!(config.ollama || config.azure || config.anthropic || config.xai)
+}
+
+/**
+ * Get provider display name for logging/UI
+ */
+export function getProviderDisplayName(): string {
+  const provider = getActiveProvider()
+  const config = getAIProviderConfig()
+  switch (provider) {
+    case "ollama":
+      return `Ollama (${config.ollama?.model || "local"})`
+    case "azure":
+      return "Azure OpenAI (Private)"
+    case "anthropic":
+      return "Anthropic Claude"
+    case "xai":
+      return "xAI Grok"
+    default:
+      return "Unknown"
+  }
+}
+
+interface GenerateTextOptions {
+  prompt: string
+  maxTokens?: number
+  temperature?: number
+  systemPrompt?: string
+}
+
+/**
+ * Generate text using the configured AI provider
+ *
+ * This function automatically selects the appropriate provider based on
+ * environment configuration. Ollama is preferred for maximum privacy
+ * as it runs entirely on your own hardware.
+ */
+export async function generateText(options: GenerateTextOptions): Promise<{ text: string; provider: AIProvider }> {
+  const config = getAIProviderConfig()
+  const provider = getActiveProvider()
+
+  if (provider === "ollama" && config.ollama) {
+    // Use dedicated Ollama provider for AI SDK 5 compatibility
+    const ollama = createOllama({
+      baseURL: config.ollama.baseURL,
+    })
+
+    const result = await aiGenerateText({
+      model: ollama(config.ollama.model),
+      prompt: options.prompt,
+      maxTokens: options.maxTokens,
+      temperature: options.temperature,
+      system: options.systemPrompt,
+    })
+
+    return { text: result.text, provider: "ollama" }
+  }
+
+  if (provider === "azure" && config.azure) {
+    // Build Azure configuration - supports custom endpoints for private endpoints
+    const azureConfig: Parameters<typeof createAzure>[0] = {
+      apiKey: config.azure.apiKey,
+    }
+
+    // If custom endpoint is provided (for private endpoints), use it
+    // Otherwise, use resourceName to build the standard Azure endpoint
+    if (config.azure.endpoint) {
+      azureConfig.baseURL = config.azure.endpoint
+    } else {
+      azureConfig.resourceName = config.azure.resourceName
+    }
+
+    const azure = createAzure(azureConfig)
+
+    const result = await aiGenerateText({
+      model: azure(config.azure.deploymentName),
+      prompt: options.prompt,
+      maxTokens: options.maxTokens,
+      temperature: options.temperature,
+      system: options.systemPrompt,
+    })
+
+    return { text: result.text, provider: "azure" }
+  }
+
+  if (provider === "anthropic" && config.anthropic) {
+    const anthropic = createAnthropic({
+      apiKey: config.anthropic.apiKey,
+    })
+
+    const result = await aiGenerateText({
+      model: anthropic(config.anthropic.model || "claude-sonnet-4-20250514"),
+      prompt: options.prompt,
+      maxTokens: options.maxTokens,
+      temperature: options.temperature,
+      system: options.systemPrompt,
+    })
+
+    return { text: result.text, provider: "anthropic" }
+  }
+
+  if (provider === "xai" && config.xai) {
+    const result = await aiGenerateText({
+      model: config.xai.model as any,
+      prompt: options.prompt,
+      maxTokens: options.maxTokens,
+      temperature: options.temperature,
+      system: options.systemPrompt,
+    })
+
+    return { text: result.text, provider: "xai" }
+  }
+
+  throw new Error("No AI provider available")
+}
+
+/**
+ * Generate tags for content using AI
+ */
+export async function generateTags(content: string, topic?: string): Promise<string[]> {
+  const prompt = `Analyze the following content and generate 3-5 relevant tags (single words or short phrases).
+
+Topic: ${topic || "N/A"}
+Content: ${content}
+
+Return ONLY a comma-separated list of tags, nothing else.`
+
+  const { text } = await generateText({ prompt, maxTokens: 100 })
+
+  return text
+    .split(",")
+    .map((tag) => tag.trim().toLowerCase())
+    .filter((tag) => tag.length > 0 && tag.length < 30)
+    .slice(0, 5)
+}
+
+/**
+ * Generate search queries for hyperlink generation
+ */
+export async function generateSearchQueries(content: string, fallbackTags: string[]): Promise<string[]> {
+  const prompt = `Based on the following note content, generate 3-5 specific search queries that would help find relevant, useful websites and resources. Focus on actionable, informative content rather than generic searches.
+
+Note content: "${content}"
+
+Return only a JSON array of search query strings, no additional text.
+
+Example response format: ["react hooks tutorial", "javascript best practices 2024", "web development tools"]`
+
+  try {
+    const { text } = await generateText({ prompt, maxTokens: 200 })
+
+    const parsed = JSON.parse(text.trim())
+    if (Array.isArray(parsed)) {
+      return parsed.filter((q) => typeof q === "string" && q.trim().length > 0).slice(0, 5)
+    }
+  } catch {
+    // Fall back to tag-based queries
+  }
+
+  return fallbackTags.map((tag) => `${tag} tutorial guide`)
+}
+
+/**
+ * Summarize content
+ */
+export async function summarizeContent(content: string, maxLength = 150): Promise<string> {
+  const prompt = `Summarize the following content in ${maxLength} characters or less:
+
+${content}
+
+Return ONLY the summary, nothing else.`
+
+  const { text } = await generateText({ prompt, maxTokens: 100 })
+  return text.trim().substring(0, maxLength)
+}

@@ -1,14 +1,20 @@
 "use client"
 
 import { useState, useEffect, memo } from "react"
+import dynamic from "next/dynamic"
 import { Button } from "@/components/ui/button"
 import { Download, Trash2, X, Save } from "lucide-react"
 import { toast } from "@/hooks/use-toast"
 import type { NoteTab } from "@/types/note"
 import type { StickTab } from "@/types/pad"
 import type { NoteTabsConfig } from "@/types/note-tabs-config"
-import { CollaborativeRichTextEditor } from "@/components/rich-text/CollaborativeRichTextEditor"
-import { CollaborativeRichTextModal } from "@/components/rich-text/CollaborativeRichTextModal"
+import { CollaborativeRichTextEditor } from "@/components/rich-text/CollaborativeRichTextEditorDynamic"
+
+// CollaborativeRichTextModal uses Tiptap which requires client-side only rendering
+const CollaborativeRichTextModal = dynamic(
+  () => import("@/components/rich-text/CollaborativeRichTextModal").then((mod) => mod.CollaborativeRichTextModal),
+  { ssr: false }
+)
 
 type TabWithData = NoteTab | StickTab
 

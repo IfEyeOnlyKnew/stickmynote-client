@@ -255,10 +255,12 @@ export function ListView({
                   )}
                 </button>
                 <span className={cs.calstick_completed ? "line-through text-gray-500" : ""}>
-                  {cs.stick?.topic || "Untitled Stick"}
+                  {cs.content || cs.stick?.topic || "Untitled Stick"}
                 </span>
               </CardTitle>
-              <p className="mt-1 text-sm text-muted-foreground">{cs.content}</p>
+              {cs.stick?.topic && cs.content && (
+                <p className="mt-1 text-sm text-muted-foreground">Topic: {cs.stick.topic}</p>
+              )}
               {progress && <TaskProgressIndicator progress={progress} compact />}
             </div>
             <div className="flex items-center gap-2 ml-2">

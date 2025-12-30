@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
+import dynamic from "next/dynamic"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -10,23 +11,22 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Calendar } from "@/components/ui/calendar"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { useEditor, EditorContent } from "@tiptap/react"
-import StarterKit from "@tiptap/starter-kit"
-import Link from "@tiptap/extension-link"
 import {
   CalendarIcon,
   Tag,
   Save,
   X,
-  Bold,
-  Italic,
-  List,
-  ListOrdered,
   Paperclip,
   Repeat,
   Bell,
   User,
 } from "lucide-react"
+
+// Dynamically import TiptapEditor with SSR disabled
+const TiptapEditor = dynamic(() => import("./TiptapEditor"), {
+  ssr: false,
+  loading: () => <div className="border rounded-lg p-4 min-h-[200px] bg-muted/20">Loading editor...</div>,
+})
 import { format, parseISO } from "date-fns"
 import type { CalStick } from "@/types/calstick"
 import { TaskTimer } from "@/components/calsticks/TaskTimer"
@@ -79,21 +79,7 @@ export function TaskDetailModal({ task, isOpen, onClose, onSave }: TaskDetailMod
   const [showReminderModal, setShowReminderModal] = useState(false)
   const [assigneeId, setAssigneeId] = useState<string | null>(null)
   const [members, setMembers] = useState<any[]>([])
-
-  const editor = useEditor({
-    extensions: [
-      StarterKit,
-      Link.configure({
-        openOnClick: false,
-      }),
-    ],
-    content: task?.calstick_description || "",
-    editorProps: {
-      attributes: {
-        class: "prose prose-sm max-w-none focus:outline-none min-h-[200px] p-4",
-      },
-    },
-  })
+  const [editorContent, setEditorContent] = useState("")
 
   useEffect(() => {
     if (!task) return
@@ -106,7 +92,7 @@ export function TaskDetailModal({ task, isOpen, onClose, onSave }: TaskDetailMod
     setEstimatedHours(task.calstick_estimated_hours?.toString() || "")
     setLabels(task.calstick_labels || [])
     setAssigneeId(task.calstick_assignee_id || null)
-    editor?.commands.setContent(task.calstick_description || "")
+    setEditorContent(task.calstick_description || "")
 
     if (task.id !== "new") {
       const checklistData = (task as any).calstick_checklist_items as ChecklistData | null
@@ -121,7 +107,7 @@ export function TaskDetailModal({ task, isOpen, onClose, onSave }: TaskDetailMod
       fetchMembers(task.stick.pad_id)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [task, editor])
+  }, [task])
 
   const fetchProgress = async () => {
     if (!task || task.id === "new") return
@@ -166,7 +152,7 @@ export function TaskDetailModal({ task, isOpen, onClose, onSave }: TaskDetailMod
             calstick_start_date: startDate?.toISOString(),
             calstick_estimated_hours: estimatedHours ? Number.parseFloat(estimatedHours) : undefined,
             calstick_labels: labels,
-            calstick_description: editor?.getHTML() || "",
+            calstick_description: editorContent,
             calstick_assignee_id: assigneeId,
           }),
         })
@@ -185,7 +171,7 @@ export function TaskDetailModal({ task, isOpen, onClose, onSave }: TaskDetailMod
           calstick_start_date: startDate?.toISOString(),
           calstick_estimated_hours: estimatedHours ? Number.parseFloat(estimatedHours) : undefined,
           calstick_labels: labels,
-          calstick_description: editor?.getHTML() || "",
+          calstick_description: editorContent,
           calstick_assignee_id: assigneeId,
         } as Partial<CalStick>)
       }
@@ -277,9 +263,19 @@ export function TaskDetailModal({ task, isOpen, onClose, onSave }: TaskDetailMod
 
             <TabsContent value="details" className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="title">Title</Label>
-                <Input id="title" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Task title" />
+                <Label htmlFor="topic">Topic</Label>
+                <Input id="topic" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Task topic" />
               </div>
+
+              {/* Reply content - read-only field showing the CalStick content */}
+              {task.content && (
+                <div className="space-y-2">
+                  <Label>Reply</Label>
+                  <div className="bg-muted/30 rounded-lg p-3 border text-sm whitespace-pre-wrap">
+                    {task.content}
+                  </div>
+                </div>
+              )}
 
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
@@ -417,43 +413,10 @@ export function TaskDetailModal({ task, isOpen, onClose, onSave }: TaskDetailMod
             </TabsContent>
 
             <TabsContent value="description" className="space-y-4">
-              <div className="border rounded-lg">
-                <div className="border-b p-2 flex gap-2 bg-muted/50">
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => editor?.chain().focus().toggleBold().run()}
-                    className={editor?.isActive("bold") ? "bg-muted" : ""}
-                  >
-                    <Bold className="h-4 w-4" />
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => editor?.chain().focus().toggleItalic().run()}
-                    className={editor?.isActive("italic") ? "bg-muted" : ""}
-                  >
-                    <Italic className="h-4 w-4" />
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => editor?.chain().focus().toggleBulletList().run()}
-                    className={editor?.isActive("bulletList") ? "bg-muted" : ""}
-                  >
-                    <List className="h-4 w-4" />
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => editor?.chain().focus().toggleOrderedList().run()}
-                    className={editor?.isActive("orderedList") ? "bg-muted" : ""}
-                  >
-                    <ListOrdered className="h-4 w-4" />
-                  </Button>
-                </div>
-                <EditorContent editor={editor} />
-              </div>
+              <TiptapEditor
+                content={editorContent}
+                onChange={setEditorContent}
+              />
             </TabsContent>
 
             {task.id !== "new" && (

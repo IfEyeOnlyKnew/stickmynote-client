@@ -71,11 +71,7 @@ const TIMEFRAME_MS: Record<Exclude<Timeframe, "all">, number> = {
   month: 30 * 24 * 60 * 60 * 1000,
 }
 
-const NOTES_SELECT_QUERY = `
-  *,
-  personal_sticks_replies (id),
-  personal_sticks_tags (id, tag_title)
-`
+const NOTES_SELECT_QUERY = `*`
 
 // Helper functions
 function escapeSearchTerm(term: string): string {
@@ -113,22 +109,70 @@ function buildUsersMap(users: UserInfo[] | null): Record<string, UserInfo> {
   )
 }
 
-function filterNotesByTags(notes: any[], tags: string[]): any[] {
+function filterNotesByTags(notes: any[], tags: string[], tagsMap: Record<string, string[]>): any[] {
   const lowerTags = tags.map((t) => t.toLowerCase())
   return notes.filter((note) => {
-    const noteTags = note.personal_sticks_tags?.map((t: any) => t.tag_title.toLowerCase()) || []
+    const noteTags = (tagsMap[note.id] || []).map((t: string) => t.toLowerCase())
     return lowerTags.some((tag) => noteTags.includes(tag))
   })
 }
 
-function enrichNotes(notes: any[], usersMap: Record<string, UserInfo>): EnrichedNote[] {
+async function fetchReplyCounts(db: DatabaseClient, noteIds: string[]): Promise<Record<string, number>> {
+  if (noteIds.length === 0) return {}
+
+  try {
+    const { data: replies } = await db
+      .from("personal_sticks_replies")
+      .select("personal_stick_id")
+      .in("personal_stick_id", noteIds)
+
+    const counts: Record<string, number> = {}
+    for (const reply of replies || []) {
+      counts[reply.personal_stick_id] = (counts[reply.personal_stick_id] || 0) + 1
+    }
+    return counts
+  } catch {
+    console.warn("Failed to fetch reply counts")
+    return {}
+  }
+}
+
+async function fetchTagsForNotes(db: DatabaseClient, noteIds: string[]): Promise<Record<string, string[]>> {
+  if (noteIds.length === 0) return {}
+
+  try {
+    const { data: tags } = await db
+      .from("personal_sticks_tags")
+      .select("personal_stick_id, tag_title")
+      .in("personal_stick_id", noteIds)
+
+    const tagsMap: Record<string, string[]> = {}
+    for (const tag of tags || []) {
+      if (!tagsMap[tag.personal_stick_id]) {
+        tagsMap[tag.personal_stick_id] = []
+      }
+      tagsMap[tag.personal_stick_id].push(tag.tag_title)
+    }
+    return tagsMap
+  } catch {
+    console.warn("Failed to fetch tags")
+    return {}
+  }
+}
+
+function enrichNotes(
+  notes: any[],
+  usersMap: Record<string, UserInfo>,
+  replyCountsMap: Record<string, number>,
+  tagsMap: Record<string, string[]>
+): EnrichedNote[] {
   return notes.map((note) => ({
     ...note,
     user: usersMap[note.user_id] || null,
-    reply_count: note.personal_sticks_replies?.length || 0,
+    reply_count: replyCountsMap[note.id] || 0,
     view_count: Math.floor(Math.random() * 100) + 10,
     like_count: Math.floor(Math.random() * 50),
-    tags: note.personal_sticks_tags?.map((t: any) => t.tag_title) || [],
+    tags: tagsMap[note.id] || [],
   }))
 }
 
@@ -278,16 +322,24 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Search failed", details: notesError.message }, { status: 500 })
     }
 
-    // Fetch user data and enrich notes
-    const usersMap = await fetchUsersForNotes(db, notes || [])
+    // Get note IDs for fetching related data
+    const noteIds = (notes || []).map((n: any) => n.id)
+
+    // Fetch user data, reply counts, and tags in parallel
+    const [usersMap, replyCountsMap, tagsMap] = await Promise.all([
+      fetchUsersForNotes(db, notes || []),
+      fetchReplyCounts(db, noteIds),
+      fetchTagsForNotes(db, noteIds),
+    ])
+
     let filteredNotes = notes || []
 
-    // Apply tag filter (client-side for joined data)
+    // Apply tag filter
     if (tags?.length) {
-      filteredNotes = filterNotesByTags(filteredNotes, tags)
+      filteredNotes = filterNotesByTags(filteredNotes, tags, tagsMap)
     }
 
-    const enrichedNotes = enrichNotes(filteredNotes, usersMap)
+    const enrichedNotes = enrichNotes(filteredNotes, usersMap, replyCountsMap, tagsMap)
     const totalCount = count || 0
     const hasMore = totalCount > offset + enrichedNotes.length
 

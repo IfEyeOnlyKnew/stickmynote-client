@@ -35,6 +35,13 @@ interface ImageInfo {
   height?: number
 }
 
+interface ExportLink {
+  url: string
+  filename: string
+  created_at: string
+  type: string
+}
+
 interface StickTabRow {
   id: string
   stick_id: string
@@ -48,6 +55,7 @@ interface StickTabRow {
     metadata?: Record<string, string | number | boolean>
     tags?: string[]
     links?: string[]
+    exports?: ExportLink[]
   } | null
   tab_order: number
   created_at: string
@@ -95,6 +103,7 @@ function normalizeTabData(input: any): {
   metadata?: Record<string, string | number | boolean>
   tags?: string[]
   links?: string[]
+  exports?: ExportLink[]
   [k: string]: any
 } {
   let obj: any = input
@@ -110,6 +119,7 @@ function normalizeTabData(input: any): {
   if (obj.images && !Array.isArray(obj.images)) obj.images = []
   if (obj.tags && !Array.isArray(obj.tags)) obj.tags = []
   if (obj.links && !Array.isArray(obj.links)) obj.links = []
+  if (obj.exports && !Array.isArray(obj.exports)) obj.exports = []
   return obj
 }
 

@@ -33,12 +33,9 @@ type StickWithPad = {
 const USER_SELECT_FIELDS = "id, full_name, username, email, avatar_url"
 const LOG_PREFIX = "[SocialStick]"
 
-const STICK_SELECT = `
-  *,
-  social_pads(id, name, owner_id)
-`
-
-const STICK_ACCESS_SELECT = "user_id, social_pad_id, social_pads(owner_id)"
+// Simple select without Supabase-style joins - fetch related data separately
+const STICK_SELECT = "*"
+const STICK_ACCESS_SELECT = "user_id, social_pad_id"
 
 // ============================================================================
 // Error Responses
@@ -124,21 +121,53 @@ async function fetchUserMap(db: any, userIds: string[]): Promise<Record<string, 
 // ============================================================================
 
 async function fetchStick(db: any, stickId: string, orgId: string) {
-  return db
+  const { data: stick, error } = await db
     .from("social_sticks")
     .select(STICK_SELECT)
     .eq("id", stickId)
     .eq("org_id", orgId)
     .maybeSingle()
+
+  if (error || !stick) {
+    return { data: stick, error }
+  }
+
+  // Fetch pad info separately
+  if (stick.social_pad_id) {
+    const { data: pad } = await db
+      .from("social_pads")
+      .select("id, name, owner_id")
+      .eq("id", stick.social_pad_id)
+      .maybeSingle()
+    stick.social_pads = pad
+  }
+
+  return { data: stick, error: null }
 }
 
 async function fetchStickForAccess(db: any, stickId: string, orgId: string) {
-  return db
+  const { data: stick, error } = await db
     .from("social_sticks")
     .select(STICK_ACCESS_SELECT)
     .eq("id", stickId)
     .eq("org_id", orgId)
     .maybeSingle()
+
+  if (error || !stick) {
+    return { data: stick, error }
+  }
+
+  // Fetch pad owner separately
+  if (stick.social_pad_id) {
+    const { data: pad } = await db
+      .from("social_pads")
+      .select("owner_id")
+      .eq("id", stick.social_pad_id)
+      .maybeSingle()
+    stick.social_pads = pad
+  }
+
+  return { data: stick, error: null }
 }
 
 async function fetchMembership(db: any, padId: string, userId: string, orgId: string) {
@@ -226,10 +255,10 @@ function canDeleteStick(
 // Route Handlers
 // ============================================================================
 
-export async function GET(request: Request, { params }: { params: { stickId: string } }) {
+export async function GET(request: Request, { params }: { params: Promise<{ stickId: string }> }) {
   try {
     const db = await createDatabaseClient()
-    const { stickId } = params
+    const { stickId } = await params
 
     // Auth check
     const authResult = await getAuthenticatedContext()
@@ -273,10 +302,10 @@ export async function GET(request: Request, { params }: { params: { stickId: str
   }
 }
 
-export async function PATCH(request: Request, { params }: { params: { stickId: string } }) {
+export async function PATCH(request: Request, { params }: { params: Promise<{ stickId: string }> }) {
   try {
     const db = await createDatabaseClient()
-    const { stickId } = params
+    const { stickId } = await params
 
     // Auth check
     const authResult = await getAuthenticatedContext()
@@ -319,10 +348,10 @@ export async function PATCH(request: Request, { params }: { params: { stickId: s
   }
 }
 
-export async function DELETE(request: Request, { params }: { params: { stickId: string } }) {
+export async function DELETE(request: Request, { params }: { params: Promise<{ stickId: string }> }) {
   try {
     const db = await createDatabaseClient()
-    const { stickId } = params
+    const { stickId } = await params
 
     // Auth check
     const authResult = await getAuthenticatedContext()

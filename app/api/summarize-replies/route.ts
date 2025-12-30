@@ -2,6 +2,7 @@ import { type NextRequest, NextResponse } from "next/server"
 import { createDatabaseClient, createServiceDatabaseClient } from "@/lib/database/database-adapter"
 import { applyRateLimit } from "@/lib/rate-limiter-enhanced"
 import { getCachedAuthUser } from "@/lib/auth/cached-auth"
+import { generateText, isAIAvailable } from "@/lib/ai/ai-provider"
 
 // ============================================================================
 // Dynamic Module Loading
@@ -64,7 +65,6 @@ interface SummarizeRequest {
   noteId: string
   tone?: string
   replies?: any[]
-  isTeamNote?: boolean
   generateDocx?: boolean
 }
 
@@ -101,7 +101,6 @@ const Errors = {
   ),
   noteIdRequired: () => NextResponse.json({ error: "Note ID is required" }, { status: 400 }),
   aiNotConfigured: () => NextResponse.json({ error: "AI service not configured" }, { status: 500 }),
-  fetchTeamRepliesFailed: () => NextResponse.json({ error: "Failed to fetch team note replies" }, { status: 500 }),
   fetchRepliesFailed: () => NextResponse.json({ error: "Failed to fetch replies" }, { status: 500 }),
   fetchUsersFailed: () => NextResponse.json({ error: "Failed to fetch user data" }, { status: 500 }),
   summaryFailed: () => NextResponse.json({ error: "Failed to generate summary" }, { status: 500 }),
@@ -141,22 +140,9 @@ function transformProvidedReplies(providedReplies: any[]): Reply[] {
     id: `reply-${index}`,
     content: reply.content,
     created_at: reply.created_at || new Date().toISOString(),
-    user_id: "team-user",
+    user_id: reply.user_id || "user",
     user: reply.user || "User",
   }))
-}
-
-async function fetchTeamNoteReplies(db: any, noteId: string): Promise<{ replies: Reply[] | null; error: any }> {
-  const { data, error } = await db
-    .from("team_note_replies")
-    .select(`
-      id, content, created_at, updated_at, user_id,
-      user:users(username, email)
-    `)
-    .eq("team_note_id", noteId)
-    .order("created_at", { ascending: true })
-
-  return { replies: data, error }
 }
 
 async function fetchPersonalReplies(db: any, noteId: string): Promise<{ replies: Reply[] | null; error: any }> {
@@ -192,8 +178,7 @@ type FetchRepliesResult =
 async function fetchReplies(
   db: any,
   noteId: string,
-  providedReplies: any[] | undefined,
-  isTeamNote: boolean | undefined
+  providedReplies: any[] | undefined
 ): Promise<FetchRepliesResult> {
   // Use provided replies if available
   if (providedReplies && Array.isArray(providedReplies)) {
@@ -202,15 +187,6 @@ async function fetchReplies(
       replies: transformProvidedReplies(providedReplies),
       userIds: [],
     }
-  }
-
-  // Fetch team note replies
-  if (isTeamNote) {
-    const { replies, error } = await fetchTeamNoteReplies(db, noteId)
-    if (error) {
-      return { success: false, response: Errors.fetchTeamRepliesFailed() }
-    }
-    return { success: true, replies: replies || [], userIds: [] }
   }
 
   // Fetch personal replies
@@ -228,37 +204,25 @@ async function fetchReplies(
 // ============================================================================
 
 async function generateAISummary(repliesText: string, tone: string): Promise<{ summary: string | null; error: boolean }> {
-  const response = await fetch("https://api.x.ai/v1/chat/completions", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${process.env.XAI_API_KEY}`,
-    },
-    body: JSON.stringify({
-      model: "grok-4",
-      messages: [
-        {
-          role: "user",
-          content: `${getTonePrompt(tone)}
+  try {
+    const prompt = `${getTonePrompt(tone)}
 
 Please summarize the following replies to a note:
 
 ${repliesText}
 
-Summary:`,
-        },
-      ],
-      max_tokens: 500,
-    }),
-  })
+Summary:`
 
-  if (!response.ok) {
+    const { text } = await generateText({
+      prompt,
+      maxTokens: 500,
+    })
+
+    return { summary: text || "Unable to generate summary", error: false }
+  } catch (error) {
+    console.error("[summarize-replies] AI generation error:", error)
     return { summary: null, error: true }
   }
-
-  const data = await response.json()
-  const summary = data.choices?.[0]?.message?.content || "Unable to generate summary"
-  return { summary, error: false }
 }
 
 // ============================================================================
@@ -395,18 +359,18 @@ export async function POST(request: NextRequest) {
     }
 
     // Parse and validate request
-    const { noteId, tone = DEFAULT_TONE, replies: providedReplies, isTeamNote, generateDocx = false }: SummarizeRequest = await request.json()
+    const { noteId, tone = DEFAULT_TONE, replies: providedReplies, generateDocx = false }: SummarizeRequest = await request.json()
 
     if (!noteId) {
       return Errors.noteIdRequired()
     }
 
-    if (!process.env.XAI_API_KEY?.trim()) {
+    if (!isAIAvailable()) {
       return Errors.aiNotConfigured()
     }
 
     // Fetch replies
-    const repliesResult = await fetchReplies(db, noteId, providedReplies, isTeamNote)
+    const repliesResult = await fetchReplies(db, noteId, providedReplies)
     if (!repliesResult.success) {
       return repliesResult.response
     }

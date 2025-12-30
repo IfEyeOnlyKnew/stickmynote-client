@@ -1,10 +1,10 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { createDatabaseClient } from "@/lib/database/database-adapter"
 
-export async function POST(request: NextRequest, { params }: { params: { token: string } }) {
+export async function POST(request: NextRequest, { params }: { params: Promise<{ token: string }> }) {
+  const { token } = await params
   try {
     const db = await createDatabaseClient()
-    const { token } = params
     const body = await request.json()
     const { data: submissionData } = body
 

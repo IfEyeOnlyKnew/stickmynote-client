@@ -2,8 +2,9 @@ import { createDatabaseClient } from "@/lib/database/database-adapter"
 import { NextResponse } from "next/server"
 import { getCachedAuthUser } from "@/lib/auth/cached-auth"
 
-export async function PATCH(request: Request, { params }: { params: { categoryId: string } }) {
+export async function PATCH(request: Request, { params }: { params: Promise<{ categoryId: string }> }) {
   try {
+    const { categoryId } = await params
     const db = await createDatabaseClient()
 
     const authResult = await getCachedAuthUser()
@@ -27,7 +28,7 @@ export async function PATCH(request: Request, { params }: { params: { categoryId
         name: name?.trim(),
         description: description?.trim() || null,
       })
-      .eq("id", params.categoryId)
+      .eq("id", categoryId)
       .eq("owner_id", user.id)
       .select()
       .maybeSingle()
@@ -44,8 +45,9 @@ export async function PATCH(request: Request, { params }: { params: { categoryId
   }
 }
 
-export async function DELETE(request: Request, { params }: { params: { categoryId: string } }) {
+export async function DELETE(request: Request, { params }: { params: Promise<{ categoryId: string }> }) {
   try {
+    const { categoryId } = await params
     const db = await createDatabaseClient()
 
     const authResult = await getCachedAuthUser()
@@ -63,7 +65,7 @@ export async function DELETE(request: Request, { params }: { params: { categoryI
     const { error } = await db
       .from("social_pad_categories")
       .delete()
-      .eq("id", params.categoryId)
+      .eq("id", categoryId)
       .eq("owner_id", user.id)
 
     if (error) throw error

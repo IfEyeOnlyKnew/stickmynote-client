@@ -28,12 +28,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ stickId
 
     const { data: stick, error: stickError } = await db
       .from("social_sticks")
-      .select(
-        `
-        *,
-        users:user_id(full_name, email)
-      `,
-      )
+      .select("*")
       .eq("id", stickId)
       .eq("org_id", orgContext.orgId)
       .maybeSingle()
@@ -45,21 +40,33 @@ export async function POST(req: Request, { params }: { params: Promise<{ stickId
     // Fetch replies
     const { data: replies } = await db
       .from("social_stick_replies")
-      .select(
-        `
-        *,
-        users:user_id(full_name, email)
-      `,
-      )
+      .select("*")
       .eq("social_stick_id", stickId)
       .order("created_at", { ascending: true })
 
+    // Fetch user data for replies
+    const userIds = [...new Set((replies || []).map((r: any) => r.user_id).filter(Boolean))]
+    let userMap: Record<string, { full_name?: string; email?: string }> = {}
+    if (userIds.length > 0) {
+      const { data: users } = await db
+        .from("users")
+        .select("id, full_name, email")
+        .in("id", userIds)
+
+      if (users) {
+        userMap = Object.fromEntries(users.map((u: any) => [u.id, { full_name: u.full_name, email: u.email }]))
+      }
+    }
+
     const formattedReplies =
-      replies?.map((r) => ({
-        content: r.content,
-        author: r.users?.full_name || r.users?.email || "Unknown",
-        created_at: r.created_at,
-      })) || []
+      replies?.map((r: any) => {
+        const userData = userMap[r.user_id]
+        return {
+          content: r.content,
+          author: userData?.full_name || userData?.email || "Unknown",
+          created_at: r.created_at,
+        }
+      }) || []
 
     // Generate AI summary
     const summary = await GrokService.generateLiveSummary({

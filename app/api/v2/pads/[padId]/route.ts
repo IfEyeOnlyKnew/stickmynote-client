@@ -5,12 +5,12 @@ import { querySingle } from '@/lib/database/pg-helpers'
 import { handleApiError } from '@/lib/api/handle-api-error'
 
 // GET /api/v2/pads/[padId] - Get pad details by ID
-export async function GET(request: NextRequest, { params }: { params: { padId: string } }) {
+export async function GET(request: NextRequest, { params }: { params: Promise<{ padId: string }> }) {
   try {
+    const { padId } = await params
     const session = await requireADSession(request)
     const userId = session.user.id
     const orgId = session.user.org_id
-    const padId = params.padId
     const pad = await querySingle(
       `SELECT * FROM pads WHERE id = $1 AND org_id = $2 AND (owner_id = $3 OR $3 = ANY(shared_with))`,
       [padId, orgId, userId]

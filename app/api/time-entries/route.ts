@@ -24,18 +24,7 @@ export async function GET(request: NextRequest) {
 
     let query = db
       .from("paks_time_entries")
-      .select(`
-        *,
-        task:paks_pad_stick_replies(
-          id,
-          content,
-          stick:paks_pad_sticks(
-            id,
-            topic,
-            content
-          )
-        )
-      `)
+      .select("*")
       .eq("user_id", user.id)
       .order("started_at", { ascending: false })
 
@@ -49,7 +38,7 @@ export async function GET(request: NextRequest) {
       query = query.eq("task_id", taskId)
     }
 
-    const { data, error } = await query
+    const { data: entries, error } = await query
 
     if (error) {
       if (error.code === "PGRST204" || error.message?.includes("Could not find the table")) {
@@ -62,7 +51,49 @@ export async function GET(request: NextRequest) {
       throw error
     }
 
-    return NextResponse.json({ entries: data || [] })
+    // Fetch task data separately
+    const taskIds = [...new Set((entries || []).map((e: any) => e.task_id).filter(Boolean))]
+    let taskMap: Record<string, any> = {}
+    let stickMap: Record<string, any> = {}
+
+    if (taskIds.length > 0) {
+      const { data: tasks } = await db
+        .from("paks_pad_stick_replies")
+        .select("id, content, stick_id")
+        .in("id", taskIds)
+
+      if (tasks) {
+        taskMap = Object.fromEntries(tasks.map((t: any) => [t.id, t]))
+
+        // Fetch sticks
+        const stickIds = [...new Set(tasks.map((t: any) => t.stick_id).filter(Boolean))]
+        if (stickIds.length > 0) {
+          const { data: sticks } = await db
+            .from("paks_pad_sticks")
+            .select("id, topic, content")
+            .in("id", stickIds)
+
+          if (sticks) {
+            stickMap = Object.fromEntries(sticks.map((s: any) => [s.id, s]))
+          }
+        }
+      }
+    }
+
+    // Attach task data to entries
+    const entriesWithTasks = (entries || []).map((entry: any) => {
+      const task = taskMap[entry.task_id]
+      return {
+        ...entry,
+        task: task ? {
+          id: task.id,
+          content: task.content,
+          stick: stickMap[task.stick_id] || null,
+        } : null,
+      }
+    })
+
+    return NextResponse.json({ entries: entriesWithTasks })
   } catch (error) {
     console.error("Error fetching time entries:", error)
     return NextResponse.json({ error: "Failed to fetch time entries" }, { status: 500 })
@@ -90,16 +121,10 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Task ID and start time are required" }, { status: 400 })
     }
 
+    // Verify task exists
     const { data: task, error: taskError } = await db
       .from("paks_pad_stick_replies")
-      .select(`
-        id,
-        stick:paks_pad_sticks(
-          id,
-          pad_id,
-          pads:paks_pads(owner_id)
-        )
-      `)
+      .select("id, stick_id")
       .eq("id", taskId)
       .maybeSingle()
 

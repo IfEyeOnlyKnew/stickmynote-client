@@ -21,8 +21,9 @@ interface AccessRequestUpdate {
 }
 
 // PATCH /api/organizations/[orgId]/access-requests/[requestId] - Approve/Reject request
-export async function PATCH(request: NextRequest, { params }: { params: { orgId: string; requestId: string } }) {
+export async function PATCH(request: NextRequest, { params }: { params: Promise<{ orgId: string; requestId: string }> }) {
   try {
+    const { orgId, requestId } = await params
     const db = await createDatabaseClient()
     const serviceDb = await createServiceDatabaseClient()
     const authResult = await getCachedAuthUser()
@@ -39,7 +40,6 @@ export async function PATCH(request: NextRequest, { params }: { params: { orgId:
     }
 
     const user = authResult.user
-    const { orgId, requestId } = params
     const body = await request.json()
     const { action, role = "member", rejection_reason } = body
 

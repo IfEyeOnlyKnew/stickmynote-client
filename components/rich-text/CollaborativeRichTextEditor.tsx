@@ -149,6 +149,8 @@ export function CollaborativeRichTextEditor({
     ],
     content: shouldEnableCollaboration ? undefined : content,
     editable: !readOnly,
+    immediatelyRender: false,
+    shouldRerenderOnTransaction: false,
     onUpdate: ({ editor }) => {
       try {
         if (!isExternalUpdate.current) {

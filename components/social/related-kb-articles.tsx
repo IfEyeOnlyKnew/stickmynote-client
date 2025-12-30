@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, memo, useMemo } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -30,7 +30,7 @@ interface RelatedKBArticlesProps {
   className?: string
 }
 
-export function RelatedKBArticles({
+export const RelatedKBArticles = memo(function RelatedKBArticles({
   padId,
   stickTags = [],
   stickContent = "",
@@ -41,12 +41,15 @@ export function RelatedKBArticles({
   const [loading, setLoading] = useState(false)
   const [isExpanded, setIsExpanded] = useState(true)
 
+  // Memoize the tags string to prevent unnecessary refetches
+  const tagsKey = useMemo(() => stickTags.join(","), [stickTags])
+
   /* eslint-disable react-hooks/exhaustive-deps */
   useEffect(() => {
-    if (padId && (stickTags.length > 0 || stickContent)) {
+    if (padId && (tagsKey || stickContent)) {
       fetchRelatedArticles()
     }
-  }, [padId, stickTags, stickContent])
+  }, [padId, tagsKey, stickContent])
   /* eslint-enable react-hooks/exhaustive-deps */
 
   const fetchRelatedArticles = async () => {
@@ -152,4 +155,4 @@ export function RelatedKBArticles({
       )}
     </Card>
   )
-}
+})

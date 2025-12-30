@@ -3,7 +3,7 @@ import { NextResponse } from "next/server"
 import { getOrgContext } from "@/lib/auth/get-org-context"
 import { getCachedAuthUser, createRateLimitResponse, createUnauthorizedResponse } from "@/lib/auth/cached-auth"
 
-export async function POST(request: Request, { params }: { params: { stickId: string } }) {
+export async function POST(request: Request, { params }: { params: Promise<{ stickId: string }> }) {
   try {
     const db = await createDatabaseClient()
     const authResult = await getCachedAuthUser()
@@ -22,11 +22,11 @@ export async function POST(request: Request, { params }: { params: { stickId: st
       return NextResponse.json({ error: "No organization context" }, { status: 403 })
     }
 
-    const { stickId } = params
+    const { stickId } = await params
 
     const { data: stick } = await db
       .from("social_sticks")
-      .select("social_pad_id, is_pinned, social_pads(owner_id)")
+      .select("social_pad_id, is_pinned")
       .eq("id", stickId)
       .eq("org_id", orgContext.orgId)
       .maybeSingle()
@@ -35,8 +35,16 @@ export async function POST(request: Request, { params }: { params: { stickId: st
       return NextResponse.json({ error: "Stick not found" }, { status: 404 })
     }
 
-    const padInfo = Array.isArray(stick.social_pads) ? stick.social_pads[0] : stick.social_pads
-    const padOwnerId = padInfo?.owner_id
+    // Fetch pad owner separately
+    let padOwnerId: string | undefined
+    if (stick.social_pad_id) {
+      const { data: pad } = await db
+        .from("social_pads")
+        .select("owner_id")
+        .eq("id", stick.social_pad_id)
+        .maybeSingle()
+      padOwnerId = pad?.owner_id
+    }
 
     const { data: membership } = await db
       .from("social_pad_members")
@@ -86,7 +94,7 @@ export async function POST(request: Request, { params }: { params: { stickId: st
   }
 }
 
-export async function PUT(request: Request, { params }: { params: { stickId: string } }) {
+export async function PUT(request: Request, { params }: { params: Promise<{ stickId: string }> }) {
   try {
     const db = await createDatabaseClient()
     const authResult = await getCachedAuthUser()
@@ -105,12 +113,12 @@ export async function PUT(request: Request, { params }: { params: { stickId: str
       return NextResponse.json({ error: "No organization context" }, { status: 403 })
     }
 
-    const { stickId } = params
+    const { stickId } = await params
     const { pin_order } = await request.json()
 
     const { data: stick } = await db
       .from("social_sticks")
-      .select("social_pad_id, is_pinned, social_pads(owner_id)")
+      .select("social_pad_id, is_pinned")
       .eq("id", stickId)
       .eq("org_id", orgContext.orgId)
       .maybeSingle()
@@ -119,8 +127,16 @@ export async function PUT(request: Request, { params }: { params: { stickId: str
       return NextResponse.json({ error: "Stick not found or not pinned" }, { status: 404 })
     }
 
-    const padInfo = Array.isArray(stick.social_pads) ? stick.social_pads[0] : stick.social_pads
-    const padOwnerId = padInfo?.owner_id
+    // Fetch pad owner separately
+    let padOwnerId: string | undefined
+    if (stick.social_pad_id) {
+      const { data: pad } = await db
+        .from("social_pads")
+        .select("owner_id")
+        .eq("id", stick.social_pad_id)
+        .maybeSingle()
+      padOwnerId = pad?.owner_id
+    }
 
     const { data: membership } = await db
       .from("social_pad_members")

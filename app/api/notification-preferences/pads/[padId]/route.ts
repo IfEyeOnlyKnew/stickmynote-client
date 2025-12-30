@@ -2,7 +2,8 @@ import { type NextRequest, NextResponse } from "next/server"
 import { createDatabaseClient } from "@/lib/database/database-adapter"
 import { getCachedAuthUser } from "@/lib/auth/cached-auth"
 
-export async function PATCH(req: NextRequest, { params }: { params: { padId: string } }) {
+export async function PATCH(req: NextRequest, { params }: { params: Promise<{ padId: string }> }) {
+  const { padId } = await params
   try {
     const db = await createDatabaseClient()
 
@@ -17,8 +18,6 @@ export async function PATCH(req: NextRequest, { params }: { params: { padId: str
     if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
-
-    const { padId } = params
     const body = await req.json()
     const { muted, digest_only } = body
 

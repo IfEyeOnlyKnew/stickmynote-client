@@ -112,10 +112,12 @@ function SortableTaskCard({
                 />
               )}
               <h4 className={`text-sm font-medium ${task.calstick_completed ? "line-through text-gray-500" : ""}`}>
-                {task.stick?.topic || "Untitled"}
+                {task.content || task.stick?.topic || "Untitled"}
               </h4>
             </div>
-            <p className="text-xs text-muted-foreground mt-1 line-clamp-2">{task.content}</p>
+            {task.stick?.topic && task.content && (
+              <p className="text-xs text-muted-foreground mt-1 line-clamp-1">Topic: {task.stick.topic}</p>
+            )}
           </div>
         </div>
       </CardHeader>
@@ -366,7 +368,7 @@ export function KanbanView({
               style={{ borderLeftColor: activeTask.color || "#6b7280" }}
             >
               <CardHeader className="pb-3 pt-3 px-4">
-                <h4 className="text-sm font-medium">{activeTask.stick?.topic || "Untitled"}</h4>
+                <h4 className="text-sm font-medium">{activeTask.content || activeTask.stick?.topic || "Untitled"}</h4>
               </CardHeader>
             </Card>
           ) : null}

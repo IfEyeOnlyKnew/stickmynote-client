@@ -29,11 +29,54 @@ export async function listNotes(session: NotesSession, limit = 50, offset = 0) {
   try {
     const effectiveLimit = Math.min(limit, 100)
     const effectiveOffset = Math.max(offset, 0)
+
+    // Fetch notes
     const notes = await query(
       'SELECT * FROM personal_sticks WHERE user_id = $1 ORDER BY created_at DESC LIMIT $2 OFFSET $3',
       [session.user.id, effectiveLimit, effectiveOffset]
     )
-    return { status: 200, body: { notes } }
+
+    // Get total count for pagination
+    const countResult = await query(
+      'SELECT COUNT(*) as count FROM personal_sticks WHERE user_id = $1',
+      [session.user.id]
+    )
+    const total = parseInt(countResult[0]?.count || '0', 10)
+
+    // Get note IDs for fetching related data
+    const noteIds = notes.map((n: { id: string }) => n.id)
+    console.log('[notes-handler] Note IDs being queried:', noteIds)
+
+    // Fetch tabs (which contain hyperlinks) for all notes
+    let tabs: any[] = []
+    if (noteIds.length > 0) {
+      tabs = await query(
+        `SELECT personal_stick_id, tab_name, tab_type, tags
+         FROM personal_sticks_tabs
+         WHERE personal_stick_id = ANY($1)`,
+        [noteIds]
+      )
+      console.log('[notes-handler] Tabs fetched:', tabs.length)
+      if (tabs.length > 0) {
+        console.log('[notes-handler] First tab:', JSON.stringify(tabs[0]))
+      }
+    } else {
+      console.log('[notes-handler] No note IDs to query tabs for')
+    }
+
+    // Fetch replies for all notes
+    let replies: any[] = []
+    if (noteIds.length > 0) {
+      replies = await query(
+        `SELECT id, content, color, created_at, updated_at, user_id, personal_stick_id
+         FROM personal_sticks_replies
+         WHERE personal_stick_id = ANY($1)
+         ORDER BY created_at ASC`,
+        [noteIds]
+      )
+    }
+
+    return { status: 200, body: { notes, total, tabs, replies } }
   } catch (error) {
     console.error('[notes-handler] listNotes error:', error)
     return { status: 500, body: { error: 'Failed to list notes' } }

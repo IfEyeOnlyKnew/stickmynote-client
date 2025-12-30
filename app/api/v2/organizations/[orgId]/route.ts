@@ -5,10 +5,10 @@ import { querySingle } from '@/lib/database/pg-helpers'
 import { handleApiError } from '@/lib/api/handle-api-error'
 
 // GET /api/v2/organizations/[orgId] - Get organization details by ID
-export async function GET(request: NextRequest, { params }: { params: { orgId: string } }) {
+export async function GET(request: NextRequest, { params }: { params: Promise<{ orgId: string }> }) {
   try {
+    const { orgId } = await params
     const session = await requireADSession(request)
-    const orgId = params.orgId
     // Only allow access if user is a member of the org or admin
     const isMember = session.user.is_admin || session.user.memberships?.some((m: any) => m.organization_id === orgId)
     if (!isMember) {

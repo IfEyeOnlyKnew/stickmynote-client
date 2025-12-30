@@ -1,10 +1,11 @@
 import { createDatabaseClient } from "@/lib/database/database-adapter"
 import { NextResponse } from "next/server"
 
-export async function POST(request: Request, { params }: { params: { id: string } }) {
+export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
+    const { id } = await params
+
     const db = await createDatabaseClient()
-    const { id } = params
 
     const { data: existingTemplate, error: fetchError } = await db
       .from("paks_pad_stick_templates")

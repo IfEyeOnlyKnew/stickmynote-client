@@ -165,7 +165,7 @@ function buildResponseMessage(added: number, invited: number, skipped: number): 
   return `${addedText}, ${invitedText}${skippedText}`
 }
 
-export async function POST(request: Request, { params }: { params: { stickId: string } }) {
+export async function POST(request: Request, { params }: { params: Promise<{ stickId: string }> }) {
   try {
     const db = await createDatabaseClient()
     const authResult = await getCachedAuthUser()
@@ -174,7 +174,7 @@ export async function POST(request: Request, { params }: { params: { stickId: st
     if (!authResult.user) return createUnauthorizedResponse()
 
     const user = authResult.user
-    const { stickId } = params
+    const { stickId } = await params
     const { emails } = await request.json()
 
     if (!validateEmails(emails)) {
@@ -183,7 +183,7 @@ export async function POST(request: Request, { params }: { params: { stickId: st
 
     const { data: stick } = await db
       .from("social_sticks")
-      .select("social_pad_id, topic, social_pads!inner(owner_id, name)")
+      .select("social_pad_id, topic")
       .eq("id", stickId)
       .maybeSingle()
 
@@ -191,7 +191,18 @@ export async function POST(request: Request, { params }: { params: { stickId: st
       return NextResponse.json({ error: "Stick not found" }, { status: 404 })
     }
 
-    const socialPads = stick.social_pads as { owner_id: string; name: string }
+    // Fetch pad owner and name separately
+    const { data: pad } = await db
+      .from("social_pads")
+      .select("owner_id, name")
+      .eq("id", stick.social_pad_id)
+      .maybeSingle()
+
+    if (!pad) {
+      return NextResponse.json({ error: "Pad not found" }, { status: 404 })
+    }
+
+    const socialPads = { owner_id: pad.owner_id, name: pad.name }
     const hasPermission = await checkPermissions(db, { social_pad_id: stick.social_pad_id, social_pads: socialPads }, user.id)
     if (!hasPermission) {
       return NextResponse.json({ error: "Only pad owners and admins can manage stick members" }, { status: 403 })

@@ -1,6 +1,7 @@
 import type { NextRequest } from "next/server"
 
-export async function POST(request: NextRequest, { params }: { params: { id: string } }) {
+export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  await params
   // Only "note_created", "note_updated", "reply_added" are allowed
   // To re-enable, add "view" to the personal_sticks_activities_activity_type_check constraint
   return new Response(JSON.stringify({ success: true, message: "View tracking disabled" }), {

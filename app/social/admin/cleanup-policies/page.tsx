@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback } from "react"
 import { useRouter } from "next/navigation"
 import { useUser } from "@/contexts/user-context"
+import { useOrganization } from "@/contexts/organization-context"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
@@ -72,6 +73,7 @@ type CleanupStats = {
 
 export default function CleanupPoliciesDashboard() {
   const { user, loading } = useUser()
+  const { canManage } = useOrganization()
   const router = useRouter()
   const [pads, setPads] = useState<PadWithPolicy[]>([])
   const [stats, setStats] = useState<CleanupStats | null>(null)
@@ -79,16 +81,14 @@ export default function CleanupPoliciesDashboard() {
   const [searchQuery, setSearchQuery] = useState("")
   const [isRunningCleanup, setIsRunningCleanup] = useState(false)
 
-  const isAdmin = user?.email === "chrisdoran63@outlook.com"
-
   useEffect(() => {
     if (!loading && !user) {
       router.push("/auth")
     }
-    if (!loading && user && !isAdmin) {
+    if (!loading && user && !canManage) {
       router.push("/social")
     }
-  }, [user, loading, router, isAdmin])
+  }, [user, loading, router, canManage])
 
   const fetchData = useCallback(async () => {
     try {
@@ -141,10 +141,10 @@ export default function CleanupPoliciesDashboard() {
   }, [])
 
   useEffect(() => {
-    if (user && isAdmin) {
+    if (user && canManage) {
       fetchData()
     }
-  }, [user, isAdmin, fetchData])
+  }, [user, canManage, fetchData])
 
   const runManualCleanup = async () => {
     if (!confirm("Run cleanup now? This will apply all active policies immediately.")) return

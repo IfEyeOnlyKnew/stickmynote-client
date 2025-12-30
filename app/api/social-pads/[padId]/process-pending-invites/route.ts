@@ -2,9 +2,9 @@ import { createDatabaseClient } from "@/lib/database/database-adapter"
 import { NextResponse } from "next/server"
 import { getCachedAuthUser } from "@/lib/auth/cached-auth"
 
-export async function POST(request: Request, { params }: { params: { padId: string } }) {
+export async function POST(request: Request, { params }: { params: Promise<{ padId: string }> }) {
   try {
-    const { padId } = params
+    const { padId } = await params
     const db = await createDatabaseClient()
 
     const authResult = await getCachedAuthUser()

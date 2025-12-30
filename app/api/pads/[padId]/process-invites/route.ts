@@ -2,8 +2,9 @@ import { createDatabaseClient, createServiceDatabaseClient } from "@/lib/databas
 import { NextResponse } from "next/server"
 import { getCachedAuthUser } from "@/lib/auth/cached-auth"
 
-export async function POST(request: Request, { params }: { params: { padId: string } }) {
+export async function POST(request: Request, { params }: { params: Promise<{ padId: string }> }) {
   try {
+    const { padId } = await params
     const db = await createDatabaseClient()
 
     const authResult = await getCachedAuthUser()
@@ -22,8 +23,6 @@ export async function POST(request: Request, { params }: { params: { padId: stri
     if (!userEmail) {
       return NextResponse.json({ error: "User email not found" }, { status: 400 })
     }
-
-    const { padId } = params
 
     const { data: pendingInvites, error: fetchError } = await db
       .from("paks_pad_pending_invites")

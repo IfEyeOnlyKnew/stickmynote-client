@@ -3,7 +3,8 @@ import { NextResponse } from "next/server"
 import { getCachedAuthUser, createRateLimitResponse, createUnauthorizedResponse } from "@/lib/auth/cached-auth"
 
 // PATCH /api/notifications/[id] - Mark activity as read/unread
-export async function PATCH(request: Request, { params }: { params: { id: string } }) {
+export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params
   try {
     const db = await createDatabaseClient()
     const authResult = await getCachedAuthUser()
@@ -15,8 +16,6 @@ export async function PATCH(request: Request, { params }: { params: { id: string
     if (!authResult.user) {
       return createUnauthorizedResponse()
     }
-
-    const { id } = params
     const body = await request.json()
     const { read } = body
 
@@ -62,7 +61,8 @@ export async function PATCH(request: Request, { params }: { params: { id: string
 }
 
 // DELETE /api/notifications/[id] - Delete activity
-export async function DELETE(request: Request, { params }: { params: { id: string } }) {
+export async function DELETE(request: Request, { params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params
   try {
     const db = await createDatabaseClient()
     const authResult = await getCachedAuthUser()
@@ -74,8 +74,6 @@ export async function DELETE(request: Request, { params }: { params: { id: strin
     if (!authResult.user) {
       return createUnauthorizedResponse()
     }
-
-    const { id } = params
 
     const { error } = await db.from("personal_sticks_activities").delete().eq("id", id)
 

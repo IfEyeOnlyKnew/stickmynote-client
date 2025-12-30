@@ -4,7 +4,7 @@ import type React from "react"
 import { Plus, X, Users } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { useState } from "react"
-import { CollaborativeRichTextEditor } from "@/components/rich-text/CollaborativeRichTextEditor"
+import { CollaborativeRichTextEditor } from "@/components/rich-text/CollaborativeRichTextEditorDynamic"
 
 interface CollaborativeReplyFormProps {
   replyId: string

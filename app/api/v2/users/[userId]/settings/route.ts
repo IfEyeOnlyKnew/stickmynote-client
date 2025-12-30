@@ -6,10 +6,10 @@ import { handleApiError } from '@/lib/api/handle-api-error'
 import { requireOptionalString } from '@/lib/api/validate'
 
 // GET /api/v2/users/[userId]/settings - Get user settings
-export async function GET(request: NextRequest, { params }: { params: { userId: string } }) {
+export async function GET(request: NextRequest, { params }: { params: Promise<{ userId: string }> }) {
   try {
+    const { userId } = await params
     const session = await requireADSession(request)
-    const userId = params.userId
     if (session.user.id !== userId && !session.user.is_admin) {
       return new Response(JSON.stringify({ error: 'Access denied' }), { status: 403 })
     }
@@ -24,10 +24,10 @@ export async function GET(request: NextRequest, { params }: { params: { userId: 
 }
 
 // PUT /api/v2/users/[userId]/settings - Update user settings
-export async function PUT(request: NextRequest, { params }: { params: { userId: string } }) {
+export async function PUT(request: NextRequest, { params }: { params: Promise<{ userId: string }> }) {
   try {
+    const { userId } = await params
     const session = await requireADSession(request)
-    const userId = params.userId
     if (session.user.id !== userId && !session.user.is_admin) {
       return new Response(JSON.stringify({ error: 'Access denied' }), { status: 403 })
     }

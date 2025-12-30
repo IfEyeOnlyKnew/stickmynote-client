@@ -206,7 +206,7 @@ function SortableTaskCard({
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-1 mb-1">
             {getStatusIcon()}
-            <span className="text-xs font-medium truncate">{task.content.slice(0, 50)}</span>
+            <span className="text-xs font-medium truncate">{(task.content || task.stick?.topic || "Untitled").slice(0, 50)}</span>
           </div>
           {task.calstick_estimated_hours && (
             <Badge variant="outline" className="text-[10px] h-4">
@@ -558,7 +558,7 @@ export default function StoryMap({ calsticks, onTaskClick, onTaskMove, onEpicCre
         <DragOverlay>
           {activeTask && (
             <div className="bg-card border rounded-lg p-2 shadow-lg">
-              <span className="text-xs font-medium">{activeTask.content.slice(0, 50)}</span>
+              <span className="text-xs font-medium">{(activeTask.content || activeTask.stick?.topic || "Untitled").slice(0, 50)}</span>
             </div>
           )}
         </DragOverlay>

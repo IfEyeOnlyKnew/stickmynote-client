@@ -3,7 +3,7 @@ import { NextResponse } from "next/server"
 import { getOrgContext } from "@/lib/auth/get-org-context"
 import { getCachedAuthUser } from "@/lib/auth/cached-auth"
 
-export async function GET(request: Request, { params }: { params: { padId: string } }) {
+export async function GET(request: Request, { params }: { params: Promise<{ padId: string }> }) {
   try {
     const db = await createDatabaseClient()
 
@@ -24,7 +24,7 @@ export async function GET(request: Request, { params }: { params: { padId: strin
       return NextResponse.json({ error: "No organization context" }, { status: 403 })
     }
 
-    const { padId } = params
+    const { padId } = await params
 
     const { data: membership } = await db
       .from("social_pad_members")
@@ -112,9 +112,24 @@ export async function GET(request: Request, { params }: { params: { padId: strin
 
     const { data: sticks } = await db
       .from("social_sticks")
-      .select("user_id, users:user_id(id, full_name, email)")
+      .select("user_id")
       .eq("social_pad_id", padId)
       .eq("org_id", orgContext.orgId)
+
+    // Fetch user details separately
+    const userIds = [...new Set((sticks || []).map((s: any) => s.user_id))]
+    const userMap = new Map<string, { id: string; full_name: string | null; email: string }>()
+
+    if (userIds.length > 0) {
+      const { data: users } = await db
+        .from("users")
+        .select("id, full_name, email")
+        .in("id", userIds)
+
+      users?.forEach((u: any) => {
+        userMap.set(u.id, u)
+      })
+    }
 
     interface ContributorData {
       user: any
@@ -126,7 +141,7 @@ export async function GET(request: Request, { params }: { params: { padId: strin
 
     sticks?.forEach((stick: any) => {
       const userId = stick.user_id
-      const userData = Array.isArray(stick.users) ? stick.users[0] : stick.users
+      const userData = userMap.get(userId) || null
       if (!contributorMap.has(userId)) {
         contributorMap.set(userId, { user: userData, stickCount: 0, replyCount: 0 })
       }

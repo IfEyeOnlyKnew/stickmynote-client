@@ -9,7 +9,8 @@ import type { TaskProgress } from '@/types/checklist'
 export const dynamic = 'force-dynamic'
 
 // GET /api/v2/calsticks/[id]/progress - Get calstick progress
-export async function GET(request: NextRequest, { params }: { params: { id: string } }) {
+export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params
   try {
     const authResult = await getCachedAuthUser()
 
@@ -29,7 +30,7 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
       return new Response(JSON.stringify({ error: 'No organization context' }), { status: 403 })
     }
 
-    const calstickId = params.id
+    const calstickId = id
 
     // Get parent task
     const parentResult = await db.query(

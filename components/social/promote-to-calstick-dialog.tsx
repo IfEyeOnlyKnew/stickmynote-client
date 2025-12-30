@@ -22,6 +22,7 @@ interface PromoteToCalStickDialogProps {
   replyId: string
   replyContent: string
   stickTopic?: string
+  stickContent?: string
   onPromote: (data: { priority: string; dueDate: string; assigneeId?: string }) => Promise<void>
 }
 
@@ -32,6 +33,7 @@ export function PromoteToCalStickDialog({
   replyId,
   replyContent,
   stickTopic,
+  stickContent,
   onPromote,
 }: PromoteToCalStickDialogProps) {
   const [priority, setPriority] = useState("medium")
@@ -39,7 +41,11 @@ export function PromoteToCalStickDialog({
   const [isPromoting, setIsPromoting] = useState(false)
   const [promoted, setPromoted] = useState(false)
 
+  const isFormValid = dueDate !== "" && priority !== ""
+
   const handlePromote = async () => {
+    if (!isFormValid) return
+
     setIsPromoting(true)
     try {
       await onPromote({ priority, dueDate })
@@ -80,22 +86,33 @@ export function PromoteToCalStickDialog({
         ) : (
           <>
             <div className="space-y-4 py-4">
+              {/* Read-only context: Topic */}
               {stickTopic && (
                 <div className="bg-muted/30 rounded-lg p-3 border-l-2 border-purple-400">
-                  <p className="text-xs font-medium text-muted-foreground mb-1">From Topic</p>
+                  <p className="text-xs font-medium text-muted-foreground mb-1">Topic</p>
                   <p className="text-sm font-medium">{stickTopic}</p>
                 </div>
               )}
 
-              <div className="bg-muted/50 rounded-lg p-3">
-                <p className="text-sm font-medium text-muted-foreground mb-1">Reply Content</p>
-                <p className="text-sm line-clamp-3">{replyContent}</p>
+              {/* Read-only context: Stick Content */}
+              {stickContent && (
+                <div className="bg-muted/30 rounded-lg p-3 border-l-2 border-blue-400">
+                  <p className="text-xs font-medium text-muted-foreground mb-1">Content</p>
+                  <p className="text-sm line-clamp-2">{stickContent}</p>
+                </div>
+              )}
+
+              {/* Read-only context: Reply - This becomes the CalStick title */}
+              <div className="bg-muted/30 rounded-lg p-3 border-l-2 border-green-400">
+                <p className="text-xs font-medium text-muted-foreground mb-1">Reply (will be CalStick title)</p>
+                <p className="text-sm">{replyContent}</p>
               </div>
 
+              {/* Priority field - required */}
               <div className="space-y-2">
                 <Label htmlFor="priority" className="flex items-center gap-2">
                   <Flag className="h-4 w-4" />
-                  Priority
+                  Priority <span className="text-red-500">*</span>
                 </Label>
                 <Select value={priority} onValueChange={setPriority}>
                   <SelectTrigger>
@@ -118,10 +135,11 @@ export function PromoteToCalStickDialog({
                 </Select>
               </div>
 
+              {/* Due Date field - required */}
               <div className="space-y-2">
                 <Label htmlFor="dueDate" className="flex items-center gap-2">
                   <Calendar className="h-4 w-4" />
-                  Due Date (Optional)
+                  Due Date <span className="text-red-500">*</span>
                 </Label>
                 <Input id="dueDate" type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} />
               </div>
@@ -131,7 +149,11 @@ export function PromoteToCalStickDialog({
               <Button variant="outline" onClick={() => onOpenChange(false)}>
                 Cancel
               </Button>
-              <Button onClick={handlePromote} disabled={isPromoting} className="bg-purple-600 hover:bg-purple-700">
+              <Button
+                onClick={handlePromote}
+                disabled={isPromoting || !isFormValid}
+                className="bg-purple-600 hover:bg-purple-700"
+              >
                 {isPromoting ? "Promoting..." : "Promote to CalStick"}
               </Button>
             </DialogFooter>

@@ -3,8 +3,10 @@ import { NextResponse } from "next/server"
 import { getCachedAuthUser } from "@/lib/auth/cached-auth"
 
 // DELETE /api/saved-searches/[id] - Delete saved search
-export async function DELETE(request: Request, { params }: { params: { id: string } }) {
+export async function DELETE(request: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
+    const { id } = await params
+
     const db = await createDatabaseClient()
 
     const authResult = await getCachedAuthUser()
@@ -18,8 +20,6 @@ export async function DELETE(request: Request, { params }: { params: { id: strin
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
     const user = authResult.user
-
-    const { id } = params
 
     const { error } = await db.from("saved_searches").delete().eq("id", id).eq("user_id", user.id)
 

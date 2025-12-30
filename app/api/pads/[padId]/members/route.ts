@@ -65,9 +65,7 @@ async function fetchPad(
   orgId: string,
   includeOwner = false
 ): Promise<{ pad: any; error: NextResponse | null }> {
-  const select = includeOwner
-    ? "name, owner_id, org_id, users!paks_pads_owner_id_fkey(id, email, username, full_name)"
-    : "owner_id, org_id"
+  const select = includeOwner ? "name, owner_id, org_id" : "owner_id, org_id"
 
   const { data: pad, error } = await db
     .from("paks_pads")
@@ -78,6 +76,16 @@ async function fetchPad(
 
   if (error || !pad) {
     return { pad: null, error: NextResponse.json({ error: "Pad not found" }, { status: 404 }) }
+  }
+
+  // Fetch owner user data separately if needed
+  if (includeOwner && pad.owner_id) {
+    const { data: ownerUser } = await db
+      .from("users")
+      .select("id, email, username, full_name")
+      .eq("id", pad.owner_id)
+      .maybeSingle()
+    pad.users = ownerUser
   }
 
   return { pad, error: null }
@@ -138,8 +146,10 @@ async function checkAdminOrOwner(
 }
 
 // Route handlers
-export async function GET(request: NextRequest, { params }: { params: { padId: string } }) {
+export async function GET(request: NextRequest, { params }: { params: Promise<{ padId: string }> }) {
   try {
+    const { padId } = await params
+
     await createDatabaseClient()
     const dbAdmin = await createServiceDatabaseClient()
 
@@ -150,14 +160,13 @@ export async function GET(request: NextRequest, { params }: { params: { padId: s
     if (contextResult instanceof NextResponse) return contextResult
 
     const { orgContext } = contextResult
-    const { padId } = params
 
     const { pad, error: padError } = await fetchPad(dbAdmin, padId, orgContext.orgId, true)
     if (padError) return padError
 
     const { data: members, error: membersError } = await dbAdmin
       .from("paks_pad_members")
-      .select("user_id, role, org_id, users!paks_pad_members_user_id_fkey(id, email, username, full_name)")
+      .select("user_id, role, org_id")
       .eq("pad_id", padId)
       .eq("org_id", orgContext.orgId)
 
@@ -165,9 +174,28 @@ export async function GET(request: NextRequest, { params }: { params: { padId: s
       return NextResponse.json({ error: "Failed to fetch members" }, { status: 500 })
     }
 
+    // Fetch user data for all members separately
+    const memberUserIds = (members || []).map((m: any) => m.user_id).filter(Boolean)
+    let memberUsersMap = new Map<string, UserData>()
+    if (memberUserIds.length > 0) {
+      const { data: users } = await dbAdmin
+        .from("users")
+        .select("id, email, username, full_name")
+        .in("id", memberUserIds)
+      for (const u of users || []) {
+        memberUsersMap.set(u.id, u)
+      }
+    }
+
+    // Attach user data to members
+    const membersWithUsers = (members || []).map((m: any) => ({
+      ...m,
+      users: memberUsersMap.get(m.user_id) || null,
+    }))
+
     return NextResponse.json({
       padName: pad.name,
-      members: formatMembers(pad, members),
+      members: formatMembers(pad, membersWithUsers),
     })
   } catch (error) {
     console.error("Error in pad members API:", error)
@@ -175,10 +203,11 @@ export async function GET(request: NextRequest, { params }: { params: { padId: s
   }
 }
 
-export async function DELETE(request: NextRequest, { params }: { params: { padId: string } }) {
+export async function DELETE(request: NextRequest, { params }: { params: Promise<{ padId: string }> }) {
   try {
+    const { padId } = await params
+
     const db = await createDatabaseClient()
-    const { padId } = params
 
     const authResult = await requireAuth()
     if (authResult instanceof NextResponse) return authResult
@@ -218,10 +247,11 @@ export async function DELETE(request: NextRequest, { params }: { params: { padId
   }
 }
 
-export async function PATCH(request: NextRequest, { params }: { params: { padId: string } }) {
+export async function PATCH(request: NextRequest, { params }: { params: Promise<{ padId: string }> }) {
   try {
+    const { padId } = await params
+
     const db = await createDatabaseClient()
-    const { padId } = params
 
     const authResult = await requireAuth()
     if (authResult instanceof NextResponse) return authResult

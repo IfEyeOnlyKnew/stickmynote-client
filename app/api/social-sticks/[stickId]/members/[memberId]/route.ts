@@ -2,7 +2,7 @@ import { createDatabaseClient } from "@/lib/database/database-adapter"
 import { NextResponse } from "next/server"
 import { getCachedAuthUser, createRateLimitResponse, createUnauthorizedResponse } from "@/lib/auth/cached-auth"
 
-export async function DELETE(request: Request, { params }: { params: { stickId: string; memberId: string } }) {
+export async function DELETE(request: Request, { params }: { params: Promise<{ stickId: string; memberId: string }> }) {
   try {
     const db = await createDatabaseClient()
     const authResult = await getCachedAuthUser()
@@ -17,19 +17,26 @@ export async function DELETE(request: Request, { params }: { params: { stickId: 
 
     const user = authResult.user
 
+    const { stickId, memberId } = await params
+
     const { data: stick } = await db
       .from("social_sticks")
-      .select("social_pad_id, social_pads!inner(owner_id)")
-      .eq("id", params.stickId)
+      .select("social_pad_id")
+      .eq("id", stickId)
       .maybeSingle()
 
     if (!stick) {
       return NextResponse.json({ error: "Stick not found" }, { status: 404 })
     }
 
-    // Type assertion to access owner_id from the joined social_pads
-    const socialPads = stick.social_pads as unknown as { owner_id: string }
-    const isOwner = socialPads.owner_id === user.id
+    // Fetch pad owner separately
+    const { data: pad } = await db
+      .from("social_pads")
+      .select("owner_id")
+      .eq("id", stick.social_pad_id)
+      .maybeSingle()
+
+    const isOwner = pad?.owner_id === user.id
 
     const { data: padMember } = await db
       .from("social_pad_members")
@@ -48,8 +55,8 @@ export async function DELETE(request: Request, { params }: { params: { stickId: 
     const { error: deleteError } = await db
       .from("social_stick_members")
       .delete()
-      .eq("id", params.memberId)
-      .eq("social_stick_id", params.stickId)
+      .eq("id", memberId)
+      .eq("social_stick_id", stickId)
 
     if (deleteError) throw deleteError
 

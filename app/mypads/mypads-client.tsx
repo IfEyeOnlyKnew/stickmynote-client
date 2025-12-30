@@ -6,10 +6,12 @@ import type { PadWithRole } from "@/lib/data/pads-data"
 import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
-import { Search } from 'lucide-react'
+import { Search, Plus } from 'lucide-react'
 import { UserMenu } from "@/components/user-menu"
 import { BreadcrumbNav } from "@/components/breadcrumb-nav"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Button } from "@/components/ui/button"
+import { CreatePadModal } from "@/components/create-pad-modal"
 
 interface MyPadsClientProps {
   initialPads: PadWithRole[]
@@ -115,6 +117,15 @@ export function MyPadsClient({ initialPads }: Readonly<MyPadsClientProps>) {
               className="pl-10 w-96"
             />
           </div>
+          <CreatePadModal
+            onPadCreated={(padId) => router.push(`/pads/${padId}`)}
+            trigger={
+              <Button className="bg-indigo-600 hover:bg-indigo-700">
+                <Plus className="h-4 w-4 mr-2" />
+                Create Pad
+              </Button>
+            }
+          />
           <UserMenu hideSettings={true} hideHowToSearch={true} />
         </div>
       </div>

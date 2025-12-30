@@ -3,7 +3,8 @@ import { createServiceDatabaseClient } from "@/lib/database/database-adapter"
 import { getOrgContext } from "@/lib/auth/get-org-context"
 import { getCachedAuthUser } from "@/lib/auth/cached-auth"
 
-export async function GET(request: NextRequest, { params }: { params: { id: string } }) {
+export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params
   try {
     const db = await createServiceDatabaseClient()
     const authResult = await getCachedAuthUser()
@@ -29,7 +30,7 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
     const { data: calstick } = await db
       .from("calsticks")
       .select("user_id, org_id")
-      .eq("id", params.id)
+      .eq("id", id)
       .eq("org_id", orgContext.orgId)
       .maybeSingle()
 
@@ -40,7 +41,7 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
     const { data: attachments, error } = await db
       .from("calstick_attachments")
       .select("*")
-      .eq("calstick_id", params.id)
+      .eq("calstick_id", id)
       .eq("org_id", orgContext.orgId)
       .order("created_at", { ascending: false })
 
@@ -54,7 +55,8 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
   }
 }
 
-export async function POST(request: NextRequest, { params }: { params: { id: string } }) {
+export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params
   try {
     const db = await createServiceDatabaseClient()
     const authResult = await getCachedAuthUser()
@@ -80,7 +82,7 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
     const { data: calstick } = await db
       .from("calsticks")
       .select("user_id, org_id")
-      .eq("id", params.id)
+      .eq("id", id)
       .eq("org_id", orgContext.orgId)
       .maybeSingle()
 
@@ -94,7 +96,7 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
     const { data: attachment, error } = await db
       .from("calstick_attachments")
       .insert({
-        calstick_id: params.id,
+        calstick_id: id,
         org_id: orgContext.orgId,
         name,
         url,
@@ -118,7 +120,8 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
   }
 }
 
-export async function DELETE(request: NextRequest, { params }: { params: { id: string } }) {
+export async function DELETE(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  await params
   try {
     const db = await createServiceDatabaseClient()
     const authResult = await getCachedAuthUser()

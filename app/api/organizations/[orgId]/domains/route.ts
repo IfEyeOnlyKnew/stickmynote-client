@@ -100,6 +100,21 @@ export async function POST(request: NextRequest, context: RouteContext) {
     const isContact =
       metadata?.primary_contact_email === userProfile?.email || metadata?.secondary_contact_email === userProfile?.email
 
+    console.log("[DEBUG] Domain add check:", {
+      orgId,
+      userId: user.id,
+      userIdType: typeof user.id,
+      orgOwnerId: org.owner_id,
+      orgOwnerIdType: typeof org.owner_id,
+      isOwner,
+      strictEqual: org.owner_id === user.id,
+      looseEqual: org.owner_id == user.id,
+      userEmail: userProfile?.email,
+      primaryContact: metadata?.primary_contact_email,
+      secondaryContact: metadata?.secondary_contact_email,
+      isContact,
+    })
+
     if (!isOwner && !isContact) {
       return NextResponse.json({ error: "Only owner or contacts can add domains" }, { status: 403 })
     }

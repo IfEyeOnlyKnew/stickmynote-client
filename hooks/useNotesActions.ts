@@ -60,8 +60,8 @@ export function useNotesActions({
       try {
         await handleUpdateNote(noteId, { is_shared: isShared })
         toast({
-          title: isShared ? "Note Shared" : "Note Made Private",
-          description: isShared ? "Your note is now visible to others." : "Your note is now private.",
+          title: isShared ? "Stick Shared" : "Stick Made Private",
+          description: isShared ? "Your Stick is now visible to others." : "Your Stick is now private.",
         })
       } catch (err) {
         const errorMessage = err instanceof Error ? err.message : "Failed to update sharing"
@@ -100,7 +100,7 @@ export function useNotesActions({
         await handleUpdateNote(noteId, { color })
         toast({
           title: "Color Updated",
-          description: "Note color has been changed successfully.",
+          description: "Stick color has been changed successfully.",
         })
       } catch (err) {
         const errorMessage = err instanceof Error ? err.message : "Failed to update color"
@@ -133,8 +133,8 @@ export function useNotesActions({
       }, 10000)
 
       toast({
-        title: "Note Deleted",
-        description: "Note moved to trash. You can undo this action.",
+        title: "Stick Deleted",
+        description: "Stick moved to trash. You can undo this action.",
       })
     },
     [allNotes, addToDeletedNotes, setAllNotes, handleDeleteNote, toast],

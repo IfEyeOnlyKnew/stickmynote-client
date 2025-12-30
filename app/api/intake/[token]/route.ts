@@ -1,10 +1,10 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { createDatabaseClient } from "@/lib/database/database-adapter"
 
-export async function GET(request: NextRequest, { params }: { params: { token: string } }) {
+export async function GET(request: NextRequest, { params }: { params: Promise<{ token: string }> }) {
+  const { token } = await params
   try {
     const db = await createDatabaseClient()
-    const { token } = params
 
     // Fetch form by token (public access)
     const { data: form, error: formError } = await db

@@ -3,10 +3,10 @@ import { createDatabaseClient } from "@/lib/database/database-adapter"
 import { getCachedAuthUser } from "@/lib/auth/cached-auth"
 
 // POST: Mark article as helpful
-export async function POST(request: NextRequest, { params }: { params: { padId: string; articleId: string } }) {
+export async function POST(request: NextRequest, { params }: { params: Promise<{ padId: string; articleId: string }> }) {
   try {
+    const { articleId } = await params
     const db = await createDatabaseClient()
-    const { articleId } = params
 
     const authResult = await getCachedAuthUser()
     if (authResult.rateLimited) {
@@ -42,10 +42,10 @@ export async function POST(request: NextRequest, { params }: { params: { padId: 
 }
 
 // DELETE: Remove helpful vote
-export async function DELETE(request: NextRequest, { params }: { params: { padId: string; articleId: string } }) {
+export async function DELETE(request: NextRequest, { params }: { params: Promise<{ padId: string; articleId: string }> }) {
   try {
+    const { articleId } = await params
     const db = await createDatabaseClient()
-    const { articleId } = params
 
     const authResult = await getCachedAuthUser()
     if (authResult.rateLimited) {

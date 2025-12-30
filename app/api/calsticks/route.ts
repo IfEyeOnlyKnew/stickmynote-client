@@ -88,7 +88,7 @@ async function getCachedResponse(cacheKey: string) {
   return response
 }
 
-// Helper: Build base query for calsticks
+// Helper: Build base query for calsticks (without nested joins for PostgreSQL adapter)
 function buildBaseQuery(db: any, orgId: string, offset: number, limit: number) {
   return db
     .from("paks_pad_stick_replies")
@@ -98,9 +98,7 @@ function buildBaseQuery(db: any, orgId: string, offset: number, limit: number) {
       calstick_date, calstick_completed, calstick_completed_at,
       calstick_progress, calstick_status, calstick_priority,
       calstick_assignee_id, calstick_estimated_hours, calstick_actual_hours,
-      calstick_start_date, social_stick_id, created_at, updated_at,
-      user:users!paks_pad_stick_replies_user_id_fkey(id, username, full_name, email, avatar_url),
-      stick:paks_pad_sticks(id, topic, content, user_id, pad_id, pad:paks_pads(id, name, owner_id))
+      calstick_start_date, social_stick_id, created_at, updated_at
     `,
       { count: "exact" },
     )
@@ -108,6 +106,43 @@ function buildBaseQuery(db: any, orgId: string, offset: number, limit: number) {
     .eq("org_id", orgId)
     .order("calstick_date", { ascending: true, nullsFirst: false })
     .range(offset, offset + limit - 1)
+}
+
+// Helper: Fetch related user and stick data separately
+async function attachRelatedData(db: any, calsticks: any[]) {
+  if (!calsticks.length) return calsticks
+
+  // Get unique user IDs and stick IDs
+  const userIds = [...new Set(calsticks.map((cs: any) => cs.user_id).filter(Boolean))]
+  const stickIds = [...new Set(calsticks.map((cs: any) => cs.stick_id).filter(Boolean))]
+
+  // Fetch users
+  const { data: users } = userIds.length > 0
+    ? await db.from("users").select("id, username, full_name, email, avatar_url").in("id", userIds)
+    : { data: [] }
+
+  // Fetch sticks
+  const { data: sticks } = stickIds.length > 0
+    ? await db.from("paks_pad_sticks").select("id, topic, content, user_id, pad_id").in("id", stickIds)
+    : { data: [] }
+
+  // Fetch pads for the sticks
+  const padIds = [...new Set((sticks || []).map((s: any) => s.pad_id).filter(Boolean))]
+  const { data: pads } = padIds.length > 0
+    ? await db.from("paks_pads").select("id, name, owner_id").in("id", padIds)
+    : { data: [] }
+
+  // Create lookup maps
+  const userMap = Object.fromEntries((users || []).map((u: any) => [u.id, u]))
+  const padMap = Object.fromEntries((pads || []).map((p: any) => [p.id, p]))
+  const stickMap = Object.fromEntries((sticks || []).map((s: any) => [s.id, { ...s, pad: padMap[s.pad_id] || null }]))
+
+  // Attach related data to calsticks
+  return calsticks.map((cs: any) => ({
+    ...cs,
+    user: userMap[cs.user_id] || null,
+    stick: stickMap[cs.stick_id] || null,
+  }))
 }
 
 export async function GET(request: NextRequest) {
@@ -154,17 +189,18 @@ export async function GET(request: NextRequest) {
 
     query = applyFilterToQuery(query, filter)
 
-    if (padId !== "all") {
-      query = query.eq("paks_pad_sticks.pad_id", padId)
-    }
+    // Note: padId filtering is done in post-processing via filterByPadId since we're not joining tables
 
     const { data: allCalsticks, error, count } = await query
 
     if (error) {
+      console.error("[calsticks] Query error:", error)
       return NextResponse.json({ error: "Failed to fetch CalSticks" }, { status: 500 })
     }
 
-    const userCalsticks = filterByUserOwnership(allCalsticks || [], user.id)
+    // Attach related user and stick data
+    const calsticksWithRelatedData = await attachRelatedData(db, allCalsticks || [])
+    const userCalsticks = filterByUserOwnership(calsticksWithRelatedData, user.id)
     const padFilteredCalsticks = filterByPadId(userCalsticks, padId)
     const calsticksWithAssignees = await attachAssignees(db, padFilteredCalsticks)
     const finalCalsticks = filterBySearch(calsticksWithAssignees, search)

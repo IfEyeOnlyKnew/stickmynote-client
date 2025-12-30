@@ -1,82 +1,72 @@
 import { NextResponse } from "next/server"
-import { generateText } from "ai"
 import { createDatabaseClient } from "@/lib/database/database-adapter"
 import { getCachedAuthUser, createRateLimitResponse, createUnauthorizedResponse } from "@/lib/auth/cached-auth"
+import { getOrgContext } from "@/lib/auth/get-org-context"
 
 type Hyperlink = { url: string; title: string }
 
-function parseJsonArrayResponse(response: string, fallback: string[] = []): string[] {
+async function fetchSearXNGResults(query: string): Promise<Hyperlink[]> {
+  const searxngUrl = process.env.SEARXNG_URL || "https://searx.be"
+
   try {
-    const parsed = JSON.parse(response.trim())
-    if (!Array.isArray(parsed)) return fallback
-    return parsed
-      .filter((item) => typeof item === "string" && item.trim().length > 0)
-      .map((item) => item.trim())
-  } catch {
-    return fallback
-  }
-}
+    console.log(`[Generate Links] Fetching from SearXNG: ${searxngUrl}/search?q=${encodeURIComponent(query)}`)
 
-function parseTags(response: string): string[] {
-  const tags = parseJsonArrayResponse(response)
-  if (tags.length > 0) {
-    return tags.map((tag) => tag.toLowerCase()).slice(0, 5)
-  }
-  const words = response.toLowerCase().match(/\b\w+\b/g) || []
-  return words.slice(0, 3)
-}
-
-function parseSearchQueries(response: string, fallbackTags: string[]): string[] {
-  const queries = parseJsonArrayResponse(response)
-  if (queries.length > 0) return queries.slice(0, 5)
-  return fallbackTags.map((tag) => `${tag} tutorial guide`)
-}
-
-async function fetchBraveSearchWithRetry(query: string, maxRetries = 2): Promise<Hyperlink[]> {
-  for (let retries = 0; retries <= maxRetries; retries++) {
-    try {
-      const response = await fetch(
-        `https://api.search.brave.com/res/v1/web/search?q=${encodeURIComponent(query)}&count=3`,
-        {
-          headers: {
-            "X-Subscription-Token": process.env.BRAVE_API_KEY!,
-            Accept: "application/json",
-          },
+    const response = await fetch(
+      `${searxngUrl}/search?q=${encodeURIComponent(query)}&format=json&categories=general`,
+      {
+        headers: {
+          Accept: "application/json",
         },
-      )
+      },
+    )
 
-      if (response.status === 429 && retries < maxRetries) {
-        await new Promise((resolve) => setTimeout(resolve, Math.pow(2, retries) * 1000))
-        continue
-      }
+    if (!response.ok) {
+      console.warn(`[Generate Links] SearXNG returned status ${response.status}`)
+      return []
+    }
 
-      if (!response.ok) return []
+    const data = await response.json()
+    const hyperlinks: Hyperlink[] = []
 
-      const data = await response.json()
-      return (data.web?.results || []).map((result: { url: string; title?: string }) => ({
-        url: result.url,
-        title: result.title || result.url,
-      }))
-    } catch (fetchError) {
-      console.warn(`Fetch error on retry ${retries}:`, fetchError)
-      if (retries < maxRetries) {
-        await new Promise((resolve) => setTimeout(resolve, 1000))
-        continue
+    if (data.results && Array.isArray(data.results)) {
+      for (const result of data.results) {
+        if (result.url && result.title) {
+          hyperlinks.push({
+            url: result.url,
+            title: result.title.substring(0, 100) + (result.title.length > 100 ? "..." : ""),
+          })
+        }
       }
     }
+
+    console.log(`[Generate Links] Found ${hyperlinks.length} results for query: ${query}`)
+    return hyperlinks.slice(0, 5)
+  } catch (fetchError) {
+    console.error("[Generate Links] SearXNG fetch error:", fetchError)
+    return []
   }
-  return []
 }
 
 async function fetchHyperlinks(searchQueries: string[]): Promise<Hyperlink[]> {
-  if (!process.env.BRAVE_API_KEY || searchQueries.length === 0) return []
+  if (searchQueries.length === 0) return []
 
   try {
-    const searchPromises = searchQueries.slice(0, 2).map((query) => fetchBraveSearchWithRetry(query))
+    const searchPromises = searchQueries.slice(0, 3).map((query) => fetchSearXNGResults(query))
     const searchResults = await Promise.all(searchPromises)
-    return searchResults.flat().slice(0, 8)
+
+    // Deduplicate by URL
+    const seen = new Set<string>()
+    const uniqueResults: Hyperlink[] = []
+    for (const result of searchResults.flat()) {
+      if (!seen.has(result.url)) {
+        seen.add(result.url)
+        uniqueResults.push(result)
+      }
+    }
+
+    return uniqueResults.slice(0, 8)
   } catch (error) {
-    console.error("Error fetching from Brave API:", error)
+    console.error("[Generate Links] Error fetching hyperlinks:", error)
     return []
   }
 }
@@ -88,91 +78,109 @@ function formatHyperlinks(hyperlinks: Hyperlink[]): Hyperlink[] {
   }))
 }
 
-async function generateTagsFromAI(noteText: string): Promise<string[]> {
-  const tagsResult = await generateText({
-    model: "xai/grok-3" as any,
-    prompt: `Analyze the following note content and generate 3-5 relevant tags that categorize the main topics, themes, or subjects discussed. Return only the tags as a JSON array of strings, no additional text or formatting.
+function generateSearchQueries(topic: string, content: string): string[] {
+  // Create search queries directly from topic and content without AI
+  const queries: string[] = []
 
-Note content: "${noteText}"
+  // Use topic as primary search query
+  if (topic && topic.trim()) {
+    queries.push(topic.trim())
+    queries.push(`${topic.trim()} tutorial`)
+    queries.push(`${topic.trim()} guide`)
+  }
 
-Example response format: ["technology", "productivity", "planning"]`,
-  })
-  return parseTags(tagsResult.text || "[]")
-}
+  // Extract key phrases from content (first 100 chars)
+  if (content && content.trim()) {
+    const contentPreview = content.trim().substring(0, 100)
+    // Get first sentence or phrase
+    const firstPhrase = contentPreview.split(/[.!?]/)[0]?.trim()
+    if (firstPhrase && firstPhrase.length > 5 && !queries.includes(firstPhrase)) {
+      queries.push(firstPhrase)
+    }
+  }
 
-async function generateSearchQueriesFromAI(noteText: string, fallbackTags: string[]): Promise<string[]> {
-  const searchQueriesResult = await generateText({
-    model: "xai/grok-3" as any,
-    prompt: `Based on the following note content, generate 3-5 specific search queries that would help find relevant, useful websites and resources. Focus on actionable, informative content rather than generic searches.
-
-Note content: "${noteText}"
-
-Return only a JSON array of search query strings, no additional text.
-
-Example response format: ["react hooks tutorial", "javascript best practices 2024", "web development tools"]`,
-  })
-  return parseSearchQueries(searchQueriesResult.text || "[]", fallbackTags)
+  return queries.slice(0, 3)
 }
 
 async function validateAndAuthorize() {
   const { user, error: authError } = await getCachedAuthUser()
-  
+
   if (authError === "rate_limited") return { error: createRateLimitResponse() }
   if (!user) return { error: createUnauthorizedResponse() }
 
   return { user }
 }
 
-async function validateStickOwnership(db: Awaited<ReturnType<typeof createDatabaseClient>>, stickId: string, userId: string) {
+async function checkStickAccess(db: Awaited<ReturnType<typeof createDatabaseClient>>, stickId: string, userId: string, orgId: string) {
+  // Check if user owns the stick
   const { data: stick, error: stickError } = await db
     .from("paks_pad_sticks")
-    .select("user_id")
+    .select("id, user_id, pad_id")
     .eq("id", stickId)
     .maybeSingle()
 
-  if (stickError || !stick) return { error: NextResponse.json({ error: "Stick not found" }, { status: 404 }) }
-  if (stick.user_id !== userId) return { error: NextResponse.json({ error: "Unauthorized" }, { status: 403 }) }
+  if (stickError || !stick) {
+    return { error: NextResponse.json({ error: "Stick not found" }, { status: 404 }) }
+  }
 
-  return { stick }
+  // Owner has access
+  if (stick.user_id === userId) {
+    return { stick }
+  }
+
+  // Check pad membership for non-owners
+  if (stick.pad_id) {
+    const { data: membership } = await db
+      .from("paks_pad_members")
+      .select("role")
+      .eq("pad_id", stick.pad_id)
+      .eq("user_id", userId)
+      .eq("accepted", true)
+      .maybeSingle()
+
+    if (membership && (membership.role === "admin" || membership.role === "edit")) {
+      return { stick }
+    }
+  }
+
+  return { error: NextResponse.json({ error: "Unauthorized" }, { status: 403 }) }
 }
 
 function validateInput(topic: string | undefined, content: string | undefined): NextResponse | null {
-  if (!topic && !content) return NextResponse.json({ error: "Missing topic or content" }, { status: 400 })
-  if (!process.env.XAI_API_KEY) return NextResponse.json({ error: "XAI_API_KEY not configured" }, { status: 500 })
+  if (!topic && !content) {
+    return NextResponse.json({ error: "Missing topic or content" }, { status: 400 })
+  }
   return null
 }
 
-async function generateTagsAndHyperlinks(noteText: string): Promise<{ tags: string[]; hyperlinks: Hyperlink[] }> {
-  const tags = await generateTagsFromAI(noteText)
-  const searchQueries = await generateSearchQueriesFromAI(noteText, tags)
+async function generateHyperlinks(topic: string, content: string): Promise<Hyperlink[]> {
+  const searchQueries = generateSearchQueries(topic, content)
+  console.log(`[Generate Links] Search queries: ${JSON.stringify(searchQueries)}`)
+
   const hyperlinks = await fetchHyperlinks(searchQueries)
-  return { tags, hyperlinks: formatHyperlinks(hyperlinks) }
+  return formatHyperlinks(hyperlinks)
 }
 
 function handleError(error: unknown): NextResponse {
   if (error instanceof Error && error.message === "RATE_LIMITED") {
     return createRateLimitResponse()
   }
-  console.error("Error in generate tags API:", error)
+  console.error("[Generate Links] Error:", error)
   return NextResponse.json(
     {
-      error: "Failed to generate tags",
+      error: "Failed to generate links",
       details: error instanceof Error ? error.message : "Unknown error",
     },
     { status: 500 },
   )
 }
 
-function buildResponseMessage(tags: string[], hyperlinks: Hyperlink[]): string | undefined {
-  return tags.length === 0 && hyperlinks.length === 0
-    ? "Having issues now or no results to display at this time."
-    : undefined
-}
-
-export async function POST(req: Request, { params }: { params: { id: string } }) {
+export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
+    const { id: stickId } = await params
     const { topic, content } = await req.json()
-    const stickId = params.id
+
+    console.log(`[Generate Links] Request for stick ${stickId}, topic: "${topic}"`)
 
     const inputError = validateInput(topic, content)
     if (inputError) return inputError
@@ -183,60 +191,44 @@ export async function POST(req: Request, { params }: { params: { id: string } })
     const { user } = authResult
     const db = await createDatabaseClient()
 
-    const ownershipResult = await validateStickOwnership(db, stickId, user.id)
-    if ("error" in ownershipResult) return ownershipResult.error
-
-    const noteText = `${topic || ""} ${content || ""}`.trim()
-    if (!noteText) return NextResponse.json({ error: "No content to analyze" }, { status: 400 })
-
-    const { tags, hyperlinks } = await generateTagsAndHyperlinks(noteText)
-
-    if (tags.length > 0 || hyperlinks.length > 0) {
-      await saveStickTags(db, stickId, tags, user.id)
-      await saveStickHyperlinks(db, stickId, hyperlinks, user.id)
+    const orgContext = await getOrgContext(user.id)
+    if (!orgContext) {
+      return NextResponse.json({ error: "Organization context required" }, { status: 403 })
     }
 
+    const accessResult = await checkStickAccess(db, stickId, user.id, orgContext.orgId)
+    if ("error" in accessResult) return accessResult.error
+
+    const noteText = `${topic || ""} ${content || ""}`.trim()
+    if (!noteText) {
+      return NextResponse.json({ error: "No content to analyze" }, { status: 400 })
+    }
+
+    const hyperlinks = await generateHyperlinks(topic || "", content || "")
+    console.log(`[Generate Links] Generated ${hyperlinks.length} hyperlinks`)
+
+    if (hyperlinks.length > 0) {
+      await saveStickHyperlinks(db, stickId, hyperlinks, user.id, orgContext.orgId)
+    }
+
+    // Return both tags (empty) and hyperlinks for backward compatibility
     return NextResponse.json({
-      tags,
+      tags: [],
       hyperlinks,
-      message: buildResponseMessage(tags, hyperlinks),
+      message: hyperlinks.length === 0 ? "No links found for this content." : undefined,
     })
   } catch (error) {
     return handleError(error)
   }
 }
 
-async function saveStickTags(db: Awaited<ReturnType<typeof createDatabaseClient>>, stickId: string, tags: string[], userId: string): Promise<void> {
-  if (tags.length === 0) return
-
-  const { data: existingTagsTab } = await db
-    .from("paks_pad_stick_tabs")
-    .select("id")
-    .eq("stick_id", stickId)
-    .eq("tab_type", "tags")
-    .maybeSingle()
-
-  const tabData = JSON.stringify({ tags })
-
-  if (existingTagsTab) {
-    await db
-      .from("paks_pad_stick_tabs")
-      .update({ tab_data: tabData, updated_at: new Date().toISOString() })
-      .eq("id", existingTagsTab.id)
-  } else {
-    await db.from("paks_pad_stick_tabs").insert({
-      stick_id: stickId,
-      user_id: userId,
-      tab_name: "Tags",
-      tab_type: "tags",
-      tab_content: "",
-      tab_data: tabData,
-      tab_order: 97,
-    })
-  }
-}
-
-async function saveStickHyperlinks(db: Awaited<ReturnType<typeof createDatabaseClient>>, stickId: string, hyperlinks: Hyperlink[], userId: string): Promise<void> {
+async function saveStickHyperlinks(
+  db: Awaited<ReturnType<typeof createDatabaseClient>>,
+  stickId: string,
+  hyperlinks: Hyperlink[],
+  userId: string,
+  orgId: string
+): Promise<void> {
   if (hyperlinks.length === 0) return
 
   const { data: existingLinksTab } = await db
@@ -244,6 +236,7 @@ async function saveStickHyperlinks(db: Awaited<ReturnType<typeof createDatabaseC
     .select("id")
     .eq("stick_id", stickId)
     .eq("tab_type", "links")
+    .eq("org_id", orgId)
     .maybeSingle()
 
   const tabData = JSON.stringify({ hyperlinks })
@@ -253,10 +246,12 @@ async function saveStickHyperlinks(db: Awaited<ReturnType<typeof createDatabaseC
       .from("paks_pad_stick_tabs")
       .update({ tab_data: tabData, updated_at: new Date().toISOString() })
       .eq("id", existingLinksTab.id)
+      .eq("org_id", orgId)
   } else {
     await db.from("paks_pad_stick_tabs").insert({
       stick_id: stickId,
       user_id: userId,
+      org_id: orgId,
       tab_name: "Links",
       tab_type: "links",
       tab_content: "",
@@ -264,4 +259,6 @@ async function saveStickHyperlinks(db: Awaited<ReturnType<typeof createDatabaseC
       tab_order: 98,
     })
   }
+
+  console.log(`[Generate Links] Saved ${hyperlinks.length} hyperlinks to database`)
 }

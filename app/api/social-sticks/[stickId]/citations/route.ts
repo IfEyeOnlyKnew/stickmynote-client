@@ -3,10 +3,10 @@ import { createDatabaseClient } from "@/lib/database/database-adapter"
 import { getCachedAuthUser, createRateLimitResponse, createUnauthorizedResponse } from "@/lib/auth/cached-auth"
 
 // GET: Fetch citations for a stick
-export async function GET(request: NextRequest, { params }: { params: { stickId: string } }) {
+export async function GET(request: NextRequest, { params }: { params: Promise<{ stickId: string }> }) {
   try {
+    const { stickId } = await params
     const db = await createDatabaseClient()
-    const { stickId } = params
 
     const authResult = await getCachedAuthUser()
     if (authResult.rateLimited) {
@@ -18,17 +18,7 @@ export async function GET(request: NextRequest, { params }: { params: { stickId:
 
     const { data: citations, error } = await db
       .from("social_stick_citations")
-      .select(
-        `
-        *,
-        kb_article:social_pad_knowledge_base(
-          id,
-          title,
-          category,
-          tags
-        )
-      `,
-      )
+      .select("*")
       .eq("stick_id", stickId)
       .order("created_at", { ascending: false })
 
@@ -37,7 +27,21 @@ export async function GET(request: NextRequest, { params }: { params: { stickId:
       return NextResponse.json({ error: error.message }, { status: 500 })
     }
 
-    const citedByIds = [...new Set((citations || []).map((c) => c.cited_by).filter(Boolean))]
+    // Fetch related KB articles separately
+    const kbArticleIds = [...new Set((citations || []).map((c: any) => c.kb_article_id).filter(Boolean))]
+    let kbArticleMap: Record<string, { id: string; title: string; category: string; tags: string[] }> = {}
+    if (kbArticleIds.length > 0) {
+      const { data: kbArticles } = await db
+        .from("social_pad_knowledge_base")
+        .select("id, title, category, tags")
+        .in("id", kbArticleIds)
+
+      if (kbArticles) {
+        kbArticleMap = Object.fromEntries(kbArticles.map((kb: any) => [kb.id, kb]))
+      }
+    }
+
+    const citedByIds = [...new Set((citations || []).map((c: any) => c.cited_by).filter(Boolean))]
     let usersMap: Record<
       string,
       { id: string; full_name: string | null; email: string | null; avatar_url: string | null }
@@ -60,9 +64,10 @@ export async function GET(request: NextRequest, { params }: { params: { stickId:
       }
     }
 
-    // Combine citations with user data
-    const citationsWithUsers = (citations || []).map((citation) => ({
+    // Combine citations with user and kb_article data
+    const citationsWithUsers = (citations || []).map((citation: any) => ({
       ...citation,
+      kb_article: citation.kb_article_id ? kbArticleMap[citation.kb_article_id] || null : null,
       cited_by_user: citation.cited_by ? usersMap[citation.cited_by] || null : null,
     }))
 
@@ -74,10 +79,10 @@ export async function GET(request: NextRequest, { params }: { params: { stickId:
 }
 
 // POST: Add a citation to a stick
-export async function POST(request: NextRequest, { params }: { params: { stickId: string } }) {
+export async function POST(request: NextRequest, { params }: { params: Promise<{ stickId: string }> }) {
   try {
+    const { stickId } = await params
     const db = await createDatabaseClient()
-    const { stickId } = params
 
     const authResult = await getCachedAuthUser()
     if (authResult.rateLimited) {
@@ -106,17 +111,7 @@ export async function POST(request: NextRequest, { params }: { params: { stickId
         external_title: external_title || null,
         cited_by: user.id,
       })
-      .select(
-        `
-        *,
-        kb_article:social_pad_knowledge_base(
-          id,
-          title,
-          category,
-          tags
-        )
-      `,
-      )
+      .select("*")
       .single()
 
     if (error) {
@@ -124,16 +119,19 @@ export async function POST(request: NextRequest, { params }: { params: { stickId
       return NextResponse.json({ error: error.message }, { status: 500 })
     }
 
-    const { data: citedByUser } = await db
-      .from("users")
-      .select("id, full_name, email, avatar_url")
-      .eq("id", user.id)
-      .maybeSingle()
+    // Fetch related data separately
+    const [kbArticleResult, citedByUserResult] = await Promise.all([
+      kb_article_id
+        ? db.from("social_pad_knowledge_base").select("id, title, category, tags").eq("id", kb_article_id).maybeSingle()
+        : Promise.resolve({ data: null }),
+      db.from("users").select("id, full_name, email, avatar_url").eq("id", user.id).maybeSingle(),
+    ])
 
     return NextResponse.json({
       citation: {
         ...citation,
-        cited_by_user: citedByUser,
+        kb_article: kbArticleResult.data || null,
+        cited_by_user: citedByUserResult.data || null,
       },
     })
   } catch (error) {
@@ -143,10 +141,10 @@ export async function POST(request: NextRequest, { params }: { params: { stickId
 }
 
 // DELETE: Remove a citation
-export async function DELETE(request: NextRequest, { params }: { params: { stickId: string } }) {
+export async function DELETE(request: NextRequest, { params }: { params: Promise<{ stickId: string }> }) {
   try {
+    const { stickId } = await params
     const db = await createDatabaseClient()
-    const { stickId } = params
 
     const authResult = await getCachedAuthUser()
     if (authResult.rateLimited) {

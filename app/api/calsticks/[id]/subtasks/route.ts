@@ -26,16 +26,31 @@ const SUBTASKS_SELECT = `
   calstick_progress,
   calstick_checklist_items,
   created_at,
-  updated_at,
-  user:users!paks_pad_stick_replies_user_id_fkey(
-    id,
-    username,
-    full_name,
-    email
-  )
+  updated_at
 `
 
-export async function GET(request: NextRequest, { params }: { params: { id: string } }) {
+// Helper to attach user data to subtasks
+async function attachUsersToSubtasks(db: any, subtasks: any[]) {
+  if (!subtasks.length) return subtasks
+
+  const userIds = [...new Set(subtasks.map((s: any) => s.user_id).filter(Boolean))]
+  if (userIds.length === 0) return subtasks.map(s => ({ ...s, user: null }))
+
+  const { data: users } = await db
+    .from("users")
+    .select("id, username, full_name, email")
+    .in("id", userIds)
+
+  const userMap = Object.fromEntries((users || []).map((u: any) => [u.id, u]))
+
+  return subtasks.map((s: any) => ({
+    ...s,
+    user: userMap[s.user_id] || null,
+  }))
+}
+
+export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params
   try {
     const db = await createDatabaseClient()
 
@@ -52,7 +67,7 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
       return NextResponse.json({ error: "No organization context" }, { status: 403 })
     }
 
-    const parentId = params.id
+    const parentId = id
 
     const { data: subtasks, error } = await db
       .from("paks_pad_stick_replies")
@@ -67,7 +82,10 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
       return NextResponse.json({ error: "Failed to fetch subtasks" }, { status: 500 })
     }
 
-    return NextResponse.json({ subtasks: subtasks || [] })
+    // Attach user data to subtasks
+    const subtasksWithUsers = await attachUsersToSubtasks(db, subtasks || [])
+
+    return NextResponse.json({ subtasks: subtasksWithUsers })
   } catch (error) {
     console.error("Error in subtasks GET:", error)
     return NextResponse.json({ error: "Internal server error" }, { status: 500 })

@@ -2,8 +2,9 @@ import { type NextRequest, NextResponse } from "next/server"
 import { createDatabaseClient } from "@/lib/database/database-adapter"
 import { getCachedAuthUser } from "@/lib/auth/cached-auth"
 
-export async function POST(request: NextRequest, { params }: { params: { id: string } }) {
+export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
+    const { id } = await params
     const db = await createDatabaseClient()
 
     const authResult = await getCachedAuthUser()
@@ -30,7 +31,7 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
       return NextResponse.json({ error: "No organization context" }, { status: 403 })
     }
 
-    const noteId = params.id
+    const noteId = id
     const orgId = membership.org_id
 
     const { data: note, error: noteError } = await db
@@ -82,10 +83,11 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
   }
 }
 
-export async function GET(request: NextRequest, { params }: { params: { id: string } }) {
+export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
+    const { id } = await params
     const db = await createDatabaseClient()
-    const noteId = params.id
+    const noteId = id
 
     const authResult = await getCachedAuthUser()
     if (authResult.rateLimited) {

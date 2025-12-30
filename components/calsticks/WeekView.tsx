@@ -141,7 +141,7 @@ export function WeekView({
               ) : (
                 <Circle className="h-4 w-4 text-gray-400 flex-shrink-0" />
               )}
-              <span className="text-sm font-medium truncate">{activeTask.stick?.topic || "Untitled"}</span>
+              <span className="text-sm font-medium truncate">{activeTask.content || activeTask.stick?.topic || "Untitled"}</span>
             </div>
           </Card>
         ) : null}

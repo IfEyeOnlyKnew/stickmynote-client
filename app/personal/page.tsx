@@ -36,14 +36,47 @@ export default async function NotesPage() {
 
     // Fetch initial notes using direct database query
     const notesResult = await db.query(
-      `SELECT * FROM personal_sticks 
-       WHERE user_id = $1 
-       ORDER BY created_at DESC 
+      `SELECT * FROM personal_sticks
+       WHERE user_id = $1
+       ORDER BY created_at DESC
        LIMIT 20`,
       [userId]
     )
 
-    const initialNotes: Note[] = notesResult.rows || []
+    const rawNotes = notesResult.rows || []
+
+    // Get note IDs to fetch related tabs (hyperlinks)
+    const noteIds = rawNotes.map((n: { id: string }) => n.id)
+
+    // Fetch tabs that contain hyperlinks
+    let tabsMap = new Map<string, { url: string; title?: string }[]>()
+    if (noteIds.length > 0) {
+      const tabsResult = await db.query(
+        `SELECT personal_stick_id, tab_name, tags
+         FROM personal_sticks_tabs
+         WHERE personal_stick_id = ANY($1) AND tab_name = 'Tags'`,
+        [noteIds]
+      )
+
+      for (const tab of tabsResult.rows || []) {
+        if (tab.tags) {
+          try {
+            const hyperlinks = typeof tab.tags === 'string'
+              ? JSON.parse(tab.tags)
+              : tab.tags
+            tabsMap.set(tab.personal_stick_id, hyperlinks)
+          } catch {
+            // Ignore parse errors
+          }
+        }
+      }
+    }
+
+    // Merge hyperlinks into notes
+    const initialNotes: Note[] = rawNotes.map((note: any) => ({
+      ...note,
+      hyperlinks: tabsMap.get(note.id) || [],
+    }))
 
     // Get counts
     const countResult = await db.query(

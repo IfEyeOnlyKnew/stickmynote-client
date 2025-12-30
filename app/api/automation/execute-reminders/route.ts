@@ -104,19 +104,43 @@ export async function POST(req: NextRequest) {
     const db = await createDatabaseClient()
     const now = new Date().toISOString()
 
+    // Fetch reminders without join
     const { data: reminders, error } = await db
       .from("task_reminders")
-      .select("*, stick_replies!inner(*, org_id)")
+      .select("*")
       .eq("is_sent", false)
       .lte("remind_at", now)
       .limit(100)
 
     if (error) throw error
 
+    // Get reply IDs from reminders and fetch stick_replies separately
+    const replyIds = (reminders || []).map((r: any) => r.reply_id).filter(Boolean)
+    let repliesMap = new Map<string, any>()
+
+    if (replyIds.length > 0) {
+      const { data: replies } = await db
+        .from("stick_replies")
+        .select("id, org_id, content, calstick_status, calstick_date")
+        .in("id", replyIds)
+
+      for (const reply of replies || []) {
+        repliesMap.set(reply.id, reply)
+      }
+    }
+
+    // Combine reminders with their replies
+    const remindersWithReplies = (reminders || [])
+      .map((reminder: any) => ({
+        ...reminder,
+        stick_replies: repliesMap.get(reminder.reply_id) || null,
+      }))
+      .filter((r: any) => r.stick_replies) // Only process reminders with valid replies
+
     const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000"
 
     const results = await Promise.all(
-      (reminders || []).map((reminder) => processReminder(db, reminder as TaskReminder, siteUrl))
+      remindersWithReplies.map((reminder: any) => processReminder(db, reminder as TaskReminder, siteUrl))
     )
 
     return NextResponse.json({ processed: results.length, results })

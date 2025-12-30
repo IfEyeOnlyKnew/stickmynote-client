@@ -31,16 +31,54 @@ export async function GET() {
         calstick_labels,
         created_at,
         updated_at,
-        stick:paks_pad_sticks(
-          topic,
-          pad:paks_pads(name)
-        )
+        stick_id
       `)
       .eq("is_calstick", true)
       .or(`user_id.eq.${user.id},calstick_assignee_id.eq.${user.id}`)
       .order("calstick_date", { ascending: false })
 
     if (error) throw error
+
+    // Fetch related sticks and pads separately
+    const stickIds = [...new Set((tasks || []).map((t: any) => t.stick_id).filter(Boolean))]
+    let stickMap: Record<string, { topic?: string; pad_id?: string }> = {}
+    let padMap: Record<string, { name?: string }> = {}
+
+    if (stickIds.length > 0) {
+      const { data: sticks } = await db
+        .from("paks_pad_sticks")
+        .select("id, topic, pad_id")
+        .in("id", stickIds)
+
+      if (sticks) {
+        stickMap = Object.fromEntries(sticks.map((s: any) => [s.id, { topic: s.topic, pad_id: s.pad_id }]))
+
+        // Fetch pads
+        const padIds = [...new Set(sticks.map((s: any) => s.pad_id).filter(Boolean))]
+        if (padIds.length > 0) {
+          const { data: pads } = await db
+            .from("paks_pads")
+            .select("id, name")
+            .in("id", padIds)
+
+          if (pads) {
+            padMap = Object.fromEntries(pads.map((p: any) => [p.id, { name: p.name }]))
+          }
+        }
+      }
+    }
+
+    // Attach stick and pad data to tasks
+    const tasksWithData = (tasks || []).map((task: any) => {
+      const stick = stickMap[task.stick_id] || null
+      return {
+        ...task,
+        stick: stick ? {
+          topic: stick.topic,
+          pad: stick.pad_id ? padMap[stick.pad_id] || null : null,
+        } : null,
+      }
+    })
 
     // Generate CSV content
     const headers = [
@@ -61,7 +99,7 @@ export async function GET() {
 
     const csvRows = [headers.join(",")]
 
-    tasks?.forEach((task: any) => {
+    tasksWithData.forEach((task: any) => {
       const row = [
         task.id,
         `"${(task.stick?.topic || "").replace(/"/g, '""')}"`,

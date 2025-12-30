@@ -12,9 +12,8 @@ async function initializeBlobModule() {
   }
 }
 
-function getTableConfig(isStick: boolean, isTeamNote: boolean): { tableName: string; noteIdField: string } {
+function getTableConfig(isStick: boolean): { tableName: string; noteIdField: string } {
   if (isStick) return { tableName: "stick_tabs", noteIdField: "stick_id" }
-  if (isTeamNote) return { tableName: "team_note_tabs", noteIdField: "team_note_id" }
   return { tableName: "note_tabs", noteIdField: "note_id" }
 }
 
@@ -69,7 +68,7 @@ export async function DELETE(request: NextRequest) {
     }
 
     const body = await request.json()
-    const { noteId, exportUrl, isTeamNote, isStick } = body
+    const { noteId, exportUrl, isStick } = body
 
     if (!noteId || !exportUrl) {
       return NextResponse.json({ error: "Missing required fields" }, { status: 400 })
@@ -78,7 +77,7 @@ export async function DELETE(request: NextRequest) {
     await deleteFromBlobStorage(exportUrl)
 
     const db = await createDatabaseClient()
-    const { tableName, noteIdField } = getTableConfig(isStick, isTeamNote)
+    const { tableName, noteIdField } = getTableConfig(isStick)
 
     const { data: detailsTabs, error: fetchError } = await db
       .from(tableName)

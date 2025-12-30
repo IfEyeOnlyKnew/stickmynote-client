@@ -5,11 +5,10 @@ import { query } from '@/lib/database/pg-helpers'
 import { handleApiError } from '@/lib/api/handle-api-error'
 
 // GET /api/v2/organizations/[orgId]/pads/[padId]/invites - List invites for a pad within an organization
-export async function GET(request: NextRequest, { params }: { params: { orgId: string, padId: string } }) {
+export async function GET(request: NextRequest, { params }: { params: Promise<{ orgId: string, padId: string }> }) {
   try {
+    const { orgId, padId } = await params
     const session = await requireADSession(request)
-    const orgId = params.orgId
-    const padId = params.padId
     // Only allow access if user is a member of the org or admin
     const isMember = session.user.is_admin || session.user.memberships?.some((m: any) => m.organization_id === orgId)
     if (!isMember) {

@@ -3,7 +3,8 @@ import { getOrgContext } from "@/lib/auth/get-org-context"
 import { getCachedAuthUser, createRateLimitResponse, createUnauthorizedResponse } from "@/lib/auth/cached-auth"
 import { createDatabaseClient } from "@/lib/database/database-adapter"
 
-export async function POST(request: NextRequest, { params }: { params: { stickId: string } }) {
+export async function POST(request: NextRequest, { params }: { params: Promise<{ stickId: string }> }) {
+  const { stickId } = await params
   const db = await createDatabaseClient()
   const authResult = await getCachedAuthUser()
 
@@ -27,7 +28,7 @@ export async function POST(request: NextRequest, { params }: { params: { stickId
     const { data: stick } = await db
       .from("social_sticks")
       .select("user_id")
-      .eq("id", params.stickId)
+      .eq("id", stickId)
       .eq("org_id", orgContext.orgId)
       .maybeSingle()
 
@@ -38,7 +39,7 @@ export async function POST(request: NextRequest, { params }: { params: { stickId
     const { data, error } = await db
       .from("social_stick_media")
       .insert({
-        social_stick_id: params.stickId,
+        social_stick_id: stickId,
         url,
         type,
         filename,
@@ -61,7 +62,8 @@ export async function POST(request: NextRequest, { params }: { params: { stickId
   }
 }
 
-export async function DELETE(request: NextRequest, { params }: { params: { stickId: string } }) {
+export async function DELETE(request: NextRequest, { params }: { params: Promise<{ stickId: string }> }) {
+  const { stickId } = await params
   const db = await createDatabaseClient()
   const authResult = await getCachedAuthUser()
 
@@ -85,7 +87,7 @@ export async function DELETE(request: NextRequest, { params }: { params: { stick
     const { error } = await db
       .from("social_stick_media")
       .delete()
-      .eq("social_stick_id", params.stickId)
+      .eq("social_stick_id", stickId)
       .eq("url", url)
       .eq("user_id", user.id)
       .eq("org_id", orgContext.orgId)

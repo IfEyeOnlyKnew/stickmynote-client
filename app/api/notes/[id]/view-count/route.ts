@@ -1,10 +1,11 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { createDatabaseClient } from "@/lib/database/database-adapter"
 
-export async function GET(request: NextRequest, { params }: { params: { id: string } }) {
+export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
+    const { id } = await params
     const db = await createDatabaseClient()
-    const noteId = params.id
+    const noteId = id
 
     const { data, error } = await db
       .from("personal_sticks_activities")

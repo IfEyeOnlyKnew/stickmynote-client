@@ -15,7 +15,7 @@ export async function GET(request: Request) {
 
     const session = await getSession()
     const user = session?.user
-    const orgContext = user ? await getOrgContext(user.id) : null
+    const orgContext = user ? await getOrgContext() : null
 
     if (isPublic) {
       const cacheKey = APICache.getCacheKey("social-pads", { public: true })
@@ -138,7 +138,7 @@ export async function POST(request: Request) {
 
     const user = session.user
 
-    const orgContext = await getOrgContext(user.id)
+    const orgContext = await getOrgContext()
     if (!orgContext) {
       return NextResponse.json({ error: "No organization context" }, { status: 403 })
     }

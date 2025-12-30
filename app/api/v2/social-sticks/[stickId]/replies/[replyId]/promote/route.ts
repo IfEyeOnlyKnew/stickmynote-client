@@ -33,7 +33,7 @@ export async function POST(
     }
 
     const body = await request.json()
-    const { priority, dueDate, assigneeId } = body
+    const { priority, dueDate, assigneeId, title } = body
 
     // Get reply
     const replyResult = await db.query(
@@ -68,10 +68,48 @@ export async function POST(
 
     const socialStick = stickResult.rows[0]
 
-    // Find or create parent stick
-    const parentResult = await db.query(
-      `SELECT id, pad_id FROM paks_pad_sticks WHERE pad_id = $1 LIMIT 1`,
+    // Get the social pad name to use for the paks_pad
+    const socialPadResult = await db.query(
+      `SELECT id, name FROM social_pads WHERE id = $1`,
       [socialStick.social_pad_id]
+    )
+
+    if (socialPadResult.rows.length === 0) {
+      return new Response(JSON.stringify({ error: 'Social pad not found' }), { status: 404 })
+    }
+
+    const socialPad = socialPadResult.rows[0]
+    const padName = socialPad.name || 'CalSticks'
+
+    // Find or create a paks_pad with the same name as the social pad
+    let paksPadId: string | undefined
+
+    const existingPaksPadResult = await db.query(
+      `SELECT id FROM paks_pads WHERE owner_id = $1 AND org_id = $2 AND name = $3`,
+      [user.id, orgContext.orgId, padName]
+    )
+
+    if (existingPaksPadResult.rows.length > 0) {
+      paksPadId = existingPaksPadResult.rows[0].id
+    } else {
+      // Create a paks_pad with the social pad's name
+      const newPaksPadResult = await db.query(
+        `INSERT INTO paks_pads (name, owner_id, org_id)
+         VALUES ($1, $2, $3)
+         RETURNING id`,
+        [padName, user.id, orgContext.orgId]
+      )
+      paksPadId = newPaksPadResult.rows[0]?.id
+    }
+
+    if (!paksPadId) {
+      return new Response(JSON.stringify({ error: 'Could not find or create CalStick pad' }), { status: 500 })
+    }
+
+    // Find or create parent stick in the paks_pad
+    const parentResult = await db.query(
+      `SELECT id FROM paks_pad_sticks WHERE pad_id = $1 AND user_id = $2 LIMIT 1`,
+      [paksPadId, user.id]
     )
 
     let stickIdForCalstick = parentResult.rows[0]?.id
@@ -82,18 +120,19 @@ export async function POST(
          VALUES ($1, $2, $3, $4, $5, $6)
          RETURNING id`,
         [
-          `Social: ${socialStick.topic || 'Untitled'}`,
+          socialStick.topic || 'Untitled',
           reply.content,
           reply.color,
           user.id,
           orgContext.orgId,
-          socialStick.social_pad_id,
+          paksPadId,
         ]
       )
       stickIdForCalstick = newStickResult.rows[0]?.id
     }
 
-    const calstickContent = `[Promoted from Social Hub Reply]\nTopic: ${socialStick.topic || 'Untitled'}\n\nReply Content:\n${reply.content}`
+    // Use the provided title as the CalStick content, or fall back to reply content
+    const calstickContent = title || reply.content
 
     // Create CalStick
     const calstickResult = await db.query(

@@ -21,10 +21,7 @@ export async function GET(request: Request) {
 
   let query = db
     .from("notification_escalations")
-    .select(`
-      *,
-      rule:notification_escalation_rules(id, name, trigger_type, escalation_channel)
-    `)
+    .select("*")
     .eq("user_id", user.id)
     .order("created_at", { ascending: false })
     .limit(50)
@@ -40,5 +37,25 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: error.message }, { status: 500 })
   }
 
-  return NextResponse.json({ escalations })
+  // Fetch rule data separately
+  const ruleIds = [...new Set((escalations || []).map((e: any) => e.rule_id).filter(Boolean))]
+  let ruleMap: Record<string, any> = {}
+  if (ruleIds.length > 0) {
+    const { data: rules } = await db
+      .from("notification_escalation_rules")
+      .select("id, name, trigger_type, escalation_channel")
+      .in("id", ruleIds)
+
+    if (rules) {
+      ruleMap = Object.fromEntries(rules.map((r: any) => [r.id, r]))
+    }
+  }
+
+  // Attach rule data to escalations
+  const escalationsWithRules = (escalations || []).map((escalation: any) => ({
+    ...escalation,
+    rule: ruleMap[escalation.rule_id] || null,
+  }))
+
+  return NextResponse.json({ escalations: escalationsWithRules })
 }

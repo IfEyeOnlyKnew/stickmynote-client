@@ -1,22 +1,21 @@
-import { generateText } from "ai"
+import { generateText } from "@/lib/ai/ai-provider"
 
 export class GrokService {
   /**
-   * Generate tags for stick content using Grok AI
+   * Generate tags for stick content using configured AI provider
    */
   static async generateTags(content: string, topic?: string): Promise<string[]> {
     try {
       const prompt = `Analyze the following content and generate 3-5 relevant tags (single words or short phrases).
-      
+
 Topic: ${topic || "N/A"}
 Content: ${content}
 
 Return ONLY a comma-separated list of tags, nothing else.`
 
       const { text } = await generateText({
-        model: "xai/grok-beta",
         prompt,
-        maxOutputTokens: 100,
+        maxTokens: 100,
       })
 
       // Parse tags from response
@@ -34,7 +33,7 @@ Return ONLY a comma-separated list of tags, nothing else.`
   }
 
   /**
-   * Summarize stick content using Grok AI
+   * Summarize stick content using configured AI provider
    */
   static async summarizeContent(content: string, maxLength = 150): Promise<string> {
     try {
@@ -45,9 +44,8 @@ ${content}
 Return ONLY the summary, nothing else.`
 
       const { text } = await generateText({
-        model: "xai/grok-beta",
         prompt,
-        maxOutputTokens: 100,
+        maxTokens: 100,
       })
 
       return text.trim().substring(0, maxLength)
@@ -84,9 +82,8 @@ SIMILARITY: [0-100 percentage or 0]
 Be strict - only mark as duplicate if content is very similar (>80% match).`
 
       const { text } = await generateText({
-        model: "xai/grok-beta",
         prompt,
-        maxOutputTokens: 150,
+        maxTokens: 150,
       })
 
       // Parse response
@@ -122,9 +119,8 @@ Content: ${stickContent}
 Return ONLY 3 reply suggestions, one per line, nothing else.`
 
       const { text } = await generateText({
-        model: "xai/grok-beta",
         prompt,
-        maxOutputTokens: 200,
+        maxTokens: 200,
       })
 
       const suggestions = text
@@ -157,9 +153,8 @@ SENTIMENT: [positive/neutral/negative]
 CONFIDENCE: [0-100 percentage]`
 
       const { text } = await generateText({
-        model: "xai/grok-beta",
         prompt,
-        maxOutputTokens: 50,
+        maxTokens: 50,
       })
 
       const sentimentMatch = text.match(/SENTIMENT:\s*(positive|neutral|negative)/i)
@@ -191,9 +186,8 @@ ${availableCategories.map((cat, idx) => `${idx + 1}. ${cat}`).join("\n")}
 Return ONLY the category name that best fits, or "none" if no good match. Return nothing else.`
 
       const { text } = await generateText({
-        model: "xai/grok-beta",
         prompt,
-        maxOutputTokens: 50,
+        maxTokens: 50,
       })
 
       const category = text.trim().toLowerCase()
@@ -231,9 +225,8 @@ Focus on: current status, key decisions, blockers, and next steps. Be concise an
 Return ONLY the summary, nothing else.`
 
       const { text } = await generateText({
-        model: "xai/grok-beta",
         prompt,
-        maxOutputTokens: 150,
+        maxTokens: 150,
       })
 
       return text.trim().substring(0, 300)
@@ -268,9 +261,8 @@ ACTION: [title] | OWNER: [name] | STATUS: [pending/in-progress/done] | DUE: [hin
 If no action items found, return "NONE".`
 
       const { text } = await generateText({
-        model: "xai/grok-beta",
         prompt,
-        maxOutputTokens: 300,
+        maxTokens: 300,
       })
 
       if (text.trim().toUpperCase() === "NONE") {
@@ -329,9 +321,8 @@ Generate questions that:
 Return ONLY 3 questions, one per line, nothing else.`
 
       const { text } = await generateText({
-        model: "xai/grok-beta",
         prompt,
-        maxOutputTokens: 200,
+        maxTokens: 200,
       })
 
       const questions = text
@@ -378,9 +369,8 @@ ANSWER: [your answer]
 CITATIONS: [1], [3] - [brief relevance note]`
 
       const { text } = await generateText({
-        model: "xai/grok-beta",
         prompt,
-        maxOutputTokens: 400,
+        maxTokens: 400,
       })
 
       // Parse response - using [\s\S] instead of 's' flag for dotall behavior

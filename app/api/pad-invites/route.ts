@@ -501,7 +501,7 @@ export async function POST(request: NextRequest) {
 
     const { data: pad, error: padError } = await db
       .from("paks_pads")
-      .select("*, paks_pad_members(*)")
+      .select("*")
       .eq("id", padId)
       .eq("org_id", orgContext.orgId)
       .maybeSingle()
@@ -509,6 +509,15 @@ export async function POST(request: NextRequest) {
     if (padError || !pad) {
       return Errors.padNotFound()
     }
+
+    // Fetch pad members separately
+    const { data: padMembers } = await db
+      .from("paks_pad_members")
+      .select("*")
+      .eq("pad_id", padId)
+      .eq("org_id", orgContext.orgId)
+
+    pad.paks_pad_members = padMembers || []
 
     if (!canInviteMembers(pad, user.id)) {
       return Errors.notAuthorized()

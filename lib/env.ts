@@ -56,6 +56,26 @@ const serverSchema = z.object({
   REDIS_URL: z.string().url().optional(),
 
   // AI Services - OPTIONAL
+  // Provider selection: "auto" | "ollama" | "azure" | "anthropic" | "xai"
+  AI_PROVIDER: z.enum(["auto", "ollama", "azure", "anthropic", "xai"]).optional(),
+
+  // Ollama (local AI - maximum privacy, runs on your own hardware)
+  OLLAMA_BASE_URL: z.string().url().optional(),
+  OLLAMA_MODEL: z.string().optional(),
+
+  // Azure OpenAI (recommended for enterprise privacy - data stays in your tenant)
+  AZURE_OPENAI_RESOURCE_NAME: z.string().optional(),
+  AZURE_OPENAI_DEPLOYMENT_NAME: z.string().optional(),
+  AZURE_OPENAI_API_KEY: z.string().optional(),
+  AZURE_OPENAI_API_VERSION: z.string().optional(),
+  // Custom endpoint for Azure Private Endpoints (maximum privacy)
+  AZURE_OPENAI_ENDPOINT: z.string().url().optional(),
+
+  // Anthropic Claude (high-quality, safety-focused)
+  ANTHROPIC_API_KEY: z.string().optional(),
+  ANTHROPIC_MODEL: z.string().optional(),
+
+  // xAI Grok (external API)
   XAI_API_KEY: z.string().optional(),
 
   // Email (Resend) - OPTIONAL

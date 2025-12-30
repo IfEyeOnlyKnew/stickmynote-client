@@ -24,7 +24,12 @@ function isProtectedRoute(pathname: string): boolean {
 }
 
 function isPublicRoute(pathname: string): boolean {
-  return PUBLIC_ROUTES.some((route) => pathname === route || pathname.startsWith(route))
+  return PUBLIC_ROUTES.some((route) => {
+    if (route === "/") {
+      return pathname === "/"
+    }
+    return pathname === route || pathname.startsWith(route + "/") || pathname.startsWith(route)
+  })
 }
 
 export async function middleware(req: NextRequest) {
@@ -60,33 +65,24 @@ export async function middleware(req: NextRequest) {
   const needsAuthCheck = isProtectedRoute(pathname) && !isPublicRoute(pathname)
 
   if (needsAuthCheck) {
-    try {
-      // Use local auth - import dynamically to avoid edge runtime issues
-      const { getSession } = await import("@/lib/auth/local-auth")
+    // Check for session cookie existence only (Edge-compatible)
+    // Full session validation happens in page/API routes which run in Node.js runtime
+    const sessionCookie = req.cookies.get("session")
 
-      const session = await getSession()
-
-      if (!session) {
-        const redirectUrl = new URL("/auth/login", req.url)
-        const fullPath = pathname + req.nextUrl.search
-        redirectUrl.searchParams.set("redirect", fullPath)
-        return NextResponse.redirect(redirectUrl)
-      }
-
-      Object.entries(securityHeaders).forEach(([key, value]) => {
-        res.headers.set(key, value)
-      })
-
-      res.headers.set("Vary", "Cookie, Authorization")
-
-      return res
-    } catch (error) {
-      console.error("Middleware auth error:", error)
+    if (!sessionCookie?.value) {
       const redirectUrl = new URL("/auth/login", req.url)
       const fullPath = pathname + req.nextUrl.search
       redirectUrl.searchParams.set("redirect", fullPath)
       return NextResponse.redirect(redirectUrl)
     }
+
+    Object.entries(securityHeaders).forEach(([key, value]) => {
+      res.headers.set(key, value)
+    })
+
+    res.headers.set("Vary", "Cookie, Authorization")
+
+    return res
   }
 
   Object.entries(securityHeaders).forEach(([key, value]) => {

@@ -44,14 +44,7 @@ export async function POST(req: Request) {
 
     const { data: sticks } = await db
       .from("paks_pad_sticks")
-      .select(`
-        *,
-        calsticks:paks_pad_stick_replies(
-          count,
-          calstick_status,
-          calstick_completed
-        )
-      `)
+      .select("*")
       .eq("pad_id", padId)
       .eq("org_id", orgContext.orgId)
 
@@ -59,12 +52,29 @@ export async function POST(req: Request) {
       return new NextResponse("Pad not found", { status: 404 })
     }
 
+    // Fetch calstick counts separately for each stick
+    const stickIds = (sticks || []).map((s: any) => s.id)
+    let calstickCounts: Record<string, number> = {}
+    if (stickIds.length > 0) {
+      const { data: calsticks } = await db
+        .from("paks_pad_stick_replies")
+        .select("stick_id")
+        .in("stick_id", stickIds)
+        .eq("is_calstick", true)
+
+      if (calsticks) {
+        calsticks.forEach((c: any) => {
+          calstickCounts[c.stick_id] = (calstickCounts[c.stick_id] || 0) + 1
+        })
+      }
+    }
+
     const sticksContext = sticks
       ?.map(
         (stick: any) => `
       Topic: ${stick.topic || "Untitled"}
       Content: ${stick.content}
-      Tasks: ${stick.calsticks?.[0]?.count || 0}
+      Tasks: ${calstickCounts[stick.id] || 0}
     `,
       )
       .join("\n")

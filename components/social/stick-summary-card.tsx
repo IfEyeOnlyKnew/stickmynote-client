@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, memo } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -39,7 +39,7 @@ interface StickSummaryCardProps {
   showGenerateButton?: boolean
 }
 
-export function StickSummaryCard({
+export const StickSummaryCard = memo(function StickSummaryCard({
   summary,
   actionItems = [],
   suggestedQuestions = [],
@@ -60,7 +60,7 @@ export function StickSummaryCard({
   if (!summary && !actionItems.length && !suggestedQuestions.length) {
     if (showGenerateButton && onRegenerateSummary) {
       return (
-        <Card className="border-dashed border-blue-200 bg-blue-50/30">
+        <Card className="border-dashed border-blue-200 bg-blue-50/30 min-h-[140px]">
           <CardContent className="py-6 text-center">
             <Sparkles className="h-8 w-8 text-blue-400 mx-auto mb-3" />
             <p className="text-sm text-gray-600 mb-3">
@@ -71,7 +71,7 @@ export function StickSummaryCard({
               size="sm"
               onClick={onRegenerateSummary}
               disabled={isLoading}
-              className="border-blue-300 text-blue-700 hover:bg-blue-100 bg-transparent"
+              className="border-blue-300 text-blue-700 hover:bg-blue-100 bg-transparent min-w-[160px]"
             >
               {isLoading ? (
                 <>
@@ -228,4 +228,4 @@ export function StickSummaryCard({
       )}
     </Card>
   )
-}
+})

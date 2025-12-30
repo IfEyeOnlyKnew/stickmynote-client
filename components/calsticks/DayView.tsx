@@ -137,9 +137,11 @@ export function DayView({
                     </button>
                     <div className="flex-1">
                       <h4 className={`font-medium ${task.calstick_completed ? "line-through text-gray-500" : ""}`}>
-                        {task.stick?.topic || "Untitled"}
+                        {task.content || task.stick?.topic || "Untitled"}
                       </h4>
-                      <p className="text-sm text-muted-foreground line-clamp-2">{task.content}</p>
+                      {task.stick?.topic && task.content && (
+                        <p className="text-sm text-muted-foreground line-clamp-1">Topic: {task.stick.topic}</p>
+                      )}
                       {task.calstick_start_time && (
                         <div className="flex items-center gap-1 mt-1 text-xs text-muted-foreground">
                           <Clock className="h-3 w-3" />
@@ -165,7 +167,7 @@ export function DayView({
               ) : (
                 <Circle className="h-4 w-4 text-gray-400 flex-shrink-0" />
               )}
-              <span className="text-sm font-medium truncate">{activeTask.stick?.topic || "Untitled"}</span>
+              <span className="text-sm font-medium truncate">{activeTask.content || activeTask.stick?.topic || "Untitled"}</span>
             </div>
           </Card>
         ) : null}

@@ -28,12 +28,9 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "Missing taskId" }, { status: 400 })
     }
 
-    const { data, error } = await db
+    const { data: values, error } = await db
       .from("custom_field_values")
-      .select(`
-        *,
-        definition:custom_field_definitions(*)
-      `)
+      .select("*")
       .eq("task_id", taskId)
 
     if (error) {
@@ -47,7 +44,27 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "Failed to fetch field values" }, { status: 500 })
     }
 
-    return NextResponse.json({ values: data })
+    // Fetch definitions separately
+    const fieldIds = [...new Set((values || []).map((v: any) => v.field_id).filter(Boolean))]
+    let definitionMap: Record<string, any> = {}
+    if (fieldIds.length > 0) {
+      const { data: definitions } = await db
+        .from("custom_field_definitions")
+        .select("*")
+        .in("id", fieldIds)
+
+      if (definitions) {
+        definitionMap = Object.fromEntries(definitions.map((d: any) => [d.id, d]))
+      }
+    }
+
+    // Attach definitions to values
+    const valuesWithDefinitions = (values || []).map((value: any) => ({
+      ...value,
+      definition: definitionMap[value.field_id] || null,
+    }))
+
+    return NextResponse.json({ values: valuesWithDefinitions })
   } catch (error) {
     console.error("[custom-fields/values GET] Error:", error)
     return NextResponse.json({ error: "Internal server error" }, { status: 500 })

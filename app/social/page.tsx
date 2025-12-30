@@ -218,7 +218,7 @@ interface StickTableRowProps {
   onToggle: (stickId: string) => void
   onSelect: (stickId: string) => void
   onOpen: (stickId: string) => void
-  onPromoteReply: (stickId: string, topic: string, replyId: string, content: string) => void
+  onPromoteReply: (stickId: string, topic: string, stickContent: string, replyId: string, replyContent: string) => void
   onNavigateToCalstick: (calstickId: string) => void
 }
 
@@ -345,7 +345,7 @@ const StickTableRow = React.memo(function StickTableRow({
                             <Button
                               variant="ghost"
                               size="sm"
-                              onClick={() => onPromoteReply(stick.id, stick.topic, reply.id, reply.content)}
+                              onClick={() => onPromoteReply(stick.id, stick.topic, stick.content || '', reply.id, reply.content)}
                               title="Promote this reply to CalStick"
                               className="text-purple-600 hover:text-purple-700 hover:bg-purple-50"
                             >
@@ -402,6 +402,7 @@ export default function SocialHubPage() {
     replyId: string
     replyContent: string
     stickTopic: string
+    stickContent: string
   } | null>(null)
 
   const fetchAttempted = useRef(false)
@@ -610,8 +611,8 @@ export default function SocialHubPage() {
     }
   }
 
-  const handleOpenPromoteReplyDialog = (stickId: string, stickTopic: string, replyId: string, replyContent: string) => {
-    setReplyToPromote({ stickId, replyId, replyContent, stickTopic })
+  const handleOpenPromoteReplyDialog = (stickId: string, stickTopic: string, stickContent: string, replyId: string, replyContent: string) => {
+    setReplyToPromote({ stickId, replyId, replyContent, stickTopic, stickContent })
     setPromoteDialogOpen(true)
   }
 
@@ -619,7 +620,7 @@ export default function SocialHubPage() {
     if (!replyToPromote) return
 
     const response = await fetch(
-      `/api/social-sticks/${replyToPromote.stickId}/replies/${replyToPromote.replyId}/promote`,
+      `/api/v2/social-sticks/${replyToPromote.stickId}/replies/${replyToPromote.replyId}/promote`,
       {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -1042,6 +1043,7 @@ export default function SocialHubPage() {
           replyId={replyToPromote.replyId}
           replyContent={replyToPromote.replyContent}
           stickTopic={replyToPromote.stickTopic}
+          stickContent={replyToPromote.stickContent}
           onPromote={handlePromoteReplyToCalStick}
         />
       )}

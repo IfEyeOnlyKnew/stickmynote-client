@@ -3,8 +3,9 @@ import { type NextRequest, NextResponse } from "next/server"
 import { createDatabaseClient } from "@/lib/database/database-adapter"
 
 // GET /api/organizations/[orgId]/access-requests - Get pending access requests
-export async function GET(request: NextRequest, { params }: { params: { orgId: string } }) {
+export async function GET(request: NextRequest, { params }: { params: Promise<{ orgId: string }> }) {
   try {
+    const { orgId } = await params
     const db = await createDatabaseClient()
     const authResult = await getCachedAuthUser()
 
@@ -20,7 +21,6 @@ export async function GET(request: NextRequest, { params }: { params: { orgId: s
     }
 
     const user = authResult.user
-    const { orgId } = params
 
     // Verify user is admin/owner of this organization
     const { data: membership } = await db
@@ -79,8 +79,9 @@ export async function GET(request: NextRequest, { params }: { params: { orgId: s
 }
 
 // POST /api/organizations/[orgId]/access-requests - Create access request
-export async function POST(request: NextRequest, { params }: { params: { orgId: string } }) {
+export async function POST(request: NextRequest, { params }: { params: Promise<{ orgId: string }> }) {
   try {
+    const { orgId } = await params
     const db = await createDatabaseClient()
     const authResult = await getCachedAuthUser()
 
@@ -96,7 +97,6 @@ export async function POST(request: NextRequest, { params }: { params: { orgId: 
     }
 
     const user = authResult.user
-    const { orgId } = params
     const body = await request.json()
     const { message } = body
 

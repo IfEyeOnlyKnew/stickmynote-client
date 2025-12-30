@@ -155,9 +155,9 @@ export function AgendaView({ calsticks, onToggleComplete, onStickClick }: Readon
                       <Circle className="h-5 w-5 text-gray-400" />
                     </button>
                     <div className="flex-1 min-w-0">
-                      <h4 className="text-sm font-medium mb-1 line-clamp-2">{task.stick?.topic || "Untitled"}</h4>
-                      {task.content && (
-                        <p className="text-xs text-muted-foreground mb-2 line-clamp-2">{task.content}</p>
+                      <h4 className="text-sm font-medium mb-1 line-clamp-2">{task.content || task.stick?.topic || "Untitled"}</h4>
+                      {task.stick?.topic && task.content && (
+                        <p className="text-xs text-muted-foreground mb-2 line-clamp-1">Topic: {task.stick.topic}</p>
                       )}
                       <div className="flex flex-wrap items-center gap-2">
                         <Badge variant="secondary" className="text-xs">
@@ -215,7 +215,7 @@ export function AgendaView({ calsticks, onToggleComplete, onStickClick }: Readon
                   </button>
                   <div className="flex-1 min-w-0">
                     <h4 className="text-sm font-medium line-through text-gray-500 mb-1 line-clamp-2">
-                      {task.stick?.topic || "Untitled"}
+                      {task.content || task.stick?.topic || "Untitled"}
                     </h4>
                     <div className="flex flex-wrap items-center gap-2">
                       <Badge variant="secondary" className="text-xs">

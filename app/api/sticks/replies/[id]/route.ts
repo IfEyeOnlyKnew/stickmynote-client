@@ -77,8 +77,9 @@ function triggerAutomationRules(
   ).catch((err) => console.error("[Automation] Error running rules:", err))
 }
 
-export async function PATCH(request: NextRequest, { params }: { params: { id: string } }) {
+export async function PATCH(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
+    const { id: replyId } = await params
     const authResult = await getCachedAuthUser()
 
     if (authResult.rateLimited) {
@@ -89,7 +90,6 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
     }
 
     const user = authResult.user
-    const replyId = params.id
     const body = await request.json()
     const db = await createDatabaseClient()
 

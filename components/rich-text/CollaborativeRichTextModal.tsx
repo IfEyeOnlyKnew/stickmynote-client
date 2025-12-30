@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
-import { CollaborativeRichTextEditor } from "./CollaborativeRichTextEditor"
+import { CollaborativeRichTextEditor } from "./CollaborativeRichTextEditorDynamic"
 
 interface CollaborativeRichTextModalProps {
   isOpen: boolean

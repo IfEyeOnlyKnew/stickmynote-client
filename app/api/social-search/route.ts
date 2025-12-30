@@ -76,15 +76,11 @@ const RATE_LIMIT_HEADERS = { "Retry-After": "30" }
 
 const STICKS_SELECT = `
   id, topic, content, color, created_at, updated_at,
-  social_pad_id, user_id, is_public,
-  social_pads!inner(id, name, is_public, owner_id),
-  users(id, full_name, email, username, avatar_url)
+  social_pad_id, user_id, is_public
 `
 
 const REPLIES_SELECT = `
-  id, content, category, created_at, social_stick_id, user_id,
-  users(id, full_name, email, username, avatar_url),
-  social_sticks!inner(id, topic, social_pad_id, social_pads(id, name, is_public))
+  id, content, category, created_at, social_stick_id, user_id
 `
 
 // Error responses
@@ -223,30 +219,11 @@ async function fetchAccessiblePadIds(
   return data?.map((p) => p.social_pad_id) || []
 }
 
-function buildVisibilityClause(userId: string, padIds: string[]): string {
-  const baseClauses = [
-    `social_pads.is_public.eq.true`,
-    `social_pads.owner_id.eq.${userId}`,
-  ]
-
-  if (padIds.length > 0) {
-    baseClauses.push(`social_pad_id.in.(${padIds.join(",")})`)
-  }
-
-  return baseClauses.join(",")
-}
-
 function applyFilters(
   query: any,
   params: SearchParams
 ): any {
   let q = query
-
-  if (params.visibility === "public") {
-    q = q.eq("social_pads.is_public", true)
-  } else if (params.visibility === "private") {
-    q = q.eq("social_pads.is_public", false)
-  }
 
   if (params.authorId) {
     q = q.eq("user_id", params.authorId)
@@ -285,40 +262,6 @@ async function fetchReplyCounts(
   return buildReplyCountMap(data)
 }
 
-interface ReplyWithStick {
-  social_sticks?: {
-    social_pads?: { is_public?: boolean }
-    social_pad_id?: string
-  }
-}
-
-function isReplyAccessible(reply: ReplyWithStick, padIds: string[]): boolean {
-  const padIsPublic = reply.social_sticks?.social_pads?.is_public === true
-  const replyPadId = reply.social_sticks?.social_pad_id || ""
-  const isInMemberPads = padIds.includes(replyPadId)
-  return padIsPublic || isInMemberPads
-}
-
-async function searchReplies(
-  db: DatabaseClient,
-  query: string,
-  orgId: string,
-  padIds: string[]
-): Promise<unknown[]> {
-  if (!query) {
-    return []
-  }
-
-  const { data: replies } = await db
-    .from("social_stick_replies")
-    .select(REPLIES_SELECT)
-    .ilike("content", `%${query}%`)
-    .eq("org_id", orgId)
-
-  return (replies || []).filter((reply: ReplyWithStick) =>
-    isReplyAccessible(reply, padIds)
-  )
-}
 
 // ============================================================================
 // Route Handler
@@ -348,13 +291,34 @@ export async function GET(request: NextRequest) {
     // Get user's accessible pads
     const padIds = await fetchAccessiblePadIds(db, user.id, orgContext.orgId)
 
+    // Get all accessible social pads (public + owned + member)
+    const { data: accessiblePads } = await db
+      .from("social_pads")
+      .select("id, name, is_public, owner_id")
+      .eq("org_id", orgContext.orgId)
+      .or(`is_public.eq.true,owner_id.eq.${user.id}${padIds.length > 0 ? `,id.in.(${padIds.join(",")})` : ""}`)
+
+    const padMap: Record<string, SocialPadData> = {}
+    const accessiblePadIds: string[] = []
+    for (const pad of accessiblePads || []) {
+      padMap[pad.id] = pad
+      accessiblePadIds.push(pad.id)
+    }
+
+    if (accessiblePadIds.length === 0) {
+      return NextResponse.json({
+        sticks: [],
+        replies: [],
+        metadata: { totalSticks: 0, totalReplies: 0, authors: [], pads: [] },
+      })
+    }
+
     // Build and execute sticks query
-    const visibilityClause = buildVisibilityClause(user.id, padIds)
     let sticksQuery = db
       .from("social_sticks")
       .select(STICKS_SELECT)
       .eq("org_id", orgContext.orgId)
-      .or(visibilityClause)
+      .in("social_pad_id", accessiblePadIds)
 
     sticksQuery = applyFilters(sticksQuery, params)
 
@@ -365,22 +329,83 @@ export async function GET(request: NextRequest) {
       return Errors.serverError(sticksError.message)
     }
 
+    // Fetch users for sticks
+    const userIds = [...new Set((sticks || []).map((s: any) => s.user_id).filter(Boolean))]
+    let userMap: Record<string, UserData> = {}
+    if (userIds.length > 0) {
+      const { data: users } = await db
+        .from("users")
+        .select("id, full_name, email, username, avatar_url")
+        .in("id", userIds)
+
+      if (users) {
+        userMap = Object.fromEntries(users.map((u: any) => [u.id, u]))
+      }
+    }
+
     // Get reply counts
-    const stickIds = sticks?.map((s) => s.id) || []
+    const stickIds = sticks?.map((s: any) => s.id) || []
     const replyCountMap = await fetchReplyCounts(db, stickIds, orgContext.orgId)
 
-    // Normalize and process sticks
-    let processedSticks = ((sticks || []) as RawStickData[]).map((stick) =>
-      normalizeStick(stick, replyCountMap[stick.id] || 0)
-    )
+    // Normalize and process sticks - attach pad and user data
+    let processedSticks: StickData[] = (sticks || []).map((stick: any) => ({
+      ...stick,
+      social_pads: padMap[stick.social_pad_id] || null,
+      users: userMap[stick.user_id] || null,
+      reply_count: replyCountMap[stick.id] || 0,
+    }))
 
     // Apply text search filter
     processedSticks = filterByQuery(processedSticks, params.query)
 
     // Search replies if requested
-    const replyResults = params.includeReplies
-      ? await searchReplies(db, params.query, orgContext.orgId, padIds)
-      : []
+    let replyResults: unknown[] = []
+    if (params.includeReplies && params.query) {
+      const { data: replies } = await db
+        .from("social_stick_replies")
+        .select(REPLIES_SELECT)
+        .ilike("content", `%${params.query}%`)
+        .eq("org_id", orgContext.orgId)
+
+      // Fetch sticks for replies to check accessibility
+      const replyStickIds = [...new Set((replies || []).map((r: any) => r.social_stick_id).filter(Boolean))]
+      let replyStickMap: Record<string, { social_pad_id: string }> = {}
+
+      if (replyStickIds.length > 0) {
+        const { data: replySticks } = await db
+          .from("social_sticks")
+          .select("id, social_pad_id")
+          .in("id", replyStickIds)
+
+        if (replySticks) {
+          replyStickMap = Object.fromEntries(replySticks.map((s: any) => [s.id, { social_pad_id: s.social_pad_id }]))
+        }
+      }
+
+      // Filter replies by accessible pads and attach user data
+      const replyUserIds = [...new Set((replies || []).map((r: any) => r.user_id).filter(Boolean))]
+      let replyUserMap: Record<string, UserData> = {}
+      if (replyUserIds.length > 0) {
+        const { data: replyUsers } = await db
+          .from("users")
+          .select("id, full_name, email, username, avatar_url")
+          .in("id", replyUserIds)
+
+        if (replyUsers) {
+          replyUserMap = Object.fromEntries(replyUsers.map((u: any) => [u.id, u]))
+        }
+      }
+
+      replyResults = (replies || [])
+        .filter((reply: any) => {
+          const stick = replyStickMap[reply.social_stick_id]
+          return stick && accessiblePadIds.includes(stick.social_pad_id)
+        })
+        .map((reply: any) => ({
+          ...reply,
+          users: replyUserMap[reply.user_id] || null,
+        }))
+    }
 
     // Sort results
     processedSticks = sortSticks(processedSticks, params.sortBy, params.sortOrder)

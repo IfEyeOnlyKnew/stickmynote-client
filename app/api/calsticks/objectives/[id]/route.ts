@@ -2,7 +2,8 @@ import { createDatabaseClient } from "@/lib/database/database-adapter"
 import { NextResponse } from "next/server"
 import { getCachedAuthUser } from "@/lib/auth/cached-auth"
 
-export async function PUT(request: Request, { params }: { params: { id: string } }) {
+export async function PUT(request: Request, { params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params
   try {
     const db = await createDatabaseClient()
     const authResult = await getCachedAuthUser()
@@ -20,7 +21,7 @@ export async function PUT(request: Request, { params }: { params: { id: string }
     const { data: objective, error: objError } = await db
       .from("objectives")
       .update(objectiveData)
-      .eq("id", params.id)
+      .eq("id", id)
       .eq("user_id", user.id)
       .select()
       .maybeSingle()
@@ -28,13 +29,13 @@ export async function PUT(request: Request, { params }: { params: { id: string }
     if (objError) throw objError
 
     // Delete existing key results
-    await db.from("key_results").delete().eq("objective_id", params.id)
+    await db.from("key_results").delete().eq("objective_id", id)
 
     // Create new key results
     if (key_results && key_results.length > 0) {
       const keyResultsData = key_results.map((kr: any) => ({
         ...kr,
-        objective_id: params.id,
+        objective_id: id,
         progress: Math.round(((kr.current_value - kr.start_value) / (kr.target_value - kr.start_value)) * 100),
       }))
 
@@ -50,7 +51,8 @@ export async function PUT(request: Request, { params }: { params: { id: string }
   }
 }
 
-export async function DELETE(request: Request, { params }: { params: { id: string } }) {
+export async function DELETE(request: Request, { params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params
   try {
     const db = await createDatabaseClient()
     const authResult = await getCachedAuthUser()
@@ -62,7 +64,7 @@ export async function DELETE(request: Request, { params }: { params: { id: strin
     }
     const user = { id: authResult.userId }
 
-    const { error } = await db.from("objectives").delete().eq("id", params.id).eq("user_id", user.id)
+    const { error } = await db.from("objectives").delete().eq("id", id).eq("user_id", user.id)
 
     if (error) throw error
 

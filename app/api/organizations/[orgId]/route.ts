@@ -245,9 +245,9 @@ async function deleteOrganization(
 // ============================================================================
 
 // GET /api/organizations/[orgId] - Get organization details
-export async function GET(req: Request, { params }: { params: { orgId: string } }) {
+export async function GET(req: Request, { params }: { params: Promise<{ orgId: string }> }) {
   try {
-    const { orgId } = params
+    const { orgId } = await params
 
     if (!isValidUUID(orgId)) {
       return Errors.invalidOrgId()
@@ -280,9 +280,9 @@ export async function GET(req: Request, { params }: { params: { orgId: string } 
 }
 
 // PATCH /api/organizations/[orgId] - Update organization
-export async function PATCH(req: Request, { params }: { params: { orgId: string } }) {
+export async function PATCH(req: Request, { params }: { params: Promise<{ orgId: string }> }) {
   try {
-    const { orgId } = params
+    const { orgId } = await params
 
     if (!isValidUUID(orgId)) {
       return Errors.invalidOrgId()
@@ -323,9 +323,9 @@ export async function PATCH(req: Request, { params }: { params: { orgId: string 
 }
 
 // DELETE /api/organizations/[orgId] - Delete organization
-export async function DELETE(req: Request, { params }: { params: { orgId: string } }) {
+export async function DELETE(req: Request, { params }: { params: Promise<{ orgId: string }> }) {
   try {
-    const { orgId } = params
+    const { orgId } = await params
 
     if (!isValidUUID(orgId)) {
       return Errors.invalidOrgId()

@@ -3,8 +3,9 @@ import { NextResponse } from "next/server"
 import { getOrgContext } from "@/lib/auth/get-org-context"
 import { getCachedAuthUser } from "@/lib/auth/cached-auth"
 
-export async function GET(request: Request, { params }: { params: { padId: string } }) {
+export async function GET(request: Request, { params }: { params: Promise<{ padId: string }> }) {
   try {
+    const { padId } = await params
     const db = await createDatabaseClient()
     const authResult = await getCachedAuthUser()
     if (authResult.rateLimited) {
@@ -19,8 +20,6 @@ export async function GET(request: Request, { params }: { params: { padId: strin
     if (!orgContext) {
       return NextResponse.json({ error: "No organization context" }, { status: 403 })
     }
-
-    const { padId } = params
 
     const { data: pad } = await db
       .from("social_pads")
@@ -71,8 +70,9 @@ export async function GET(request: Request, { params }: { params: { padId: strin
   }
 }
 
-export async function DELETE(request: Request, { params }: { params: { padId: string } }) {
+export async function DELETE(request: Request, { params }: { params: Promise<{ padId: string }> }) {
   try {
+    const { padId } = await params
     const db = await createDatabaseClient()
     const authResult = await getCachedAuthUser()
     if (authResult.rateLimited) {
@@ -87,8 +87,6 @@ export async function DELETE(request: Request, { params }: { params: { padId: st
     if (!orgContext) {
       return NextResponse.json({ error: "No organization context" }, { status: 403 })
     }
-
-    const { padId } = params
     const { searchParams } = new URL(request.url)
     const inviteId = searchParams.get("inviteId")
 

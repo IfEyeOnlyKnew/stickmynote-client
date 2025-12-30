@@ -2,8 +2,9 @@ import { createDatabaseClient } from "@/lib/database/database-adapter"
 import { NextResponse } from "next/server"
 import { getCachedAuthUser } from "@/lib/auth/cached-auth"
 
-export async function PATCH(request: Request, { params }: { params: { padId: string; memberId: string } }) {
+export async function PATCH(request: Request, { params }: { params: Promise<{ padId: string; memberId: string }> }) {
   try {
+    const { padId, memberId } = await params
     const db = await createDatabaseClient()
     const authResult = await getCachedAuthUser()
     if (authResult.rateLimited) {
@@ -13,8 +14,6 @@ export async function PATCH(request: Request, { params }: { params: { padId: str
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
     const user = authResult.user
-
-    const { padId, memberId } = params
     const permissions = await request.json()
 
     // Check if current user is owner or admin

@@ -301,8 +301,9 @@ function buildSuccessResponse(results: ImportResults) {
 // ============================================================================
 
 // POST /api/organizations/[orgId]/members/import - Import/pre-register members from CSV
-export async function POST(request: NextRequest, { params }: { params: { orgId: string } }) {
+export async function POST(request: NextRequest, { params }: { params: Promise<{ orgId: string }> }) {
   try {
+    const { orgId } = await params
     const db = await createDatabaseClient()
     const serviceDb = await createServiceDatabaseClient()
     const authResult = await getCachedAuthUser()
@@ -316,7 +317,6 @@ export async function POST(request: NextRequest, { params }: { params: { orgId: 
     }
 
     const user = authResult.user
-    const { orgId } = params
 
     // Verify user is admin/owner
     const membership = await getUserMembership(db, orgId, user.id)

@@ -28,7 +28,7 @@ export async function POST(request: Request) {
 
     const { data: invite, error: inviteError } = await serviceDb
       .from("organization_invites")
-      .select("*, organizations(name)")
+      .select("*")
       .eq("token", token)
       .eq("status", "pending")
       .maybeSingle()
@@ -36,6 +36,17 @@ export async function POST(request: Request) {
     if (inviteError || !invite) {
       console.error("[v0] Invalid or not found invite:", inviteError)
       return NextResponse.json({ error: "Invalid or expired invitation link" }, { status: 404 })
+    }
+
+    // Fetch organization name separately
+    let organizationName: string | undefined
+    if (invite.org_id) {
+      const { data: org } = await serviceDb
+        .from("organizations")
+        .select("name")
+        .eq("id", invite.org_id)
+        .maybeSingle()
+      organizationName = org?.name
     }
 
     // Check if invite matches user's email
@@ -97,7 +108,7 @@ export async function POST(request: Request) {
     return NextResponse.json({
       success: true,
       orgId: invite.org_id,
-      organizationName: invite.organizations?.name,
+      organizationName,
     })
   } catch (error) {
     console.error("[v0] Error accepting invite:", error)

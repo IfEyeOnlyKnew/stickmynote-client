@@ -3,9 +3,9 @@ import { getCachedAuthUser } from "@/lib/auth/cached-auth"
 import { type NextRequest, NextResponse } from "next/server"
 
 // GET /api/sticks/[id]/calsticks - Get CalStick replies for a specific Stick
-export async function GET(request: NextRequest, { params }: { params: { id: string } }) {
+export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
-    const { id: stickId } = params
+    const { id: stickId } = await params
     const db = await createDatabaseClient()
 
     const { user, error: authError, rateLimited } = await getCachedAuthUser()

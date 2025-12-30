@@ -1,10 +1,10 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { createServiceDatabaseClient } from "@/lib/database/database-adapter"
 
-export async function GET(request: NextRequest, { params }: { params: { token: string } }) {
+export async function GET(request: NextRequest, { params }: { params: Promise<{ token: string }> }) {
+  const { token } = await params
   try {
     const serviceDb = await createServiceDatabaseClient()
-    const { token } = params
 
     if (!token) {
       return new NextResponse("Missing token", { status: 400 })
@@ -37,10 +37,7 @@ export async function GET(request: NextRequest, { params }: { params: { token: s
         calstick_completed,
         updated_at,
         created_at,
-        stick:paks_pad_sticks(
-          topic,
-          content
-        )
+        stick_id
       `)
       .eq("is_calstick", true)
       .or(`user_id.eq.${feed.user_id},calstick_assignee_id.eq.${feed.user_id}`)
@@ -51,6 +48,23 @@ export async function GET(request: NextRequest, { params }: { params: { token: s
       console.error("Error fetching tasks for feed:", tasksError)
       return new NextResponse("Internal Server Error", { status: 500 })
     }
+
+    // Fetch related sticks separately
+    const stickIds = [...new Set((tasks || []).map((t: any) => t.stick_id).filter(Boolean))]
+    let stickMap: Record<string, { topic: string; content: string }> = {}
+    if (stickIds.length > 0) {
+      const { data: sticks } = await serviceDb
+        .from("paks_pad_sticks")
+        .select("id, topic, content")
+        .in("id", stickIds)
+      stickMap = Object.fromEntries((sticks || []).map((s: any) => [s.id, { topic: s.topic, content: s.content }]))
+    }
+
+    // Attach stick data to tasks
+    const tasksWithSticks = (tasks || []).map((task: any) => ({
+      ...task,
+      stick: stickMap[task.stick_id] || null,
+    }))
 
     // 3. Generate iCal String
     const icsContent = [
@@ -63,7 +77,7 @@ export async function GET(request: NextRequest, { params }: { params: { token: s
       "X-WR-TIMEZONE:UTC",
     ]
 
-    tasks?.forEach((task: any) => {
+    tasksWithSticks.forEach((task: any) => {
       if (!task.calstick_date) return // Skip tasks without dates
 
       const startDate = task.calstick_start_date ? new Date(task.calstick_start_date) : new Date(task.calstick_date)

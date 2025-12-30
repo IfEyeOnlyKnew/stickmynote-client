@@ -4,7 +4,8 @@ import { getOrgContext } from "@/lib/auth/get-org-context"
 import { getCachedAuthUser } from "@/lib/auth/cached-auth"
 import type { ChecklistData } from "@/types/checklist"
 
-export async function PATCH(request: NextRequest, { params }: { params: { id: string } }) {
+export async function PATCH(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params
   try {
     const db = await createServiceDatabaseClient()
     const authResult = await getCachedAuthUser()
@@ -27,7 +28,7 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
       return NextResponse.json({ error: "No organization context" }, { status: 403 })
     }
 
-    const calstickId = params.id
+    const calstickId = id
     const body = await request.json()
     const { checklist_items } = body as { checklist_items: ChecklistData }
 

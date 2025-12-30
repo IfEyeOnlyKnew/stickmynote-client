@@ -209,7 +209,7 @@ export function CalendarView({
                             )}
                           </button>
                           <span className={`truncate ${cs.calstick_completed ? "line-through" : ""}`}>
-                            {cs.stick?.topic || cs.content.substring(0, 20)}
+                            {cs.content || cs.stick?.topic || "Untitled"}
                           </span>
                         </div>
                       </button>

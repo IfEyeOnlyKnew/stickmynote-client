@@ -232,11 +232,28 @@ export async function GET() {
 
     const { data: sticks } = await db
       .from("social_sticks")
-      .select(`id, topic, content, workflow_status, workflow_owner_id, workflow_due_date, workflow_updated_at, calstick_id, created_at, updated_at, social_pad_id, user_id, social_pads(name)`)
+      .select("id, topic, content, workflow_status, workflow_owner_id, workflow_due_date, workflow_updated_at, calstick_id, created_at, updated_at, social_pad_id, user_id")
       .in("social_pad_id", padIds)
       .eq("org_id", orgContext.orgId)
 
-    const allSticks = (sticks || []) as StickData[]
+    // Fetch pad names separately
+    const uniquePadIds = [...new Set((sticks || []).map((s: any) => s.social_pad_id).filter(Boolean))]
+    let padNameMap = new Map<string, string>()
+    if (uniquePadIds.length > 0) {
+      const { data: pads } = await db
+        .from("social_pads")
+        .select("id, name")
+        .in("id", uniquePadIds)
+      for (const p of pads || []) {
+        padNameMap.set(p.id, p.name)
+      }
+    }
+
+    // Attach pad names to sticks
+    const allSticks = ((sticks || []) as any[]).map((s) => ({
+      ...s,
+      social_pads: s.social_pad_id ? { name: padNameMap.get(s.social_pad_id) } : null,
+    })) as StickData[]
     const stickIds = allSticks.map((s) => s.id)
 
     const { data: recentReplies } = await db

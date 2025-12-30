@@ -331,16 +331,17 @@ async function createPendingInvite(
 }
 
 // Route handlers
-export async function GET(request: Request, { params }: { params: { padId: string } }) {
+export async function GET(request: Request, { params }: { params: Promise<{ padId: string }> }) {
   try {
+    const { padId } = await params
     const contextResult = await getAuthenticatedContext()
     if (contextResult instanceof NextResponse) return contextResult
 
-    const padContext = await getPadContext(contextResult, params.padId)
+    const padContext = await getPadContext(contextResult, padId)
     if (padContext instanceof NextResponse) return padContext
 
-    const { db, serviceClient, orgContext, user, padId, ownerId } = padContext
-    const membership = await checkMembership(db, padId, user.id, orgContext.orgId)
+    const { db, serviceClient, orgContext, user, padId: contextPadId, ownerId } = padContext
+    const membership = await checkMembership(db, contextPadId, user.id, orgContext.orgId)
 
     if (!membership && ownerId !== user.id) {
       return Errors.forbidden("Access denied")
@@ -349,7 +350,7 @@ export async function GET(request: Request, { params }: { params: { padId: strin
     const { data: members, error } = await db
       .from("social_pad_members")
       .select("*")
-      .eq("social_pad_id", padId)
+      .eq("social_pad_id", contextPadId)
       .eq("org_id", orgContext.orgId)
       .order("created_at", { ascending: true })
 
@@ -379,12 +380,13 @@ export async function GET(request: Request, { params }: { params: { padId: strin
   }
 }
 
-export async function POST(request: Request, { params }: { params: { padId: string } }) {
+export async function POST(request: Request, { params }: { params: Promise<{ padId: string }> }) {
   try {
+    const { padId } = await params
     const contextResult = await getAuthenticatedContext()
     if (contextResult instanceof NextResponse) return contextResult
 
-    const padContext = await getPadContext(contextResult, params.padId)
+    const padContext = await getPadContext(contextResult, padId)
     if (padContext instanceof NextResponse) return padContext
 
     if (!padContext.canManage) {
@@ -497,19 +499,20 @@ async function getUpdatedMemberWithUser(
   return { ...member, users: userData }
 }
 
-export async function PATCH(request: Request, { params }: { params: { padId: string } }) {
+export async function PATCH(request: Request, { params }: { params: Promise<{ padId: string }> }) {
   try {
+    const { padId } = await params
     const contextResult = await getAuthenticatedContext()
     if (contextResult instanceof NextResponse) return contextResult
 
-    const padContext = await getPadContext(contextResult, params.padId)
+    const padContext = await getPadContext(contextResult, padId)
     if (padContext instanceof NextResponse) return padContext
 
     if (!padContext.canManage) {
       return Errors.forbidden()
     }
 
-    const { db, serviceClient, orgContext, padId } = padContext
+    const { db, serviceClient, orgContext, padId: contextPadId } = padContext
 
     let body: { memberId?: string; role?: string; hourlyRateCents?: number }
     try {
@@ -529,14 +532,14 @@ export async function PATCH(request: Request, { params }: { params: { padId: str
     }
 
     if (role) {
-      await updateMemberRole(db, memberId, role, padId, orgContext.orgId)
+      await updateMemberRole(db, memberId, role, contextPadId, orgContext.orgId)
     }
 
     if (hourlyRateCents !== undefined) {
       await updateMemberHourlyRate(db, memberId, hourlyRateCents, orgContext.orgId)
     }
 
-    const updatedMember = await getUpdatedMemberWithUser(db, serviceClient, memberId, padId, orgContext.orgId)
+    const updatedMember = await getUpdatedMemberWithUser(db, serviceClient, memberId, contextPadId, orgContext.orgId)
 
     return NextResponse.json({ member: updatedMember })
   } catch (error) {
@@ -551,12 +554,13 @@ export async function PATCH(request: Request, { params }: { params: { padId: str
   }
 }
 
-export async function DELETE(request: Request, { params }: { params: { padId: string } }) {
+export async function DELETE(request: Request, { params }: { params: Promise<{ padId: string }> }) {
   try {
+    const { padId } = await params
     const contextResult = await getAuthenticatedContext()
     if (contextResult instanceof NextResponse) return contextResult
 
-    const padContext = await getPadContext(contextResult, params.padId)
+    const padContext = await getPadContext(contextResult, padId)
     if (padContext instanceof NextResponse) return padContext
 
     if (!padContext.canManage) {

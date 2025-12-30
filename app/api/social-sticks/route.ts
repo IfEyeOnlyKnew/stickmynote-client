@@ -54,9 +54,6 @@ interface MemberPadId {
   social_pad_id: string
 }
 
-interface Membership {
-  role: string
-}
 
 // ============================================================================
 // Constants
@@ -71,15 +68,8 @@ const CACHE_TTL_MEDIUM = 60
 const CACHE_STALE_SHORT = 60
 const CACHE_STALE_LONG = 300
 
-const STICK_SELECT_FIELDS = `
-  *,
-  social_pads(id, name, is_public, owner_id)
-`
-
-const STICK_SELECT_WITH_PUBLIC_PAD = `
-  *,
-  social_pads!inner(id, name, is_public)
-`
+// Simple column selection - PostgreSQL adapter doesn't support Supabase-style joins
+const STICK_SELECT_FIELDS = "*"
 
 // ============================================================================
 // Error Responses
@@ -207,10 +197,18 @@ async function enrichSticksWithData(
 }
 
 async function fetchPublicSticks(db: DatabaseClient): Promise<SocialStick[]> {
+  // First get public pad IDs
+  const publicPadIds = await fetchPublicPadIds(db)
+
+  if (publicPadIds.length === 0) {
+    return []
+  }
+
+  // Then fetch sticks for those pads
   const { data, error } = await db
     .from("social_sticks")
-    .select(STICK_SELECT_WITH_PUBLIC_PAD)
-    .eq("social_pads.is_public", true)
+    .select(STICK_SELECT_FIELDS)
+    .in("social_pad_id", publicPadIds)
     .order("created_at", { ascending: false })
 
   if (error) {
@@ -312,10 +310,7 @@ async function fetchSticksByPadIds(
 async function fetchAllSticks(db: DatabaseClient): Promise<SocialStick[]> {
   const { data, error } = await db
     .from("social_sticks")
-    .select(`
-      *,
-      social_pads(id, name)
-    `)
+    .select(STICK_SELECT_FIELDS)
     .order("created_at", { ascending: false })
 
   if (error) throw error
@@ -492,7 +487,7 @@ async function handleDefaultSticksRequest(
   )
 }
 
-async function getOrgContextSafe(user: { id: string }): Promise<OrgContext | null> {
+async function getOrgContextSafe(): Promise<OrgContext | null> {
   try {
     return await getOrgContext()
   } catch (orgError) {
@@ -536,7 +531,7 @@ export async function GET(request: Request) {
     }
 
     // Get org context for private/default requests
-    const orgContext = await getOrgContextSafe(user)
+    const orgContext = await getOrgContextSafe()
 
     // Handle private sticks request
     if (isPrivate) {

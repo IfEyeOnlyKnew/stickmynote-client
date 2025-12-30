@@ -136,12 +136,28 @@ async function fetchUsersForReplies(serviceDb: any, userIds: string[]): Promise<
 }
 
 async function fetchStickWithPad(db: any, stickId: string, orgId: string) {
-  return db
+  const { data: stick, error } = await db
     .from("social_sticks")
-    .select("social_pad_id, social_pads(owner_id)")
+    .select("social_pad_id")
     .eq("id", stickId)
     .eq("org_id", orgId)
     .maybeSingle()
+
+  if (error || !stick) {
+    return { data: null, error }
+  }
+
+  // Fetch pad owner separately
+  if (stick.social_pad_id) {
+    const { data: pad } = await db
+      .from("social_pads")
+      .select("owner_id")
+      .eq("id", stick.social_pad_id)
+      .maybeSingle()
+    stick.social_pads = pad
+  }
+
+  return { data: stick, error: null }
 }
 
 async function fetchMembership(db: any, padId: string, userId: string, orgId: string) {
@@ -248,10 +264,10 @@ async function validateStickAndAccess(
 // Route Handlers
 // ============================================================================
 
-export async function GET(request: Request, { params }: { params: { stickId: string } }) {
+export async function GET(request: Request, { params }: { params: Promise<{ stickId: string }> }) {
   try {
+    const { stickId } = await params
     const db = await createDatabaseClient()
-    const { stickId } = params
 
     const orgResult = await getOrgContextSafe()
     if ("error" in orgResult && orgResult.error === "RATE_LIMITED") {
@@ -287,10 +303,10 @@ export async function GET(request: Request, { params }: { params: { stickId: str
   }
 }
 
-export async function POST(request: Request, { params }: { params: { stickId: string } }) {
+export async function POST(request: Request, { params }: { params: Promise<{ stickId: string }> }) {
   try {
+    const { stickId } = await params
     const db = await createDatabaseClient()
-    const { stickId } = params
 
     // Auth + org context check
     const authResult = await getAuthenticatedContext()
@@ -346,8 +362,9 @@ export async function POST(request: Request, { params }: { params: { stickId: st
   }
 }
 
-export async function PUT(request: Request, { params }: { params: { stickId: string } }) {
+export async function PUT(request: Request, { params }: { params: Promise<{ stickId: string }> }) {
   try {
+    const { stickId } = await params
     const db = await createDatabaseClient()
 
     // Auth + org context check
@@ -404,8 +421,9 @@ export async function PUT(request: Request, { params }: { params: { stickId: str
   }
 }
 
-export async function DELETE(request: Request, { params }: { params: { stickId: string } }) {
+export async function DELETE(request: Request, { params }: { params: Promise<{ stickId: string }> }) {
   try {
+    const { stickId } = await params
     const db = await createDatabaseClient()
 
     // Auth + org context check
@@ -414,8 +432,6 @@ export async function DELETE(request: Request, { params }: { params: { stickId: 
       return authResult.response
     }
     const { user, orgContext } = authResult.context
-
-    const { stickId } = params
     const { searchParams } = new URL(request.url)
     const replyId = searchParams.get("replyId")
 

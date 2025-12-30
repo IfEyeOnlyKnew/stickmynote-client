@@ -107,8 +107,8 @@ export function useNotes(userId: string | null, shouldLoad = true): UseNotesRetu
         const newNote = await data.handleCreateNote(color, windowSize, state.highestZIndex)
         state.setHighestZIndex(state.highestZIndex + 1)
         toast({
-          title: "Note Created",
-          description: "Your new note has been created successfully.",
+          title: "Stick Created",
+          description: "Your new Stick has been created successfully.",
         })
         return newNote
       } catch (err) {
@@ -130,8 +130,8 @@ export function useNotes(userId: string | null, shouldLoad = true): UseNotesRetu
     const restoredNotes = state.handleUndoDelete()
     data.setAllNotes((prev) => [...restoredNotes, ...prev])
     toast({
-      title: "Notes Restored",
-      description: `${restoredNotes.length} note(s) have been restored.`,
+      title: "Sticks Restored",
+      description: `${restoredNotes.length} Stick(s) have been restored.`,
     })
   }, [state.handleUndoDelete, data.setAllNotes, toast])
   /* eslint-enable react-hooks/exhaustive-deps */
@@ -142,8 +142,8 @@ export function useNotes(userId: string | null, shouldLoad = true): UseNotesRetu
       await data.clearAllNotes()
       state.handleClearUndo()
       toast({
-        title: "All Notes Cleared",
-        description: "All your notes have been permanently deleted.",
+        title: "All Sticks Cleared",
+        description: "All your Sticks have been permanently deleted.",
       })
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : "Failed to clear notes"

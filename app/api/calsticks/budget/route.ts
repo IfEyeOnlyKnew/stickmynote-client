@@ -81,6 +81,42 @@ export async function GET(request: NextRequest) {
     }
 
     const padIds = pads.map((p) => p.id)
+
+    // First get sticks for these pads
+    const { data: padsSticks, error: padsStickError } = await db
+      .from("paks_pad_sticks")
+      .select("id, pad_id")
+      .in("pad_id", padIds)
+      .eq("org_id", orgContext.orgId)
+
+    if (padsStickError) {
+      return NextResponse.json({ error: "Failed to fetch pad sticks" }, { status: 500 })
+    }
+
+    const stickToPadMap: Record<string, string> = {}
+    const padStickIds: string[] = []
+    for (const stick of padsSticks || []) {
+      stickToPadMap[stick.id] = stick.pad_id
+      padStickIds.push(stick.id)
+    }
+
+    if (padStickIds.length === 0) {
+      // No sticks in these pads, return pads with empty tasks
+      const projects = pads.map((pad) => ({
+        padId: pad.id,
+        padName: pad.name,
+        budgetCents: pad.budget_cents || 0,
+        hourlyRateCents: pad.hourly_rate_cents || 0,
+        isBillable: pad.is_billable || false,
+        tasks: [],
+        totalEstimatedCost: 0,
+        totalActualCost: 0,
+        remainingBudget: pad.budget_cents || 0,
+        percentSpent: 0,
+      }))
+      return NextResponse.json({ projects })
+    }
+
     const { data: tasks, error: tasksError } = await db
       .from("paks_pad_stick_replies")
       .select(`
@@ -90,31 +126,35 @@ export async function GET(request: NextRequest) {
         calstick_estimated_hours,
         calstick_actual_hours,
         calstick_assignee_id,
-        calstick_status,
-        paks_pad_sticks!inner(pad_id)
+        calstick_status
       `)
       .eq("is_calstick", true)
       .eq("org_id", orgContext.orgId)
       .not("calstick_date", "is", null)
-      .in("paks_pad_sticks.pad_id", padIds)
+      .in("stick_id", padStickIds)
 
     if (tasksError) {
       return NextResponse.json({ error: "Failed to fetch tasks" }, { status: 500 })
     }
 
-    const assigneeIds = [...new Set(tasks.map((t) => t.calstick_assignee_id).filter(Boolean))]
-    const { data: users } = await db
-      .from("users")
-      .select("id, full_name, email, hourly_rate_cents")
-      .in("id", assigneeIds)
+    const assigneeIds = [...new Set((tasks || []).map((t: any) => t.calstick_assignee_id).filter(Boolean))]
+    let userMap = new Map<string, { id: string; full_name: string | null; email: string | null; hourly_rate_cents: number | null }>()
 
-    type UserInfo = { id: string; full_name: string | null; email: string | null; hourly_rate_cents: number | null }
-    const userMap = new Map<string, UserInfo>(users?.map((u: UserInfo) => [u.id, u]) || [])
+    if (assigneeIds.length > 0) {
+      const { data: users } = await db
+        .from("users")
+        .select("id, full_name, email, hourly_rate_cents")
+        .in("id", assigneeIds)
+
+      if (users) {
+        userMap = new Map(users.map((u: any) => [u.id, u]))
+      }
+    }
 
     const projects = pads.map((pad) => {
-      const padTasks = tasks
-        .filter((t) => (t.paks_pad_sticks as any).pad_id === pad.id)
-        .map((task) => {
+      const padTasks = (tasks || [])
+        .filter((t: any) => stickToPadMap[t.stick_id] === pad.id)
+        .map((task: any) => {
           const assignee = task.calstick_assignee_id ? userMap.get(task.calstick_assignee_id) : null
           const assigneeRate = assignee?.hourly_rate_cents || pad.hourly_rate_cents || 0
 

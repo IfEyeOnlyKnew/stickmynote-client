@@ -1,8 +1,9 @@
 import { NextResponse } from "next/server"
 import { createDatabaseClient } from "@/lib/database/database-adapter"
 
-export async function GET(request: Request, { params }: { params: { orgId: string } }) {
+export async function GET(request: Request, { params }: { params: Promise<{ orgId: string }> }) {
   try {
+    const { orgId } = await params
     const db = await createDatabaseClient()
     const {
       data: { user },
@@ -16,7 +17,7 @@ export async function GET(request: Request, { params }: { params: { orgId: strin
     const { data: member } = await db
       .from("organization_members")
       .select("role")
-      .eq("organization_id", params.orgId)
+      .eq("organization_id", orgId)
       .eq("user_id", user.id)
       .single()
 
@@ -28,7 +29,7 @@ export async function GET(request: Request, { params }: { params: { orgId: strin
     const { data: config, error } = await db
       .from("server_configurations")
       .select("*")
-      .eq("org_id", params.orgId)
+      .eq("org_id", orgId)
       .single()
 
     if (error && error.code !== "PGRST116") {
@@ -42,8 +43,9 @@ export async function GET(request: Request, { params }: { params: { orgId: strin
   }
 }
 
-export async function POST(request: Request, { params }: { params: { orgId: string } }) {
+export async function POST(request: Request, { params }: { params: Promise<{ orgId: string }> }) {
   try {
+    const { orgId } = await params
     const db = await createDatabaseClient()
     const {
       data: { user },
@@ -57,7 +59,7 @@ export async function POST(request: Request, { params }: { params: { orgId: stri
     const { data: member } = await db
       .from("organization_members")
       .select("role")
-      .eq("organization_id", params.orgId)
+      .eq("organization_id", orgId)
       .eq("user_id", user.id)
       .single()
 
@@ -69,7 +71,7 @@ export async function POST(request: Request, { params }: { params: { orgId: stri
 
     // Encrypt sensitive fields before saving
     const configToSave = {
-      org_id: params.orgId,
+      org_id: orgId,
       ...body,
       // In production, encrypt these fields using a proper encryption library
       postgres_password_encrypted: body.postgres_password

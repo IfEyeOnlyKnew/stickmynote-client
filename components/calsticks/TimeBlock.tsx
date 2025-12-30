@@ -105,7 +105,7 @@ function DraggableTask({
           <div
             className={`text-xs font-medium truncate ${task.calstick_completed ? "line-through text-gray-500" : ""}`}
           >
-            {task.stick?.topic || "Untitled"}
+            {task.content || task.stick?.topic || "Untitled"}
           </div>
           {task.calstick_start_time && task.calstick_end_time && (
             <div className="text-[10px] text-muted-foreground">

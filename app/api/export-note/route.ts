@@ -268,11 +268,27 @@ export async function POST(request: NextRequest) {
     // Fetch replies
     const { data: repliesData } = await db
       .from("personal_sticks_replies")
-      .select(`*, user:users(username, email)`)
+      .select("*")
       .eq("personal_stick_id", noteId)
       .order("created_at", { ascending: true })
 
-    const replies = repliesData || []
+    // Fetch user data for replies separately
+    const replyUserIds = [...new Set((repliesData || []).map((r: any) => r.user_id).filter(Boolean))]
+    let userMap = new Map<string, { username: string; email: string }>()
+    if (replyUserIds.length > 0) {
+      const { data: users } = await db
+        .from("users")
+        .select("id, username, email")
+        .in("id", replyUserIds)
+      for (const u of users || []) {
+        userMap.set(u.id, { username: u.username, email: u.email })
+      }
+    }
+
+    const replies = (repliesData || []).map((r: any) => ({
+      ...r,
+      user: r.user_id ? userMap.get(r.user_id) || null : null,
+    }))
 
     // Fetch tabs
     const { data: tabsData } = await db

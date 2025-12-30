@@ -3,10 +3,10 @@ import { NextResponse } from "next/server"
 import { getCachedAuthUser, createRateLimitResponse, createUnauthorizedResponse } from "@/lib/auth/cached-auth"
 
 // Create reactions table for replies
-export async function GET(request: Request, { params }: { params: { replyId: string } }) {
+export async function GET(request: Request, { params }: { params: Promise<{ replyId: string }> }) {
   try {
+    const { replyId } = await params
     const db = await createDatabaseClient()
-    const { replyId } = params
 
     // Get all reactions for this reply with user data
     const { data: reactions, error } = await db
@@ -42,8 +42,9 @@ export async function GET(request: Request, { params }: { params: { replyId: str
   }
 }
 
-export async function POST(request: Request, { params }: { params: { replyId: string } }) {
+export async function POST(request: Request, { params }: { params: Promise<{ replyId: string }> }) {
   try {
+    const { replyId } = await params
     const db = await createDatabaseClient()
     const authResult = await getCachedAuthUser()
 
@@ -56,7 +57,6 @@ export async function POST(request: Request, { params }: { params: { replyId: st
     }
 
     const user = authResult.user
-    const { replyId } = params
     const { reaction_type } = await request.json()
 
     // Check if user already reacted with this type

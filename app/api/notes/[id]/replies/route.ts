@@ -283,9 +283,9 @@ function handleInsertError(error: any): NextResponse {
 // Handlers
 // ============================================================================
 
-export async function GET(request: NextRequest, { params }: { params: { id: string } }) {
+export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
-    const { id: noteId } = params
+    const { id: noteId } = await params
     const db = await createServiceDatabaseClient()
 
     const note = await fetchNote(db, noteId)
@@ -347,20 +347,20 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
   }
 }
 
-export async function POST(request: NextRequest, { params }: { params: { id: string } }) {
+export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const isCSRFValid = await validateCSRFMiddleware(request)
   if (!isCSRFValid) {
     return Errors.csrf()
   }
 
   try {
+    const { id: noteId } = await params
     const authResult = await getAuthenticatedContext()
     if (!authResult.success) {
       return authResult.response
     }
 
     const { user, orgContext, db } = authResult.context
-    const { id: noteId } = params
     const body = await request.json()
     const { content, color = DEFAULT_REPLY_COLOR } = body
 
@@ -409,8 +409,9 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
   }
 }
 
-export async function PUT(request: NextRequest, { params }: { params: { id: string } }) {
+export async function PUT(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
+    await params
     const authResult = await getAuthenticatedContext()
     if (!authResult.success) {
       return authResult.response

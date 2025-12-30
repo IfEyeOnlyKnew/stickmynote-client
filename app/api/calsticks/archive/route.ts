@@ -13,11 +13,71 @@ const DEFAULT_AUTO_ARCHIVE_DAYS = 14
 const DEFAULT_PAGE = 1
 const DEFAULT_LIMIT = 20
 
-const ARCHIVED_TASKS_SELECT = `
-  *,
-  stick:sticks(id, topic, content, pad:pads(id, name)),
-  user:users(id, full_name, email, username, avatar_url)
-`
+const ARCHIVED_TASKS_SELECT = "*"
+
+// Helper to attach related data to archived tasks
+async function attachRelatedData(db: any, tasks: any[]) {
+  if (!tasks.length) return tasks
+
+  const stickIds = [...new Set(tasks.map((t: any) => t.stick_id).filter(Boolean))]
+  const userIds = [...new Set(tasks.map((t: any) => t.user_id).filter(Boolean))]
+
+  // Fetch sticks
+  let stickMap: Record<string, { id: string; topic: string; content: string; pad_id?: string }> = {}
+  let padMap: Record<string, { id: string; name: string }> = {}
+
+  if (stickIds.length > 0) {
+    const { data: sticks } = await db
+      .from("sticks")
+      .select("id, topic, content, pad_id")
+      .in("id", stickIds)
+
+    if (sticks) {
+      stickMap = Object.fromEntries(sticks.map((s: any) => [s.id, s]))
+
+      // Fetch pads
+      const padIds = [...new Set(sticks.map((s: any) => s.pad_id).filter(Boolean))]
+      if (padIds.length > 0) {
+        const { data: pads } = await db
+          .from("pads")
+          .select("id, name")
+          .in("id", padIds)
+
+        if (pads) {
+          padMap = Object.fromEntries(pads.map((p: any) => [p.id, p]))
+        }
+      }
+    }
+  }
+
+  // Fetch users
+  let userMap: Record<string, { id: string; full_name?: string; email?: string; username?: string; avatar_url?: string }> = {}
+  if (userIds.length > 0) {
+    const { data: users } = await db
+      .from("users")
+      .select("id, full_name, email, username, avatar_url")
+      .in("id", userIds)
+
+    if (users) {
+      userMap = Object.fromEntries(users.map((u: any) => [u.id, u]))
+    }
+  }
+
+  // Attach related data
+  return tasks.map((task: any) => {
+    const stick = stickMap[task.stick_id] || null
+    return {
+      ...task,
+      stick: stick ? {
+        id: stick.id,
+        topic: stick.topic,
+        content: stick.content,
+        pad: stick.pad_id ? padMap[stick.pad_id] || null : null,
+      } : null,
+      user: userMap[task.user_id] || null,
+    }
+  })
+}
 
 // Archive a single task or bulk archive
 export async function POST(request: NextRequest) {
@@ -166,6 +226,9 @@ export async function GET(request: NextRequest) {
 
     if (error) throw error
 
+    // Attach related data
+    const tasksWithRelatedData = await attachRelatedData(db, data || [])
+
     // Get total count with a separate query
     const { data: countData } = await db
       .from("calstick_tasks")
@@ -176,7 +239,7 @@ export async function GET(request: NextRequest) {
     const count = countData?.length ?? 0
 
     return NextResponse.json({
-      archivedTasks: data ?? [],
+      archivedTasks: tasksWithRelatedData,
       total: count,
       hasMore: count > offset + limit,
     })

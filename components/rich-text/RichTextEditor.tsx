@@ -214,6 +214,8 @@ export function RichTextEditor({
     extensions: createEditorExtensions(),
     content,
     editable: !readOnly,
+    immediatelyRender: false,
+    shouldRerenderOnTransaction: false,
     onUpdate: ({ editor }) => {
       if (isExternalUpdate.current) return
       

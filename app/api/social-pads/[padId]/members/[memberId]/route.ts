@@ -2,8 +2,9 @@ import { createDatabaseClient } from "@/lib/database/database-adapter"
 import { type NextRequest, NextResponse } from "next/server"
 import { getCachedAuthUser } from "@/lib/auth/cached-auth"
 
-export async function PATCH(request: NextRequest, { params }: { params: { padId: string; memberId: string } }) {
+export async function PATCH(request: NextRequest, { params }: { params: Promise<{ padId: string; memberId: string }> }) {
   try {
+    const { padId, memberId } = await params
     const db = await createDatabaseClient()
 
     const authResult = await getCachedAuthUser()
@@ -19,7 +20,7 @@ export async function PATCH(request: NextRequest, { params }: { params: { padId:
     const { data: membership } = await db
       .from("social_pad_members")
       .select("admin_level")
-      .eq("social_pad_id", params.padId)
+      .eq("social_pad_id", padId)
       .eq("user_id", user.id)
       .maybeSingle()
 
@@ -38,7 +39,7 @@ export async function PATCH(request: NextRequest, { params }: { params: { padId:
     const { data: targetMember } = await db
       .from("social_pad_members")
       .select("admin_level")
-      .eq("id", params.memberId)
+      .eq("id", memberId)
       .maybeSingle()
 
     if (targetMember?.admin_level === "owner" && admin_level !== "owner") {
@@ -48,8 +49,8 @@ export async function PATCH(request: NextRequest, { params }: { params: { padId:
     const { data: updatedMember, error } = await db
       .from("social_pad_members")
       .update({ admin_level })
-      .eq("id", params.memberId)
-      .eq("social_pad_id", params.padId)
+      .eq("id", memberId)
+      .eq("social_pad_id", padId)
       .select()
       .maybeSingle()
 
@@ -62,8 +63,9 @@ export async function PATCH(request: NextRequest, { params }: { params: { padId:
   }
 }
 
-export async function DELETE(request: NextRequest, { params }: { params: { padId: string; memberId: string } }) {
+export async function DELETE(request: NextRequest, { params }: { params: Promise<{ padId: string; memberId: string }> }) {
   try {
+    const { padId, memberId } = await params
     const db = await createDatabaseClient()
 
     const authResult = await getCachedAuthUser()
@@ -79,7 +81,7 @@ export async function DELETE(request: NextRequest, { params }: { params: { padId
     const { data: membership } = await db
       .from("social_pad_members")
       .select("admin_level")
-      .eq("social_pad_id", params.padId)
+      .eq("social_pad_id", padId)
       .eq("user_id", user.id)
       .maybeSingle()
 
@@ -91,7 +93,7 @@ export async function DELETE(request: NextRequest, { params }: { params: { padId
     const { data: targetMember } = await db
       .from("social_pad_members")
       .select("admin_level")
-      .eq("id", params.memberId)
+      .eq("id", memberId)
       .maybeSingle()
 
     if (targetMember?.admin_level === "owner") {
@@ -101,8 +103,8 @@ export async function DELETE(request: NextRequest, { params }: { params: { padId
     const { error } = await db
       .from("social_pad_members")
       .delete()
-      .eq("id", params.memberId)
-      .eq("social_pad_id", params.padId)
+      .eq("id", memberId)
+      .eq("social_pad_id", padId)
 
     if (error) throw error
 

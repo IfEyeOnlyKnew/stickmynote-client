@@ -3,10 +3,10 @@ import { createDatabaseClient } from "@/lib/database/database-adapter"
 import { getCachedAuthUser } from "@/lib/auth/cached-auth"
 
 // GET: Search KB articles by tags for semantic matching
-export async function GET(request: NextRequest, { params }: { params: { padId: string } }) {
+export async function GET(request: NextRequest, { params }: { params: Promise<{ padId: string }> }) {
   try {
+    const { padId } = await params
     const db = await createDatabaseClient()
-    const { padId } = params
     const { searchParams } = new URL(request.url)
     const tags = searchParams.get("tags")?.split(",") || []
     const query = searchParams.get("query") || ""

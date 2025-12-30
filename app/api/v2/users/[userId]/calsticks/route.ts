@@ -5,10 +5,10 @@ import { query } from '@/lib/database/pg-helpers'
 import { handleApiError } from '@/lib/api/handle-api-error'
 
 // GET /api/v2/users/[userId]/calsticks - List calendar stick events for a user
-export async function GET(request: NextRequest, { params }: { params: { userId: string } }) {
+export async function GET(request: NextRequest, { params }: { params: Promise<{ userId: string }> }) {
   try {
+    const { userId } = await params
     const session = await requireADSession(request)
-    const userId = params.userId
     // Only allow access if requesting own user or admin
     if (session.user.id !== userId && !session.user.is_admin) {
       return new Response(JSON.stringify({ error: 'Access denied' }), { status: 403 })

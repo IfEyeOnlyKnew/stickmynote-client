@@ -52,17 +52,7 @@ export async function GET(request: NextRequest) {
 
     let query = db
       .from("paks_pad_sticks")
-      .select(
-        `
-        *,
-        pads:paks_pads!inner(
-          id,
-          name,
-          owner_id
-        )
-      `,
-        { count: "exact" },
-      )
+      .select("*", { count: "exact" })
       .eq("is_quickstick", true)
       .eq("org_id", orgContext.orgId)
       .order("updated_at", { ascending: false })
@@ -81,14 +71,35 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "Failed to fetch QuickSticks" }, { status: 500 })
     }
 
-    // Filter sticks based on user permissions
-    const accessibleSticks = sticks?.filter((stick) => {
-      const pad = stick.pads
-      if (!pad) return false
-      if (stick.user_id === user.id) return true
-      if (pad.owner_id === user.id) return true
-      return false
-    })
+    // Fetch pads separately for the sticks
+    const padIds = [...new Set((sticks || []).map((s: any) => s.pad_id).filter(Boolean))]
+    let padMap: Record<string, { id: string; name: string; owner_id: string }> = {}
+
+    if (padIds.length > 0) {
+      const { data: pads } = await db
+        .from("paks_pads")
+        .select("id, name, owner_id")
+        .in("id", padIds)
+        .eq("org_id", orgContext.orgId)
+
+      if (pads) {
+        padMap = Object.fromEntries(pads.map((p: any) => [p.id, p]))
+      }
+    }
+
+    // Attach pad data and filter sticks based on user permissions
+    const accessibleSticks = (sticks || [])
+      .map((stick: any) => ({
+        ...stick,
+        pads: padMap[stick.pad_id] || null,
+      }))
+      .filter((stick: any) => {
+        const pad = stick.pads
+        if (!pad) return false
+        if (stick.user_id === user.id) return true
+        if (pad.owner_id === user.id) return true
+        return false
+      })
 
     const responseData = {
       sticks: accessibleSticks || [],

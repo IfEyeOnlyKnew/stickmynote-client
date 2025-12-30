@@ -2,9 +2,9 @@ import { createDatabaseClient } from "@/lib/database/database-adapter"
 import { type NextRequest, NextResponse } from "next/server"
 import { getCachedAuthUser } from "@/lib/auth/cached-auth"
 
-export async function GET(request: NextRequest, { params }: { params: { stickId: string } }) {
+export async function GET(request: NextRequest, { params }: { params: Promise<{ stickId: string }> }) {
   try {
-    const { stickId } = params
+    const { stickId } = await params
     const db = await createDatabaseClient()
 
     const authResult = await getCachedAuthUser()
@@ -43,9 +43,9 @@ export async function GET(request: NextRequest, { params }: { params: { stickId:
   }
 }
 
-export async function POST(request: NextRequest, { params }: { params: { stickId: string } }) {
+export async function POST(request: NextRequest, { params }: { params: Promise<{ stickId: string }> }) {
   try {
-    const { stickId } = params
+    const { stickId } = await params
     const db = await createDatabaseClient()
 
     const authResult = await getCachedAuthUser()
@@ -120,9 +120,9 @@ export async function POST(request: NextRequest, { params }: { params: { stickId
   }
 }
 
-export async function DELETE(request: NextRequest, { params }: { params: { stickId: string } }) {
+export async function DELETE(request: NextRequest, { params }: { params: Promise<{ stickId: string }> }) {
   try {
-    const { stickId } = params
+    const { stickId } = await params
     const db = await createDatabaseClient()
 
     const authResult = await getCachedAuthUser()

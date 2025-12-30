@@ -19,6 +19,8 @@ interface PersonalStick {
 
 interface TabRow {
   personal_stick_id: string
+  tab_name: string
+  tab_type: string
   tags: string | string[]
 }
 
@@ -105,11 +107,18 @@ function parseHyperlinksFromTab(tab: TabRow): { url: string; title?: string }[] 
   }
 }
 
-// Helper: Build hyperlinks map from tabs
+// Helper: Build hyperlinks map from tabs (only from "Tags" tabs)
 function buildHyperlinksMap(tabs: TabRow[]): Map<string, { url: string; title?: string }[]> {
   const map = new Map<string, { url: string; title?: string }[]>()
+  console.log('[buildHyperlinksMap] Processing tabs:', tabs?.length || 0)
   for (const tab of tabs || []) {
-    map.set(tab.personal_stick_id, parseHyperlinksFromTab(tab))
+    console.log(`[buildHyperlinksMap] Tab: tab_name="${tab.tab_name}", has tags=${!!tab.tags}, tags type=${typeof tab.tags}`)
+    // Only process tabs with tab_name = 'Tags' which contain hyperlinks
+    if (tab.tab_name === 'Tags' && tab.tags) {
+      const hyperlinks = parseHyperlinksFromTab(tab)
+      console.log(`[buildHyperlinksMap] Parsed ${hyperlinks.length} hyperlinks for note ${tab.personal_stick_id}`)
+      map.set(tab.personal_stick_id, hyperlinks)
+    }
   }
   return map
 }
@@ -205,6 +214,12 @@ export function useNotesData(userId: string | null, shouldLoad = true): UseNotes
 
         // Fetch notes via API
         const { notes: rawNotes, total, tabs, replies } = await fetchNotes(userId!, limit, currentOffset)
+
+        // Debug: Log tabs data to understand structure
+        console.log('[useNotesData] Tabs received from API:', tabs)
+        if (tabs && tabs.length > 0) {
+          console.log('[useNotesData] First tab structure:', JSON.stringify(tabs[0], null, 2))
+        }
 
         if (!rawNotes || rawNotes.length === 0) {
           if (isLoadMore) {

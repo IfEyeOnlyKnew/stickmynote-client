@@ -8,7 +8,8 @@ import { handleApiError } from '@/lib/api/handle-api-error'
 export const dynamic = 'force-dynamic'
 
 // GET /api/v2/calsticks/[id]/subtasks - Get subtasks for a calstick
-export async function GET(request: NextRequest, { params }: { params: { id: string } }) {
+export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params
   try {
     const authResult = await getCachedAuthUser()
     if (authResult.rateLimited) {
@@ -26,7 +27,7 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
       return new Response(JSON.stringify({ error: 'No organization context' }), { status: 403 })
     }
 
-    const parentId = params.id
+    const parentId = id
 
     const result = await db.query(
       `SELECT

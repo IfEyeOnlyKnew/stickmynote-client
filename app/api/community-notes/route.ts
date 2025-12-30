@@ -14,20 +14,10 @@ export async function GET(request: NextRequest) {
     const user = authResult.user
     const db = await createServiceDatabaseClient()
 
-    // Fetch shared notes with their stats
+    // Fetch shared notes
     const { data: sharedNotes, error: notesError } = await db
       .from("personal_sticks")
-      .select(`
-        id,
-        topic,
-        content,
-        user_id,
-        created_at,
-        updated_at,
-        personal_sticks_tags(tag),
-        personal_sticks_replies(id),
-        personal_sticks_reactions(id, user_id, reaction_type)
-      `)
+      .select("id, topic, content, user_id, created_at, updated_at")
       .eq("is_shared", true)
       .order("created_at", { ascending: false })
       .limit(10)
@@ -37,54 +27,56 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ notes: [] })
     }
 
-    // Get unique user IDs
-    const userIds = [...new Set((sharedNotes || []).map((n: { user_id: string }) => n.user_id))]
+    if (!sharedNotes || sharedNotes.length === 0) {
+      return NextResponse.json({ notes: [] })
+    }
 
-    // Fetch user details
-    let usersMap: Record<string, { email: string; display_name?: string; avatar_url?: string }> = {}
-    if (userIds.length > 0) {
-      const { data: users } = await db
-        .from("users")
-        .select("id, email, display_name, avatar_url")
-        .in("id", userIds)
+    const noteIds = sharedNotes.map((n: { id: string }) => n.id)
+    const userIds = [...new Set(sharedNotes.map((n: { user_id: string }) => n.user_id))]
 
-      if (users) {
-        usersMap = users.reduce(
-          (
-            acc: Record<string, { email: string; display_name?: string; avatar_url?: string }>,
-            u: { id: string; email: string; display_name?: string; avatar_url?: string },
-          ) => {
-            acc[u.id] = { email: u.email, display_name: u.display_name, avatar_url: u.avatar_url }
-            return acc
-          },
-          {} as typeof usersMap,
-        )
-      }
+    // Fetch related data in parallel
+    const [tagsResult, repliesResult, reactionsResult, usersResult] = await Promise.all([
+      db.from("personal_sticks_tags").select("personal_stick_id, tag").in("personal_stick_id", noteIds),
+      db.from("personal_sticks_replies").select("personal_stick_id").in("personal_stick_id", noteIds),
+      db.from("personal_sticks_reactions").select("personal_stick_id, user_id, reaction_type").in("personal_stick_id", noteIds),
+      userIds.length > 0 ? db.from("users").select("id, email, display_name, avatar_url").in("id", userIds) : { data: [] },
+    ])
+
+    // Build lookup maps
+    const tagsMap: Record<string, string[]> = {}
+    for (const t of tagsResult.data || []) {
+      if (!tagsMap[t.personal_stick_id]) tagsMap[t.personal_stick_id] = []
+      tagsMap[t.personal_stick_id].push(t.tag)
+    }
+
+    const repliesCountMap: Record<string, number> = {}
+    for (const r of repliesResult.data || []) {
+      repliesCountMap[r.personal_stick_id] = (repliesCountMap[r.personal_stick_id] || 0) + 1
+    }
+
+    const reactionsMap: Record<string, { user_id: string; reaction_type: string }[]> = {}
+    for (const r of reactionsResult.data || []) {
+      if (!reactionsMap[r.personal_stick_id]) reactionsMap[r.personal_stick_id] = []
+      reactionsMap[r.personal_stick_id].push({ user_id: r.user_id, reaction_type: r.reaction_type })
+    }
+
+    const usersMap: Record<string, { email: string; display_name?: string; avatar_url?: string }> = {}
+    for (const u of usersResult.data || []) {
+      usersMap[u.id] = { email: u.email, display_name: u.display_name, avatar_url: u.avatar_url }
     }
 
     // Transform to CommunityNote format
-    const transformedNotes = (sharedNotes || []).map(
-      (note: {
-        id: string
-        user_id: string
-        topic?: string
-        content?: string
-        created_at: string
-        personal_sticks_tags?: { tag: string }[]
-        personal_sticks_replies?: { id: string }[]
-        personal_sticks_reactions?: { user_id: string; reaction_type: string }[]
-      }) => {
+    const transformedNotes = sharedNotes.map(
+      (note: { id: string; user_id: string; topic?: string; content?: string; created_at: string }) => {
         const userInfo = usersMap[note.user_id] || { email: "Unknown" }
-        const tags = (note.personal_sticks_tags || []).map((t: { tag: string }) => t.tag)
-        const replies = note.personal_sticks_replies || []
-        const reactions = note.personal_sticks_reactions || []
-        const likes = reactions.filter((r: { reaction_type: string }) => r.reaction_type === "like").length
-        const isLiked = reactions.some(
-          (r: { user_id: string; reaction_type: string }) => r.user_id === user.id && r.reaction_type === "like",
-        )
+        const tags = tagsMap[note.id] || []
+        const repliesCount = repliesCountMap[note.id] || 0
+        const reactions = reactionsMap[note.id] || []
+        const likes = reactions.filter((r) => r.reaction_type === "like").length
+        const isLiked = reactions.some((r) => r.user_id === user.id && r.reaction_type === "like")
 
         // Determine if trending (more than 5 likes or recent activity)
-        const trending = likes > 5 || replies.length > 3
+        const trending = likes > 5 || repliesCount > 3
 
         return {
           id: note.id,
@@ -94,7 +86,7 @@ export async function GET(request: NextRequest) {
           authorId: note.user_id,
           avatar: userInfo.avatar_url || "/diverse-avatars.png",
           likes,
-          comments: replies.length,
+          comments: repliesCount,
           tags,
           isLiked,
           trending,

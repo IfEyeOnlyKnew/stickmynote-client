@@ -5,11 +5,10 @@ import { querySingle } from '@/lib/database/pg-helpers'
 import { handleApiError } from '@/lib/api/handle-api-error'
 
 // GET /api/v2/users/[userId]/notes/[noteId] - Get note details by user and note ID
-export async function GET(request: NextRequest, { params }: { params: { userId: string, noteId: string } }) {
+export async function GET(request: NextRequest, { params }: { params: Promise<{ userId: string, noteId: string }> }) {
   try {
+    const { userId, noteId } = await params
     const session = await requireADSession(request)
-    const userId = params.userId
-    const noteId = params.noteId
     // Only allow access if requesting own user or admin
     if (session.user.id !== userId && !session.user.is_admin) {
       return new Response(JSON.stringify({ error: 'Access denied' }), { status: 403 })

@@ -1,10 +1,12 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { createDatabaseClient } from "@/lib/database/database-adapter";
 import { getCachedAuthUser } from "@/lib/auth/cached-auth";
+import { getOrgContext } from "@/lib/auth/get-org-context";
 import type { DatabaseClient } from "@/lib/database/database-adapter";
+import { generateText as aiProviderGenerateText, isAIAvailable } from "@/lib/ai/ai-provider";
+import { writeFile, mkdir } from "fs/promises";
+import path from "path";
 
-let generateText: typeof import("ai").generateText | undefined;
-let put: typeof import("@vercel/blob").put | undefined;
 let Document: typeof import("docx").Document | undefined;
 let Packer: typeof import("docx").Packer | undefined;
 let Paragraph: typeof import("docx").Paragraph | undefined;
@@ -12,20 +14,6 @@ let TextRun: typeof import("docx").TextRun | undefined;
 let HeadingLevel: typeof import("docx").HeadingLevel | undefined;
 
 const initializeModules = async () => {
-  try {
-    const aiModule = await import("ai");
-    generateText = aiModule.generateText;
-  } catch {
-    // ai module is optional - continue without AI features
-  }
-
-  try {
-    const blobModule = await import("@vercel/blob");
-    put = blobModule.put;
-  } catch {
-    // @vercel/blob is optional - continue without blob storage
-  }
-
   try {
     const docxModule = await import("docx");
     Document = docxModule.Document;
@@ -96,6 +84,11 @@ async function checkUserAccess(
   stickData: StickData,
   userId: string
 ): Promise<boolean> {
+  // Check if user is the stick owner
+  if ((stickData as any).user_id === userId) {
+    return true;
+  }
+
   // Check if user is the pad owner
   if (stickData.pads?.owner_id === userId) {
     return true;
@@ -106,6 +99,18 @@ async function checkUserAccess(
     stickData.pads?.multi_pak_id &&
     stickData.pads?.multi_paks?.owner_id === userId
   ) {
+    return true;
+  }
+
+  // Check direct stick membership
+  const { data: stickMember } = await db
+    .from("paks_pad_stick_members")
+    .select("role")
+    .eq("stick_id", stickData.id)
+    .eq("user_id", userId)
+    .maybeSingle();
+
+  if (stickMember) {
     return true;
   }
 
@@ -235,6 +240,7 @@ async function saveExportLink(
   db: DatabaseClient,
   stickId: string,
   userId: string,
+  orgId: string,
   exportLink: ExportLink
 ): Promise<void> {
   const { data: existingDetailsTab } = await db
@@ -242,6 +248,7 @@ async function saveExportLink(
     .select("*")
     .eq("stick_id", stickId)
     .eq("tab_type", "details")
+    .eq("org_id", orgId)
     .maybeSingle();
 
   if (existingDetailsTab) {
@@ -268,11 +275,13 @@ async function saveExportLink(
         tab_data: newTabData,
         updated_at: new Date().toISOString(),
       })
-      .eq("id", existingDetailsTab.id);
+      .eq("id", existingDetailsTab.id)
+      .eq("org_id", orgId);
   } else {
     await db.from("paks_pad_stick_tabs").insert({
       stick_id: stickId,
       user_id: userId,
+      org_id: orgId,
       tab_type: "details",
       tab_name: "Details",
       tab_content: "Stick details and exports",
@@ -284,23 +293,16 @@ async function saveExportLink(
 
 export async function POST(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   await initializeModules();
 
   try {
+    const { id: stickId } = await params;
     const { tone = "formal" } = await request.json();
-    const stickId = params.id;
 
-    if (!stickId) {
-      return NextResponse.json(
-        { error: "Stick ID is required" },
-        { status: 400 }
-      );
-    }
-
-    // Check if XAI_API_KEY is configured
-    if (!process.env.XAI_API_KEY) {
+    // Check if AI service is configured
+    if (!isAIAvailable()) {
       return NextResponse.json(
         { error: "AI service not configured" },
         { status: 500 }
@@ -321,20 +323,19 @@ export async function POST(
     }
     const user = authResult.user;
 
-    // Fetch stick data with pad and multi-pak information
+    // Get org context
+    const orgContext = await getOrgContext(user.id);
+    if (!orgContext) {
+      return NextResponse.json(
+        { error: "Organization context required" },
+        { status: 403 }
+      );
+    }
+
+    // Fetch stick data
     const { data: stickData, error: stickError } = await db
       .from("paks_pad_sticks")
-      .select(
-        `
-        *,
-        pads:paks_pads(
-          name, 
-          multi_pak_id, 
-          owner_id,
-          multi_paks(owner_id)
-        )
-      `
-      )
+      .select("*")
       .eq("id", stickId)
       .maybeSingle();
 
@@ -345,9 +346,34 @@ export async function POST(
       );
     }
 
+    // Fetch pad and multi-pak info separately
+    let padsData: { name?: string; multi_pak_id?: string; owner_id?: string; multi_paks?: { owner_id?: string } } | null = null;
+    if (stickData.pad_id) {
+      const { data: pad } = await db
+        .from("paks_pads")
+        .select("name, multi_pak_id, owner_id")
+        .eq("id", stickData.pad_id)
+        .maybeSingle();
+
+      if (pad) {
+        padsData = { ...pad };
+        if (pad.multi_pak_id) {
+          const { data: multiPak } = await db
+            .from("multi_paks")
+            .select("owner_id")
+            .eq("id", pad.multi_pak_id)
+            .maybeSingle();
+          if (multiPak) {
+            padsData.multi_paks = { owner_id: multiPak.owner_id };
+          }
+        }
+      }
+    }
+    const stickDataWithPads = { ...stickData, pads: padsData };
+
     const hasAccess = await checkUserAccess(
       db,
-      stickData as StickData,
+      stickDataWithPads as StickData,
       user.id
     );
 
@@ -358,14 +384,26 @@ export async function POST(
     // Fetch stick replies
     const { data: replies } = await db
       .from("paks_pad_stick_replies")
-      .select(
-        `
-        *,
-        user:users(username, email)
-      `
-      )
+      .select("*")
       .eq("stick_id", stickId)
       .order("created_at", { ascending: true });
+
+    // Fetch user data for replies
+    const replyUserIds = [...new Set((replies || []).map((r: any) => r.user_id).filter(Boolean))] as string[];
+    let replyUserMap: Record<string, { username?: string; email?: string }> = {};
+    if (replyUserIds.length > 0) {
+      const { data: users } = await db
+        .from("users")
+        .select("id, username, email")
+        .in("id", replyUserIds);
+      if (users) {
+        replyUserMap = Object.fromEntries(users.map((u: any) => [u.id, { username: u.username, email: u.email }]));
+      }
+    }
+    const repliesWithUsers = (replies || []).map((reply: any) => ({
+      ...reply,
+      user: replyUserMap[reply.user_id] || null,
+    }));
 
     // Fetch stick tabs
     const { data: stickTabs } = await db
@@ -385,18 +423,17 @@ export async function POST(
     // Build prompt and generate AI summary
     const prompt = buildPrompt(
       tone,
-      stickData as StickData,
+      stickDataWithPads as StickData,
       videoLinks,
       imageLinks,
-      replies as Reply[] | null
+      repliesWithUsers as Reply[] | null
     );
 
     // Generate comprehensive summary using AI
-    const { text: comprehensiveSummary } = (await generateText?.({
-      model: "xai/grok-3" as any,
+    const { text: comprehensiveSummary } = await aiProviderGenerateText({
       prompt: prompt,
-      maxOutputTokens: 2000,
-    })) || { text: "AI service unavailable" };
+      maxTokens: 2000,
+    });
 
     // Check if docx module is available
     if (!Document || !Paragraph || !TextRun || !Packer) {
@@ -472,7 +509,7 @@ export async function POST(
               children: [
                 new DocxTextRun({ text: "Topic: ", bold: true, size: 24 }),
                 new DocxTextRun({
-                  text: stickData.topic || "Untitled",
+                  text: stickDataWithPads.topic || "Untitled",
                   size: 24,
                 }),
               ],
@@ -482,7 +519,7 @@ export async function POST(
               children: [
                 new DocxTextRun({ text: "Pad: ", bold: true, size: 24 }),
                 new DocxTextRun({
-                  text: stickData.pads?.name || "Unknown Pad",
+                  text: stickDataWithPads.pads?.name || "Unknown Pad",
                   size: 24,
                 }),
               ],
@@ -492,7 +529,7 @@ export async function POST(
               children: [
                 new DocxTextRun({ text: "Created: ", bold: true, size: 24 }),
                 new DocxTextRun({
-                  text: new Date(stickData.created_at).toLocaleDateString(),
+                  text: new Date(stickDataWithPads.created_at).toLocaleDateString(),
                   size: 24,
                 }),
               ],
@@ -508,7 +545,7 @@ export async function POST(
             new DocxParagraph({
               children: [
                 new DocxTextRun({
-                  text: stickData.content || "No content provided.",
+                  text: stickDataWithPads.content || "No content provided.",
                   size: 24,
                 }),
               ],
@@ -584,12 +621,12 @@ export async function POST(
 
             // Discussion and Replies
             new DocxParagraph({
-              text: `DISCUSSION AND REPLIES (${replies?.length || 0})`,
+              text: `DISCUSSION AND REPLIES (${repliesWithUsers?.length || 0})`,
               heading: HeadingLevel?.HEADING_1,
               spacing: { before: 400, after: 200 },
             }),
-            ...(replies && replies.length > 0
-              ? replies.flatMap((reply) => [
+            ...(repliesWithUsers && repliesWithUsers.length > 0
+              ? repliesWithUsers.flatMap((reply: any) => [
                   new DocxParagraph({
                     children: [
                       new DocxTextRun({
@@ -656,33 +693,37 @@ export async function POST(
     });
 
     const buffer = await DocxPacker.toBuffer(doc);
-    const docxBlob = new Blob([new Uint8Array(buffer)], {
-      type: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-    });
 
-    const sanitizedTopic = (stickData.topic || "Untitled")
+    const sanitizedTopic = (stickDataWithPads.topic || "Untitled")
       .replaceAll(/[^a-zA-Z0-9\s-]/g, "")
       .replaceAll(/\s+/g, "-")
       .toLowerCase()
       .substring(0, 50);
 
     const filename = `${sanitizedTopic}-export-${Date.now()}.docx`;
-    const blob = (await put?.(filename, docxBlob, {
-      access: "public",
-    })) || { url: "" };
+
+    // Save to local public/exports directory
+    const exportsDir = path.join(process.cwd(), "public", "exports");
+    await mkdir(exportsDir, { recursive: true });
+    const filePath = path.join(exportsDir, filename);
+    await writeFile(filePath, Buffer.from(buffer));
+
+    // Generate URL for local file
+    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+    const fileUrl = `${baseUrl}/exports/${filename}`;
 
     const exportLink = {
-      url: blob.url,
+      url: fileUrl,
       filename: filename,
       created_at: new Date().toISOString(),
       type: "complete_export",
     };
 
-    await saveExportLink(db, stickId, user.id, exportLink);
+    await saveExportLink(db, stickId, user.id, orgContext.orgId, exportLink);
 
     return NextResponse.json({
       success: true,
-      exportUrl: blob.url,
+      exportUrl: fileUrl,
       filename: filename,
       message: "Complete stick export generated successfully",
     });

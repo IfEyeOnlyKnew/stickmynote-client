@@ -87,7 +87,7 @@ export async function PUT(request: Request) {
     // Get the stick to check permissions
     let stickQuery = db
       .from("social_sticks")
-      .select("user_id, social_pad_id, social_pads(owner_id)")
+      .select("user_id, social_pad_id")
       .eq("id", socialStickId)
 
     if (orgId) stickQuery = stickQuery.eq("org_id", orgId)
@@ -95,6 +95,16 @@ export async function PUT(request: Request) {
     const { data: stick } = await stickQuery.maybeSingle()
     if (!stick) {
       return NextResponse.json({ error: "Stick not found" }, { status: 404 })
+    }
+
+    // Fetch pad owner separately
+    if (stick.social_pad_id) {
+      const { data: pad } = await db
+        .from("social_pads")
+        .select("owner_id")
+        .eq("id", stick.social_pad_id)
+        .maybeSingle()
+      stick.social_pads = pad
     }
 
     // Check membership

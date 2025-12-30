@@ -1,16 +1,15 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useCallback, useMemo } from "react"
 import { useUser } from "@/contexts/user-context"
 import { Dialog, DialogContent, DialogTitle, DialogDescription } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Textarea } from "@/components/ui/textarea"
-import { User, Calendar, Filter, MessageSquare, Pencil, Trash2, BookOpen, LinkIcon } from "lucide-react"
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { ReplyModal, REPLY_CATEGORIES } from "@/components/social/reply-modal"
+import { User, Calendar, Filter, MessageSquare, BookOpen, LinkIcon, Trash2 } from "lucide-react"
 import { formatDistanceToNow } from "date-fns"
+import { ReplyModal, REPLY_CATEGORIES } from "@/components/social/reply-modal"
 import { Badge } from "@/components/ui/badge"
+import { ReplyCard } from "@/components/social/reply-card"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -33,6 +32,7 @@ interface Reply {
   updated_at: string
   user_id: string
   parent_reply_id: string | null
+  calstick_id?: string | null
   users: {
     id: string
     full_name: string | null
@@ -79,12 +79,9 @@ export function StickDetailModal({ open, onOpenChange, stickId, onUpdate }: Stic
   const [loading, setLoading] = useState(false)
   const [replyModalOpen, setReplyModalOpen] = useState(false)
   const [parentReply, setParentReply] = useState<Reply | null>(null)
-  const [editingReplyId, setEditingReplyId] = useState<string | null>(null)
-  const [editReplyContent, setEditReplyContent] = useState("")
   const [isPadOwner, setIsPadOwner] = useState(false)
   const [isAdmin, setIsAdmin] = useState(false)
   const [selectedCategories, setSelectedCategories] = useState<string[]>(REPLY_CATEGORIES.map((c) => c.value))
-  const [editDetails, setEditDetails] = useState("")
 
   const [isEditing, setIsEditing] = useState(false)
   const [tempTopic, setTempTopic] = useState("")
@@ -199,7 +196,6 @@ export function StickDetailModal({ open, onOpenChange, stickId, onUpdate }: Stic
 
       const data = await response.json()
       setStick(data.stick)
-      setEditDetails(data.stick.details || "")
 
       if (user && data.stick.social_pad_id) {
         await fetchPadOwnership(data.stick.social_pad_id)
@@ -301,47 +297,13 @@ export function StickDetailModal({ open, onOpenChange, stickId, onUpdate }: Stic
     }
   }
 
-  const handleStartEditReply = (reply: Reply) => {
-    setEditingReplyId(reply.id)
-    setEditReplyContent(reply.content)
-  }
 
-  const handleSaveReply = async (replyId: string) => {
-    if (!editReplyContent.trim()) return
-
-    try {
-      console.log("[v0] Updating reply:", replyId)
-      const response = await fetch(`/api/social-sticks/${stickId}/replies`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          reply_id: replyId,
-          content: editReplyContent,
-        }),
-      })
-
-      if (response.ok) {
-        console.log("[v0] Reply updated successfully")
-        await fetchStick()
-        setEditingReplyId(null)
-        setEditReplyContent("")
-        onUpdate?.()
-      } else {
-        console.error("[v0] Failed to update reply:", response.status)
-        alert("Failed to update reply. Please try again.")
-      }
-    } catch (error) {
-      console.error("[v0] Error updating reply:", error)
-      alert("An error occurred while updating the reply.")
-    }
-  }
-
-  const handleOpenReplyModal = (reply?: Reply) => {
+  const handleOpenReplyModal = useCallback((reply?: Reply) => {
     setParentReply(reply || null)
     setReplyModalOpen(true)
-  }
+  }, [])
 
-  const handleDeleteReply = async (replyId: string) => {
+  const handleDeleteReply = useCallback(async (replyId: string) => {
     if (!confirm("Are you sure you want to delete this reply? This action cannot be undone.")) {
       return
     }
@@ -364,9 +326,9 @@ export function StickDetailModal({ open, onOpenChange, stickId, onUpdate }: Stic
       console.error("[v0] Error deleting reply:", error)
       alert("An error occurred while deleting the reply.")
     }
-  }
+  }, [stickId, onUpdate])
 
-  const handleEditReply = async (replyId: string, content: string) => {
+  const handleEditReply = useCallback(async (replyId: string, content: string) => {
     try {
       console.log("[v0] Editing reply:", replyId)
       const response = await fetch(`/api/social-sticks/${stickId}/replies`, {
@@ -377,7 +339,52 @@ export function StickDetailModal({ open, onOpenChange, stickId, onUpdate }: Stic
 
       if (response.ok) {
         console.log("[v0] Reply edited successfully")
-        await fetchStick()
+
+        // Find the reply to check if it has a calstick_id
+        const findReply = (replies: Reply[]): Reply | undefined => {
+          for (const reply of replies) {
+            if (reply.id === replyId) return reply
+            if (reply.replies?.length) {
+              const found = findReply(reply.replies)
+              if (found) return found
+            }
+          }
+          return undefined
+        }
+
+        const editedReply = stick?.replies ? findReply(stick.replies) : undefined
+
+        // If the reply has a linked CalStick, update it too
+        if (editedReply?.calstick_id) {
+          try {
+            await fetch(`/api/calsticks/${editedReply.calstick_id}`, {
+              method: "PATCH",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ content }),
+            })
+            console.log("[v0] CalStick synced successfully")
+          } catch (calstickError) {
+            console.error("[v0] Error syncing CalStick:", calstickError)
+            // Don't throw - reply was updated successfully
+          }
+        }
+
+        // Update reply locally instead of refetching entire stick
+        setStick((prev) => {
+          if (!prev || !prev.replies) return prev
+          const updateReplyInList = (replies: Reply[]): Reply[] => {
+            return replies.map((reply) => {
+              if (reply.id === replyId) {
+                return { ...reply, content, updated_at: new Date().toISOString() }
+              }
+              if (reply.replies && reply.replies.length > 0) {
+                return { ...reply, replies: updateReplyInList(reply.replies) }
+              }
+              return reply
+            })
+          }
+          return { ...prev, replies: updateReplyInList(prev.replies) }
+        })
         onUpdate?.()
       } else {
         const errorData = await response.json().catch(() => ({ error: "Unknown error" }))
@@ -389,18 +396,51 @@ export function StickDetailModal({ open, onOpenChange, stickId, onUpdate }: Stic
       console.error("[v0] Error editing reply:", error)
       throw error
     }
-  }
+  }, [stickId, stick?.replies, onUpdate])
 
-  const getDisplayName = (reply: Reply) => {
-    if (!reply.users) return "Unknown User"
-    return reply.users.full_name || reply.users.username || reply.users.email
-  }
+  const handleSyncFromCalStick = useCallback(async (replyId: string, calstickId: string) => {
+    try {
+      // Fetch the CalStick content
+      const calstickResponse = await fetch(`/api/calsticks/${calstickId}`)
+      if (!calstickResponse.ok) {
+        throw new Error("Failed to fetch CalStick")
+      }
+      const calstickData = await calstickResponse.json()
+      const newContent = calstickData.calstick.content
 
-  const getInitials = (reply: Reply) => {
-    if (!reply.users) return "??"
-    const name = reply.users.full_name || reply.users.username || reply.users.email
-    return name.substring(0, 2).toUpperCase()
-  }
+      // Update the reply with the CalStick content
+      const response = await fetch(`/api/social-sticks/${stickId}/replies`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ reply_id: replyId, content: newContent }),
+      })
+
+      if (response.ok) {
+        // Update reply locally
+        setStick((prev) => {
+          if (!prev || !prev.replies) return prev
+          const updateReplyInList = (replies: Reply[]): Reply[] => {
+            return replies.map((reply) => {
+              if (reply.id === replyId) {
+                return { ...reply, content: newContent, updated_at: new Date().toISOString() }
+              }
+              if (reply.replies && reply.replies.length > 0) {
+                return { ...reply, replies: updateReplyInList(reply.replies) }
+              }
+              return reply
+            })
+          }
+          return { ...prev, replies: updateReplyInList(prev.replies) }
+        })
+        onUpdate?.()
+      } else {
+        throw new Error("Failed to sync reply")
+      }
+    } catch (error) {
+      console.error("[v0] Error syncing from CalStick:", error)
+      throw error
+    }
+  }, [stickId, onUpdate])
 
   const organizeReplies = (replies: Reply[]): Reply[] => {
     const replyMap = new Map<string, Reply>()
@@ -464,125 +504,25 @@ export function StickDetailModal({ open, onOpenChange, stickId, onUpdate }: Stic
     return grouped
   }
 
-  const renderReply = (reply: Reply, depth = 0) => {
+  const renderReply = useCallback((reply: Reply, depth = 0) => {
     if (!reply) return null
 
-    const isOwner = reply.user_id === user?.id
-    const canDelete = isOwner || isPadOwner || isAdmin
-    const canEditReply = isOwner
-    const isEditing = editingReplyId === reply.id
-
     return (
-      <div key={reply.id} className={depth > 0 ? "ml-8 mt-3" : ""}>
-        <Card className="bg-white border shadow-sm">
-          <CardContent className="pt-4">
-            <div className="flex items-start gap-3">
-              <Avatar className="h-8 w-8">
-                {reply.users?.avatar_url && (
-                  <AvatarImage src={reply.users.avatar_url || "/placeholder.svg"} alt={getDisplayName(reply)} />
-                )}
-                <AvatarFallback className="text-xs">{getInitials(reply)}</AvatarFallback>
-              </Avatar>
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center justify-between mb-1">
-                  <div className="flex items-center gap-2 text-sm flex-wrap">
-                    <span className="font-semibold text-gray-900">{getDisplayName(reply)}</span>
-                    <Badge variant="secondary" className="text-xs">
-                      {reply.category}
-                    </Badge>
-                    <span className="text-gray-500">
-                      {formatDistanceToNow(new Date(reply.created_at), { addSuffix: true })}
-                    </span>
-                    {reply.updated_at !== reply.created_at && <span className="text-xs text-gray-400">(edited)</span>}
-                  </div>
-                  <div className="flex gap-1">
-                    {isOwner && !isEditing && (
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-8 w-8"
-                        onClick={() => handleStartEditReply(reply)}
-                        title="Edit reply"
-                      >
-                        <Pencil className="h-4 w-4" />
-                      </Button>
-                    )}
-                    {canDelete && !isEditing && (
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-8 w-8 text-red-600 hover:text-red-700 hover:bg-red-50"
-                        onClick={() => handleDeleteReply(reply.id)}
-                        title="Delete reply"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    )}
-                    {canEditReply && isEditing && (
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-8 w-8"
-                        onClick={() => handleEditReply(reply.id, editReplyContent)}
-                        title="Save reply"
-                      >
-                        <Pencil className="h-4 w-4" />
-                      </Button>
-                    )}
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-8 w-8"
-                      onClick={() => handleOpenReplyModal(reply)}
-                      title="Reply to this comment"
-                    >
-                      <MessageSquare className="h-4 w-4" />
-                    </Button>
-                  </div>
-                </div>
-                {isEditing ? (
-                  <div className="space-y-2">
-                    <Textarea
-                      value={editReplyContent}
-                      onChange={(e) => setEditReplyContent(e.target.value)}
-                      rows={2}
-                      maxLength={1000}
-                      className="text-sm"
-                    />
-                    <div className="flex justify-between items-center">
-                      <span className="text-xs text-gray-500">{editReplyContent.length}/1000</span>
-                      <div className="flex gap-2">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => {
-                            setEditingReplyId(null)
-                            setEditReplyContent("")
-                          }}
-                        >
-                          Cancel
-                        </Button>
-                        <Button size="sm" onClick={() => handleSaveReply(reply.id)}>
-                          Save
-                        </Button>
-                      </div>
-                    </div>
-                  </div>
-                ) : (
-                  <p className="text-sm text-gray-800 whitespace-pre-wrap break-words">{reply.content}</p>
-                )}
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-        {reply.replies && reply.replies.length > 0 && (
-          <div className="space-y-3 mt-3">
-            {reply.replies.map((nestedReply) => renderReply(nestedReply, depth + 1))}
-          </div>
-        )}
-      </div>
+      <ReplyCard
+        key={reply.id}
+        reply={reply}
+        depth={depth}
+        currentUserId={currentUserId || undefined}
+        isPadOwner={isPadOwner}
+        isAdmin={isAdmin}
+        onEdit={handleEditReply}
+        onDelete={handleDeleteReply}
+        onReply={handleOpenReplyModal}
+        onSyncFromCalStick={handleSyncFromCalStick}
+        renderNestedReply={renderReply}
+      />
     )
-  }
+  }, [currentUserId, isPadOwner, isAdmin, handleEditReply, handleDeleteReply, handleOpenReplyModal, handleSyncFromCalStick])
 
   const handleFocus = () => {
     if (stick && stick.user_id === user?.id && !isEditing) {
@@ -621,7 +561,7 @@ export function StickDetailModal({ open, onOpenChange, stickId, onUpdate }: Stic
     }
   }
 
-  const handleRegenerateSummary = async () => {
+  const handleRegenerateSummary = useCallback(async () => {
     if (!stickId) return
 
     setIsSummarizing(true)
@@ -650,33 +590,71 @@ export function StickDetailModal({ open, onOpenChange, stickId, onUpdate }: Stic
     } finally {
       setIsSummarizing(false)
     }
-  }
+  }, [stickId])
 
-  const handleInsertQuestion = (question: string) => {
+  const handleInsertQuestion = useCallback((_question: string) => {
     setParentReply(null)
     setReplyModalOpen(true)
-  }
+  }, [])
+
+  // Memoize computed values to prevent unnecessary re-renders
+  const replyCount = useMemo(() => stick?.replies?.length || 0, [stick?.replies?.length])
+  const showGenerateButton = useMemo(
+    () => !stick?.live_summary && replyCount > 0,
+    [stick?.live_summary, replyCount]
+  )
+
+  // Memoize StickSummaryCard props to prevent re-renders
+  const summaryCardProps = useMemo(() => ({
+    summary: stick?.live_summary,
+    actionItems: stick?.action_items,
+    suggestedQuestions: stick?.suggested_questions,
+    lastSummarizedAt: stick?.last_summarized_at,
+    summaryReplyCount: stick?.summary_reply_count,
+  }), [
+    stick?.live_summary,
+    stick?.action_items,
+    stick?.suggested_questions,
+    stick?.last_summarized_at,
+    stick?.summary_reply_count,
+  ])
+
+  // Memoize RelatedKBArticles props
+  const stickTags = useMemo(() => stick?.ai_generated_tags || [], [stick?.ai_generated_tags])
+  const stickContentForKB = useMemo(() => stick?.content || "", [stick?.content])
+  const handleCiteArticle = useCallback(() => setShowCitationModal(true), [])
+
+  const organizedReplies = useMemo(
+    () => (stick?.replies ? organizeReplies(stick.replies) : []),
+    [stick?.replies]
+  )
+  const filteredReplies = useMemo(
+    () => filterRepliesByCategory(organizedReplies),
+    [organizedReplies, selectedCategories]
+  )
+  const groupedReplies = useMemo(
+    () => groupRepliesByCategory(filteredReplies),
+    [filteredReplies]
+  )
+  const isOwner = stick?.user_id === user?.id
 
   if (!stick && !loading) return null
-
-  const organizedReplies = stick?.replies ? organizeReplies(stick.replies) : []
-  const filteredReplies = filterRepliesByCategory(organizedReplies)
-  const groupedReplies = groupRepliesByCategory(filteredReplies)
-  const isOwner = stick?.user_id === user?.id
 
   return (
     <>
       <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="max-w-[95vw] h-[95vh] w-full p-0 gap-0">
+        <DialogContent
+          className="max-w-[95vw] h-[95vh] w-full p-0 gap-0 overflow-hidden"
+          style={{ display: 'flex', flexDirection: 'column' }}
+        >
           <DialogTitle className="sr-only">Stick Details</DialogTitle>
           <DialogDescription className="sr-only">View and manage stick content, replies, and media</DialogDescription>
 
-          <div className="flex flex-col h-full overflow-y-auto">
-            <div className="flex items-center justify-between p-6 border-b bg-white shrink-0">
-              <h2 className="text-2xl font-bold text-gray-900">Stick Details</h2>
-            </div>
+          <div className="flex items-center justify-between p-6 border-b bg-white shrink-0">
+            <h2 className="text-2xl font-bold text-gray-900">Stick Details</h2>
+          </div>
 
-            <div className="flex-1 overflow-y-auto min-h-0">
+          <div className="flex-1 overflow-y-auto min-h-0">
               {loading && (
                 <div className="flex items-center justify-center h-full">
                   <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600" />
@@ -811,28 +789,28 @@ export function StickDetailModal({ open, onOpenChange, stickId, onUpdate }: Stic
                     {padId && (
                       <RelatedKBArticles
                         padId={padId}
-                        stickTags={stick.ai_generated_tags || []}
-                        stickContent={stick.content}
-                        onCiteArticle={() => setShowCitationModal(true)}
+                        stickTags={stickTags}
+                        stickContent={stickContentForKB}
+                        onCiteArticle={handleCiteArticle}
                       />
                     )}
 
                     <StickSummaryCard
-                      summary={stick.live_summary}
-                      actionItems={stick.action_items}
-                      suggestedQuestions={stick.suggested_questions}
-                      lastSummarizedAt={stick.last_summarized_at}
-                      replyCount={stick.replies?.length || 0}
-                      summaryReplyCount={stick.summary_reply_count}
+                      summary={summaryCardProps.summary}
+                      actionItems={summaryCardProps.actionItems}
+                      suggestedQuestions={summaryCardProps.suggestedQuestions}
+                      lastSummarizedAt={summaryCardProps.lastSummarizedAt}
+                      replyCount={replyCount}
+                      summaryReplyCount={summaryCardProps.summaryReplyCount}
                       onRegenerateSummary={handleRegenerateSummary}
                       onInsertQuestion={handleInsertQuestion}
                       isLoading={isSummarizing}
-                      showGenerateButton={!stick.live_summary && (stick.replies?.length || 0) > 0}
+                      showGenerateButton={showGenerateButton}
                     />
 
                     <div className="space-y-4">
                       <div className="flex items-center justify-between">
-                        <h3 className="text-xl font-bold text-gray-900">Replies ({stick.replies?.length || 0})</h3>
+                        <h3 className="text-xl font-bold text-gray-900">Replies ({replyCount})</h3>
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
                             <Button variant="outline" size="sm">
@@ -887,7 +865,6 @@ export function StickDetailModal({ open, onOpenChange, stickId, onUpdate }: Stic
                   </div>
                 </div>
               )}
-            </div>
           </div>
         </DialogContent>
       </Dialog>
@@ -911,7 +888,7 @@ export function StickDetailModal({ open, onOpenChange, stickId, onUpdate }: Stic
             open={showKBDrawer}
             onOpenChange={setShowKBDrawer}
             padId={padId}
-            onSelectArticle={(article) => {
+            onSelectArticle={(_article) => {
               setShowKBDrawer(false)
               setShowCitationModal(true)
             }}

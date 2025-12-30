@@ -1,13 +1,19 @@
 "use client"
 
+import dynamic from "next/dynamic"
 import { MessageSquare, Plus, ChevronDown } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { ReplyItem } from "@/components/replies/ReplyItem"
 import { ReplyForm } from "@/components/replies/ReplyForm"
-import { CollaborativeReplyForm } from "@/components/replies/CollaborativeReplyForm"
 import type React from "react"
 import { useCallback, useState, useEffect } from "react"
+
+// CollaborativeReplyForm uses Tiptap which requires client-side only rendering
+const CollaborativeReplyForm = dynamic(
+  () => import("@/components/replies/CollaborativeReplyForm").then((mod) => mod.CollaborativeReplyForm),
+  { ssr: false }
+)
 import { toast } from "sonner"
 
 interface Reply {

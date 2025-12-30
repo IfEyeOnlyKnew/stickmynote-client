@@ -33,7 +33,11 @@ import { AutoScheduleDialog } from "@/components/calsticks/AutoScheduleDialog"
 import { KanbanView } from "@/components/calsticks/KanbanView"
 import { CalendarView } from "@/components/calsticks/CalendarView"
 import { ListView } from "@/components/calsticks/ListView"
-import { TaskDetailModal } from "@/components/calsticks/TaskDetailModal"
+// TaskDetailModal uses Tiptap which requires client-side only rendering
+const TaskDetailModal = dynamic(
+  () => import("@/components/calsticks/TaskDetailModal").then((mod) => mod.TaskDetailModal),
+  { ssr: false }
+)
 import { AutomationRulesModal } from "@/components/calsticks/AutomationRulesModal"
 import { IntegrationsModal } from "@/components/calsticks/IntegrationsModal"
 import { ExportDialog } from "@/components/calsticks/ExportDialog"

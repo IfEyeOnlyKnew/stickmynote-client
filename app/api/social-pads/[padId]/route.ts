@@ -3,18 +3,19 @@ import { type NextRequest, NextResponse } from "next/server"
 import { getOrgContext } from "@/lib/auth/get-org-context"
 import { getCachedAuthUser } from "@/lib/auth/cached-auth"
 
-export async function GET(request: NextRequest, { params }: { params: { padId: string } }) {
+export async function GET(request: NextRequest, { params }: { params: Promise<{ padId: string }> }) {
   try {
     const db = await createDatabaseClient()
-    const { padId } = params
+    const { padId } = await params
 
     const orgContext = await getOrgContext()
 
-    const padQuery = db.from("social_pads").select("*, social_pad_members(count)").eq("id", padId)
+    // Build pad query - use simple select without Supabase-style joins
+    let padQuery = db.from("social_pads").select("*").eq("id", padId)
 
     // Filter by org_id if user is authenticated
     if (orgContext) {
-      padQuery.eq("org_id", orgContext.orgId)
+      padQuery = padQuery.eq("org_id", orgContext.orgId)
     }
 
     const { data: pad, error: padError } = await padQuery.maybeSingle()
@@ -22,6 +23,13 @@ export async function GET(request: NextRequest, { params }: { params: { padId: s
     if (padError || !pad) {
       return NextResponse.json({ error: "Pad not found" }, { status: 404 })
     }
+
+    // Get member count separately
+    const { data: memberCount } = await db
+      .from("social_pad_members")
+      .select("id")
+      .eq("social_pad_id", padId)
+      .eq("accepted", true)
 
     const { data: owner } = await db.from("users").select("email, full_name").eq("id", pad.owner_id).maybeSingle()
 
@@ -55,14 +63,15 @@ export async function GET(request: NextRequest, { params }: { params: { padId: s
       }
     }
 
-    const sticksQuery = db
+    // Build sticks query - use simple select without Supabase-style joins
+    let sticksQuery = db
       .from("social_sticks")
-      .select("*, social_stick_replies(count)")
+      .select("*")
       .eq("social_pad_id", padId)
       .order("created_at", { ascending: false })
 
     if (orgContext) {
-      sticksQuery.eq("org_id", orgContext.orgId)
+      sticksQuery = sticksQuery.eq("org_id", orgContext.orgId)
     }
 
     const { data: sticks, error: sticksError } = await sticksQuery
@@ -71,8 +80,24 @@ export async function GET(request: NextRequest, { params }: { params: { padId: s
       console.error("Error fetching sticks:", sticksError)
     }
 
+    // Get reply counts for all sticks
+    const stickIds = (sticks || []).map((s: any) => s.id)
+    let replyCountMap = new Map<string, number>()
+
+    if (stickIds.length > 0) {
+      const { data: replies } = await db
+        .from("social_stick_replies")
+        .select("social_stick_id")
+        .in("social_stick_id", stickIds)
+
+      for (const reply of replies || []) {
+        const count = replyCountMap.get(reply.social_stick_id) || 0
+        replyCountMap.set(reply.social_stick_id, count + 1)
+      }
+    }
+
     const sticksWithUsers = await Promise.all(
-      (sticks || []).map(async (stick) => {
+      (sticks || []).map(async (stick: any) => {
         const { data: stickUser } = await db
           .from("users")
           .select("email, full_name")
@@ -82,6 +107,7 @@ export async function GET(request: NextRequest, { params }: { params: { padId: s
         return {
           ...stick,
           user: stickUser || null,
+          reply_count: replyCountMap.get(stick.id) || 0,
         }
       }),
     )
@@ -90,6 +116,7 @@ export async function GET(request: NextRequest, { params }: { params: { padId: s
       pad: {
         ...pad,
         owner: owner || null,
+        member_count: memberCount?.length || 0,
       },
       sticks: sticksWithUsers,
     })
@@ -99,9 +126,10 @@ export async function GET(request: NextRequest, { params }: { params: { padId: s
   }
 }
 
-export async function PATCH(request: NextRequest, { params }: { params: { padId: string } }) {
+export async function PATCH(request: NextRequest, { params }: { params: Promise<{ padId: string }> }) {
   try {
     const db = await createDatabaseClient()
+    const { padId } = await params
     const authResult = await getCachedAuthUser()
 
     if (authResult.rateLimited) {
@@ -123,7 +151,6 @@ export async function PATCH(request: NextRequest, { params }: { params: { padId:
     }
 
     const { name, description, is_public } = await request.json()
-    const { padId } = params
 
     const { data: pad } = await db
       .from("social_pads")

@@ -51,3 +51,6 @@ secrets/
 # Database schema exports
 database-schema.json
 schema.sql
+
+# Generated exports (DOCX files)
+/public/exports/

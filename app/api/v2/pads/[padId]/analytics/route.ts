@@ -5,12 +5,12 @@ import { query } from '@/lib/database/pg-helpers'
 import { handleApiError } from '@/lib/api/handle-api-error'
 
 // GET /api/v2/pads/[padId]/analytics - Analytics for a pad
-export async function GET(request: NextRequest, { params }: { params: { padId: string } }) {
+export async function GET(request: NextRequest, { params }: { params: Promise<{ padId: string }> }) {
   try {
+    const { padId } = await params
     const session = await requireADSession(request)
     const userId = session.user.id
     const orgId = session.user.org_id
-    const padId = params.padId
     // Only return analytics if user has access to the pad
     const analytics = await query(
       `SELECT a.* FROM analytics a

@@ -2,10 +2,10 @@ import { createDatabaseClient } from "@/lib/database/database-adapter"
 import { NextResponse } from "next/server"
 import { getCachedAuthUser, createRateLimitResponse, createUnauthorizedResponse } from "@/lib/auth/cached-auth"
 
-export async function GET(request: Request, { params }: { params: { stickId: string } }) {
+export async function GET(request: Request, { params }: { params: Promise<{ stickId: string }> }) {
   try {
+    const { stickId } = await params
     const db = await createDatabaseClient()
-    const { stickId } = params
 
     // Get all reactions for this stick with user data
     const { data: reactions, error } = await db
@@ -35,8 +35,9 @@ export async function GET(request: Request, { params }: { params: { stickId: str
   }
 }
 
-export async function POST(request: Request, { params }: { params: { stickId: string } }) {
+export async function POST(request: Request, { params }: { params: Promise<{ stickId: string }> }) {
   try {
+    const { stickId } = await params
     const db = await createDatabaseClient()
     const authResult = await getCachedAuthUser()
 
@@ -49,7 +50,6 @@ export async function POST(request: Request, { params }: { params: { stickId: st
     }
 
     const user = authResult.user
-    const { stickId } = params
     const { reaction_type } = await request.json()
 
     // Check if user already reacted with this type
@@ -90,8 +90,9 @@ export async function POST(request: Request, { params }: { params: { stickId: st
   }
 }
 
-export async function DELETE(request: Request, { params }: { params: { stickId: string } }) {
+export async function DELETE(request: Request, { params }: { params: Promise<{ stickId: string }> }) {
   try {
+    const { stickId } = await params
     const db = await createDatabaseClient()
     const authResult = await getCachedAuthUser()
 
@@ -104,7 +105,6 @@ export async function DELETE(request: Request, { params }: { params: { stickId: 
     }
 
     const user = authResult.user
-    const { stickId } = params
     const { searchParams } = new URL(request.url)
     const reactionType = searchParams.get("reactionType")
 

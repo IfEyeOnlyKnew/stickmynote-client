@@ -40,14 +40,14 @@ export function useCreateStick(padId: string) {
     setError(null)
 
     try {
-      const response = await fetch("/api/social-sticks", {
+      const response = await fetch("/api/sticks", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
           ...stickData,
-          social_pad_id: padId,
+          pad_id: padId,
         }),
       })
 

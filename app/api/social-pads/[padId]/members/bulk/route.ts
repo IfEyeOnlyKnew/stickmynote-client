@@ -172,8 +172,9 @@ async function checkPermissions(db: any, padId: string, userId: string): Promise
   return { pad, canInvite }
 }
 
-export async function POST(request: Request, { params }: { params: { padId: string } }) {
+export async function POST(request: Request, { params }: { params: Promise<{ padId: string }> }) {
   try {
+    const { padId } = await params
     const db = await createDatabaseClient()
     const authResult = await getCachedAuthUser()
 
@@ -183,8 +184,6 @@ export async function POST(request: Request, { params }: { params: { padId: stri
     if (!authResult.user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
-
-    const { padId } = params
     const { emails, role } = await request.json()
 
     const validationError = validateInput(emails, role)
