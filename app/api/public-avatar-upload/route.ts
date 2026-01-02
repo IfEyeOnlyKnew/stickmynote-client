@@ -1,5 +1,5 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { put } from "@vercel/blob"
+import { put } from "@/lib/storage/local-storage"
 
 export async function POST(request: NextRequest) {
   try {
@@ -38,14 +38,14 @@ export async function POST(request: NextRequest) {
     const timestamp = Date.now()
     const randomId = Math.random().toString(36).substring(2, 8)
     const extension = file.name.split(".").pop() || "jpg"
-    const filename = `avatars/signup/${timestamp}-${randomId}.${extension}`
+    const filename = `${timestamp}-${randomId}.${extension}`
 
     const arrayBuffer = await file.arrayBuffer()
 
-    // Upload to Vercel Blob
+    // Upload to local storage
     const blob = await put(filename, arrayBuffer, {
-      access: "public",
-      contentType: file.type,
+      orgId: "public",
+      folder: "avatars",
     })
 
     console.log("[v0] Avatar uploaded successfully:", blob.url)

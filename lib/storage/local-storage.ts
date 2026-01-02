@@ -153,16 +153,42 @@ export const localStorage = new LocalFileStorage()
 export async function put(
   filename: string,
   content: Buffer | ArrayBuffer,
-  options?: { orgId?: string; folder?: string },
+  options?: {
+    orgId?: string
+    folder?: string
+    access?: "public" | "private"
+    contentType?: string
+    addRandomSuffix?: boolean
+  },
 ) {
   const buffer = content instanceof ArrayBuffer ? Buffer.from(content) : content
-  const orgId = options?.orgId || "default"
+  // Extract orgId from path if it follows the pattern orgs/{orgId}/...
+  let orgId = options?.orgId || "default"
+  let actualFilename = filename
+
+  // Check if filename contains org prefix
+  const orgMatch = filename.match(/^orgs\/([^/]+)\/(.+)$/)
+  if (orgMatch) {
+    orgId = orgMatch[1]
+    actualFilename = orgMatch[2]
+  }
+
   const folder = (options?.folder as any) || "images"
 
-  return localStorage.uploadFile(buffer, filename, orgId, folder)
+  return localStorage.uploadFile(buffer, actualFilename, orgId, folder)
 }
 
-export async function del(pathname: string) {
+export async function del(urlOrPathname: string) {
+  // Handle full URL or just pathname
+  let pathname = urlOrPathname
+  if (urlOrPathname.startsWith("http")) {
+    try {
+      const url = new URL(urlOrPathname)
+      pathname = url.pathname.replace(/^\/uploads\//, "")
+    } catch {
+      // Not a valid URL, treat as pathname
+    }
+  }
   return localStorage.deleteFile(pathname)
 }
 

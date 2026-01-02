@@ -1,5 +1,5 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { put, del } from "@vercel/blob"
+import { put, del } from "@/lib/storage/local-storage"
 import { createDatabaseClient } from "@/lib/database/database-adapter"
 import { getOrgContext } from "@/lib/auth/get-org-context"
 import { encryptFileForOrg, getOrgPrefixedPath, isEncryptionEnabled } from "@/lib/encryption"

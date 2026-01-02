@@ -1,19 +1,8 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { getCachedAuthUser } from "@/lib/auth/cached-auth"
-
-let put: any
-
-const initializeBlobModule = async () => {
-  try {
-    const blobModule = await import("@vercel/blob")
-    put = blobModule.put
-  } catch (error) {
-    put = async () => ({ url: "", pathname: "" })
-  }
-}
+import { put } from "@/lib/storage/local-storage"
 
 export async function POST(request: NextRequest) {
-  await initializeBlobModule()
 
   try {
     const authResult = await getCachedAuthUser()
@@ -83,10 +72,9 @@ export async function POST(request: NextRequest) {
     const extension = file.name.split(".").pop() || "bin"
     const filename = `calstick-attachments/${user.id}/${timestamp}-${randomId}.${extension}`
 
-    // Upload to Vercel Blob
+    // Upload to local storage
     const blob = await put(filename, buffer, {
-      access: "public",
-      contentType: file.type,
+      folder: "documents",
     })
 
     return NextResponse.json({

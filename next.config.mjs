@@ -1,7 +1,7 @@
 import bundleAnalyzer from '@next/bundle-analyzer'
 
 const withBundleAnalyzer = bundleAnalyzer({
-  enabled: process.env.ANALYZE === 'true' && !process.env.VERCEL,
+  enabled: process.env.ANALYZE === 'true',
 })
 
 /** @type {import('next').NextConfig} */
@@ -35,14 +35,6 @@ const nextConfig = {
     contentSecurityPolicy: "default-src 'self'; script-src 'none'; sandbox;",
     domains: ["stickmynote.com", "www.stickmynote.com"],
     remotePatterns: [
-      {
-        protocol: "https",
-        hostname: "**.public.blob.vercel-storage.com",
-      },
-      {
-        protocol: "https",
-        hostname: "**.supabase.co",
-      },
       {
         protocol: "https",
         hostname: "i.ytimg.com",
@@ -85,23 +77,19 @@ const nextConfig = {
       },
       {
         protocol: "https",
-        hostname: "vercel.com",
-      },
-      {
-        protocol: "https",
-        hostname: "**.vercel.com",
-      },
-      {
-        protocol: "https",
-        hostname: "**.vercel.app",
-      },
-      {
-        protocol: "https",
         hostname: "stickmynote.com",
       },
       {
         protocol: "https",
         hostname: "www.stickmynote.com",
+      },
+      {
+        protocol: "https",
+        hostname: "stickmynotes.com",
+      },
+      {
+        protocol: "https",
+        hostname: "www.stickmynotes.com",
       },
       {
         protocol: "https",

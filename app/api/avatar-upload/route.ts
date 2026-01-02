@@ -17,24 +17,15 @@ const initializeModules = async () => {
   }
 }
 
-// Helper to save avatar file locally or to Vercel Blob
+// Helper to save avatar file locally
 async function saveAvatarFile(buffer: Buffer, filename: string, contentType: string): Promise<{ url: string; pathname: string }> {
-  // Check if Vercel Blob is available
-  if (process.env.BLOB_READ_WRITE_TOKEN) {
-    const { put } = await import("@vercel/blob")
-    const blob = await put(filename, new Blob([new Uint8Array(buffer)], { type: contentType }), {
-      access: "public",
-    })
-    return { url: blob.url, pathname: blob.pathname }
-  }
-
-  // Fall back to local file storage
+  // Use local file storage
   const uploadDir = path.join(process.cwd(), "public", "uploads", "avatars")
   await mkdir(uploadDir, { recursive: true })
 
   const localFilename = filename.replaceAll("/", "-")
   const filePath = path.join(uploadDir, localFilename)
-  
+
   await writeFile(filePath, buffer)
 
   // Return URL path for local file

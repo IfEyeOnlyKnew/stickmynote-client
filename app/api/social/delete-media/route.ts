@@ -1,22 +1,9 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { createDatabaseClient } from "@/lib/database/database-adapter"
 import { getCachedAuthUser } from "@/lib/auth/cached-auth"
-
-let del: any
-
-const initializeModules = async () => {
-  try {
-    const blobModule = await import("@vercel/blob")
-    del = blobModule.del
-  } catch (error) {
-    console.error("[delete-media] Blob module load error:", error)
-    console.warn("[v0] @vercel/blob not available")
-    del = async () => {}
-  }
-}
+import { del } from "@/lib/storage/local-storage"
 
 export async function DELETE(request: NextRequest) {
-  await initializeModules()
 
   try {
     await createDatabaseClient()
@@ -42,7 +29,7 @@ export async function DELETE(request: NextRequest) {
       return NextResponse.json({ error: "Unauthorized to delete this file" }, { status: 403 })
     }
 
-    // Delete from Vercel Blob
+    // Delete from local storage
     await del(url)
 
     return NextResponse.json({ success: true })
