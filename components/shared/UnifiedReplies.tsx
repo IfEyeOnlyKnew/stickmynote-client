@@ -472,24 +472,26 @@ export const UnifiedReplies: React.FC<UnifiedRepliesProps> = ({
 
       {localReplies.length > 0 && (
         <ul className="space-y-3 mb-4" key="replies-list">
-          {localReplies.map((reply, index) => (
-            <ReplyItem
-              key={reply.id || `reply-${index}`}
-              reply={reply}
-              context={context}
-              supportsCalStick={supportsCalStick}
-              editingCalStick={editingCalStick}
-              calStickDate={calStickDates[reply.id] || ""}
-              currentUserId={currentUserId}
-              onDelete={onDeleteReply ? handleDeleteReply : undefined}
-              onEdit={onEditReply ? handleEditReply : undefined}
-              onToggleCalStick={handleToggleCalStick}
-              onCalStickDateChange={handleCalStickDateChange}
-              onSaveCalStickDate={handleSaveCalStickDate}
-              onCancelCalStickEdit={() => setEditingCalStick(null)}
-              onToggleCalStickComplete={handleToggleCalStickComplete}
-            />
-          ))}
+          {[...localReplies]
+            .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+            .map((reply, index) => (
+              <ReplyItem
+                key={reply.id || `reply-${index}`}
+                reply={reply}
+                context={context}
+                supportsCalStick={supportsCalStick}
+                editingCalStick={editingCalStick}
+                calStickDate={calStickDates[reply.id] || ""}
+                currentUserId={currentUserId}
+                onDelete={onDeleteReply ? handleDeleteReply : undefined}
+                onEdit={onEditReply ? handleEditReply : undefined}
+                onToggleCalStick={handleToggleCalStick}
+                onCalStickDateChange={handleCalStickDateChange}
+                onSaveCalStickDate={handleSaveCalStickDate}
+                onCancelCalStickEdit={() => setEditingCalStick(null)}
+                onToggleCalStickComplete={handleToggleCalStickComplete}
+              />
+            ))}
         </ul>
       )}
 
@@ -501,10 +503,9 @@ export const UnifiedReplies: React.FC<UnifiedRepliesProps> = ({
     return (
       <div className="bg-white rounded-lg shadow-md border h-full flex flex-col">
         {renderHeader()}
-        <div className="p-4 flex-1 overflow-y-auto text-gray-900">{renderReplies()}</div>
 
         {canEdit && !isNewNote && (
-          <div className="p-4 border-t bg-white flex-shrink-0">
+          <div className="p-4 border-b bg-white flex-shrink-0">
             {enableCollaboration ? (
               <CollaborativeReplyForm
                 replyId={`${noteId}-new-reply`}
@@ -526,6 +527,8 @@ export const UnifiedReplies: React.FC<UnifiedRepliesProps> = ({
             )}
           </div>
         )}
+
+        <div className="p-4 flex-1 overflow-y-auto text-gray-900">{renderReplies()}</div>
       </div>
     )
   }

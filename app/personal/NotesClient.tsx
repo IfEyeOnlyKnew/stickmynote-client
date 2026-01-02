@@ -39,10 +39,10 @@ import { BreadcrumbNav } from "@/components/breadcrumb-nav"
 
 // hooks and utils
 import { useNotes } from "@/hooks/useNotes"
-import { useReplyManagement } from "@/hooks/useReplyManagement"
 import { useFullscreenNote } from "@/hooks/useFullscreenNote"
 import { useWindowSize } from "@/hooks/useWindowSize"
 import { useUserProfile } from "@/hooks/useUserProfile"
+import { useCSRF } from "@/hooks/useCSRF"
 import { COLORS } from "@/utils/noteUtils"
 
 // components
@@ -59,6 +59,12 @@ export function NotesClient({ initialNotes, userId, stats }: Readonly<NotesClien
   const router = useRouter()
   const windowSize = useWindowSize()
   const { userProfile } = useUserProfile(userId)
+  const { csrfToken } = useCSRF()
+  const csrfTokenRef = useRef<string | null>(csrfToken)
+
+  useEffect(() => {
+    csrfTokenRef.current = csrfToken
+  }, [csrfToken])
 
   // Gate to avoid kicking off client fetches until we confirm client + user id
   const [shouldLoad, setShouldLoad] = useState(false)
@@ -91,8 +97,7 @@ export function NotesClient({ initialNotes, userId, stats }: Readonly<NotesClien
     markInitialized,
   } = useNotes(userId, shouldLoad)
 
-  // Replies and fullscreen editing hooks
-  const replyHook = useReplyManagement(userId ?? null, setAllNotes)
+  // Fullscreen editing hook
   const fullscreenHook = useFullscreenNote({
     allNotes: allNotes || [],
     onDeleteNote: handleDeleteNote,
@@ -282,6 +287,99 @@ export function NotesClient({ initialNotes, userId, stats }: Readonly<NotesClien
     },
     [userId, setAllNotes],
   )
+
+  // Reply handlers - inline to match /panel implementation
+  const handleAddReply = useCallback(async (noteId: string, content: string): Promise<void> => {
+    try {
+      const currentCsrfToken = csrfTokenRef.current
+      const response = await fetch(`/api/notes/${noteId}/replies`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(currentCsrfToken ? { "X-CSRF-Token": currentCsrfToken } : {}),
+        },
+        body: JSON.stringify({ content, color: "#f3f4f6" }),
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.error || "Failed to add reply")
+      }
+
+      const { reply } = await response.json()
+      setAllNotes((prev) =>
+        prev.map((note) =>
+          note.id === noteId
+            ? { ...note, replies: [...(note.replies || []), reply] }
+            : note
+        )
+      )
+    } catch (error) {
+      console.error("Error adding reply:", error)
+      throw error
+    }
+  }, [setAllNotes])
+
+  const handleEditReply = useCallback(async (noteId: string, replyId: string, content: string): Promise<void> => {
+    try {
+      const currentCsrfToken = csrfTokenRef.current
+      const response = await fetch(`/api/notes/${noteId}/replies`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          ...(currentCsrfToken ? { "X-CSRF-Token": currentCsrfToken } : {}),
+        },
+        body: JSON.stringify({ replyId, content }),
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.error || "Failed to edit reply")
+      }
+
+      const { reply: updatedReply } = await response.json()
+      setAllNotes((prev) =>
+        prev.map((note) => ({
+          ...note,
+          replies: (note.replies || []).map((r) =>
+            r.id === replyId ? { ...r, ...updatedReply } : r
+          ),
+        }))
+      )
+    } catch (error) {
+      console.error("Error editing reply:", error)
+      throw error
+    }
+  }, [setAllNotes])
+
+  const handleDeleteReply = useCallback(async (noteId: string, replyId: string): Promise<void> => {
+    try {
+      const currentCsrfToken = csrfTokenRef.current
+      const response = await fetch(`/api/notes/${noteId}/replies`, {
+        method: "DELETE",
+        headers: {
+          "Content-Type": "application/json",
+          ...(currentCsrfToken ? { "X-CSRF-Token": currentCsrfToken } : {}),
+        },
+        body: JSON.stringify({ replyId }),
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.error || "Failed to delete reply")
+      }
+
+      setAllNotes((prev) =>
+        prev.map((note) => ({
+          ...note,
+          replies: (note.replies || []).filter((r) => r.id !== replyId),
+        }))
+      )
+    } catch (error) {
+      console.error("Error deleting reply:", error)
+      throw error
+    }
+  }, [setAllNotes])
 
   // Mark client-side readiness
   useEffect(() => {
@@ -614,9 +712,9 @@ export function NotesClient({ initialNotes, userId, stats }: Readonly<NotesClien
                     onGenerateTags={handleGenerateTagsWrapper}
                     onSummarizeLinks={handleSummarizeLinks}
                     summarizingLinks={summarizingLinks}
-                    onAddReply={replyHook.handleAddReply}
-                    onEditReply={replyHook.handleEditReply}
-                    onDeleteReply={replyHook.handleDeleteReply}
+                    onAddReply={handleAddReply}
+                    onEditReply={handleEditReply}
+                    onDeleteReply={handleDeleteReply}
                     onNoteUpdate={(updatedNote) => {
                       setAllNotes((prev) => prev.map((n) => (n.id === updatedNote.id ? updatedNote : n)))
                       handleNoteUpdate(updatedNote.id)

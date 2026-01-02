@@ -1,8 +1,9 @@
 "use client"
 
-import { useCallback } from "react"
+import { useCallback, useRef } from "react"
 import type { Note } from "@/types/note"
 import { toast } from "@/hooks/use-toast"
+import { useCSRF } from "@/hooks/useCSRF"
 
 interface UseReplyManagementReturn {
   handleAddReply: (noteId: string, content: string) => Promise<void>
@@ -38,11 +39,16 @@ function validateContext(
 }
 
 // API: Add reply
-async function addReplyApi(noteId: string, content: string): Promise<{ reply?: any; error?: string }> {
+async function addReplyApi(noteId: string, content: string, csrfToken: string | null): Promise<{ reply?: any; error?: string }> {
   try {
+    const headers: Record<string, string> = { "Content-Type": "application/json" }
+    if (csrfToken) {
+      headers["x-csrf-token"] = csrfToken
+    }
     const response = await fetch(`/api/notes/${noteId}/replies`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers,
+      credentials: "include",
       body: JSON.stringify({ content: content.trim(), color: "#f3f4f6" }),
     })
     if (!response.ok) {
@@ -57,11 +63,16 @@ async function addReplyApi(noteId: string, content: string): Promise<{ reply?: a
 }
 
 // API: Edit reply
-async function editReplyApi(noteId: string, replyId: string, content: string): Promise<{ reply?: any; error?: string }> {
+async function editReplyApi(noteId: string, replyId: string, content: string, csrfToken: string | null): Promise<{ reply?: any; error?: string }> {
   try {
+    const headers: Record<string, string> = { "Content-Type": "application/json" }
+    if (csrfToken) {
+      headers["x-csrf-token"] = csrfToken
+    }
     const response = await fetch(`/api/notes/${noteId}/replies`, {
       method: "PUT",
-      headers: { "Content-Type": "application/json" },
+      headers,
+      credentials: "include",
       body: JSON.stringify({ replyId, content: content.trim() }),
     })
     if (!response.ok) {
@@ -76,11 +87,16 @@ async function editReplyApi(noteId: string, replyId: string, content: string): P
 }
 
 // API: Delete reply
-async function deleteReplyApi(noteId: string, replyId: string): Promise<{ success: boolean; error?: string }> {
+async function deleteReplyApi(noteId: string, replyId: string, csrfToken: string | null): Promise<{ success: boolean; error?: string }> {
   try {
+    const headers: Record<string, string> = { "Content-Type": "application/json" }
+    if (csrfToken) {
+      headers["x-csrf-token"] = csrfToken
+    }
     const response = await fetch(`/api/notes/${noteId}/replies`, {
       method: "DELETE",
-      headers: { "Content-Type": "application/json" },
+      headers,
+      credentials: "include",
       body: JSON.stringify({ replyId }),
     })
     if (!response.ok) {
@@ -125,12 +141,21 @@ export function useReplyManagement(
   userId: string | null,
   setAllNotes: ((notes: Note[] | ((prev: Note[]) => Note[])) => void) | null,
 ): UseReplyManagementReturn {
+  const { csrfToken } = useCSRF()
+  const csrfTokenRef = useRef<string | null>(null)
+
+  // Keep ref in sync with token - this runs on every render to catch updates
+  csrfTokenRef.current = csrfToken
+
   const handleAddReply = useCallback(
     async (noteId: string, content: string) => {
       if (!validateContext(userId, setAllNotes, "add")) return
 
-      const result = await addReplyApi(noteId, content)
-      
+      // Use current token value at time of call
+      const currentToken = csrfTokenRef.current
+      console.log("[useReplyManagement] Adding reply, CSRF token:", currentToken ? `present (${currentToken.substring(0, 30)}...)` : "MISSING")
+      const result = await addReplyApi(noteId, content, currentToken)
+
       if (result.error) {
         showErrorToast("Error", result.error)
         return
@@ -146,7 +171,7 @@ export function useReplyManagement(
     async (noteId: string, replyId: string, content: string) => {
       if (!validateContext(userId, setAllNotes, "edit")) return
 
-      const result = await editReplyApi(noteId, replyId, content)
+      const result = await editReplyApi(noteId, replyId, content, csrfTokenRef.current)
 
       if (result.error) {
         showErrorToast("Error", result.error)
@@ -163,7 +188,7 @@ export function useReplyManagement(
     async (noteId: string, replyId: string) => {
       if (!validateContext(userId, setAllNotes, "delete")) return
 
-      const result = await deleteReplyApi(noteId, replyId)
+      const result = await deleteReplyApi(noteId, replyId, csrfTokenRef.current)
 
       if (!result.success) {
         showErrorToast("Error", result.error || "Failed to delete reply")

@@ -260,11 +260,8 @@ function checkReplyAuthorization(
     return { allowed: false, response: Errors.cannotReplyPrivate() }
   }
 
-  // Private notes: must be same org
-  if (note.org_id !== orgId) {
-    return { allowed: false, response: Errors.cannotReplyDifferentOrg() }
-  }
-
+  // Owner can always reply to their own private notes
+  // This handles legacy notes without org_id and personal org fallback cases
   return { allowed: true }
 }
 

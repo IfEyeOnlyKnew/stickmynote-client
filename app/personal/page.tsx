@@ -34,7 +34,7 @@ export default async function NotesPage() {
 
     const userId = session.user.id
 
-    // Fetch initial notes using direct database query
+    // Fetch initial sticks  direct database query
     const notesResult = await db.query(
       `SELECT * FROM personal_sticks
        WHERE user_id = $1
@@ -50,6 +50,9 @@ export default async function NotesPage() {
 
     // Fetch tabs that contain hyperlinks
     let tabsMap = new Map<string, { url: string; title?: string }[]>()
+    // Fetch replies for all notes
+    let repliesMap = new Map<string, any[]>()
+
     if (noteIds.length > 0) {
       const tabsResult = await db.query(
         `SELECT personal_stick_id, tab_name, tags
@@ -70,12 +73,36 @@ export default async function NotesPage() {
           }
         }
       }
+
+      // Fetch replies
+      const repliesResult = await db.query(
+        `SELECT id, content, color, created_at, updated_at, user_id, personal_stick_id
+         FROM personal_sticks_replies
+         WHERE personal_stick_id = ANY($1)
+         ORDER BY created_at DESC`,
+        [noteIds]
+      )
+
+      for (const reply of repliesResult.rows || []) {
+        const arr = repliesMap.get(reply.personal_stick_id) || []
+        arr.push({
+          id: reply.id,
+          content: reply.content || "",
+          color: reply.color || "#ffffff",
+          created_at: reply.created_at,
+          updated_at: reply.updated_at || reply.created_at,
+          user_id: reply.user_id,
+          note_id: reply.personal_stick_id,
+        })
+        repliesMap.set(reply.personal_stick_id, arr)
+      }
     }
 
-    // Merge hyperlinks into notes
+    // Merge hyperlinks and replies into notes
     const initialNotes: Note[] = rawNotes.map((note: any) => ({
       ...note,
       hyperlinks: tabsMap.get(note.id) || [],
+      replies: repliesMap.get(note.id) || [],
     }))
 
     // Get counts
