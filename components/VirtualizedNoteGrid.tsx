@@ -54,6 +54,7 @@ interface VirtualizedNoteGridProps {
   onContentChange?: (noteId: string, content: string) => void;
   onDetailsChange?: (noteId: string, details: string) => void;
   onGenerateTags?: (noteId: string, topic: string) => void;
+  onSummarizeLinks?: (noteId: string) => void;
   onReplyFormToggle?: (noteId: string, isVisible: boolean) => void;
   hasActiveReplyForm?: (noteId: string) => boolean;
   lastInteractedNote?: string | null;
@@ -66,6 +67,8 @@ interface VirtualizedNoteGridProps {
   focusTopicId?: string | null;
   onFocusTopicTextarea?: (noteId: string) => void;
   generatingTags?: string | null;
+  summarizingLinks?: string | null;
+  tabsRefreshKeys?: Record<string, number>;
   onLoadMore?: () => Promise<void>;
   hasMore?: boolean;
   isLoadingMore?: boolean;
@@ -153,6 +156,7 @@ export function VirtualizedNoteGrid({
       onContentChange: props.onContentChange || (() => {}),
       onDetailsChange: props.onDetailsChange || (() => {}),
       onGenerateTags: props.onGenerateTags || (() => {}),
+      onSummarizeLinks: props.onSummarizeLinks,
       onNoteUpdate: props.onNoteUpdate,
       onFocusTopicTextarea: props.onFocusTopicTextarea,
     }),
@@ -168,6 +172,7 @@ export function VirtualizedNoteGrid({
       props.onContentChange,
       props.onDetailsChange,
       props.onGenerateTags,
+      props.onSummarizeLinks,
       props.onNoteUpdate,
       props.onFocusTopicTextarea,
     ]
@@ -194,14 +199,18 @@ export function VirtualizedNoteGrid({
       hasActiveReplyForm: undefined,
       newNoteIds: props.newNoteIds,
       generatingTags: props.generatingTags,
+      summarizingLinks: props.summarizingLinks,
       focusTopicId: props.focusTopicId,
+      tabsRefreshKeys: props.tabsRefreshKeys,
     }),
     [
       props.draggedNote,
       props.lastInteractedNote,
       props.newNoteIds,
       props.generatingTags,
+      props.summarizingLinks,
       props.focusTopicId,
+      props.tabsRefreshKeys,
     ]
   );
 

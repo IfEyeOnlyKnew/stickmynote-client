@@ -64,6 +64,7 @@ export function PermissionBasedStickFullscreen({
   const [replies, setReplies] = useState<any[]>([])
   const [loading, setLoading] = useState(false)
   const [isGeneratingTags, setIsGeneratingTags] = useState(false)
+  const [isSummarizingLinks, setIsSummarizingLinks] = useState(false)
 
   const [isEditingTopic, setIsEditingTopic] = useState(false)
   const [isEditingContent, setIsEditingContent] = useState(false)
@@ -143,7 +144,7 @@ export function PermissionBasedStickFullscreen({
     fetchCurrentUser()
   }, [])
 
-  const handleStickUpdate = async (updates: Partial<ExtendedStick>) => {
+  const handleStickUpdate = async (updates: Partial<ExtendedStick>, showToast = true) => {
     if (!permissions.canEdit) return
 
     try {
@@ -161,9 +162,30 @@ export function PermissionBasedStickFullscreen({
           ...data.stick,
           topic: data.stick.topic || "",
         }))
+
+        if (showToast) {
+          const updateType = updates.topic !== undefined ? "Topic" : updates.content !== undefined ? "Content" : "Stick"
+          toast({
+            title: `${updateType} Saved`,
+            description: `Your ${updateType.toLowerCase()} has been updated successfully.`,
+            variant: "default",
+          })
+        }
+      } else {
+        const errorData = await response.json().catch(() => ({ error: "Unknown error" }))
+        toast({
+          title: "Failed to Save",
+          description: errorData.error || "An error occurred while saving.",
+          variant: "destructive",
+        })
       }
     } catch (error) {
       console.error("Error updating stick:", error)
+      toast({
+        title: "Error",
+        description: "Failed to save changes. Please try again.",
+        variant: "destructive",
+      })
     }
   }
 
@@ -248,6 +270,45 @@ export function PermissionBasedStickFullscreen({
     }
   }
 
+  const handleSummarizeLinks = async () => {
+    if (!permissions.canEdit) return
+
+    setIsSummarizingLinks(true)
+    try {
+      const response = await fetch(`/api/sticks/${stick.id}/summarize-links`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+      })
+
+      if (response.ok) {
+        const data = await response.json()
+
+        window.dispatchEvent(new CustomEvent("refreshStickTabs"))
+
+        toast({
+          title: "Links Summarized",
+          description: data.message || `Summarized ${data.summaryCount} of ${data.totalLinks} links. Check the Details tab.`,
+          variant: "default",
+        })
+      } else {
+        const errorData = await response.json().catch(() => ({ error: "Unknown error" }))
+        toast({
+          title: "Failed to Summarize Links",
+          description: errorData.error || "An error occurred while summarizing links.",
+          variant: "destructive",
+        })
+      }
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to summarize links. Please try again.",
+        variant: "destructive",
+      })
+    } finally {
+      setIsSummarizingLinks(false)
+    }
+  }
+
   const handleAddReply = async (stickId: string, content: string, isCalStick: boolean, calStickDate: string | null) => {
     if (!permissions.canEdit || !content.trim()) return
 
@@ -313,9 +374,9 @@ export function PermissionBasedStickFullscreen({
     }
   }
 
-  const handleDeleteReply = async (replyId: string) => {
+  const handleDeleteReply = async (stickId: string, replyId: string) => {
     try {
-      const response = await fetch(`/api/sticks/${stick.id}/replies`, {
+      const response = await fetch(`/api/sticks/${stickId}/replies`, {
         method: "DELETE",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ replyId }),
@@ -328,7 +389,7 @@ export function PermissionBasedStickFullscreen({
         setRefreshTrigger((prev) => prev + 1)
 
         if (onUpdate) {
-          const stickResponse = await fetch(`/api/sticks/${stick.id}`)
+          const stickResponse = await fetch(`/api/sticks/${stickId}`)
           if (stickResponse.ok) {
             const stickData = await stickResponse.json()
             onUpdate(stickData.stick)
@@ -348,9 +409,9 @@ export function PermissionBasedStickFullscreen({
     }
   }
 
-  const handleEditReply = async (replyId: string, content: string) => {
+  const handleEditReply = async (stickId: string, replyId: string, content: string) => {
     try {
-      const response = await fetch(`/api/sticks/${stick.id}/replies`, {
+      const response = await fetch(`/api/sticks/${stickId}/replies`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ replyId, content }),
@@ -361,7 +422,7 @@ export function PermissionBasedStickFullscreen({
         setReplies((prev) => prev.map((reply) => (reply.id === replyId ? { ...reply, ...updatedReply } : reply)))
 
         if (onUpdate) {
-          const stickResponse = await fetch(`/api/sticks/${stick.id}`)
+          const stickResponse = await fetch(`/api/sticks/${stickId}`)
           if (stickResponse.ok) {
             const stickData = await stickResponse.json()
             onUpdate(stickData.stick)
@@ -537,7 +598,7 @@ export function PermissionBasedStickFullscreen({
   }
 
   const handleDetailsChange = async (details: string) => {
-    await handleStickUpdate({ details })
+    await handleStickUpdate({ details }, false) // Don't show toast for auto-saved details
     window.dispatchEvent(new CustomEvent("refreshStickTabs"))
   }
 
@@ -627,6 +688,8 @@ export function PermissionBasedStickFullscreen({
               onStickContent={handleStickContent}
               onGenerateTags={handleGenerateTags}
               isGeneratingTags={isGeneratingTags}
+              onSummarizeLinks={handleSummarizeLinks}
+              isSummarizingLinks={isSummarizingLinks}
             />
 
             {renderMetadata()}

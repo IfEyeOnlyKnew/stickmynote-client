@@ -196,11 +196,16 @@ export const DetailsTabContent = memo(function DetailsTabContent({
                 className="flex items-center justify-between p-3 bg-gray-50 border border-gray-200 rounded-md"
               >
                 <div className="flex-1">
-                  <div className="text-sm font-medium text-gray-900">Complete Note Export</div>
+                  <div className="text-sm font-medium text-gray-900">
+                    {exportLink.type === "link_summary" ? "Link Summary Report" : "Complete Note Export"}
+                  </div>
                   <div className="text-xs text-gray-500">
                     Generated on {new Date(exportLink.created_at).toLocaleDateString()} at{" "}
                     {new Date(exportLink.created_at).toLocaleTimeString()}
                   </div>
+                  {exportLink.filename && (
+                    <div className="text-xs text-gray-400 mt-1">{exportLink.filename}</div>
+                  )}
                 </div>
                 <div className="flex items-center gap-2">
                   <Button variant="outline" size="sm" onClick={() => window.open(exportLink.url, "_blank")}>

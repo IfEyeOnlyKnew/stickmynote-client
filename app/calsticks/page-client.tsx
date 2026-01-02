@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useCallback } from "react"
+import { useState, useEffect, useCallback, useRef } from "react"
 import { useSearchParams } from "next/navigation"
 import {
   Search,
@@ -196,14 +196,21 @@ export default function CalSticksPageClient() {
     if (!user?.id) return
 
     const POLL_INTERVAL = 30000 // 30 seconds
+    let isMounted = true
 
     const intervalId = setInterval(() => {
-      fetchCalSticks().catch((error) => {
-        console.error("[CalSticks] Polling error:", error)
-      })
+      if (isMounted) {
+        fetchCalSticks().catch((error) => {
+          // Ignore abort errors and fetch failures when component is unmounted
+          if (isMounted && error?.name !== 'AbortError') {
+            console.error("[CalSticks] Polling error:", error)
+          }
+        })
+      }
     }, POLL_INTERVAL)
 
     return () => {
+      isMounted = false
       clearInterval(intervalId)
     }
   }, [user?.id, fetchCalSticks])

@@ -11,7 +11,9 @@ interface NoteContextValue {
   isNewNote: boolean
   isOwner: boolean
   generatingTags?: string | null
+  summarizingLinks?: string | null
   hideGenerateTags: boolean
+  tabsRefreshKey?: number
 
   // Event handlers
   onOpenFullscreen?: (noteId: string) => void
@@ -23,11 +25,12 @@ interface NoteContextValue {
   onContentChange: (noteId: string, content: string) => void
   onDetailsChange: (noteId: string, details: string) => void
   onGenerateTags: (noteId: string, topic: string) => void
+  onSummarizeLinks?: (noteId: string) => void
   onMouseDown?: (e: React.MouseEvent, noteId: string) => void
   onFocusTopicTextarea?: (noteId: string) => void
   onAddReply: (noteId: string, content: string, color?: string) => Promise<void>
-  onEditReply?: (replyId: string, content: string, color?: string) => Promise<void>
-  onDeleteReply?: (replyId: string) => Promise<void>
+  onEditReply?: (noteId: string, replyId: string, content: string) => Promise<void>
+  onDeleteReply?: (noteId: string, replyId: string) => Promise<void>
 
   // State management
   focusTopicId?: string | null

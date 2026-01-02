@@ -11,6 +11,7 @@ export interface NoteEventHandlers {
   onContentChange: (noteId: string, content: string) => void
   onDetailsChange: (noteId: string, details: string) => void
   onGenerateTags: (noteId: string, topic: string) => void
+  onSummarizeLinks?: (noteId: string) => void
   onMouseDown?: (e: React.MouseEvent, noteId: string) => void
   onFocusTopicTextarea?: (noteId: string) => void
   onNoteInteraction?: (noteId: string) => void
@@ -20,8 +21,8 @@ export interface NoteEventHandlers {
 
 export interface NoteReplyHandlers {
   onAddReply: (noteId: string, content: string, color?: string) => Promise<void>
-  onEditReply?: (replyId: string, content: string, color?: string) => Promise<void>
-  onDeleteReply?: (replyId: string) => Promise<void>
+  onEditReply?: (noteId: string, replyId: string, content: string) => Promise<void>
+  onDeleteReply?: (noteId: string, replyId: string) => Promise<void>
   onReplyFormToggle?: (noteId: string, isVisible: boolean) => void
 }
 
@@ -37,6 +38,8 @@ export interface NoteStateManagement {
   draggedNote?: string | null
   newNoteIds?: Set<string>
   generatingTags?: string | null
+  summarizingLinks?: string | null
+  tabsRefreshKeys?: Record<string, number>
 }
 
 export interface NoteConfiguration {

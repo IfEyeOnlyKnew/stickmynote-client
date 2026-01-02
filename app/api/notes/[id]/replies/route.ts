@@ -411,7 +411,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
 
 export async function PUT(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
-    await params
+    const { id: noteId } = await params
     const authResult = await getAuthenticatedContext()
     if (!authResult.success) {
       return authResult.response
@@ -420,11 +420,14 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
     const { user, orgContext, db } = authResult.context
     const { replyId, content, color } = await request.json()
 
+    console.log("[Replies PUT] noteId:", noteId, "replyId:", replyId, "orgId:", orgContext.orgId)
+
     if (!replyId) {
       return Errors.replyIdRequired()
     }
 
     const existingReply = await fetchReply(db, replyId)
+    console.log("[Replies PUT] existingReply:", existingReply)
     if (!existingReply) {
       return Errors.replyNotFound()
     }

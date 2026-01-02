@@ -1,5 +1,6 @@
 "use client"
 import { GenerateTagsButton } from "@/components/ui/generate-tags-button"
+import { SummarizeLinksButton } from "@/components/ui/summarize-links-button"
 import { Badge } from "@/components/ui/badge"
 import type React from "react"
 
@@ -10,10 +11,12 @@ interface NoteCardMetadataProps {
   isNewNote: boolean
   hideGenerateTags: boolean
   generatingTags: string | null | undefined
+  summarizingLinks?: string | null | undefined
   topic?: string
   title?: string
   content?: string
   onGenerateTags: (noteId: string, topic: string) => void
+  onSummarizeLinks?: (noteId: string) => void
 }
 
 export const NoteCardMetadata: React.FC<NoteCardMetadataProps> = ({
@@ -23,10 +26,12 @@ export const NoteCardMetadata: React.FC<NoteCardMetadataProps> = ({
   isNewNote,
   hideGenerateTags,
   generatingTags,
+  summarizingLinks,
   topic,
   title,
   content,
   onGenerateTags,
+  onSummarizeLinks,
 }) => {
   return (
     <>
@@ -88,6 +93,12 @@ export const NoteCardMetadata: React.FC<NoteCardMetadataProps> = ({
             onClick={() => onGenerateTags(noteId, topic || title || "")}
             isGenerating={generatingTags === noteId}
           />
+          {hyperlinks && hyperlinks.length > 0 && (
+            <SummarizeLinksButton
+              onClick={() => onSummarizeLinks?.(noteId)}
+              isSummarizing={summarizingLinks === noteId}
+            />
+          )}
         </div>
       )}
     </>

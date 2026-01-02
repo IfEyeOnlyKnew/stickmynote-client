@@ -51,7 +51,7 @@ export async function POST(request: NextRequest) {
     const endDateStr = endDate.toISOString()
 
     const { object } = await generateObject({
-      model: xai('grok-3-mini'),
+      model: xai('grok-3-mini') as any,
       schema: scheduleSchema,
       prompt: `You are an intelligent task scheduler. Schedule the following tasks optimally within the next 7 days.
 

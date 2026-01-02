@@ -43,6 +43,8 @@ interface GenericStickTabsProps {
   onStickContent?: () => void
   onGenerateTags?: () => void
   isGeneratingTags?: boolean
+  onSummarizeLinks?: () => void
+  isSummarizingLinks?: boolean
 }
 
 export function GenericStickTabs({
@@ -68,6 +70,8 @@ export function GenericStickTabs({
   onStickContent,
   onGenerateTags,
   isGeneratingTags,
+  onSummarizeLinks,
+  isSummarizingLinks,
 }: GenericStickTabsProps) {
   const [activeTab, setActiveTab] = useState("main")
   const [topic, setTopic] = useState(initialTopic)
@@ -231,6 +235,8 @@ export function GenericStickTabs({
             onStickContent={onStickContent}
             onGenerateTags={onGenerateTags}
             isGeneratingTags={isGeneratingTags}
+            onSummarizeLinks={onSummarizeLinks}
+            isSummarizingLinks={isSummarizingLinks}
             generatedTags={generatedTags}
             generatedLinks={generatedLinks}
             details={details}

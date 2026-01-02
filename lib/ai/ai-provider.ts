@@ -23,6 +23,55 @@ import { createAzure } from "@ai-sdk/azure"
 import { createAnthropic } from "@ai-sdk/anthropic"
 import { createOllama } from "ai-sdk-ollama"
 
+// Default timeout for AI operations (60 seconds for slow models)
+const AI_TIMEOUT_MS = 60000
+
+/**
+ * Wrap a promise with a timeout
+ */
+function withTimeout<T>(promise: Promise<T>, ms: number, errorMessage: string): Promise<T> {
+  return Promise.race([
+    promise,
+    new Promise<T>((_, reject) =>
+      setTimeout(() => reject(new Error(errorMessage)), ms)
+    ),
+  ])
+}
+
+/**
+ * Check if Ollama server is reachable
+ */
+export async function checkOllamaHealth(): Promise<{ available: boolean; error?: string }> {
+  const config = getAIProviderConfig()
+  if (!config.ollama) {
+    return { available: false, error: "Ollama not configured" }
+  }
+
+  try {
+    const controller = new AbortController()
+    const timeoutId = setTimeout(() => controller.abort(), 5000)
+
+    const response = await fetch(`${config.ollama.baseURL}/api/tags`, {
+      method: "GET",
+      signal: controller.signal,
+    })
+
+    clearTimeout(timeoutId)
+
+    if (!response.ok) {
+      return { available: false, error: `Ollama returned ${response.status}` }
+    }
+
+    return { available: true }
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Unknown error"
+    if (message.includes("abort")) {
+      return { available: false, error: "Ollama server timeout (5s) - server may be unreachable" }
+    }
+    return { available: false, error: `Cannot connect to Ollama: ${message}` }
+  }
+}
+
 export type AIProvider = "ollama" | "azure" | "anthropic" | "xai" | "auto"
 
 interface AIProviderConfig {
@@ -185,13 +234,20 @@ export async function generateText(options: GenerateTextOptions): Promise<{ text
       baseURL: config.ollama.baseURL,
     })
 
-    const result = await aiGenerateText({
-      model: ollama(config.ollama.model),
+    const generatePromise = aiGenerateText({
+      model: ollama(config.ollama.model) as any,
       prompt: options.prompt,
-      maxTokens: options.maxTokens,
+      maxOutputTokens: options.maxTokens,
       temperature: options.temperature,
       system: options.systemPrompt,
     })
+
+    // Wrap with timeout to prevent hanging forever
+    const result = await withTimeout(
+      generatePromise,
+      AI_TIMEOUT_MS,
+      `Ollama request timed out after ${AI_TIMEOUT_MS / 1000}s - server may be slow or unreachable at ${config.ollama.baseURL}`
+    )
 
     return { text: result.text, provider: "ollama" }
   }
@@ -213,9 +269,9 @@ export async function generateText(options: GenerateTextOptions): Promise<{ text
     const azure = createAzure(azureConfig)
 
     const result = await aiGenerateText({
-      model: azure(config.azure.deploymentName),
+      model: azure(config.azure.deploymentName) as any,
       prompt: options.prompt,
-      maxTokens: options.maxTokens,
+      maxOutputTokens: options.maxTokens,
       temperature: options.temperature,
       system: options.systemPrompt,
     })
@@ -229,9 +285,9 @@ export async function generateText(options: GenerateTextOptions): Promise<{ text
     })
 
     const result = await aiGenerateText({
-      model: anthropic(config.anthropic.model || "claude-sonnet-4-20250514"),
+      model: anthropic(config.anthropic.model || "claude-sonnet-4-20250514") as any,
       prompt: options.prompt,
-      maxTokens: options.maxTokens,
+      maxOutputTokens: options.maxTokens,
       temperature: options.temperature,
       system: options.systemPrompt,
     })
@@ -243,7 +299,7 @@ export async function generateText(options: GenerateTextOptions): Promise<{ text
     const result = await aiGenerateText({
       model: config.xai.model as any,
       prompt: options.prompt,
-      maxTokens: options.maxTokens,
+      maxOutputTokens: options.maxTokens,
       temperature: options.temperature,
       system: options.systemPrompt,
     })

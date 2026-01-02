@@ -24,6 +24,7 @@ const UnifiedNote: React.FC<UnifiedNoteProps> = (props) => {
     onContentChange,
     onDetailsChange,
     onGenerateTags,
+    onSummarizeLinks,
     onMouseDown,
     onFocusTopicTextarea,
     // Group reply handlers
@@ -44,6 +45,7 @@ const UnifiedNote: React.FC<UnifiedNoteProps> = (props) => {
     onNoteInteraction,
     // Group configuration
     generatingTags,
+    summarizingLinks,
     currentUserId,
     readOnly,
     hideGenerateTags,
@@ -59,6 +61,7 @@ const UnifiedNote: React.FC<UnifiedNoteProps> = (props) => {
     onContentChange,
     onDetailsChange,
     onGenerateTags,
+    onSummarizeLinks,
     onMouseDown,
     onFocusTopicTextarea,
   }
@@ -83,6 +86,7 @@ const UnifiedNote: React.FC<UnifiedNoteProps> = (props) => {
     lastInteractedNote,
     onNoteInteraction,
     generatingTags,
+    summarizingLinks,
   }
 
   const configuration = {

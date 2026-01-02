@@ -6,8 +6,8 @@ import { toast } from "@/hooks/use-toast"
 
 interface UseReplyManagementReturn {
   handleAddReply: (noteId: string, content: string) => Promise<void>
-  handleEditReply: (replyId: string, content: string) => Promise<void>
-  handleDeleteReply: (replyId: string) => Promise<void>
+  handleEditReply: (noteId: string, replyId: string, content: string) => Promise<void>
+  handleDeleteReply: (noteId: string, replyId: string) => Promise<void>
 }
 
 // Helper: Show error toast
@@ -57,28 +57,32 @@ async function addReplyApi(noteId: string, content: string): Promise<{ reply?: a
 }
 
 // API: Edit reply
-async function editReplyApi(replyId: string, content: string): Promise<{ reply?: any; error?: string }> {
+async function editReplyApi(noteId: string, replyId: string, content: string): Promise<{ reply?: any; error?: string }> {
   try {
-    const response = await fetch(`/api/replies/${replyId}`, {
+    const response = await fetch(`/api/notes/${noteId}/replies`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ content: content.trim() }),
+      body: JSON.stringify({ replyId, content: content.trim() }),
     })
     if (!response.ok) {
       const errorData = await response.json()
       return { error: errorData.error || "Failed to edit reply" }
     }
-    const reply = await response.json()
-    return { reply }
+    const data = await response.json()
+    return { reply: data.reply }
   } catch {
     return { error: "Failed to edit reply. Please try again." }
   }
 }
 
 // API: Delete reply
-async function deleteReplyApi(replyId: string): Promise<{ success: boolean; error?: string }> {
+async function deleteReplyApi(noteId: string, replyId: string): Promise<{ success: boolean; error?: string }> {
   try {
-    const response = await fetch(`/api/replies/${replyId}`, { method: "DELETE" })
+    const response = await fetch(`/api/notes/${noteId}/replies`, {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ replyId }),
+    })
     if (!response.ok) {
       const errorData = await response.json()
       return { success: false, error: errorData.error || "Failed to delete reply" }
@@ -139,11 +143,11 @@ export function useReplyManagement(
   )
 
   const handleEditReply = useCallback(
-    async (replyId: string, content: string) => {
+    async (noteId: string, replyId: string, content: string) => {
       if (!validateContext(userId, setAllNotes, "edit")) return
 
-      const result = await editReplyApi(replyId, content)
-      
+      const result = await editReplyApi(noteId, replyId, content)
+
       if (result.error) {
         showErrorToast("Error", result.error)
         return
@@ -156,11 +160,11 @@ export function useReplyManagement(
   )
 
   const handleDeleteReply = useCallback(
-    async (replyId: string) => {
+    async (noteId: string, replyId: string) => {
       if (!validateContext(userId, setAllNotes, "delete")) return
 
-      const result = await deleteReplyApi(replyId)
-      
+      const result = await deleteReplyApi(noteId, replyId)
+
       if (!result.success) {
         showErrorToast("Error", result.error || "Failed to delete reply")
         return

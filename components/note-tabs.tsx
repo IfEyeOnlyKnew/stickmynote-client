@@ -28,7 +28,7 @@ const noteTabsConfig: NoteTabsConfig = {
   saveNoteTab,
   deleteNoteTabItem,
   idFieldName: "noteId",
-  supportsExportDeletion: false,
+  supportsExportDeletion: true,
   isTeamNote: false,
 }
 

@@ -33,7 +33,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { VirtualizedNoteGrid } from "@/components/VirtualizedNoteGrid"
+import { SimpleNoteGrid } from "@/components/SimpleNoteGrid"
 import { UserMenu } from "@/components/user-menu"
 import { BreadcrumbNav } from "@/components/breadcrumb-nav"
 
@@ -106,20 +106,13 @@ export function NotesClient({ initialNotes, userId, stats }: Readonly<NotesClien
   const [searchFilter, setSearchFilter] = useState("all")
   const [selectedColor] = useState<(typeof COLORS)[number]>(COLORS[0])
   const [isClient, setIsClient] = useState(false)
-
-  const loadMoreRef = useRef<HTMLDivElement | null>(null)
+  const [summarizingLinks, setSummarizingLinks] = useState<string | null>(null)
 
   // Sidebar state
   const [isSidebarOpen, setIsSidebarOpen] = useState(false)
 
-  // Editing and new notes
-  const [focusTopicId, setFocusTopicId] = useState<string | null>(null)
-  const [newNoteIds, setNewNoteIds] = useState<Set<string>>(new Set())
-
-  // Note heights
-  const [activeReplyForms, setActiveReplyForms] = useState<Set<string>>(new Set())
-
-  const [lastInteractedNote, setLastInteractedNote] = useState<string | null>(null)
+  // Track loading state when clicking a card
+  const [loadingNoteId, setLoadingNoteId] = useState<string | null>(null)
 
   // Derived lists - deduplicated to prevent duplicate key warnings
   const uniqueNotes = useMemo(() => {
@@ -148,27 +141,7 @@ export function NotesClient({ initialNotes, userId, stats }: Readonly<NotesClien
     )
   }, [uniqueNotes, personalNotes, sharedNotes, searchTerm, searchFilter])
 
-  const handleNoteInteraction = useCallback((noteId: string) => {
-    setLastInteractedNote(noteId)
-  }, [])
-
-  const handleNoteHeightChange = useCallback(() => {
-    // No-op
-  }, [])
-
-  const handleReplyFormToggle = useCallback((noteId: string, isVisible: boolean) => {
-    setActiveReplyForms((prev) => {
-      const next = new Set(prev)
-      if (isVisible) {
-        next.add(noteId)
-      } else {
-        next.delete(noteId)
-      }
-      return next
-    })
-  }, [])
-
-  // Create a new note and focus its topic input briefly
+  // Create a new note and open it in fullscreen immediately
   const handleCreateNoteClick = useCallback(async () => {
     if (!userId || !isClient) {
       router.push("/")
@@ -176,33 +149,20 @@ export function NotesClient({ initialNotes, userId, stats }: Readonly<NotesClien
     }
     try {
       const newNote = await handleCreateNote(selectedColor.value, windowSize)
-      setNewNoteIds((prev) => new Set(prev).add(newNote.id))
-      setFocusTopicId(newNote.id)
-      setTimeout(() => setFocusTopicId(null), 500)
+      // Open the new note in fullscreen immediately for editing
+      fullscreenHook.openFullscreen(newNote.id)
     } catch (err) {
       console.error("Error creating note:", err)
     }
-  }, [userId, isClient, router, handleCreateNote, selectedColor, windowSize])
+  }, [userId, isClient, router, handleCreateNote, selectedColor, windowSize, fullscreenHook])
 
-  const handleCancelNewNote = useCallback(
-    (noteId: string) => {
-      setNewNoteIds((prev) => {
-        const next = new Set(prev)
-        next.delete(noteId)
-        return next
-      })
-      handleDeleteNote?.(noteId)
-    },
-    [handleDeleteNote],
-  )
-
-  const handleStickNewNote = useCallback((noteId: string) => {
-    setNewNoteIds((prev) => {
-      const next = new Set(prev)
-      next.delete(noteId)
-      return next
-    })
-  }, [])
+  // Handle clicking a card to open fullscreen
+  const handleNoteClick = useCallback((noteId: string) => {
+    setLoadingNoteId(noteId)
+    fullscreenHook.openFullscreen(noteId)
+    // Clear loading state after a short delay
+    setTimeout(() => setLoadingNoteId(null), 300)
+  }, [fullscreenHook])
 
   // Persist "details" (note tabs) via API route
   const handleNoteDetailsChange = useCallback(async (noteId: string, details: string) => {
@@ -230,9 +190,41 @@ export function NotesClient({ initialNotes, userId, stats }: Readonly<NotesClien
     [handleGenerateTags],
   )
 
-  const handleFocusTopicTextarea = useCallback((_noteId: string) => {
-    setTimeout(() => setFocusTopicId(null), 100)
-  }, [])
+  // Handler for summarizing links of a note
+  const handleSummarizeLinks = useCallback(
+    async (noteId: string) => {
+      setSummarizingLinks(noteId)
+      try {
+        const response = await fetch(`/api/notes/${noteId}/summarize-links`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+        })
+
+        if (!response.ok) {
+          throw new Error("Failed to summarize links")
+        }
+
+        const data = await response.json()
+
+        // Update the note with the new details
+        if (data.details) {
+          setAllNotes((prev) =>
+            prev.map((n) =>
+              n.id === noteId
+                ? { ...n, details: data.details }
+                : n
+            )
+          )
+        }
+      } catch (error) {
+        console.error("Error summarizing links:", error)
+      } finally {
+        setSummarizingLinks(null)
+      }
+    },
+    [setAllNotes],
+  )
+
 
   // Account deletion (double-confirm) with redirect on success
   const handleDeleteAccount = useCallback(async () => {
@@ -423,6 +415,7 @@ export function NotesClient({ initialNotes, userId, stats }: Readonly<NotesClien
               </Select>
 
               <Button
+                type="button"
                 onClick={handleCreateNoteClick}
                 className="flex items-center gap-1.5 whitespace-nowrap flex-shrink-0 bg-blue-600 hover:bg-blue-700 text-white shadow-md hover:shadow-lg transition-all"
                 size="default"
@@ -432,6 +425,7 @@ export function NotesClient({ initialNotes, userId, stats }: Readonly<NotesClien
               </Button>
 
               <Button
+                type="button"
                 variant="outline"
                 onClick={() => router.push("/panel")}
                 className="flex items-center gap-1.5 bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white border-0 shadow-md hover:shadow-lg transition-all whitespace-nowrap flex-shrink-0"
@@ -455,44 +449,9 @@ export function NotesClient({ initialNotes, userId, stats }: Readonly<NotesClien
         </div>
       </div>
 
-      {/* Notes grid/canvas: virtualized grid with infinite load and rich interactions */}
-      <div className="relative min-h-[calc(100vh-200px)] pt-8">
-        <VirtualizedNoteGrid
-          notes={filteredNotes}
-          windowSize={windowSize}
-          onNoteInteraction={handleNoteInteraction}
-          onMouseDown={() => {}}
-          draggedNote={null}
-          currentUserId={userId}
-          onNoteHeightChange={handleNoteHeightChange}
-          onOpenFullscreen={fullscreenHook.openFullscreen}
-          onAddReply={replyHook.handleAddReply}
-          onUpdateSharing={handleUpdateNoteSharing}
-          onUpdateColor={handleUpdateNoteColor}
-          onDeleteNote={handleDeleteNote}
-          onTopicChange={handleNoteTopicChange}
-          onContentChange={handleNoteContentChange}
-          onDetailsChange={handleNoteDetailsChange}
-          onGenerateTags={handleGenerateTagsWrapper}
-          onReplyFormToggle={handleReplyFormToggle}
-          hasActiveReplyForm={(noteId) => activeReplyForms.has(noteId)}
-          lastInteractedNote={lastInteractedNote}
-          onNoteUpdate={(updatedNote) => {
-            setAllNotes((prev) => prev.map((n) => (n.id === updatedNote.id ? { ...n, ...updatedNote } : n)))
-            handleNoteUpdate(updatedNote.id)
-          }}
-          newNoteIds={newNoteIds}
-          onCancelNewNote={handleCancelNewNote}
-          onStickNewNote={handleStickNewNote}
-          focusTopicId={focusTopicId}
-          onFocusTopicTextarea={handleFocusTopicTextarea}
-          generatingTags={generatingTags || null}
-          onLoadMore={loadMoreNotes}
-          hasMore={hasMore}
-          isLoadingMore={loadingMore}
-        />
-
-        {filteredNotes.length === 0 && !loading && (
+      {/* Notes grid: simple responsive grid with card previews */}
+      <div className="relative min-h-[calc(100vh-200px)] pt-8 px-4 md:px-6">
+        {filteredNotes.length === 0 && !loading ? (
           <div className="flex flex-col items-center justify-center py-16 text-gray-500">
             <div className="text-6xl mb-4">📝</div>
             <h3 className="text-lg font-medium mb-2">No notes found</h3>
@@ -500,24 +459,16 @@ export function NotesClient({ initialNotes, userId, stats }: Readonly<NotesClien
               {searchTerm ? "Try adjusting your search or filter" : "Create your first note to get started!"}
             </p>
           </div>
-        )}
-
-        {hasMore && (
-          <div ref={loadMoreRef} className="flex items-center justify-center py-8">
-            {loadingMore ? (
-              <div className="flex items-center gap-2 text-gray-500">
-                <Loader2 className="h-5 w-5 animate-spin" />
-                <span>Loading more notes...</span>
-              </div>
-            ) : (
-              <div className="h-10" />
-            )}
-          </div>
-        )}
-
-        {/* Show message when all notes are loaded */}
-        {!hasMore && filteredNotes.length > 0 && (
-          <div className="flex items-center justify-center py-8 text-gray-400 text-sm">All notes loaded</div>
+        ) : (
+          <SimpleNoteGrid
+            notes={filteredNotes}
+            onNoteClick={handleNoteClick}
+            onUpdateColor={handleUpdateNoteColor}
+            onLoadMore={loadMoreNotes}
+            hasMore={hasMore}
+            isLoadingMore={loadingMore}
+            loadingNoteId={loadingNoteId}
+          />
         )}
       </div>
 
@@ -661,6 +612,8 @@ export function NotesClient({ initialNotes, userId, stats }: Readonly<NotesClien
                     onDetailsChange={(noteId: string, details: string) => handleNoteDetailsChange(noteId, details)}
                     onUpdateColor={handleUpdateNoteColor}
                     onGenerateTags={handleGenerateTagsWrapper}
+                    onSummarizeLinks={handleSummarizeLinks}
+                    summarizingLinks={summarizingLinks}
                     onAddReply={replyHook.handleAddReply}
                     onEditReply={replyHook.handleEditReply}
                     onDeleteReply={replyHook.handleDeleteReply}

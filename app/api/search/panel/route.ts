@@ -20,6 +20,39 @@ interface SearchInput {
   limit?: number
 }
 
+interface UserInfo {
+  id: string
+  username: string
+  full_name: string
+  avatar_url: string
+}
+
+interface ReplyUser {
+  username?: string
+  email?: string
+}
+
+interface ReplyData {
+  id: string
+  content: string
+  color?: string
+  created_at: string
+  updated_at?: string
+  user_id?: string
+  personal_stick_id: string
+  user?: ReplyUser
+}
+
+interface EnrichedNote {
+  user: UserInfo | null
+  reply_count: number
+  replies: ReplyData[]
+  view_count: number
+  like_count: number
+  tags: string[]
+  [key: string]: any
+}
+
 interface SearchResult {
   notes: EnrichedNote[]
   totalCount: number
@@ -28,22 +61,6 @@ interface SearchResult {
   searchDuration: number
   cached?: boolean
   rateLimited?: boolean
-}
-
-interface EnrichedNote {
-  user: UserInfo | null
-  reply_count: number
-  view_count: number
-  like_count: number
-  tags: string[]
-  [key: string]: any
-}
-
-interface UserInfo {
-  id: string
-  username: string
-  full_name: string
-  avatar_url: string
 }
 
 interface Suggestions {
@@ -117,23 +134,62 @@ function filterNotesByTags(notes: any[], tags: string[], tagsMap: Record<string,
   })
 }
 
-async function fetchReplyCounts(db: DatabaseClient, noteIds: string[]): Promise<Record<string, number>> {
-  if (noteIds.length === 0) return {}
+interface RepliesResult {
+  counts: Record<string, number>
+  replies: Record<string, ReplyData[]>
+}
+
+async function fetchRepliesForNotes(db: DatabaseClient, noteIds: string[]): Promise<RepliesResult> {
+  if (noteIds.length === 0) return { counts: {}, replies: {} }
 
   try {
     const { data: replies } = await db
       .from("personal_sticks_replies")
-      .select("personal_stick_id")
+      .select("id, content, color, created_at, updated_at, user_id, personal_stick_id")
       .in("personal_stick_id", noteIds)
+      .order("created_at", { ascending: true })
+
+    if (!replies || replies.length === 0) {
+      return { counts: {}, replies: {} }
+    }
+
+    // Get unique user IDs from replies
+    const replyUserIds = [...new Set(replies.map((r) => r.user_id).filter(Boolean))]
+
+    // Fetch user data for reply authors
+    let usersMap: Record<string, ReplyUser> = {}
+    if (replyUserIds.length > 0) {
+      const { data: users } = await db
+        .from("users")
+        .select("id, username, email")
+        .in("id", replyUserIds)
+
+      usersMap = (users || []).reduce((acc, user) => {
+        acc[user.id] = { username: user.username, email: user.email }
+        return acc
+      }, {} as Record<string, ReplyUser>)
+    }
 
     const counts: Record<string, number> = {}
-    for (const reply of replies || []) {
-      counts[reply.personal_stick_id] = (counts[reply.personal_stick_id] || 0) + 1
+    const repliesMap: Record<string, ReplyData[]> = {}
+
+    for (const reply of replies) {
+      const noteId = reply.personal_stick_id
+      counts[noteId] = (counts[noteId] || 0) + 1
+      if (!repliesMap[noteId]) {
+        repliesMap[noteId] = []
+      }
+      // Attach user data to each reply
+      const replyWithUser: ReplyData = {
+        ...reply,
+        user: reply.user_id ? usersMap[reply.user_id] : undefined,
+      }
+      repliesMap[noteId].push(replyWithUser)
     }
-    return counts
-  } catch {
-    console.warn("Failed to fetch reply counts")
-    return {}
+    return { counts, replies: repliesMap }
+  } catch (err) {
+    console.warn("Failed to fetch replies:", err)
+    return { counts: {}, replies: {} }
   }
 }
 
@@ -163,13 +219,14 @@ async function fetchTagsForNotes(db: DatabaseClient, noteIds: string[]): Promise
 function enrichNotes(
   notes: any[],
   usersMap: Record<string, UserInfo>,
-  replyCountsMap: Record<string, number>,
+  repliesResult: RepliesResult,
   tagsMap: Record<string, string[]>
 ): EnrichedNote[] {
   return notes.map((note) => ({
     ...note,
     user: usersMap[note.user_id] || null,
-    reply_count: replyCountsMap[note.id] || 0,
+    reply_count: repliesResult.counts[note.id] || 0,
+    replies: repliesResult.replies[note.id] || [],
     view_count: Math.floor(Math.random() * 100) + 10,
     like_count: Math.floor(Math.random() * 50),
     tags: tagsMap[note.id] || [],
@@ -325,10 +382,10 @@ export async function POST(request: Request) {
     // Get note IDs for fetching related data
     const noteIds = (notes || []).map((n: any) => n.id)
 
-    // Fetch user data, reply counts, and tags in parallel
-    const [usersMap, replyCountsMap, tagsMap] = await Promise.all([
+    // Fetch user data, replies, and tags in parallel
+    const [usersMap, repliesResult, tagsMap] = await Promise.all([
       fetchUsersForNotes(db, notes || []),
-      fetchReplyCounts(db, noteIds),
+      fetchRepliesForNotes(db, noteIds),
       fetchTagsForNotes(db, noteIds),
     ])
 
@@ -339,7 +396,7 @@ export async function POST(request: Request) {
       filteredNotes = filterNotesByTags(filteredNotes, tags, tagsMap)
     }
 
-    const enrichedNotes = enrichNotes(filteredNotes, usersMap, replyCountsMap, tagsMap)
+    const enrichedNotes = enrichNotes(filteredNotes, usersMap, repliesResult, tagsMap)
     const totalCount = count || 0
     const hasMore = totalCount > offset + enrichedNotes.length
 

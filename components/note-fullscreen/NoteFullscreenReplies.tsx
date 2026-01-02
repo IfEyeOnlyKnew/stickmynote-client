@@ -2,7 +2,6 @@
 
 import { UnifiedReplies } from "@/components/shared/UnifiedReplies"
 import type React from "react"
-import { useCallback } from "react"
 
 interface Reply {
   id: string
@@ -46,32 +45,14 @@ interface NoteFullscreenRepliesProps {
 export const NoteFullscreenReplies: React.FC<NoteFullscreenRepliesProps> = (props) => {
   const { noteId, onEditReply, onDeleteReply, currentUserId, ...restProps } = props
 
-  const handleEditReply = useCallback(
-    async (replyId: string, content: string) => {
-      if (onEditReply) {
-        await onEditReply(noteId, replyId, content)
-      }
-    },
-    [noteId, onEditReply],
-  )
-
-  const handleDeleteReply = useCallback(
-    async (replyId: string) => {
-      if (onDeleteReply) {
-        await onDeleteReply(noteId, replyId)
-      }
-    },
-    [noteId, onDeleteReply],
-  )
-
   return (
     <UnifiedReplies
       {...restProps}
       noteId={noteId}
       context="fullscreen"
       enableSummary={true}
-      onEditReply={onEditReply ? handleEditReply : undefined}
-      onDeleteReply={onDeleteReply ? handleDeleteReply : undefined}
+      onEditReply={onEditReply}
+      onDeleteReply={onDeleteReply}
       currentUserId={currentUserId}
     />
   )

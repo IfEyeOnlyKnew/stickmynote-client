@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useCallback, useEffect } from "react"
+import { useState, useCallback, useEffect, useRef } from "react"
 
 export interface FullscreenItem {
   id: string
@@ -45,6 +45,8 @@ export const useFullscreen = <T extends FullscreenItem>(
 ): UseFullscreenReturn<T> => {
   const { allItems = [], onDeleteItem, onUpdateItem, onUpdateItemColor, onUpdateItemSharing } = props
   const [fullscreenItemId, setFullscreenItemId] = useState<string | null>(null)
+  // Track if a deletion was explicitly requested to distinguish from temporary state changes
+  const isExplicitDeletionRef = useRef(false)
 
   // Get the current fullscreen item
   const fullscreenItem = fullscreenItemId ? allItems.find((item) => item.id === fullscreenItemId) || null : null
@@ -67,6 +69,7 @@ export const useFullscreen = <T extends FullscreenItem>(
   // Close fullscreen mode
   const closeFullscreen = useCallback(() => {
     setFullscreenItemId(null)
+    isExplicitDeletionRef.current = false
     // Restore body scrolling
     document.body.style.overflow = "unset"
   }, [])
@@ -106,6 +109,7 @@ export const useFullscreen = <T extends FullscreenItem>(
   // Handle delete in fullscreen mode
   const handleFullscreenDelete = useCallback(() => {
     if (fullscreenItem && onDeleteItem) {
+      isExplicitDeletionRef.current = true
       onDeleteItem(fullscreenItem.id)
       closeFullscreen()
     }
@@ -158,10 +162,12 @@ export const useFullscreen = <T extends FullscreenItem>(
     }
   }, [])
 
-  // Close fullscreen if the item is deleted or no longer exists
+  // Close fullscreen only if the item was explicitly deleted
+  // Don't close during temporary state changes (e.g., tab refresh, data updates)
   useEffect(() => {
-    if (fullscreenItemId && !fullscreenItem) {
+    if (fullscreenItemId && !fullscreenItem && isExplicitDeletionRef.current) {
       closeFullscreen()
+      isExplicitDeletionRef.current = false
     }
   }, [fullscreenItemId, fullscreenItem, closeFullscreen])
 

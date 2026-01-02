@@ -4,7 +4,23 @@
       "mcp__ide__getDiagnostics",
       "Bash(grep:*)",
       "Bash(git diff:*)",
-      "Bash(git add:*)"
+      "Bash(git add:*)",
+      "Bash(pnpm run build:*)",
+      "Bash(NODE_TLS_REJECT_UNAUTHORIZED=0 pnpm run build:*)",
+      "Bash(git commit -m \"$\\(cat <<''EOF''\nFix build issues for production deployment\n\n- Fix TypeScript errors in sticks export route \\(padsData null check\\)\n- Fix AI SDK type compatibility issues \\(use ''as any'' for model types\\)\n- Fix maxTokens -> maxOutputTokens for AI SDK 5 compatibility\n- Fix StarterKit.configure\\(\\) link option removal\n- Add lazy initialization for Redis to prevent build-time connections\n- Create .env.local for build-time configuration \\(no external connections\\)\n\n🤖 Generated with [Claude Code]\\(https://claude.com/claude-code\\)\n\nCo-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>\nEOF\n\\)\")",
+      "Bash(git commit:*)",
+      "Bash(where:*)",
+      "Bash(openssl req:*)",
+      "Bash(MSYS_NO_PATHCONV=1 openssl req:*)",
+      "Bash(openssl x509:*)",
+      "Bash(powershell -Command \"Start-Process cmd -ArgumentList ''/c'',''C:\\\\stick-my-note-prod\\\\stickmynote-client\\\\install-service.bat'' -Verb RunAs -Wait\")",
+      "Bash(powershell -Command \"Get-Service -Name ''StickyMyNote'' | Format-List Name,Status,StartType\")",
+      "Bash(cat:*)",
+      "Bash(powershell -Command \"Get-NetTCPConnection -LocalPort 443,80,3000 -State Listen 2>null | Select-Object LocalAddress,LocalPort,OwningProcess | Format-Table\")",
+      "Bash(powershell -Command:*)",
+      "Bash(C:/nssm/win64/nssm.exe restart StickyMyNote)",
+      "Bash(xargs -I {} sh -c 'echo \"\"=== {} ===\"\"; ls -la \"\"{}\"\"')",
+      "Bash(ls:*)"
     ]
   }
 }

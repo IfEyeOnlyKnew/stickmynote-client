@@ -1,8 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server"
-import { createServiceDatabaseClient } from "@/lib/database/database-adapter"
-import type { DatabaseClient } from "@/lib/database/database-adapter"
-import { getCachedAuthUser } from "@/lib/auth/cached-auth"
-import { getOrgContext } from "@/lib/auth/get-org-context"
+import { db } from "@/lib/database/pg-client"
+import { getSession } from "@/lib/auth/local-auth"
 
 // Types
 type DbTabType = "content" | "video" | "images" | "details"
@@ -33,7 +31,7 @@ interface ImageInfo {
 
 interface NoteTabRow {
   id: string
-  personal_stick_id: string // Renamed from note_id
+  personal_stick_id: string
   tab_name: string
   tab_type: DbTabType
   tab_content: string
@@ -41,18 +39,12 @@ interface NoteTabRow {
     videos?: VideoInfo[]
     images?: ImageInfo[]
     content?: string
+    exports?: any[]
     metadata?: Record<string, string | number | boolean>
   } | null
   tab_order: number
   created_at: string
   updated_at: string
-}
-
-interface NoteRow {
-  id: string
-  user_id: string
-  is_shared: boolean
-  org_id: string
 }
 
 // Utilities
@@ -72,6 +64,7 @@ function decodeBase64Maybe(value: string): string {
 function normalizeTabData(input: any): {
   videos?: VideoInfo[]
   images?: ImageInfo[]
+  exports?: any[]
   [k: string]: any
 } {
   let obj: any = input
@@ -86,22 +79,8 @@ function normalizeTabData(input: any): {
   if (!obj || typeof obj !== "object") obj = {}
   if (obj.videos && !Array.isArray(obj.videos)) obj.videos = []
   if (obj.images && !Array.isArray(obj.images)) obj.images = []
+  if (obj.exports && !Array.isArray(obj.exports)) obj.exports = []
   return obj
-}
-
-function parseUrlsFromText(s?: string | null): string[] {
-  if (!s || typeof s !== "string") return []
-  const re = /\bhttps?:\/\/[^\s)'"<>]+/gi
-  const urls = s.match(re) || []
-  const seen = new Set<string>()
-  const out: string[] = []
-  for (const u of urls) {
-    if (!seen.has(u)) {
-      seen.add(u)
-      out.push(u)
-    }
-  }
-  return out
 }
 
 function extractVideoInfo(url: string): VideoInfo | null {
@@ -185,94 +164,6 @@ function dedupeByIdOrUrl<T extends { id?: string; url?: string }>(items: T[]) {
   return out
 }
 
-async function getUser(db: DatabaseClient) {
-  const authResult = await getCachedAuthUser()
-  if (authResult.rateLimited) return { user: null, rateLimited: true }
-  return { user: authResult.user, rateLimited: false }
-}
-
-async function getNote(db: DatabaseClient, noteId: string) {
-  const { data, error } = await db
-    .from("personal_sticks")
-    .select("id,user_id,is_shared,org_id")
-    .eq("id", noteId)
-    .single()
-  if (error) return null
-  return data as NoteRow & { org_id: string }
-}
-
-function isUserIdColumnError(err: any) {
-  const msg = String(err?.message || "")
-  const code = String(err?.code || "")
-  return code === "42703" || msg.includes('column "user_id"') || msg.includes("user_id")
-}
-
-async function safeInsertNoteTab(
-  db: DatabaseClient,
-  payload: any,
-  userId: string,
-) {
-  let ins = await db
-    .from("personal_sticks_tabs")
-    .insert({ ...payload, user_id: userId })
-    .select("*")
-    .single()
-  if (ins.error && isUserIdColumnError(ins.error)) {
-    ins = await db.from("personal_sticks_tabs").insert(payload).select("*").single()
-  }
-  if (ins.error) throw ins.error
-  return ins.data
-}
-
-// Helper function for secure organization access check
-function canAccessNote(note: NoteRow, userId: string, userOrgId: string | null): { allowed: boolean; reason?: string } {
-  const isOwner = note.user_id === userId
-  const noteOrgId = note.org_id || null
-
-  if (isOwner) {
-    return { allowed: true }
-  }
-
-  if (note.is_shared) {
-    if (!noteOrgId) {
-      return { allowed: true }
-    }
-    if (noteOrgId && userOrgId === noteOrgId) {
-      return { allowed: true }
-    }
-    if (noteOrgId && userOrgId !== noteOrgId) {
-      return { allowed: false, reason: "Note belongs to a different organization" }
-    }
-  }
-
-  return { allowed: false, reason: "Access denied" }
-}
-
-// Helper function for write access (owner only, with org check for org notes)
-function canModifyNote(note: NoteRow, userId: string, userOrgId: string | null): { allowed: boolean; reason?: string } {
-  const isOwner = note.user_id === userId
-  const noteOrgId = note.org_id || null
-
-  if (!isOwner) {
-    return { allowed: false, reason: "Only the note owner can modify" }
-  }
-
-  if (!noteOrgId) {
-    return { allowed: true }
-  }
-
-  if (noteOrgId) {
-    if (!userOrgId) {
-      return { allowed: true }
-    }
-    if (userOrgId !== noteOrgId) {
-      return { allowed: false, reason: "Note belongs to a different organization" }
-    }
-  }
-
-  return { allowed: true }
-}
-
 // GET /api/note-tabs?noteId=...
 export async function GET(request: NextRequest) {
   try {
@@ -282,50 +173,40 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "Invalid noteId" }, { status: 400 })
     }
 
-    const db = await createServiceDatabaseClient()
-    const { user, rateLimited } = await getUser(db)
-    if (rateLimited) {
-      return NextResponse.json(
-        { error: "Too many requests. Please try again later." },
-        { status: 429, headers: { "Retry-After": "30" } },
-      )
+    const session = await getSession()
+    if (!session) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
-    if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    const userId = session.user.id
 
-    const orgContext = await getOrgContext(user.id)
-    const userOrgId = orgContext?.orgId || null
+    // Check note ownership or sharing
+    const noteResult = await db.query(
+      `SELECT id, user_id, is_shared FROM personal_sticks WHERE id = $1`,
+      [noteId]
+    )
 
-    const note = await getNote(db, noteId)
-    if (!note) return NextResponse.json({ error: "Not found" }, { status: 404 })
-
-    const accessCheck = canAccessNote(note, user.id, userOrgId)
-    if (!accessCheck.allowed) {
-      return NextResponse.json({ error: accessCheck.reason || "Forbidden" }, { status: 403 })
+    if (noteResult.rows.length === 0) {
+      return NextResponse.json({ error: "Not found" }, { status: 404 })
     }
 
-    const noteOrgId = note.org_id || null
-
-    let query = db
-      .from("personal_sticks_tabs")
-      .select("id, personal_stick_id, tab_name, tab_type, tab_content, tab_data, tab_order, created_at, updated_at")
-      .eq("personal_stick_id", noteId)
-      .order("tab_order", { ascending: true })
-
-    if (noteOrgId) {
-      query = query.eq("org_id", noteOrgId)
+    const note = noteResult.rows[0]
+    if (note.user_id !== userId && !note.is_shared) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 })
     }
 
-    const { data, error } = await query
+    // Get tabs
+    const tabsResult = await db.query(
+      `SELECT id, personal_stick_id, tab_name, tab_type, tab_content, tab_data, tab_order, created_at, updated_at
+       FROM personal_sticks_tabs
+       WHERE personal_stick_id = $1
+       ORDER BY tab_order ASC`,
+      [noteId]
+    )
 
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-
-    const normalized: NoteTabRow[] = []
-
-    for (const row of data || []) {
-      const typedRow = row as NoteTabRow
-      const tab_data = normalizeTabData(typedRow.tab_data)
-      normalized.push({ ...typedRow, tab_data })
-    }
+    const normalized: NoteTabRow[] = tabsResult.rows.map((row: any) => ({
+      ...row,
+      tab_data: normalizeTabData(row.tab_data),
+    }))
 
     return NextResponse.json({ tabs: normalized })
   } catch (err: any) {
@@ -338,18 +219,11 @@ export async function GET(request: NextRequest) {
 // Body: { noteId: string, tabType: 'videos'|'images', items: VideoInfo[] | ImageInfo[] }
 export async function POST(request: NextRequest) {
   try {
-    const db = await createServiceDatabaseClient()
-    const { user, rateLimited } = await getUser(db)
-    if (rateLimited) {
-      return NextResponse.json(
-        { error: "Too many requests. Please try again later." },
-        { status: 429, headers: { "Retry-After": "30" } },
-      )
+    const session = await getSession()
+    if (!session) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
-    if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
-
-    const orgContext = await getOrgContext(user.id)
-    const userOrgId = orgContext?.orgId || null
+    const userId = session.user.id
 
     const body = await request.json().catch(() => ({}))
     const noteId = String(body?.noteId || "")
@@ -360,50 +234,49 @@ export async function POST(request: NextRequest) {
     if (!["videos", "images"].includes(tabType)) return NextResponse.json({ error: "Invalid tabType" }, { status: 400 })
     if (!items.length) return NextResponse.json({ error: "No items to merge" }, { status: 400 })
 
-    const note = await getNote(db, noteId)
-    if (!note) return NextResponse.json({ error: "Not found" }, { status: 404 })
+    // Verify ownership
+    const noteResult = await db.query(
+      `SELECT id, user_id FROM personal_sticks WHERE id = $1`,
+      [noteId]
+    )
 
-    const modifyCheck = canModifyNote(note, user.id, userOrgId)
-    if (!modifyCheck.allowed) {
-      return NextResponse.json({ error: modifyCheck.reason || "Forbidden" }, { status: 403 })
+    if (noteResult.rows.length === 0) {
+      return NextResponse.json({ error: "Not found" }, { status: 404 })
     }
 
-    const noteOrgId = note.org_id || null
+    if (noteResult.rows[0].user_id !== userId) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 })
+    }
 
     const dbType: DbTabType = tabType === "videos" ? "video" : "images"
 
-    let findQuery = db
-      .from("personal_sticks_tabs")
-      .select("id, tab_type, tab_data")
-      .eq("personal_stick_id", noteId)
-      .eq("tab_type", dbType)
-      .limit(1)
+    // Find existing tab
+    const findResult = await db.query(
+      `SELECT id, tab_type, tab_data FROM personal_sticks_tabs
+       WHERE personal_stick_id = $1 AND tab_type = $2
+       LIMIT 1`,
+      [noteId, dbType]
+    )
 
-    if (noteOrgId) {
-      findQuery = findQuery.eq("org_id", noteOrgId)
-    }
+    let tab = findResult.rows[0] as NoteTabRow | undefined
 
-    const { data: rows, error: findErr } = await findQuery
-
-    if (findErr) return NextResponse.json({ error: findErr.message }, { status: 500 })
-
-    let tab = rows?.[0] as NoteTabRow | undefined
     if (!tab) {
-      const payload = {
-        personal_stick_id: noteId, // Renamed from note_id
-        tab_type: dbType,
-        tab_name: dbType === "video" ? "Videos" : "Images",
-        tab_content: "",
-        tab_data: dbType === "video" ? { videos: [] } : { images: [] },
-        tab_order: dbType === "video" ? 1 : 2,
-        ...(noteOrgId ? { org_id: noteOrgId } : {}),
-      }
-      try {
-        tab = await safeInsertNoteTab(db, payload, user.id)
-      } catch (e: any) {
-        console.error("Insert note_tab failed:", e)
-        return NextResponse.json({ error: e?.message || "Insert failed" }, { status: 500 })
-      }
+      // Create new tab
+      const insertResult = await db.query(
+        `INSERT INTO personal_sticks_tabs
+         (personal_stick_id, user_id, tab_type, tab_name, tab_content, tab_data, tab_order, created_at, updated_at)
+         VALUES ($1, $2, $3, $4, '', $5, $6, NOW(), NOW())
+         RETURNING *`,
+        [
+          noteId,
+          userId,
+          dbType,
+          dbType === "video" ? "Videos" : "Images",
+          JSON.stringify(dbType === "video" ? { videos: [] } : { images: [] }),
+          dbType === "video" ? 1 : 2,
+        ]
+      )
+      tab = insertResult.rows[0]
     }
 
     if (!tab) {
@@ -433,23 +306,17 @@ export async function POST(request: NextRequest) {
     const merged = dedupeByIdOrUrl([...(currentArr || []), ...normalizedIncoming])
     const newTabData = { ...baseData, [tabType]: merged }
 
-    let updateQuery = db
-      .from("personal_sticks_tabs")
-      .update({
-        tab_type: dbType,
-        tab_name: dbType === "video" ? "Videos" : "Images",
-        tab_data: newTabData,
-        updated_at: new Date().toISOString(),
-      })
-      .eq("id", tab.id)
-
-    if (noteOrgId) {
-      updateQuery = updateQuery.eq("org_id", noteOrgId)
-    }
-
-    const { error: updateErr } = await updateQuery
-
-    if (updateErr) return NextResponse.json({ error: updateErr.message }, { status: 500 })
+    await db.query(
+      `UPDATE personal_sticks_tabs
+       SET tab_type = $1, tab_name = $2, tab_data = $3, updated_at = NOW()
+       WHERE id = $4`,
+      [
+        dbType,
+        dbType === "video" ? "Videos" : "Images",
+        JSON.stringify(newTabData),
+        tab.id,
+      ]
+    )
 
     return NextResponse.json({
       success: true,
@@ -466,18 +333,11 @@ export async function POST(request: NextRequest) {
 // Body: { noteId: string, tabType: 'videos'|'images', itemId: string }
 export async function DELETE(request: NextRequest) {
   try {
-    const db = await createServiceDatabaseClient()
-    const { user, rateLimited } = await getUser(db)
-    if (rateLimited) {
-      return NextResponse.json(
-        { error: "Too many requests. Please try again later." },
-        { status: 429, headers: { "Retry-After": "30" } },
-      )
+    const session = await getSession()
+    if (!session) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
-    if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
-
-    const orgContext = await getOrgContext(user.id)
-    const userOrgId = orgContext?.orgId || null
+    const userId = session.user.id
 
     const body = await request.json().catch(() => ({}))
     const noteId = String(body?.noteId || "")
@@ -488,34 +348,30 @@ export async function DELETE(request: NextRequest) {
     if (!["videos", "images"].includes(tabType)) return NextResponse.json({ error: "Invalid tabType" }, { status: 400 })
     if (!itemId) return NextResponse.json({ error: "Missing itemId" }, { status: 400 })
 
-    const note = await getNote(db, noteId)
-    if (!note) return NextResponse.json({ error: "Not found" }, { status: 404 })
+    // Verify ownership
+    const noteResult = await db.query(
+      `SELECT id, user_id FROM personal_sticks WHERE id = $1`,
+      [noteId]
+    )
 
-    const modifyCheck = canModifyNote(note, user.id, userOrgId)
-    if (!modifyCheck.allowed) {
-      return NextResponse.json({ error: modifyCheck.reason || "Forbidden" }, { status: 403 })
+    if (noteResult.rows.length === 0) {
+      return NextResponse.json({ error: "Not found" }, { status: 404 })
     }
 
-    const noteOrgId = note.org_id || null
+    if (noteResult.rows[0].user_id !== userId) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 })
+    }
 
     const dbType: DbTabType = tabType === "videos" ? "video" : "images"
 
-    let findQuery = db
-      .from("personal_sticks_tabs")
-      .select("id, tab_type, tab_data")
-      .eq("personal_stick_id", noteId)
-      .eq("tab_type", dbType)
-      .limit(1)
+    const findResult = await db.query(
+      `SELECT id, tab_type, tab_data FROM personal_sticks_tabs
+       WHERE personal_stick_id = $1 AND tab_type = $2
+       LIMIT 1`,
+      [noteId, dbType]
+    )
 
-    if (noteOrgId) {
-      findQuery = findQuery.eq("org_id", noteOrgId)
-    }
-
-    const { data: rows, error: findErr } = await findQuery
-
-    if (findErr) return NextResponse.json({ error: findErr.message }, { status: 500 })
-
-    const tab = rows?.[0]
+    const tab = findResult.rows[0]
     if (!tab) return NextResponse.json({ success: true, count: 0 })
 
     const baseData = normalizeTabData(tab.tab_data)
@@ -523,23 +379,17 @@ export async function DELETE(request: NextRequest) {
     const filtered = (currentArr || []).filter((i) => (i?.id || i?.url || "") !== itemId)
     const newTabData = { ...baseData, [tabType]: filtered }
 
-    let updateQuery = db
-      .from("personal_sticks_tabs")
-      .update({
-        tab_type: dbType,
-        tab_name: dbType === "video" ? "Videos" : "Images",
-        tab_data: newTabData,
-        updated_at: new Date().toISOString(),
-      })
-      .eq("id", tab.id)
-
-    if (noteOrgId) {
-      updateQuery = updateQuery.eq("org_id", noteOrgId)
-    }
-
-    const { error: updateErr } = await updateQuery
-
-    if (updateErr) return NextResponse.json({ error: updateErr.message }, { status: 500 })
+    await db.query(
+      `UPDATE personal_sticks_tabs
+       SET tab_type = $1, tab_name = $2, tab_data = $3, updated_at = NOW()
+       WHERE id = $4`,
+      [
+        dbType,
+        dbType === "video" ? "Videos" : "Images",
+        JSON.stringify(newTabData),
+        tab.id,
+      ]
+    )
 
     return NextResponse.json({ success: true, count: filtered.length })
   } catch (err) {
@@ -552,18 +402,11 @@ export async function DELETE(request: NextRequest) {
 // Body: { noteId: string, details: string }
 export async function PUT(request: NextRequest) {
   try {
-    const db = await createServiceDatabaseClient()
-    const { user, rateLimited } = await getUser(db)
-    if (rateLimited) {
-      return NextResponse.json(
-        { error: "Too many requests. Please try again later." },
-        { status: 429, headers: { "Retry-After": "30" } },
-      )
+    const session = await getSession()
+    if (!session) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
-    if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
-
-    const orgContext = await getOrgContext(user.id)
-    const userOrgId = orgContext?.orgId || null
+    const userId = session.user.id
 
     const body = await request.json().catch(() => ({}))
     const noteId = String(body?.noteId || "")
@@ -571,67 +414,51 @@ export async function PUT(request: NextRequest) {
 
     if (!validateUUID(noteId)) return NextResponse.json({ error: "Invalid noteId" }, { status: 400 })
 
-    const note = await getNote(db, noteId)
-    if (!note) return NextResponse.json({ error: "Not found" }, { status: 404 })
+    // Verify ownership
+    const noteResult = await db.query(
+      `SELECT id, user_id FROM personal_sticks WHERE id = $1`,
+      [noteId]
+    )
 
-    const modifyCheck = canModifyNote(note, user.id, userOrgId)
-    if (!modifyCheck.allowed) {
-      return NextResponse.json({ error: modifyCheck.reason || "Forbidden" }, { status: 403 })
+    if (noteResult.rows.length === 0) {
+      return NextResponse.json({ error: "Not found" }, { status: 404 })
     }
 
-    const noteOrgId = note.org_id || null
+    if (noteResult.rows[0].user_id !== userId) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 })
+    }
 
     const dbType: DbTabType = "details"
 
-    let findQuery = db
-      .from("personal_sticks_tabs")
-      .select("id, tab_type, tab_content, tab_data")
-      .eq("personal_stick_id", noteId)
-      .eq("tab_type", dbType)
-      .limit(1)
+    // Find existing details tab
+    const findResult = await db.query(
+      `SELECT id, tab_type, tab_content, tab_data FROM personal_sticks_tabs
+       WHERE personal_stick_id = $1 AND tab_type = $2
+       LIMIT 1`,
+      [noteId, dbType]
+    )
 
-    if (noteOrgId) {
-      findQuery = findQuery.eq("org_id", noteOrgId)
-    }
+    let tab = findResult.rows[0] as NoteTabRow | undefined
 
-    const { data: rows, error: findErr } = await findQuery
-
-    if (findErr) return NextResponse.json({ error: findErr.message }, { status: 500 })
-
-    let tab = rows?.[0] as NoteTabRow | undefined
     if (!tab) {
-      const payload = {
-        personal_stick_id: noteId, // Renamed from note_id
-        tab_type: dbType,
-        tab_name: "Details",
-        tab_content: details,
-        tab_data: { content: details },
-        tab_order: 3,
-        ...(noteOrgId ? { org_id: noteOrgId } : {}),
-      }
-      try {
-        tab = await safeInsertNoteTab(db, payload, user.id)
-      } catch (e: any) {
-        console.error("Insert details tab failed:", e)
-        return NextResponse.json({ error: e?.message || "Insert failed" }, { status: 500 })
-      }
+      // Create new details tab
+      await db.query(
+        `INSERT INTO personal_sticks_tabs
+         (personal_stick_id, user_id, tab_type, tab_name, tab_content, tab_data, tab_order, created_at, updated_at)
+         VALUES ($1, $2, $3, 'Details', $4, $5, 3, NOW(), NOW())`,
+        [noteId, userId, dbType, details, JSON.stringify({ content: details })]
+      )
     } else {
-      let updateQuery = db
-        .from("personal_sticks_tabs")
-        .update({
-          tab_content: details,
-          tab_data: { content: details },
-          updated_at: new Date().toISOString(),
-        })
-        .eq("id", tab.id)
+      // Preserve existing tab_data (like exports) and only update the content
+      const existingTabData = normalizeTabData(tab.tab_data)
+      const updatedTabData = { ...existingTabData, content: details }
 
-      if (noteOrgId) {
-        updateQuery = updateQuery.eq("org_id", noteOrgId)
-      }
-
-      const { error: updateErr } = await updateQuery
-
-      if (updateErr) return NextResponse.json({ error: updateErr.message }, { status: 500 })
+      await db.query(
+        `UPDATE personal_sticks_tabs
+         SET tab_content = $1, tab_data = $2, updated_at = NOW()
+         WHERE id = $3`,
+        [details, JSON.stringify(updatedTabData), tab.id]
+      )
     }
 
     return NextResponse.json({

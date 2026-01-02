@@ -130,12 +130,12 @@ async function checkStickPermissions(
   orgId: string,
   action: "read" | "write",
 ) {
-  // Get stick and pad info with org_id filter
+  // Get stick and pad info - don't filter by org_id on stick lookup
+  // as sticks may have different org_id than user's current context
   const { data: stick, error: stickError } = await db
     .from("paks_pad_sticks")
     .select("id, user_id, pad_id, org_id")
     .eq("id", stickId)
-    .eq("org_id", orgId)
     .maybeSingle()
 
   if (stickError || !stick) {
@@ -213,7 +213,7 @@ export async function GET(request: NextRequest, context: { params: Promise<{ id:
       return NextResponse.json({ error: "Rate limit exceeded" }, { status: 429 })
     }
 
-    const { hasPermission, error: permError } = await checkStickPermissions(
+    const { hasPermission, error: permError, stick } = await checkStickPermissions(
       db,
       stickId,
       user.id,
@@ -224,11 +224,14 @@ export async function GET(request: NextRequest, context: { params: Promise<{ id:
       return NextResponse.json({ error: permError || "Permission denied" }, { status: 403 })
     }
 
+    // Use the stick's org_id for fetching tabs, not user's current context
+    const stickOrgId = stick?.org_id || orgContext.orgId
+
     const { data, error } = await db
       .from("paks_pad_stick_tabs")
       .select("id, stick_id, tab_name, tab_type, tab_content, tab_data, tab_order, created_at, updated_at, org_id")
       .eq("stick_id", stickId)
-      .eq("org_id", orgContext.orgId)
+      .eq("org_id", stickOrgId)
       .order("tab_order", { ascending: true })
 
     if (error) {
@@ -246,7 +249,7 @@ export async function GET(request: NextRequest, context: { params: Promise<{ id:
         {
           stick_id: stickId,
           user_id: user.id,
-          org_id: orgContext.orgId,
+          org_id: stickOrgId,
           tab_name: "Main",
           tab_type: "main" as DbTabType,
           tab_content: "",
@@ -256,7 +259,7 @@ export async function GET(request: NextRequest, context: { params: Promise<{ id:
         {
           stick_id: stickId,
           user_id: user.id,
-          org_id: orgContext.orgId,
+          org_id: stickOrgId,
           tab_name: "Details",
           tab_type: "details" as DbTabType,
           tab_content: "",
@@ -366,7 +369,7 @@ export async function POST(request: NextRequest, context: { params: Promise<{ id
       return NextResponse.json({ error: "Rate limit exceeded" }, { status: 429 })
     }
 
-    const { hasPermission, error: permError } = await checkStickPermissions(
+    const { hasPermission, error: permError, stick } = await checkStickPermissions(
       db,
       stickId,
       user.id,
@@ -377,6 +380,9 @@ export async function POST(request: NextRequest, context: { params: Promise<{ id
       return NextResponse.json({ error: permError || "Permission denied" }, { status: 403 })
     }
 
+    // Use the stick's org_id for tab operations
+    const stickOrgId = stick?.org_id || orgContext.orgId
+
     const body = await request.json()
     const { tab_type, type, url, title, thumbnail, metadata } = body
 
@@ -385,7 +391,7 @@ export async function POST(request: NextRequest, context: { params: Promise<{ id
       .select("id, tab_data")
       .eq("stick_id", stickId)
       .eq("tab_type", tab_type)
-      .eq("org_id", orgContext.orgId)
+      .eq("org_id", stickOrgId)
       .maybeSingle()
 
     const tabData = normalizeTabData(existingTab?.tab_data || {})
@@ -406,7 +412,7 @@ export async function POST(request: NextRequest, context: { params: Promise<{ id
           updated_at: new Date().toISOString(),
         })
         .eq("id", existingTab.id)
-        .eq("org_id", orgContext.orgId)
+        .eq("org_id", stickOrgId)
         .select()
         .single()
 
@@ -422,7 +428,7 @@ export async function POST(request: NextRequest, context: { params: Promise<{ id
         .insert({
           stick_id: stickId,
           user_id: user.id,
-          org_id: orgContext.orgId,
+          org_id: stickOrgId,
           tab_name: getTabName(tab_type),
           tab_type,
           tab_content: "",
@@ -475,7 +481,7 @@ export async function PUT(request: NextRequest, context: { params: Promise<{ id:
       return NextResponse.json({ error: "Rate limit exceeded" }, { status: 429 })
     }
 
-    const { hasPermission, error: permError } = await checkStickPermissions(
+    const { hasPermission, error: permError, stick } = await checkStickPermissions(
       db,
       stickId,
       user.id,
@@ -486,6 +492,9 @@ export async function PUT(request: NextRequest, context: { params: Promise<{ id:
       return NextResponse.json({ error: permError || "Permission denied" }, { status: 403 })
     }
 
+    // Use the stick's org_id for tab operations
+    const stickOrgId = stick?.org_id || orgContext.orgId
+
     const body = await request.json()
     const { tab_type, tab_data } = body
 
@@ -494,7 +503,7 @@ export async function PUT(request: NextRequest, context: { params: Promise<{ id:
       .select("id, tab_data")
       .eq("stick_id", stickId)
       .eq("tab_type", tab_type)
-      .eq("org_id", orgContext.orgId)
+      .eq("org_id", stickOrgId)
       .maybeSingle()
 
     if (existingTab) {
@@ -505,7 +514,7 @@ export async function PUT(request: NextRequest, context: { params: Promise<{ id:
           updated_at: new Date().toISOString(),
         })
         .eq("id", existingTab.id)
-        .eq("org_id", orgContext.orgId)
+        .eq("org_id", stickOrgId)
         .select("id, stick_id, tab_name, tab_type, tab_content, tab_data, tab_order, created_at, updated_at, org_id")
         .single()
 
@@ -521,7 +530,7 @@ export async function PUT(request: NextRequest, context: { params: Promise<{ id:
         .insert({
           stick_id: stickId,
           user_id: user.id,
-          org_id: orgContext.orgId,
+          org_id: stickOrgId,
           tab_name: getTabName(tab_type),
           tab_type,
           tab_content: "",

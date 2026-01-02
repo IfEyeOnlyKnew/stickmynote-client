@@ -45,7 +45,7 @@ export async function POST(request: NextRequest) {
     }
 
     const { object } = await generateObject({
-      model: xai('grok-3-mini'),
+      model: xai('grok-3-mini') as any,
       schema: tasksSchema,
       prompt: `Parse the following text and extract individual tasks. For each task, identify:
 - A clear, concise title

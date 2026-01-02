@@ -1,6 +1,8 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { createDatabaseClient } from "@/lib/database/database-adapter"
 import { getCachedAuthUser } from "@/lib/auth/cached-auth"
+import { writeFile, mkdir } from "fs/promises"
+import { existsSync } from "fs"
+import path from "path"
 
 const ALLOWED_TYPES = ["image/jpeg", "image/jpg", "image/png", "image/webp", "image/gif"]
 const MAX_FILE_SIZE = 5 * 1024 * 1024
@@ -12,7 +14,7 @@ async function loadSharp(): Promise<any> {
     return sharpModule.default
   } catch (error) {
     console.error("[upload-image] Sharp load error:", error)
-    console.log("[v0] Sharp not available, EXIF stripping disabled")
+    console.log("[upload-image] Sharp not available, EXIF stripping disabled")
     return null
   }
 }
@@ -49,7 +51,7 @@ async function optimizeImage(sharp: any, buffer: Buffer): Promise<Buffer> {
     image = image.rotate()
     return await image.toBuffer()
   } catch (error) {
-    console.error("[v0] Image optimization error:", error)
+    console.error("[upload-image] Image optimization error:", error)
     return buffer
   }
 }
@@ -58,13 +60,48 @@ function generateFilename(userId: string, originalName: string): string {
   const timestamp = Date.now()
   const randomId = Math.random().toString(36).substring(2, 8)
   const extension = originalName.split(".").pop() || "jpg"
-  return `user-images/${userId}/${timestamp}-${randomId}.${extension}`
+  return `${timestamp}-${randomId}.${extension}`
+}
+
+// Check if we should use local storage (development) or Vercel Blob (production)
+function useLocalStorage(): boolean {
+  // Use local storage if BLOB_READ_WRITE_TOKEN is not set
+  return !process.env.BLOB_READ_WRITE_TOKEN
+}
+
+async function saveToLocalStorage(buffer: Buffer, userId: string, filename: string, contentType: string): Promise<{ url: string; pathname: string }> {
+  // Save to public/uploads/user-images/{userId}/
+  const uploadsDir = path.join(process.cwd(), "public", "uploads", "user-images", userId)
+
+  // Create directory if it doesn't exist
+  if (!existsSync(uploadsDir)) {
+    await mkdir(uploadsDir, { recursive: true })
+  }
+
+  const filePath = path.join(uploadsDir, filename)
+  await writeFile(filePath, buffer)
+
+  // Return URL path relative to public folder
+  const url = `/uploads/user-images/${userId}/${filename}`
+
+  return { url, pathname: url }
+}
+
+async function saveToVercelBlob(buffer: Buffer, userId: string, filename: string, contentType: string): Promise<{ url: string; pathname: string }> {
+  const { put } = await import("@vercel/blob")
+  const blobPath = `user-images/${userId}/${filename}`
+
+  const blob = await put(blobPath, new Blob([new Uint8Array(buffer)], { type: contentType }), {
+    access: "public",
+    contentType: contentType,
+  })
+
+  return { url: blob.url, pathname: blob.pathname }
 }
 
 export async function POST(request: NextRequest) {
   try {
-    const [{ put }, sharp] = await Promise.all([import("@vercel/blob"), loadSharp()])
-    await createDatabaseClient()
+    const sharp = await loadSharp()
 
     const { user, error: authError, rateLimited } = await getCachedAuthUser()
 
@@ -88,14 +125,17 @@ export async function POST(request: NextRequest) {
     const optimizedBuffer = sharp ? await optimizeImage(sharp, buffer) : buffer
 
     const filename = generateFilename(user.id, file.name)
-    const blob = await put(filename, new Blob([new Uint8Array(optimizedBuffer)], { type: file.type }), {
-      access: "public",
-      contentType: file.type,
-    })
+
+    // Choose storage based on environment
+    const storage = useLocalStorage()
+      ? await saveToLocalStorage(optimizedBuffer, user.id, filename, file.type)
+      : await saveToVercelBlob(optimizedBuffer, user.id, filename, file.type)
+
+    console.log(`[upload-image] Saved image to ${useLocalStorage() ? 'local storage' : 'Vercel Blob'}: ${storage.url}`)
 
     return NextResponse.json({
-      url: blob.url,
-      filename: blob.pathname,
+      url: storage.url,
+      filename: storage.pathname,
       size: optimizedBuffer.length,
       originalSize: file.size,
       type: file.type,
@@ -103,7 +143,7 @@ export async function POST(request: NextRequest) {
     })
   } catch (error: unknown) {
     const errorMessage = error instanceof Error ? error.message : String(error)
-    console.error("[v0] Image upload error:", errorMessage)
+    console.error("[upload-image] Image upload error:", errorMessage)
     return NextResponse.json({ error: "Upload failed: " + errorMessage }, { status: 500 })
   }
 }

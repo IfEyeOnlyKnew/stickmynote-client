@@ -357,7 +357,7 @@ export async function POST(
 
       if (pad) {
         padsData = { ...pad };
-        if (pad.multi_pak_id) {
+        if (pad.multi_pak_id && padsData) {
           const { data: multiPak } = await db
             .from("multi_paks")
             .select("owner_id")

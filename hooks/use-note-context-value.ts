@@ -20,7 +20,10 @@ export const useNoteContextValue = ({
   configuration,
 }: UseNoteContextValueProps) => {
   const { currentUserId, readOnly = false, hideGenerateTags = false } = configuration
-  const { isNewNote = false, generatingTags } = stateManagement
+  const { isNewNote = false, generatingTags, summarizingLinks, tabsRefreshKeys } = stateManagement
+
+  // Extract the refresh key for this specific note
+  const tabsRefreshKey = tabsRefreshKeys?.[note.id] || 0
 
   return useMemo(() => {
     const isOwner = currentUserId === note.user_id
@@ -33,7 +36,9 @@ export const useNoteContextValue = ({
       isNewNote,
       isOwner,
       generatingTags,
+      summarizingLinks,
       hideGenerateTags,
+      tabsRefreshKey,
 
       // Spread grouped handlers to maintain existing context interface
       ...eventHandlers,
@@ -46,7 +51,9 @@ export const useNoteContextValue = ({
     readOnly,
     isNewNote,
     generatingTags,
+    summarizingLinks,
     hideGenerateTags,
+    tabsRefreshKey,
     eventHandlers,
     replyHandlers,
     stateManagement,

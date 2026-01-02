@@ -116,91 +116,85 @@ export default function CommunityPanelPage() {
     )
   }, [])
 
-  const [replyHook] = useState({
-    handleAddReply: async (noteId: string, content: string, color?: string): Promise<void> => {
-      try {
-        const currentCsrfToken = csrfTokenRef.current
-        const response = await fetch(`/api/notes/${noteId}/replies`, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            ...(currentCsrfToken ? { "X-CSRF-Token": currentCsrfToken } : {}),
-          },
-          body: JSON.stringify({ content, color: color || "#fef3c7" }),
-        })
+  // Use a ref to always have access to current communityNotes
+  const communityNotesRef = useRef<Note[]>(communityNotes)
+  useEffect(() => {
+    communityNotesRef.current = communityNotes
+  }, [communityNotes])
 
-        if (!response.ok) {
-          const errorData = await response.json()
-          throw new Error(errorData.error || "Failed to add reply")
-        }
+  const handleAddReply = useCallback(async (noteId: string, content: string, color?: string): Promise<void> => {
+    try {
+      const currentCsrfToken = csrfTokenRef.current
+      const response = await fetch(`/api/notes/${noteId}/replies`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(currentCsrfToken ? { "X-CSRF-Token": currentCsrfToken } : {}),
+        },
+        body: JSON.stringify({ content, color: color || "#fef3c7" }),
+      })
 
-        const { reply } = await response.json()
-        addReplyToNote(noteId, reply)
-      } catch (error) {
-        console.error("Error adding reply:", error)
-        throw error
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.error || "Failed to add reply")
       }
-    },
-    handleEditReply: async (replyId: string, content: string, color?: string): Promise<void> => {
-      try {
-        const noteWithReply = communityNotes.find((note) => note.replies?.some((r: { id: string }) => r.id === replyId))
 
-        if (!noteWithReply) {
-          throw new Error("Reply not found")
-        }
+      const { reply } = await response.json()
+      addReplyToNote(noteId, reply)
+    } catch (error) {
+      console.error("Error adding reply:", error)
+      throw error
+    }
+  }, [addReplyToNote])
 
-        const currentCsrfToken = csrfTokenRef.current
-        const response = await fetch(`/api/notes/${noteWithReply.id}/replies`, {
-          method: "PUT",
-          headers: {
-            "Content-Type": "application/json",
-            ...(currentCsrfToken ? { "X-CSRF-Token": currentCsrfToken } : {}),
-          },
-          body: JSON.stringify({ replyId, content, color }),
-        })
+  const handleEditReply = useCallback(async (noteId: string, replyId: string, content: string): Promise<void> => {
+    try {
+      const currentCsrfToken = csrfTokenRef.current
+      const response = await fetch(`/api/notes/${noteId}/replies`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          ...(currentCsrfToken ? { "X-CSRF-Token": currentCsrfToken } : {}),
+        },
+        body: JSON.stringify({ replyId, content }),
+      })
 
-        if (!response.ok) {
-          const errorData = await response.json()
-          throw new Error(errorData.error || "Failed to edit reply")
-        }
-
-        const { reply: updatedReply } = await response.json()
-        updateReplyInNote(noteWithReply.id, replyId, updatedReply)
-      } catch (error) {
-        console.error("Error editing reply:", error)
-        throw error
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.error || "Failed to edit reply")
       }
-    },
-    handleDeleteReply: async (replyId: string): Promise<void> => {
-      try {
-        const noteWithReply = communityNotes.find((note) => note.replies?.some((r: { id: string }) => r.id === replyId))
 
-        if (!noteWithReply) {
-          throw new Error("Reply not found")
-        }
+      const { reply: updatedReply } = await response.json()
+      updateReplyInNote(noteId, replyId, updatedReply)
+    } catch (error) {
+      console.error("Error editing reply:", error)
+      throw error
+    }
+  }, [updateReplyInNote])
 
-        const currentCsrfToken = csrfTokenRef.current
-        const response = await fetch(`/api/notes/${noteWithReply.id}/replies`, {
-          method: "DELETE",
-          headers: {
-            "Content-Type": "application/json",
-            ...(currentCsrfToken ? { "X-CSRF-Token": currentCsrfToken } : {}),
-          },
-          body: JSON.stringify({ replyId }),
-        })
+  const handleDeleteReply = useCallback(async (noteId: string, replyId: string): Promise<void> => {
+    try {
+      const currentCsrfToken = csrfTokenRef.current
+      const response = await fetch(`/api/notes/${noteId}/replies`, {
+        method: "DELETE",
+        headers: {
+          "Content-Type": "application/json",
+          ...(currentCsrfToken ? { "X-CSRF-Token": currentCsrfToken } : {}),
+        },
+        body: JSON.stringify({ replyId }),
+      })
 
-        if (!response.ok) {
-          const errorData = await response.json()
-          throw new Error(errorData.error || "Failed to delete reply")
-        }
-
-        removeReplyFromNote(noteWithReply.id, replyId)
-      } catch (error) {
-        console.error("Error deleting reply:", error)
-        throw error
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.error || "Failed to delete reply")
       }
-    },
-  })
+
+      removeReplyFromNote(noteId, replyId)
+    } catch (error) {
+      console.error("Error deleting reply:", error)
+      throw error
+    }
+  }, [removeReplyFromNote])
 
   const [debouncedSearchTerm, setDebouncedSearchTerm] = useState("")
   const [circuitOpen, setCircuitOpen] = useState(false)
@@ -765,9 +759,9 @@ export default function CommunityPanelPage() {
                 currentUserId={user?.id}
                 readOnly={true}
                 onClose={fullscreenHook.closeFullscreen}
-                onAddReply={replyHook.handleAddReply}
-                onEditReply={replyHook.handleEditReply}
-                onDeleteReply={replyHook.handleDeleteReply}
+                onAddReply={handleAddReply}
+                onEditReply={handleEditReply}
+                onDeleteReply={handleDeleteReply}
                 onNoteUpdate={handleNoteUpdateInFullscreen}
                 onDeleteNote={handleDeleteNoteInFullscreen}
                 onUpdateSharing={handleUpdateSharingInFullscreen}

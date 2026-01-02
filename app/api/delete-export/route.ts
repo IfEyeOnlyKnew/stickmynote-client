@@ -1,21 +1,9 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { createDatabaseClient } from "@/lib/database/database-adapter"
-import { getCachedAuthUser } from "@/lib/auth/cached-auth"
-
-let del: any
-async function initializeBlobModule() {
-  try {
-    const blobModule = await import("@vercel/blob")
-    del = blobModule.del
-  } catch {
-    del = async () => ({})
-  }
-}
-
-function getTableConfig(isStick: boolean): { tableName: string; noteIdField: string } {
-  if (isStick) return { tableName: "stick_tabs", noteIdField: "stick_id" }
-  return { tableName: "note_tabs", noteIdField: "note_id" }
-}
+import { getSession } from "@/lib/auth/local-auth"
+import { db } from "@/lib/database/pg-client"
+import { unlink } from "fs/promises"
+import { existsSync } from "fs"
+import path from "path"
 
 function parseTabData(tabData: unknown): unknown[] {
   if (tabData === null || tabData === undefined) return []
@@ -43,59 +31,75 @@ function parseTabData(tabData: unknown): unknown[] {
   return []
 }
 
-async function deleteFromBlobStorage(exportUrl: string): Promise<void> {
+async function deleteLocalFile(exportUrl: string): Promise<void> {
   try {
-    await del(exportUrl)
+    // exportUrl is like /exports/link-summary-xxx.docx
+    const filename = exportUrl.replace(/^\/exports\//, "")
+    const filePath = path.join(process.cwd(), "public", "exports", filename)
+
+    if (existsSync(filePath)) {
+      await unlink(filePath)
+      console.log(`[delete-export] Deleted file: ${filePath}`)
+    } else {
+      console.log(`[delete-export] File not found (already deleted?): ${filePath}`)
+    }
   } catch (error) {
-    console.error("[delete-export] Blob deletion error:", error)
-    // Continue with database cleanup even if blob deletion fails
+    console.error("[delete-export] File deletion error:", error)
+    // Continue with database cleanup even if file deletion fails
   }
 }
 
 export async function DELETE(request: NextRequest) {
   try {
-    if (!del) await initializeBlobModule()
-
-    const authResult = await getCachedAuthUser()
-    if (authResult.rateLimited) {
-      return NextResponse.json(
-        { error: "Rate limit exceeded. Please try again in a moment." },
-        { status: 429, headers: { "Retry-After": "30" } },
-      )
-    }
-    if (!authResult.user) {
+    const session = await getSession()
+    if (!session) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
     const body = await request.json()
-    const { noteId, exportUrl, isStick } = body
+    const { noteId, exportUrl, isStick, isTeamNote } = body
 
     if (!noteId || !exportUrl) {
       return NextResponse.json({ error: "Missing required fields" }, { status: 400 })
     }
 
-    await deleteFromBlobStorage(exportUrl)
+    // Delete the local file
+    await deleteLocalFile(exportUrl)
 
-    const db = await createDatabaseClient()
-    const { tableName, noteIdField } = getTableConfig(isStick)
+    // Determine which table to use
+    let tableName: string
+    let idColumn: string
 
-    const { data: detailsTabs, error: fetchError } = await db
-      .from(tableName)
-      .select("*")
-      .eq(noteIdField, noteId)
-      .eq("tab_type", "details")
-
-    if (fetchError) {
-      return NextResponse.json({ error: "Failed to fetch details tab" }, { status: 500 })
+    if (isStick) {
+      tableName = "stick_tabs"
+      idColumn = "stick_id"
+    } else if (isTeamNote) {
+      tableName = "note_tabs"
+      idColumn = "note_id"
+    } else {
+      // Personal sticks
+      tableName = "personal_sticks_tabs"
+      idColumn = "personal_stick_id"
     }
 
-    if (!detailsTabs || detailsTabs.length === 0) {
+    // Get the details tab
+    const detailsTabResult = await db.query(
+      `SELECT id, tab_data FROM ${tableName}
+       WHERE ${idColumn} = $1 AND tab_type = 'details'
+       ORDER BY created_at DESC
+       LIMIT 1`,
+      [noteId]
+    )
+
+    if (detailsTabResult.rows.length === 0) {
       return NextResponse.json({ message: "Export already deleted or details tab not found" })
     }
 
+    const detailsTab = detailsTabResult.rows[0]
+
     let currentExports: unknown[] = []
     try {
-      currentExports = parseTabData(detailsTabs[0].tab_data)
+      currentExports = parseTabData(detailsTab.tab_data)
     } catch (error) {
       console.error("[delete-export] Parse error:", error)
       currentExports = []
@@ -103,21 +107,27 @@ export async function DELETE(request: NextRequest) {
 
     const updatedExports = currentExports.filter((exp: any) => exp.url !== exportUrl)
 
-    const { error: updateError } = await db
-      .from(tableName)
-      .update({ tab_data: { exports: updatedExports } })
-      .eq(noteIdField, noteId)
-      .eq("tab_type", "details")
+    // Update the tab_data
+    const currentData = detailsTab.tab_data && typeof detailsTab.tab_data === "object"
+      ? detailsTab.tab_data
+      : {}
+    const newTabData = { ...currentData, exports: updatedExports }
 
-    if (updateError) {
-      return NextResponse.json({ error: "Failed to update details tab" }, { status: 500 })
-    }
+    await db.query(
+      `UPDATE ${tableName}
+       SET tab_data = $1, updated_at = NOW()
+       WHERE id = $2`,
+      [JSON.stringify(newTabData), detailsTab.id]
+    )
+
+    console.log(`[delete-export] Removed export ${exportUrl} from ${tableName}`)
 
     return NextResponse.json({ message: "Export deleted successfully" })
   } catch (error) {
+    console.error("[delete-export] Error:", error)
     return NextResponse.json(
       { error: `Failed to delete export: ${error instanceof Error ? error.message : "Unknown error"}` },
-      { status: 500 },
+      { status: 500 }
     )
   }
 }

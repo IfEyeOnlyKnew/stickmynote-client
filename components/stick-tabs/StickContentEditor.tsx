@@ -2,6 +2,7 @@
 
 import { Button } from "@/components/ui/button"
 import { GenerateTagsButton } from "@/components/ui/generate-tags-button"
+import { SummarizeLinksButton } from "@/components/ui/summarize-links-button"
 import { ExternalLink, ChevronDown, ChevronUp } from "lucide-react"
 import { useState } from "react"
 import type { VideoItem, ImageItem } from "@/types/pad"
@@ -29,6 +30,8 @@ interface StickContentEditorProps {
   onStickContent?: () => void
   onGenerateTags?: () => void
   isGeneratingTags?: boolean
+  onSummarizeLinks?: () => void
+  isSummarizingLinks?: boolean
   generatedTags?: string[]
   generatedLinks?: Array<{ title: string; url: string }>
   details?: string
@@ -55,6 +58,8 @@ export function StickContentEditor({
   onStickContent,
   onGenerateTags,
   isGeneratingTags,
+  onSummarizeLinks,
+  isSummarizingLinks,
   generatedTags = [],
   generatedLinks = [],
   details = "",
@@ -229,6 +234,12 @@ export function StickContentEditor({
       {!readOnly && onGenerateTags && (
         <div className="flex items-center gap-2 mt-2 mb-4">
           <GenerateTagsButton onClick={onGenerateTags} isGenerating={isGeneratingTags || false} />
+          {generatedLinks.length > 0 && onSummarizeLinks && (
+            <SummarizeLinksButton
+              onClick={onSummarizeLinks}
+              isSummarizing={isSummarizingLinks || false}
+            />
+          )}
         </div>
       )}
     </div>

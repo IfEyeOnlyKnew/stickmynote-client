@@ -123,6 +123,7 @@ export const ReplyItem: React.FC<ReplyItemProps> = ({
               )}
               {onDelete && (
                 <Button
+                  type="button"
                   variant="ghost"
                   size="sm"
                   onClick={() => onDelete(reply.id)}
@@ -150,6 +151,7 @@ export const ReplyItem: React.FC<ReplyItemProps> = ({
               <span className="text-xs text-gray-500">{editContent.length}/1000</span>
               <div className="flex gap-1">
                 <Button
+                  type="button"
                   variant="ghost"
                   size="sm"
                   onClick={handleCancelEdit}
@@ -160,6 +162,7 @@ export const ReplyItem: React.FC<ReplyItemProps> = ({
                   Cancel
                 </Button>
                 <Button
+                  type="button"
                   variant="default"
                   size="sm"
                   onClick={handleSaveEdit}
@@ -171,7 +174,7 @@ export const ReplyItem: React.FC<ReplyItemProps> = ({
                   ) : (
                     <>
                       <Check className="h-3 w-3 mr-1" />
-                      Save
+                      Stick
                     </>
                   )}
                 </Button>

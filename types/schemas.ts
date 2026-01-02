@@ -210,6 +210,7 @@ export const noteSchema = z.object({
   title: z.string(),
   topic: z.string().max(75).optional(),
   content: z.string().min(1).max(1000),
+  details: z.string().optional(),
   color: colorSchema,
   position_x: z.number().int().min(0),
   position_y: z.number().int().min(0),

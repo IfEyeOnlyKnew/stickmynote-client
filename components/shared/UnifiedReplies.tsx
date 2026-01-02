@@ -12,7 +12,14 @@ import { useCallback, useState, useEffect } from "react"
 // CollaborativeReplyForm uses Tiptap which requires client-side only rendering
 const CollaborativeReplyForm = dynamic(
   () => import("@/components/replies/CollaborativeReplyForm").then((mod) => mod.CollaborativeReplyForm),
-  { ssr: false }
+  {
+    ssr: false,
+    loading: () => (
+      <div className="p-4 border rounded-md bg-gray-50">
+        <div className="animate-pulse text-gray-500 text-sm">Loading reply form...</div>
+      </div>
+    )
+  }
 )
 import { toast } from "sonner"
 
@@ -81,9 +88,9 @@ interface UnifiedRepliesProps {
   // Additional props for different contexts
   canEdit?: boolean
   setIsSubmittingReply?: (submitting: boolean) => void
-  onDeleteReply?: (replyId: string) => Promise<void>
+  onDeleteReply?: (noteId: string, replyId: string) => Promise<void>
   currentUserId?: string | null
-  onEditReply?: (replyId: string, content: string) => Promise<void>
+  onEditReply?: (noteId: string, replyId: string, content: string) => Promise<void>
 }
 
 export const UnifiedReplies: React.FC<UnifiedRepliesProps> = ({
@@ -142,6 +149,7 @@ export const UnifiedReplies: React.FC<UnifiedRepliesProps> = ({
           await onAddReply(noteId, trimmedContent, false, null)
           setReplyContent("")
         } catch (error) {
+          console.error("Error adding reply:", error)
         } finally {
           setIsSubmittingReply(false)
         }
@@ -165,11 +173,11 @@ export const UnifiedReplies: React.FC<UnifiedRepliesProps> = ({
       if (!onDeleteReply) return
 
       try {
-        await onDeleteReply(replyId)
+        await onDeleteReply(noteId, replyId)
         setLocalReplies((prev) => prev.filter((r) => r.id !== replyId))
       } catch (error) {}
     },
-    [onDeleteReply],
+    [onDeleteReply, noteId],
   )
 
   const handleEditReply = useCallback(
@@ -177,7 +185,7 @@ export const UnifiedReplies: React.FC<UnifiedRepliesProps> = ({
       if (!onEditReply) return
 
       try {
-        await onEditReply(replyId, content)
+        await onEditReply(noteId, replyId, content)
         // Update local state after successful edit
         setLocalReplies((prev) =>
           prev.map((r) => (r.id === replyId ? { ...r, content, updated_at: new Date().toISOString() } : r)),
@@ -186,7 +194,7 @@ export const UnifiedReplies: React.FC<UnifiedRepliesProps> = ({
         throw error // Re-throw so ReplyItem can handle it
       }
     },
-    [onEditReply],
+    [onEditReply, noteId],
   )
 
   const handleToggleCalStick = useCallback(

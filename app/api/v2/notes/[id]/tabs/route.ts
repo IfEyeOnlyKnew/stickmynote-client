@@ -82,10 +82,44 @@ export async function POST(
     }
 
     const body = await request.json()
-    const { tab_type, tab_name, tab_content, tab_data, tab_order } = body
+    // Support both camelCase (from client) and snake_case (legacy)
+    const tabType = body.tabType || body.tab_type
+    const tabName = body.tab_name
+    const tabContent = body.tab_content
+    const tabData = body.data || body.tab_data
+    const tabOrder = body.tab_order
+
+    // Handle videos/images merge operation from useMediaUploadBase
+    if ((tabType === 'videos' || tabType === 'video' || tabType === 'images') && tabData) {
+      // Check if tab already exists
+      const existingTab = await db.query(
+        `SELECT id, tab_data FROM personal_sticks_tabs
+         WHERE personal_stick_id = $1 AND user_id = $2 AND tab_type = $3
+         LIMIT 1`,
+        [noteId, user.id, tabType === 'video' ? 'video' : tabType]
+      )
+
+      if (existingTab.rows.length > 0) {
+        // Update existing tab by merging data
+        const existingData = existingTab.rows[0].tab_data || {}
+        const mergedData = {
+          ...existingData,
+          ...tabData
+        }
+
+        await db.query(
+          `UPDATE personal_sticks_tabs
+           SET tab_data = $1, updated_at = NOW()
+           WHERE id = $2`,
+          [JSON.stringify(mergedData), existingTab.rows[0].id]
+        )
+
+        return new Response(JSON.stringify({ success: true, updated: true }), { status: 200 })
+      }
+    }
 
     // Get the next tab order if not provided
-    let order = tab_order
+    let order = tabOrder
     if (order === undefined || order === null) {
       const maxOrderResult = await db.query(
         `SELECT COALESCE(MAX(tab_order), 0) as max_order FROM personal_sticks_tabs WHERE personal_stick_id = $1`,
@@ -99,7 +133,7 @@ export async function POST(
        (personal_stick_id, user_id, tab_type, tab_name, tab_content, tab_data, tab_order, created_at, updated_at)
        VALUES ($1, $2, $3, $4, $5, $6, $7, NOW(), NOW())
        RETURNING *`,
-      [noteId, user.id, tab_type || 'main', tab_name || 'Main', tab_content || '', JSON.stringify(tab_data || {}), order]
+      [noteId, user.id, tabType || 'main', tabName || 'Main', tabContent || '', JSON.stringify(tabData || {}), order]
     )
 
     return new Response(JSON.stringify({ tab: result.rows[0] }), { status: 201 })

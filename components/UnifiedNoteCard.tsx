@@ -27,7 +27,9 @@ export const UnifiedNoteCard: React.FC<UnifiedNoteCardProps> = ({ windowSize, dr
     isNewNote,
     isOwner,
     generatingTags,
+    summarizingLinks,
     hideGenerateTags,
+    tabsRefreshKey,
     onOpenFullscreen,
     onUpdateSharing,
     onUpdateColor, // Get onUpdateColor from context
@@ -36,6 +38,7 @@ export const UnifiedNoteCard: React.FC<UnifiedNoteCardProps> = ({ windowSize, dr
     onContentChange,
     onDetailsChange,
     onGenerateTags,
+    onSummarizeLinks,
     onMouseDown,
     onNoteHeightChange,
     onCancelNewNote,
@@ -315,7 +318,7 @@ export const UnifiedNoteCard: React.FC<UnifiedNoteCardProps> = ({ windowSize, dr
           onTopicFocus={() => !isNewNote && !isEditing && !readOnly && handleStartEditing()}
           onContentFocus={() => !isNewNote && !isEditing && !readOnly && handleStartEditing()}
           readOnly={readOnly || (!isOwner && !isNewNote)}
-          resetKey={resetKey}
+          resetKey={resetKey + (tabsRefreshKey || 0)}
           onTabChange={setActiveTab}
           onNoteInteraction={onNoteInteraction}
         />
@@ -342,10 +345,12 @@ export const UnifiedNoteCard: React.FC<UnifiedNoteCardProps> = ({ windowSize, dr
           isNewNote={isNewNote}
           hideGenerateTags={hideGenerateTags}
           generatingTags={generatingTags}
+          summarizingLinks={summarizingLinks}
           topic={note.topic}
           title={note.title}
           content={note.content}
           onGenerateTags={onGenerateTags}
+          onSummarizeLinks={onSummarizeLinks}
         />
 
         <NoteCardReplies

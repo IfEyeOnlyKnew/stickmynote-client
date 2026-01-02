@@ -3,14 +3,14 @@
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import React from "react"
-import { useEffect, useCallback } from "react"
+import { useEffect, useCallback, useMemo } from "react"
 import { useNoteContext } from "./NoteContext"
 import { useNote } from "@/hooks/useNote"
 import { NoteFullscreenHeader } from "./note-fullscreen/NoteFullscreenHeader"
 import { NoteFullscreenContent } from "./note-fullscreen/NoteFullscreenContent"
 import { NoteFullscreenReplies } from "./note-fullscreen/NoteFullscreenReplies"
-import { Palette, Trash2, Share2, Lock } from "lucide-react"
-import { NOTE_COLORS } from "@/lib/constants/note-colors"
+import { SummarizeLinksButton } from "./ui/summarize-links-button"
+import { Trash2, Share2, Lock } from "lucide-react"
 
 export const UnifiedNoteFullscreen: React.FC = () => {
   const context = useNoteContext()
@@ -20,12 +20,14 @@ export const UnifiedNoteFullscreen: React.FC = () => {
     isNewNote,
     isOwner,
     generatingTags,
+    summarizingLinks,
     hideGenerateTags,
     onClose,
     onTopicChange,
     onContentChange,
     onDetailsChange,
     onGenerateTags,
+    onSummarizeLinks,
     onCancelNewNote,
     onStickNewNote,
     onEditStateChange,
@@ -36,7 +38,6 @@ export const UnifiedNoteFullscreen: React.FC = () => {
     onDeleteReply,
     currentUserId,
     onUpdateSharing,
-    onUpdateColor,
     onDeleteNote,
   } = context
 
@@ -78,21 +79,16 @@ export const UnifiedNoteFullscreen: React.FC = () => {
     onNoteInteraction,
   })
 
-  const [showColorPalette, setShowColorPalette] = React.useState(false)
-
   useEffect(() => {
     onEditStateChange?.(note.id, isEditing)
   }, [isEditing, note.id, onEditStateChange])
 
-  const handleColorChange = useCallback(
-    (color: string) => {
-      if (onUpdateColor) {
-        onUpdateColor(note.id, color)
-      }
-      setShowColorPalette(false)
-    },
-    [note.id, onUpdateColor],
-  )
+  // Check if a link summary report has been generated
+  // The report is stored in the details field and contains "LINK SUMMARY REPORT" marker
+  const hasLinkSummaryReport = useMemo(() => {
+    if (!note.details) return false
+    return note.details.includes("LINK SUMMARY REPORT") || note.details.includes("Link Summary Report")
+  }, [note.details])
 
   const handleSharingToggle = useCallback(() => {
     if (onUpdateSharing) {
@@ -180,6 +176,14 @@ export const UnifiedNoteFullscreen: React.FC = () => {
                 "Generate Links"
               )}
             </Button>
+
+            {/* Show Summarize Links button only if there are links and no report has been generated */}
+            {note.hyperlinks && note.hyperlinks.length > 0 && !hasLinkSummaryReport && onSummarizeLinks && (
+              <SummarizeLinksButton
+                onClick={() => onSummarizeLinks(note.id)}
+                isSummarizing={summarizingLinks === note.id}
+              />
+            )}
           </div>
         )}
       </>
@@ -187,13 +191,16 @@ export const UnifiedNoteFullscreen: React.FC = () => {
   }, [
     note.tags,
     note.hyperlinks,
-    isNewNote,
-    hideGenerateTags,
-    generatingTags,
     note.id,
     note.topic,
     note.title,
+    isNewNote,
+    hideGenerateTags,
+    generatingTags,
+    summarizingLinks,
+    hasLinkSummaryReport,
     onGenerateTags,
+    onSummarizeLinks,
   ])
 
   return (
@@ -230,34 +237,6 @@ export const UnifiedNoteFullscreen: React.FC = () => {
                       </>
                     )}
                   </Button>
-                )}
-
-                {!isNewNote && isOwner && (
-                  <div className="relative">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setShowColorPalette(!showColorPalette)}
-                      className="flex items-center gap-1 px-2 md:px-3"
-                      title="Change Color"
-                    >
-                      <Palette className="h-3 w-3 md:h-4 md:w-4" />
-                    </Button>
-                    {showColorPalette && (
-                      <div className="absolute top-full right-0 mt-2 p-2 bg-white border rounded-lg shadow-lg z-50 grid grid-cols-4 gap-2">
-                        {NOTE_COLORS.map((color) => (
-                          <button
-                            key={color.value}
-                            onClick={() => handleColorChange(color.value)}
-                            className="w-8 h-8 rounded border-2 hover:border-gray-400 transition-colors"
-                            style={{ backgroundColor: color.value }}
-                            title={color.name}
-                            aria-label={`Change color to ${color.name}`}
-                          />
-                        ))}
-                      </div>
-                    )}
-                  </div>
                 )}
 
                 {!isNewNote && isOwner && (

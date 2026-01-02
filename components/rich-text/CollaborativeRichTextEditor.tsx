@@ -93,7 +93,6 @@ export function CollaborativeRichTextEditor({
         heading: {
           levels: [1, 2, 3],
         },
-        link: false,
       }),
       Image.configure({
         inline: true,
