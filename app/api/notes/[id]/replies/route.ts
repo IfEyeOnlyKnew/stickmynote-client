@@ -56,7 +56,7 @@ interface Reply {
 
 interface UserInfo {
   id: string
-  username?: string
+  email?: string
   full_name?: string
   avatar_url?: string
 }
@@ -84,7 +84,7 @@ const REPLY_SELECT_FIELDS = `
   org_id
 `
 
-const USER_SELECT_FIELDS = "id, username, full_name, avatar_url"
+const USER_SELECT_FIELDS = "id, email, full_name, avatar_url"
 
 // ============================================================================
 // Error Responses
@@ -232,11 +232,12 @@ function buildCompleteReply(reply: Reply, userData: UserInfo | null, fallbackEma
     updated_at: reply.updated_at,
     user_id: reply.user_id,
     view_count: reply.view_count || 0,
-    user: userData || {
-      id: reply.user_id,
-      username: fallbackEmail?.split("@")[0] || "User",
-      full_name: null,
-      avatar_url: null,
+    user: {
+      id: userData?.id || reply.user_id,
+      username: userData?.full_name || fallbackEmail?.split("@")[0] || "User",
+      email: userData?.email || fallbackEmail || null,
+      full_name: userData?.full_name || null,
+      avatar_url: userData?.avatar_url || null,
     },
   }
 }

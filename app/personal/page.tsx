@@ -74,12 +74,14 @@ export default async function NotesPage() {
         }
       }
 
-      // Fetch replies
+      // Fetch replies with user info
       const repliesResult = await db.query(
-        `SELECT id, content, color, created_at, updated_at, user_id, personal_stick_id
-         FROM personal_sticks_replies
-         WHERE personal_stick_id = ANY($1)
-         ORDER BY created_at DESC`,
+        `SELECT r.id, r.content, r.color, r.created_at, r.updated_at, r.user_id, r.personal_stick_id,
+                u.full_name, u.email
+         FROM personal_sticks_replies r
+         LEFT JOIN users u ON u.id = r.user_id
+         WHERE r.personal_stick_id = ANY($1)
+         ORDER BY r.created_at DESC`,
         [noteIds]
       )
 
@@ -93,6 +95,10 @@ export default async function NotesPage() {
           updated_at: reply.updated_at || reply.created_at,
           user_id: reply.user_id,
           note_id: reply.personal_stick_id,
+          user: {
+            username: reply.full_name || null,
+            email: reply.email || null,
+          },
         })
         repliesMap.set(reply.personal_stick_id, arr)
       }
