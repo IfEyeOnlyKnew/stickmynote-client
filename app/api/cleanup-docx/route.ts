@@ -4,26 +4,12 @@ import path from "node:path"
 import fs from "node:fs"
 import { promisify } from "node:util"
 
-let put: any, del: any
-
-const initializeModules = async () => {
-  try {
-    const blobModule = await import("@vercel/blob")
-    put = blobModule.put
-    del = blobModule.del
-  } catch (error) {
-    console.warn("Blob storage module not available, using fallback:", error)
-    put = async () => ({ url: "" })
-    del = async () => ({})
-  }
-}
+import { put, del } from "@/lib/storage/local-storage"
 
 const writeFile = promisify(fs.writeFile)
 const unlink = promisify(fs.unlink)
 
 export async function POST(request: NextRequest) {
-  await initializeModules()
-
   try {
     const { blobUrl, filename } = await request.json()
 
@@ -83,9 +69,8 @@ export async function POST(request: NextRequest) {
       type: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
     })
 
-    const cleanedBlobResult = await put(filename, cleanedBlob, {
-      access: "public",
-      contentType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    const cleanedBlobResult = await put(filename, Buffer.from(await cleanedBlob.arrayBuffer()), {
+      folder: "documents",
     })
 
     // Clean up temporary files

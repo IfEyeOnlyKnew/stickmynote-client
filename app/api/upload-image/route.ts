@@ -63,12 +63,6 @@ function generateFilename(userId: string, originalName: string): string {
   return `${timestamp}-${randomId}.${extension}`
 }
 
-// Check if we should use local storage (development) or Vercel Blob (production)
-function useLocalStorage(): boolean {
-  // Use local storage if BLOB_READ_WRITE_TOKEN is not set
-  return !process.env.BLOB_READ_WRITE_TOKEN
-}
-
 async function saveToLocalStorage(buffer: Buffer, userId: string, filename: string, contentType: string): Promise<{ url: string; pathname: string }> {
   // Save to public/uploads/user-images/{userId}/
   const uploadsDir = path.join(process.cwd(), "public", "uploads", "user-images", userId)
@@ -85,18 +79,6 @@ async function saveToLocalStorage(buffer: Buffer, userId: string, filename: stri
   const url = `/uploads/user-images/${userId}/${filename}`
 
   return { url, pathname: url }
-}
-
-async function saveToVercelBlob(buffer: Buffer, userId: string, filename: string, contentType: string): Promise<{ url: string; pathname: string }> {
-  const { put } = await import("@vercel/blob")
-  const blobPath = `user-images/${userId}/${filename}`
-
-  const blob = await put(blobPath, new Blob([new Uint8Array(buffer)], { type: contentType }), {
-    access: "public",
-    contentType: contentType,
-  })
-
-  return { url: blob.url, pathname: blob.pathname }
 }
 
 export async function POST(request: NextRequest) {
@@ -126,12 +108,10 @@ export async function POST(request: NextRequest) {
 
     const filename = generateFilename(user.id, file.name)
 
-    // Choose storage based on environment
-    const storage = useLocalStorage()
-      ? await saveToLocalStorage(optimizedBuffer, user.id, filename, file.type)
-      : await saveToVercelBlob(optimizedBuffer, user.id, filename, file.type)
+    // Save to local storage
+    const storage = await saveToLocalStorage(optimizedBuffer, user.id, filename, file.type)
 
-    console.log(`[upload-image] Saved image to ${useLocalStorage() ? 'local storage' : 'Vercel Blob'}: ${storage.url}`)
+    console.log(`[upload-image] Saved image to local storage: ${storage.url}`)
 
     return NextResponse.json({
       url: storage.url,

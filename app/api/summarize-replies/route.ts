@@ -8,17 +8,11 @@ import { generateText, isAIAvailable } from "@/lib/ai/ai-provider"
 // Dynamic Module Loading
 // ============================================================================
 
-let put: any, Document: any, Packer: any, Paragraph: any, TextRun: any, HeadingLevel: any
+import { put } from "@/lib/storage/local-storage"
+
+let Document: any, Packer: any, Paragraph: any, TextRun: any, HeadingLevel: any
 
 const initializeModules = async () => {
-  try {
-    const blobModule = await import("@vercel/blob")
-    put = blobModule.put
-  } catch (error) {
-    console.error("[summarize-replies] Blob module load error:", error)
-    put = async () => ({ url: "" })
-  }
-
   try {
     const docxModule = await import("docx")
     Document = docxModule.Document
@@ -308,7 +302,7 @@ async function generateDocxDocument(
   })
 
   const filename = `reply-summary-${noteId}-${Date.now()}.docx`
-  const blob = await put(filename, docxBlob, { access: "public" })
+  const blob = await put(filename, Buffer.from(buffer), { folder: "documents" })
 
   return { url: blob.url, filename }
 }

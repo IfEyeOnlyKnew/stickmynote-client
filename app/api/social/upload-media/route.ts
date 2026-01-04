@@ -2,19 +2,11 @@ import { type NextRequest, NextResponse } from "next/server"
 import { createDatabaseClient } from "@/lib/database/database-adapter"
 import { getCachedAuthUser } from "@/lib/auth/cached-auth"
 
-let put: any
+import { put } from "@/lib/storage/local-storage"
+
 let sharp: any
 
 const initializeModules = async () => {
-  try {
-    const blobModule = await import("@vercel/blob")
-    put = blobModule.put
-  } catch (error) {
-    console.error("[upload-media] Blob module load error:", error)
-    console.warn("[v0] @vercel/blob not available")
-    put = async () => ({ url: "", pathname: "" })
-  }
-
   try {
     const sharpModule = await import("sharp")
     sharp = sharpModule.default

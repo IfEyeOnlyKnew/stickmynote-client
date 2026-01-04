@@ -13,6 +13,11 @@ export async function checkDatabase() {
 }
 
 export async function checkAD() {
+  // Skip during build to prevent LDAP connection attempts
+  if (process.env.BUILDING === 'true' || process.env.NEXT_BUILD_MODE === 'true') {
+    return { status: 'skipped', error: 'Build time - skipping LDAP check' }
+  }
+
   try {
     // Dynamically import ldapjs to prevent build-time connection attempts
     const ldap = await import('ldapjs')

@@ -21,9 +21,10 @@ interface TabData {
   images?: Array<{ caption?: string; url?: string }>
 }
 
+import { put } from "@/lib/storage/local-storage"
+
 // Dynamic module references
 let generateText: typeof import("ai").generateText | undefined
-let put: typeof import("@vercel/blob").put | undefined
 let Document: typeof import("docx").Document | undefined
 let Packer: typeof import("docx").Packer | undefined
 let Paragraph: typeof import("docx").Paragraph | undefined
@@ -36,13 +37,6 @@ const initializeModules = async () => {
     generateText = aiModule.generateText
   } catch (error) {
     console.warn("ai module not available:", error instanceof Error ? error.message : String(error))
-  }
-
-  try {
-    const blobModule = await import("@vercel/blob")
-    put = blobModule.put
-  } catch (error) {
-    console.warn("@vercel/blob not available:", error instanceof Error ? error.message : String(error))
   }
 
   try {
@@ -233,7 +227,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "AI service not available" }, { status: 500 })
     }
 
-    if (!Document || !Paragraph || !TextRun || !HeadingLevel || !Packer || !put) {
+    if (!Document || !Paragraph || !TextRun || !HeadingLevel || !Packer) {
       return NextResponse.json({ error: "Document export modules not available" }, { status: 500 })
     }
 
@@ -242,7 +236,6 @@ export async function POST(request: NextRequest) {
     const TextRunClass = TextRun
     const HeadingLevelEnum = HeadingLevel
     const PackerClass = Packer
-    const putBlob = put
 
     const db = await createDatabaseClient()
     const authResult = await getCachedAuthUser()
@@ -445,7 +438,7 @@ export async function POST(request: NextRequest) {
     })
 
     const filename = `note-export-${noteId}-${Date.now()}.docx`
-    const blob = await putBlob(filename, docxBlob, { access: "public" })
+    const blob = await put(filename, Buffer.from(await docxBlob.arrayBuffer()), { folder: "documents" })
 
     let finalUrl = blob.url
     let message = "Complete note export generated successfully"

@@ -16,7 +16,7 @@ export function getSecurityHeaders(): SecurityHeaders {
 
   // Note: When nonce is present, browsers ignore 'unsafe-inline', which breaks Next.js inline scripts
   const scriptSrcDirective =
-    `'self' 'unsafe-inline' ${isDevelopment ? "'unsafe-eval'" : ""} https://vercel.live https://va.vercel-scripts.com https://*.vercel-scripts.com https://*.vercel-analytics.com https://browser.sentry-cdn.com https://*.ingest.sentry.io https://*.sentry.io`.trim()
+    `'self' 'unsafe-inline' ${isDevelopment ? "'unsafe-eval'" : ""} https://static.cloudflareinsights.com`.trim()
 
   const cspDirectives = [
     "default-src 'self'",
@@ -24,11 +24,11 @@ export function getSecurityHeaders(): SecurityHeaders {
     `script-src-elem ${scriptSrcDirective}`,
     "worker-src 'self' blob:",
     "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
-    "font-src 'self' data: https://fonts.gstatic.com https://*.public.blob.vercel-storage.com https://r2cdn.perplexity.ai",
-    "img-src 'self' data: blob: https://vercel.com https://*.vercel.com https://*.vercel-analytics.com https://i.ytimg.com https://img.youtube.com https://i.vimeocdn.com https://*.public.blob.vercel-storage.com https://*.vimeo.com https://*.cloudfront.net https://*.canva.com https://*.imgur.com https://*.googleusercontent.com",
+    "font-src 'self' data: https://fonts.gstatic.com https://r2cdn.perplexity.ai",
+    "img-src 'self' data: blob: https://i.ytimg.com https://img.youtube.com https://i.vimeocdn.com https://*.vimeo.com https://*.cloudfront.net https://*.canva.com https://*.imgur.com https://*.googleusercontent.com",
     "media-src 'self' blob: https://www.youtube.com https://player.vimeo.com https://rumble.com https://*.rumble.com https://www.loom.com https://*.loom.com",
-    `connect-src 'self' https://*.upstash.io https://vercel.live https://vercel.com https://*.vercel.com https://*.vercel-analytics.com https://*.vercel-insights.com https://vitals.vercel-insights.com https://api.v0.app https://*.v0.app https://www.youtube.com https://vimeo.com https://*.vimeo.com https://api.grok.x.ai https://*.ingest.us.sentry.io https://*.ingest.sentry.io https://*.sentry.io ${isDevelopment ? "http://localhost:* ws://localhost:* wss://localhost:* http://127.0.0.1:* ws://127.0.0.1:* wss://127.0.0.1:*" : ""}`.trim(),
-    "frame-src 'self' https://vercel.live https://www.youtube.com https://www.youtube-nocookie.com https://youtube.com https://player.vimeo.com https://rumble.com https://*.rumble.com https://www.loom.com https://*.loom.com https://www.figma.com https://figma.com https://docs.google.com",
+    `connect-src 'self' https://*.upstash.io https://www.youtube.com https://vimeo.com https://*.vimeo.com https://api.grok.x.ai ${isDevelopment ? "http://localhost:* ws://localhost:* wss://localhost:* http://127.0.0.1:* ws://127.0.0.1:* wss://127.0.0.1:*" : ""}`.trim(),
+    "frame-src 'self' https://www.youtube.com https://www.youtube-nocookie.com https://youtube.com https://player.vimeo.com https://rumble.com https://*.rumble.com https://www.loom.com https://*.loom.com https://www.figma.com https://figma.com https://docs.google.com",
     "object-src 'none'",
     "base-uri 'self'",
     "form-action 'self'",

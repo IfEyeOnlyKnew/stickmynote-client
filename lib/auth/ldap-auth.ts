@@ -73,7 +73,7 @@ const LDAP_SEARCH_ATTRIBUTES = [
 ] as const
 
 const DEFAULT_LDAP_CONFIG: LDAPConfig = {
-  url: "ldaps://192.168.50.10:636",
+  url: "ldaps://192.168.50.11:636",
   bindDN: "svc_ldap@stickmynote.com",
   bindPassword: "",
   baseDN: "DC=stickmynote,DC=com",
@@ -86,9 +86,15 @@ const DEFAULT_LDAP_CONFIG: LDAPConfig = {
 // Module State
 // ============================================================================
 
+// Skip LDAP during build to prevent connection errors
+const isBuildTime = process.env.BUILDING === "true" || process.env.NEXT_BUILD_MODE === "true"
+
 let ldapModule: typeof import("ldapjs") | null = null
 
 async function getLdapModule() {
+  if (isBuildTime) {
+    throw new Error("LDAP not available during build")
+  }
   if (!ldapModule) {
     ldapModule = await import("ldapjs")
   }
@@ -189,29 +195,46 @@ async function searchUser(client: any, config: LDAPConfig, username: string): Pr
       attributes: [...LDAP_SEARCH_ATTRIBUTES],
     }
 
+    // Use process.stderr.write to ensure logs are not stripped by minifier
+    process.stderr.write(`[LDAP] Searching with filter: ${searchFilter} in base: ${config.userBaseDN}\n`)
+
     client.search(config.userBaseDN, opts, (err: Error | null, res: any) => {
       if (err) {
-        console.error("[LDAP] Search error:", err)
+        process.stderr.write(`[LDAP] Search error: ${err.message}\n`)
         reject(err)
         return
       }
 
       let user: LDAPUser | null = null
+      let entryCount = 0
 
       res.on("searchEntry", (entry: LDAPSearchEntry) => {
-        user = parseSearchEntry(entry)
+        entryCount++
+        process.stderr.write(`[LDAP] Found entry #${entryCount}: ${JSON.stringify(entry?.pojo?.objectName || "unknown")}\n`)
+        try {
+          user = parseSearchEntry(entry)
+          process.stderr.write(`[LDAP] Parsed user DN: ${user?.dn || "null"}\n`)
+        } catch (parseErr) {
+          process.stderr.write(`[LDAP] Parse error: ${parseErr}\n`)
+        }
+      })
+
+      res.on("searchReference", (referral: any) => {
+        process.stderr.write(`[LDAP] Search referral: ${JSON.stringify(referral)}\n`)
       })
 
       res.on("error", (searchErr: Error) => {
-        console.error("[LDAP] Search result error:", searchErr)
+        process.stderr.write(`[LDAP] Search result error: ${searchErr.message}\n`)
         reject(searchErr)
       })
 
-      res.on("end", () => {
+      res.on("end", (result: any) => {
+        process.stderr.write(`[LDAP] Search ended, status: ${result?.status}, entries: ${entryCount}, user found: ${!!user}\n`)
         resolve(user)
       })
     })
   })
+
 }
 
 function safeUnbind(client: any): void {

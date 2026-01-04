@@ -3,6 +3,8 @@ import { NextRequest } from 'next/server'
 import { handleApiError } from '@/lib/api/handle-api-error'
 import { checkDatabase, checkAD, checkSMTP } from '@/lib/api/config-check-helpers'
 
+export const dynamic = 'force-dynamic'
+
 // GET /api/v2/config-check - System config status
 export async function GET(_request: NextRequest) {
   try {

@@ -7,8 +7,9 @@ import { handleApiError } from '@/lib/api/handle-api-error'
 export const dynamic = 'force-dynamic'
 export const maxDuration = 60
 
+import { put } from '@/lib/storage/local-storage'
+
 let generateText: typeof import('ai').generateText | undefined
-let put: typeof import('@vercel/blob').put | undefined
 let Document: typeof import('docx').Document | undefined
 let Packer: typeof import('docx').Packer | undefined
 let Paragraph: typeof import('docx').Paragraph | undefined
@@ -19,11 +20,6 @@ const initializeModules = async () => {
   try {
     const aiModule = await import('ai')
     generateText = aiModule.generateText
-  } catch {}
-
-  try {
-    const blobModule = await import('@vercel/blob')
-    put = blobModule.put
   } catch {}
 
   try {
@@ -253,7 +249,7 @@ Provide a well-structured summary.`
       .substring(0, 50)
 
     const filename = `${sanitizedTopic}-export-${Date.now()}.docx`
-    const blob = await put?.(filename, docxBlob, { access: 'public' }) || { url: '' }
+    const blob = await put(filename, Buffer.from(await docxBlob.arrayBuffer()), { folder: 'documents' })
 
     // Save export link to details tab
     const exportLink = {

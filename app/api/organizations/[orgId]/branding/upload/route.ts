@@ -7,22 +7,15 @@ import path from "path"
 const MAX_FILE_SIZE = 5 * 1024 * 1024 // 5MB
 const ALLOWED_TYPES = ["image/png", "image/jpeg", "image/jpg", "image/webp", "image/svg+xml"]
 
-// Helper to save file locally or to Vercel Blob
+// Helper to save file locally
 async function saveFile(file: File, filename: string): Promise<string> {
-  // Check if Vercel Blob is available
-  if (process.env.BLOB_READ_WRITE_TOKEN) {
-    const { put } = await import("@vercel/blob")
-    const blob = await put(filename, file, { access: "public" })
-    return blob.url
-  }
-
-  // Fall back to local file storage
+  // Use local file storage
   const uploadDir = path.join(process.cwd(), "public", "uploads", "branding")
   await mkdir(uploadDir, { recursive: true })
 
   const localFilename = filename.replace(/\//g, "-")
   const filePath = path.join(uploadDir, localFilename)
-  
+
   const arrayBuffer = await file.arrayBuffer()
   const buffer = Buffer.from(arrayBuffer)
   await writeFile(filePath, buffer)
