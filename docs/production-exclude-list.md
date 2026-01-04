@@ -168,3 +168,81 @@ pnpm run build
 | Cloudflare | Not used | "Full" SSL mode |
 | Database | Local PostgreSQL | Production PostgreSQL |
 | `.env` files | Dev credentials | Production credentials |
+
+---
+
+## Build-Time Configuration for LDAP
+
+The production build requires special configuration to prevent ldapjs from attempting connections during the Next.js static page generation phase.
+
+### Required next.config.mjs Settings
+
+Ensure `next.config.mjs` includes these settings to externalize ldapjs:
+
+```javascript
+experimental: {
+  instrumentationHook: true,
+  // Prevent ldapjs from being bundled - will be loaded from node_modules at runtime only
+  serverComponentsExternalPackages: ["ldapjs"],
+},
+
+// Also add to top-level serverExternalPackages for Next.js 14.2+
+serverExternalPackages: ["ldapjs"],
+```
+
+And in the webpack configuration:
+
+```javascript
+if (isServer) {
+  config.externals = config.externals || [];
+  config.externals.push(
+    "isomorphic-dompurify",
+    // Externalize ldapjs to prevent it from being bundled and attempting connections during build
+    "ldapjs"
+  );
+}
+```
+
+### Build-Time Guards
+
+Files that use LDAP must have build-time guards to prevent connection attempts during `pnpm run build`:
+
+- `lib/auth/ldap-auth.ts` - Uses `BUILDING` env var check
+- `lib/api/config-check-helpers.ts` - `checkAD()` function has build-time guard
+
+### Building for Production
+
+When running builds, ensure you're NOT using `.env.local` with `BUILDING=true` in production runtime:
+
+```bash
+# For building only (use .env.local with BUILDING=true)
+cp .env.local.build-only .env.local
+pnpm run build
+
+# After build, remove .env.local so production uses real config
+rm .env.local
+
+# Restart service
+nssm restart StickyMyNote
+```
+
+### Incident History: 2026-01-04 - Build Failure (ECONNRESET)
+
+**What happened:**
+- Build failed with `ECONNRESET` during "Generating static pages" phase
+- ldapjs was being loaded and attempting LDAP connection during build
+
+**Root cause:**
+- `/api/v2/config-check/route.ts` had a GET handler that called `checkAD()`
+- During static generation, Next.js executed this route
+- ldapjs attempted to connect to LDAP server (which rejected/reset the connection)
+
+**Resolution:**
+1. Added `export const dynamic = 'force-dynamic'` to `/api/v2/config-check/route.ts`
+2. Added build-time guard to `checkAD()` function
+3. Added `serverComponentsExternalPackages: ["ldapjs"]` to `next.config.mjs`
+4. Added `ldapjs` to webpack externals
+
+**Prevention:**
+- All routes using LDAP must have `export const dynamic = 'force-dynamic'`
+- All functions importing ldapjs must check `process.env.BUILDING` before import
