@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useCallback } from "react"
+import { useState, useEffect, useCallback, useRef } from "react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
@@ -85,6 +85,10 @@ export function PermissionBasedStickFullscreen({
 
   const [currentUserId, setCurrentUserId] = useState<string | null>(null)
 
+  // Real-time polling for replies
+  const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null)
+  const lastReplyIdsRef = useRef<string>("")
+
   const tones: Tone[] = [
     { value: "professional", label: "Professional" },
     { value: "casual", label: "Casual" },
@@ -103,8 +107,9 @@ export function PermissionBasedStickFullscreen({
     setIsQuickStick(stick.is_quickstick || false)
   }, [stick])
 
+  // Load replies with polling for real-time updates
   useEffect(() => {
-    const loadReplies = async () => {
+    const loadReplies = async (isPolling = false) => {
       try {
         const timestamp = Date.now()
         const response = await fetch(`/api/sticks/${stick.id}/replies?t=${timestamp}`, {
@@ -116,8 +121,17 @@ export function PermissionBasedStickFullscreen({
         })
         if (response.ok) {
           const data = await response.json()
-          setReplies(data.replies || [])
-          setReplyCount(data.replies?.length || 0)
+          const newReplies = data.replies || []
+
+          // Create a hash of reply IDs to detect changes
+          const newReplyIds = newReplies.map((r: { id: string }) => r.id).join(",")
+          const hasChanges = newReplyIds !== lastReplyIdsRef.current
+
+          if (!isPolling || hasChanges) {
+            setReplies(newReplies)
+            setReplyCount(newReplies.length)
+            lastReplyIdsRef.current = newReplyIds
+          }
         }
       } catch (error) {
         console.error("Error loading stick replies:", error)
@@ -125,7 +139,21 @@ export function PermissionBasedStickFullscreen({
     }
 
     if (permissions.canView) {
-      loadReplies()
+      // Initial load
+      loadReplies(false)
+
+      // Set up polling every 5 seconds for real-time updates
+      pollingIntervalRef.current = setInterval(() => {
+        loadReplies(true)
+      }, 5000)
+    }
+
+    // Cleanup polling on unmount or when stick changes
+    return () => {
+      if (pollingIntervalRef.current) {
+        clearInterval(pollingIntervalRef.current)
+        pollingIntervalRef.current = null
+      }
     }
   }, [stick.id, permissions.canView, refreshTrigger])
 

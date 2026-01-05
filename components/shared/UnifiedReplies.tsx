@@ -7,7 +7,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { ReplyItem } from "@/components/replies/ReplyItem"
 import { ReplyForm } from "@/components/replies/ReplyForm"
 import type React from "react"
-import { useCallback, useState, useEffect } from "react"
+import { useCallback, useState, useEffect, useRef } from "react"
 
 // CollaborativeReplyForm uses Tiptap which requires client-side only rendering
 const CollaborativeReplyForm = dynamic(
@@ -94,6 +94,11 @@ interface UnifiedRepliesProps {
 
   // Reply-to-reply support
   enableReplyToReply?: boolean
+
+  // Real-time polling for replies (chat-like experience)
+  enablePolling?: boolean
+  pollingInterval?: number
+  onRepliesUpdated?: (replies: Reply[]) => void
 }
 
 export const UnifiedReplies: React.FC<UnifiedRepliesProps> = ({
@@ -130,15 +135,76 @@ export const UnifiedReplies: React.FC<UnifiedRepliesProps> = ({
   currentUserId,
   onEditReply,
   enableReplyToReply = true,
+  enablePolling = false,
+  pollingInterval = 5000,
+  onRepliesUpdated,
 }) => {
   const [editingCalStick, setEditingCalStick] = useState<string | null>(null)
   const [calStickDates, setCalStickDates] = useState<Record<string, string>>({})
   const [localReplies, setLocalReplies] = useState<Reply[]>(replies)
   const [replyingTo, setReplyingTo] = useState<Reply | null>(null)
 
+  // Refs for polling
+  const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null)
+  const lastReplyIdsRef = useRef<string>("")
+
   useEffect(() => {
     setLocalReplies(replies)
+    // Update the ref when replies change from parent
+    lastReplyIdsRef.current = replies.map((r: Reply) => r.id).join(",")
   }, [replies])
+
+  // Real-time polling for replies
+  useEffect(() => {
+    if (!enablePolling || !noteId || isNewNote) return
+
+    const fetchReplies = async () => {
+      try {
+        // Determine the correct API endpoint based on context
+        const apiEndpoint = context === "stick"
+          ? `/api/sticks/${noteId}/replies`
+          : `/api/notes/${noteId}/replies`
+
+        const timestamp = Date.now()
+        const response = await fetch(`${apiEndpoint}?t=${timestamp}`, {
+          cache: "no-store",
+          headers: {
+            "Cache-Control": "no-cache, no-store, must-revalidate",
+            Pragma: "no-cache",
+          },
+        })
+
+        if (response.ok) {
+          const data = await response.json()
+          const newReplies: Reply[] = data.replies || []
+
+          // Create a hash of reply IDs to detect changes
+          const newReplyIds = newReplies.map((r: Reply) => r.id).join(",")
+          const hasChanges = newReplyIds !== lastReplyIdsRef.current
+
+          if (hasChanges) {
+            setLocalReplies(newReplies)
+            lastReplyIdsRef.current = newReplyIds
+            // Notify parent of updates if callback provided
+            onRepliesUpdated?.(newReplies)
+          }
+        }
+      } catch (error) {
+        console.error("Error polling replies:", error)
+      }
+    }
+
+    // Start polling
+    pollingIntervalRef.current = setInterval(fetchReplies, pollingInterval)
+
+    // Cleanup on unmount or when dependencies change
+    return () => {
+      if (pollingIntervalRef.current) {
+        clearInterval(pollingIntervalRef.current)
+        pollingIntervalRef.current = null
+      }
+    }
+  }, [enablePolling, noteId, context, isNewNote, pollingInterval, onRepliesUpdated])
 
   const handleReplyToReply = useCallback((reply: Reply) => {
     setReplyingTo(reply)
