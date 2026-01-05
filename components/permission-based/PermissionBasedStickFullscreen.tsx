@@ -18,7 +18,7 @@ import {
 } from "@/components/ui/alert-dialog"
 import { X, Trash2, Zap } from "lucide-react"
 import { GenericStickTabs } from "@/components/GenericStickTabs"
-import { UnifiedReplies } from "@/components/shared/UnifiedReplies"
+import { ThreadedReplies } from "@/components/replies/ThreadedReplies"
 import type { Stick } from "@/types/pad"
 import type { StickTabsConfig } from "@/types/stick-tabs-config"
 import { getStickTabs, saveStickTab, deleteStickTabItem } from "@/lib/stick-tabs"
@@ -309,7 +309,7 @@ export function PermissionBasedStickFullscreen({
     }
   }
 
-  const handleAddReply = async (stickId: string, content: string, isCalStick: boolean, calStickDate: string | null) => {
+  const handleAddReply = async (stickId: string, content: string, isCalStick: boolean, calStickDate: string | null, parentReplyId?: string | null) => {
     if (!permissions.canEdit || !content.trim()) return
 
     try {
@@ -320,6 +320,7 @@ export function PermissionBasedStickFullscreen({
           content: content.trim(),
           is_calstick: isCalStick,
           calstick_date: calStickDate,
+          parent_reply_id: parentReplyId || null,
         }),
       })
 
@@ -698,7 +699,7 @@ export function PermissionBasedStickFullscreen({
 
         {permissions.canView && (
           <div className="w-full lg:w-1/2 lg:flex-shrink-0 mt-6 lg:mt-0 lg:h-full">
-            <UnifiedReplies
+            <ThreadedReplies
               noteId={editedStick.id}
               context="stick"
               replies={replies}
@@ -719,6 +720,7 @@ export function PermissionBasedStickFullscreen({
               isNewNote={false}
               enableSummary={true}
               enableExport={false}
+              enableThreading={true}
               isExporting={isExporting}
               onGenerateSummary={handleGenerateSummary}
               currentUserId={currentUserId}

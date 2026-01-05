@@ -17,6 +17,7 @@ interface AuthResult {
 interface ReplyInput {
   content: string
   color?: string
+  parent_reply_id?: string | null
   is_calstick?: boolean
   calstick_date?: string | null
   calstick_status?: string | null
@@ -45,6 +46,7 @@ const REPLY_SELECT_FIELDS = `
   created_at,
   updated_at,
   user_id,
+  parent_reply_id,
   is_calstick,
   calstick_date,
   calstick_completed,
@@ -271,6 +273,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     const {
       content,
       color = DEFAULT_REPLY_COLOR,
+      parent_reply_id = null,
       is_calstick = false,
       calstick_date = null,
       calstick_status = null,
@@ -303,6 +306,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
         org_id: orgContext!.orgId,
         content: content.trim(),
         color,
+        parent_reply_id,
         is_calstick,
         calstick_date,
         calstick_status,
