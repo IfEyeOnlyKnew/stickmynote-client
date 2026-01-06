@@ -33,9 +33,9 @@ export function MySticksClient({ initialSticks }: MySticksClientProps) {
   const filteredSticks = useMemo(() => {
     return sticks.filter((stick) => {
       const matchesSearch =
-        stick.topic.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        stick.content.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        stick.pad_name?.toLowerCase().includes(searchQuery.toLowerCase())
+        (stick.topic || "").toLowerCase().includes(searchQuery.toLowerCase()) ||
+        (stick.content || "").toLowerCase().includes(searchQuery.toLowerCase()) ||
+        (stick.pad_name || "").toLowerCase().includes(searchQuery.toLowerCase())
 
       const matchesTab =
         activeTab === "all" ||
