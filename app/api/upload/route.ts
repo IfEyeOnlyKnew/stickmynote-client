@@ -23,7 +23,7 @@ export async function POST(request: NextRequest) {
     // Get organization context for tenant isolation
     let orgContext
     try {
-      orgContext = await getOrgContext(user.id)
+      orgContext = await getOrgContext()
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : String(err)
       if (errorMessage === "RATE_LIMITED") {
@@ -119,7 +119,7 @@ export async function DELETE(request: NextRequest) {
     // Get organization context for tenant isolation
     let orgContext
     try {
-      orgContext = await getOrgContext(user.id)
+      orgContext = await getOrgContext()
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : String(err)
       if (errorMessage === "RATE_LIMITED") {

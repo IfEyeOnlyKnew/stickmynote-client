@@ -74,7 +74,7 @@ export async function PUT(request: Request) {
     if (!authResult.user) return createUnauthorizedResponse()
 
     const user = authResult.user
-    const orgContext = await getOrgContext(user.id)
+    const orgContext = await getOrgContext()
     const { socialStickId, details } = await request.json()
 
     if (!socialStickId || details === undefined) {

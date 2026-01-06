@@ -21,7 +21,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ stickId
       return new NextResponse("Unauthorized", { status: 401 })
     }
 
-    const orgContext = await getOrgContext(user.id)
+    const orgContext = await getOrgContext()
     if (!orgContext) {
       return new NextResponse("No organization context", { status: 403 })
     }

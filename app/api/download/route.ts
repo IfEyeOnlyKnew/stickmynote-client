@@ -20,7 +20,7 @@ export async function GET(request: NextRequest) {
     const user = authResult.user
 
     // Get organization context for tenant isolation
-    const orgContext = await getOrgContext(user.id)
+    const orgContext = await getOrgContext()
     if (!orgContext) {
       return NextResponse.json({ error: "No organization context found" }, { status: 403 })
     }

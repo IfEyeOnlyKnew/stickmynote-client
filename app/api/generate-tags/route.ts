@@ -97,7 +97,7 @@ async function validateAndAuthorize() {
   if (authError === "rate_limited") return { error: createRateLimitResponse() }
   if (!user) return { error: createUnauthorizedResponse("Unauthorized. Please log in to generate links.") }
 
-  const orgContext = await getOrgContext(user.id)
+  const orgContext = await getOrgContext()
   if (!orgContext) return { error: NextResponse.json({ error: "No organization context" }, { status: 403 }) }
 
   return { user, orgContext }

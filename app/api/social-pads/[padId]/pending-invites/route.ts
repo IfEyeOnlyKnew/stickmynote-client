@@ -16,7 +16,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ padI
     }
     const user = authResult.user
 
-    const orgContext = await getOrgContext(user.id)
+    const orgContext = await getOrgContext()
     if (!orgContext) {
       return NextResponse.json({ error: "No organization context" }, { status: 403 })
     }
@@ -83,7 +83,7 @@ export async function DELETE(request: Request, { params }: { params: Promise<{ p
     }
     const user = authResult.user
 
-    const orgContext = await getOrgContext(user.id)
+    const orgContext = await getOrgContext()
     if (!orgContext) {
       return NextResponse.json({ error: "No organization context" }, { status: 403 })
     }

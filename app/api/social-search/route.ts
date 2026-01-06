@@ -280,7 +280,7 @@ export async function GET(request: NextRequest) {
   }
 
   const user = authResult.user
-  const orgContext = await getOrgContext(user.id)
+  const orgContext = await getOrgContext()
   if (!orgContext) {
     return Errors.noOrgContext()
   }

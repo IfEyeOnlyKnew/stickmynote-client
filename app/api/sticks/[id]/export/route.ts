@@ -324,7 +324,7 @@ export async function POST(
     const user = authResult.user;
 
     // Get org context
-    const orgContext = await getOrgContext(user.id);
+    const orgContext = await getOrgContext();
     if (!orgContext) {
       return NextResponse.json(
         { error: "Organization context required" },

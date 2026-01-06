@@ -22,7 +22,7 @@ export async function GET(request: NextRequest) {
     }
     const user = authResult.user
 
-    const orgContext = await getOrgContext(user.id)
+    const orgContext = await getOrgContext()
     if (!orgContext) {
       return new Response(JSON.stringify({ error: 'No organization context' }), { status: 403 })
     }
@@ -147,7 +147,7 @@ export async function POST(request: NextRequest) {
     }
     const user = authResult.user
 
-    const orgContext = await getOrgContext(user.id)
+    const orgContext = await getOrgContext()
     if (!orgContext) {
       return new Response(JSON.stringify({ error: 'No organization context' }), { status: 403 })
     }

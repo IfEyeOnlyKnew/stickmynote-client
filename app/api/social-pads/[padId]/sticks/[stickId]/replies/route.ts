@@ -25,7 +25,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ padI
 
     let orgId: string | null = null
     if (user) {
-      const orgContext = await getOrgContext(user.id)
+      const orgContext = await getOrgContext()
       orgId = orgContext?.orgId || null
     }
 

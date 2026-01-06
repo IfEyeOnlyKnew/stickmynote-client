@@ -27,7 +27,7 @@ export async function DELETE(request: NextRequest, context: { params: Promise<{ 
       return createUnauthorizedResponse()
     }
 
-    const orgContext = await getOrgContext(user.id)
+    const orgContext = await getOrgContext()
     if (!orgContext) {
       return NextResponse.json({ error: "No organization context" }, { status: 403 })
     }
@@ -113,7 +113,7 @@ export async function PUT(request: NextRequest, context: { params: Promise<{ id:
       return createUnauthorizedResponse()
     }
 
-    const orgContext = await getOrgContext(user.id)
+    const orgContext = await getOrgContext()
     if (!orgContext) {
       return NextResponse.json({ error: "No organization context" }, { status: 403 })
     }
@@ -208,7 +208,7 @@ export async function PATCH(request: NextRequest, context: { params: Promise<{ i
       return createUnauthorizedResponse()
     }
 
-    const orgContext = await getOrgContext(user.id)
+    const orgContext = await getOrgContext()
     if (!orgContext) {
       return NextResponse.json({ error: "No organization context" }, { status: 403 })
     }
