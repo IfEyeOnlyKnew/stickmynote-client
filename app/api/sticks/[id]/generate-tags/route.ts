@@ -191,7 +191,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     const { user } = authResult
     const db = await createDatabaseClient()
 
-    const orgContext = await getOrgContext(user.id)
+    const orgContext = await getOrgContext()
     if (!orgContext) {
       return NextResponse.json({ error: "Organization context required" }, { status: 403 })
     }

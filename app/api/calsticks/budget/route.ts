@@ -15,7 +15,7 @@ export async function GET(request: NextRequest) {
     }
     const user = { id: authResult.userId }
 
-    const orgContext = await getOrgContext(user.id)
+    const orgContext = await getOrgContext()
     if (!orgContext) {
       return NextResponse.json({ error: "No organization context" }, { status: 403 })
     }
@@ -209,7 +209,7 @@ export async function POST(request: NextRequest) {
     }
     const user = { id: authResult.userId }
 
-    const orgContext = await getOrgContext(user.id)
+    const orgContext = await getOrgContext()
     if (!orgContext) {
       return NextResponse.json({ error: "No organization context" }, { status: 403 })
     }

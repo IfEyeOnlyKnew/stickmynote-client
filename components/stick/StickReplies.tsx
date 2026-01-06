@@ -1,6 +1,7 @@
 "use client"
 
-import { UnifiedReplies } from "@/components/shared/UnifiedReplies"
+import { ThreadedReplies } from "@/components/replies/ThreadedReplies"
+import type { ThreadedReply } from "@/components/replies/ThreadedReplyItem"
 
 interface Reply {
   id: string
@@ -12,6 +13,7 @@ interface Reply {
     username?: string
     email?: string
   }
+  parent_reply_id?: string | null
 }
 
 interface Tone {
@@ -37,6 +39,7 @@ interface StickRepliesProps {
   onExportAll: () => void
   onSetSelectedTone: (tone: string) => void
   setIsSubmittingReply?: (submitting: boolean) => void
+  currentUserId?: string | null
 }
 
 export function StickReplies({
@@ -45,10 +48,11 @@ export function StickReplies({
   onSubmitReply,
   onSetSelectedTone,
   isNew,
+  currentUserId,
   ...props
 }: StickRepliesProps) {
   return (
-    <UnifiedReplies
+    <ThreadedReplies
       {...props}
       noteId="" // Sticks handle this differently
       context="stick"
@@ -57,8 +61,10 @@ export function StickReplies({
       isNewNote={isNew}
       enableSummary={true}
       enableExport={true}
+      enableThreading={true}
       onStickReply={onSubmitReply}
       setSelectedTone={onSetSelectedTone}
+      currentUserId={currentUserId}
     />
   )
 }

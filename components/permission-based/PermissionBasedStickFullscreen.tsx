@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useCallback } from "react"
+import { useState, useEffect, useCallback, useRef } from "react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
@@ -18,7 +18,7 @@ import {
 } from "@/components/ui/alert-dialog"
 import { X, Trash2, Zap } from "lucide-react"
 import { GenericStickTabs } from "@/components/GenericStickTabs"
-import { UnifiedReplies } from "@/components/shared/UnifiedReplies"
+import { ThreadedReplies } from "@/components/replies/ThreadedReplies"
 import type { Stick } from "@/types/pad"
 import type { StickTabsConfig } from "@/types/stick-tabs-config"
 import { getStickTabs, saveStickTab, deleteStickTabItem } from "@/lib/stick-tabs"
@@ -85,6 +85,10 @@ export function PermissionBasedStickFullscreen({
 
   const [currentUserId, setCurrentUserId] = useState<string | null>(null)
 
+  // Real-time polling for replies
+  const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null)
+  const lastReplyIdsRef = useRef<string>("")
+
   const tones: Tone[] = [
     { value: "professional", label: "Professional" },
     { value: "casual", label: "Casual" },
@@ -103,8 +107,9 @@ export function PermissionBasedStickFullscreen({
     setIsQuickStick(stick.is_quickstick || false)
   }, [stick])
 
+  // Load replies with polling for real-time updates
   useEffect(() => {
-    const loadReplies = async () => {
+    const loadReplies = async (isPolling = false) => {
       try {
         const timestamp = Date.now()
         const response = await fetch(`/api/sticks/${stick.id}/replies?t=${timestamp}`, {
@@ -116,8 +121,17 @@ export function PermissionBasedStickFullscreen({
         })
         if (response.ok) {
           const data = await response.json()
-          setReplies(data.replies || [])
-          setReplyCount(data.replies?.length || 0)
+          const newReplies = data.replies || []
+
+          // Create a hash of reply IDs to detect changes
+          const newReplyIds = newReplies.map((r: { id: string }) => r.id).join(",")
+          const hasChanges = newReplyIds !== lastReplyIdsRef.current
+
+          if (!isPolling || hasChanges) {
+            setReplies(newReplies)
+            setReplyCount(newReplies.length)
+            lastReplyIdsRef.current = newReplyIds
+          }
         }
       } catch (error) {
         console.error("Error loading stick replies:", error)
@@ -125,7 +139,21 @@ export function PermissionBasedStickFullscreen({
     }
 
     if (permissions.canView) {
-      loadReplies()
+      // Initial load
+      loadReplies(false)
+
+      // Set up polling every 5 seconds for real-time updates
+      pollingIntervalRef.current = setInterval(() => {
+        loadReplies(true)
+      }, 5000)
+    }
+
+    // Cleanup polling on unmount or when stick changes
+    return () => {
+      if (pollingIntervalRef.current) {
+        clearInterval(pollingIntervalRef.current)
+        pollingIntervalRef.current = null
+      }
     }
   }, [stick.id, permissions.canView, refreshTrigger])
 
@@ -309,7 +337,7 @@ export function PermissionBasedStickFullscreen({
     }
   }
 
-  const handleAddReply = async (stickId: string, content: string, isCalStick: boolean, calStickDate: string | null) => {
+  const handleAddReply = async (stickId: string, content: string, isCalStick: boolean, calStickDate: string | null, parentReplyId?: string | null) => {
     if (!permissions.canEdit || !content.trim()) return
 
     try {
@@ -320,6 +348,7 @@ export function PermissionBasedStickFullscreen({
           content: content.trim(),
           is_calstick: isCalStick,
           calstick_date: calStickDate,
+          parent_reply_id: parentReplyId || null,
         }),
       })
 
@@ -698,7 +727,7 @@ export function PermissionBasedStickFullscreen({
 
         {permissions.canView && (
           <div className="w-full lg:w-1/2 lg:flex-shrink-0 mt-6 lg:mt-0 lg:h-full">
-            <UnifiedReplies
+            <ThreadedReplies
               noteId={editedStick.id}
               context="stick"
               replies={replies}
@@ -719,6 +748,7 @@ export function PermissionBasedStickFullscreen({
               isNewNote={false}
               enableSummary={true}
               enableExport={false}
+              enableThreading={true}
               isExporting={isExporting}
               onGenerateSummary={handleGenerateSummary}
               currentUserId={currentUserId}

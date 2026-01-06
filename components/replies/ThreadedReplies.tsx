@@ -4,10 +4,11 @@ import dynamic from "next/dynamic"
 import { MessageSquare, Plus, ChevronDown, X } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
-import { ReplyItem } from "@/components/replies/ReplyItem"
-import { ReplyForm } from "@/components/replies/ReplyForm"
+import { ThreadedReplyItem, type ThreadedReply } from "./ThreadedReplyItem"
+import { ReplyForm } from "./ReplyForm"
 import type React from "react"
-import { useCallback, useState, useEffect, useRef } from "react"
+import { useCallback, useState, useEffect, useMemo } from "react"
+import { toast } from "sonner"
 
 // CollaborativeReplyForm uses Tiptap which requires client-side only rendering
 const CollaborativeReplyForm = dynamic(
@@ -21,34 +22,16 @@ const CollaborativeReplyForm = dynamic(
     )
   }
 )
-import { toast } from "sonner"
-
-interface Reply {
-  id: string
-  content: string
-  color?: string
-  created_at: string
-  updated_at?: string
-  user_id?: string
-  user?: {
-    username?: string
-    email?: string
-  }
-  is_calstick?: boolean
-  calstick_date?: string | null
-  calstick_completed?: boolean
-  calstick_completed_at?: string | null
-}
 
 interface Tone {
   value: string
   label: string
 }
 
-interface UnifiedRepliesProps {
+interface ThreadedRepliesProps {
   // Core props
   noteId: string
-  replies: Reply[]
+  replies: ThreadedReply[]
   replyCount: number
   replyContent: string
   setReplyContent: (content: string) => void
@@ -64,6 +47,7 @@ interface UnifiedRepliesProps {
   enableExport?: boolean
   enableFullscreenButton?: boolean
   enableCollaboration?: boolean
+  enableThreading?: boolean
 
   // Summary props (when enableSummary is true)
   isGeneratingSummary?: boolean
@@ -82,7 +66,7 @@ interface UnifiedRepliesProps {
   onAddReplyClick?: (e: React.MouseEvent) => void
   onCancelReply?: (e: React.MouseEvent) => void
   onStickReply?: (e: React.MouseEvent) => void
-  onAddReply?: (noteId: string, content: string, isCalStick: boolean, calStickDate: string | null) => Promise<void>
+  onAddReply?: (noteId: string, content: string, isCalStick: boolean, calStickDate: string | null, parentReplyId?: string | null) => Promise<void>
   onGenerateSummary?: (tone: string) => void
 
   // Additional props for different contexts
@@ -91,17 +75,60 @@ interface UnifiedRepliesProps {
   onDeleteReply?: (noteId: string, replyId: string) => Promise<void>
   currentUserId?: string | null
   onEditReply?: (noteId: string, replyId: string, content: string) => Promise<void>
-
-  // Reply-to-reply support
-  enableReplyToReply?: boolean
-
-  // Real-time polling for replies (chat-like experience)
-  enablePolling?: boolean
-  pollingInterval?: number
-  onRepliesUpdated?: (replies: Reply[]) => void
 }
 
-export const UnifiedReplies: React.FC<UnifiedRepliesProps> = ({
+// Helper function to build thread tree from flat replies array
+function buildReplyTree(replies: ThreadedReply[]): ThreadedReply[] {
+  const replyMap = new Map<string, ThreadedReply>()
+  const rootReplies: ThreadedReply[] = []
+
+  // First pass: create a map of all replies with empty children arrays
+  replies.forEach(reply => {
+    replyMap.set(reply.id, { ...reply, replies: [] })
+  })
+
+  // Second pass: build the tree structure
+  replies.forEach(reply => {
+    const replyWithChildren = replyMap.get(reply.id)!
+    if (reply.parent_reply_id && replyMap.has(reply.parent_reply_id)) {
+      const parent = replyMap.get(reply.parent_reply_id)!
+      parent.replies = parent.replies || []
+      parent.replies.push(replyWithChildren)
+    } else {
+      rootReplies.push(replyWithChildren)
+    }
+  })
+
+  // Sort root replies by created_at (newest first)
+  rootReplies.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+
+  // Sort nested replies by created_at (oldest first for natural conversation flow)
+  const sortNestedReplies = (replies: ThreadedReply[]) => {
+    replies.forEach(reply => {
+      if (reply.replies && reply.replies.length > 0) {
+        reply.replies.sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime())
+        sortNestedReplies(reply.replies)
+      }
+    })
+  }
+  sortNestedReplies(rootReplies)
+
+  return rootReplies
+}
+
+// Helper to count total replies including nested
+function countAllReplies(replies: ThreadedReply[]): number {
+  let count = 0
+  replies.forEach(reply => {
+    count += 1
+    if (reply.replies && reply.replies.length > 0) {
+      count += countAllReplies(reply.replies)
+    }
+  })
+  return count
+}
+
+export const ThreadedReplies: React.FC<ThreadedRepliesProps> = ({
   noteId,
   replies,
   replyCount,
@@ -115,6 +142,7 @@ export const UnifiedReplies: React.FC<UnifiedRepliesProps> = ({
   enableExport = false,
   enableFullscreenButton = false,
   enableCollaboration = context === "fullscreen" || context === "stick",
+  enableThreading = true,
   isGeneratingSummary = false,
   replySummary,
   selectedTone = "professional",
@@ -134,95 +162,30 @@ export const UnifiedReplies: React.FC<UnifiedRepliesProps> = ({
   onDeleteReply,
   currentUserId,
   onEditReply,
-  enableReplyToReply = true,
-  enablePolling = false,
-  pollingInterval = 5000,
-  onRepliesUpdated,
 }) => {
   const [editingCalStick, setEditingCalStick] = useState<string | null>(null)
   const [calStickDates, setCalStickDates] = useState<Record<string, string>>({})
-  const [localReplies, setLocalReplies] = useState<Reply[]>(replies)
-  const [replyingTo, setReplyingTo] = useState<Reply | null>(null)
-
-  // Refs for polling
-  const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null)
-  const lastReplyIdsRef = useRef<string>("")
+  const [localReplies, setLocalReplies] = useState<ThreadedReply[]>(replies)
+  const [replyingTo, setReplyingTo] = useState<ThreadedReply | null>(null)
 
   useEffect(() => {
     setLocalReplies(replies)
-    // Update the ref when replies change from parent
-    lastReplyIdsRef.current = replies.map((r: Reply) => r.id).join(",")
   }, [replies])
 
-  // Real-time polling for replies
-  useEffect(() => {
-    if (!enablePolling || !noteId || isNewNote) return
-
-    const fetchReplies = async () => {
-      try {
-        // Determine the correct API endpoint based on context
-        const apiEndpoint = context === "stick"
-          ? `/api/sticks/${noteId}/replies`
-          : `/api/notes/${noteId}/replies`
-
-        const timestamp = Date.now()
-        const response = await fetch(`${apiEndpoint}?t=${timestamp}`, {
-          cache: "no-store",
-          headers: {
-            "Cache-Control": "no-cache, no-store, must-revalidate",
-            Pragma: "no-cache",
-          },
-        })
-
-        if (response.ok) {
-          const data = await response.json()
-          const newReplies: Reply[] = data.replies || []
-
-          // Create a hash of reply IDs to detect changes
-          const newReplyIds = newReplies.map((r: Reply) => r.id).join(",")
-          const hasChanges = newReplyIds !== lastReplyIdsRef.current
-
-          if (hasChanges) {
-            setLocalReplies(newReplies)
-            lastReplyIdsRef.current = newReplyIds
-            // Notify parent of updates if callback provided
-            onRepliesUpdated?.(newReplies)
-          }
-        }
-      } catch (error) {
-        console.error("Error polling replies:", error)
-      }
+  // Build the threaded reply tree
+  const threadedReplies = useMemo(() => {
+    if (!enableThreading) {
+      // Return flat list sorted by newest first
+      return [...localReplies].sort((a, b) =>
+        new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+      )
     }
+    return buildReplyTree(localReplies)
+  }, [localReplies, enableThreading])
 
-    // Start polling
-    pollingIntervalRef.current = setInterval(fetchReplies, pollingInterval)
-
-    // Cleanup on unmount or when dependencies change
-    return () => {
-      if (pollingIntervalRef.current) {
-        clearInterval(pollingIntervalRef.current)
-        pollingIntervalRef.current = null
-      }
-    }
-  }, [enablePolling, noteId, context, isNewNote, pollingInterval, onRepliesUpdated])
-
-  const handleReplyToReply = useCallback((reply: Reply) => {
-    setReplyingTo(reply)
-    // Prepend @username to the reply content
-    const username = reply.user?.username || reply.user?.email || "User"
-    setReplyContent(`@${username} `)
-    // Focus on the reply form (scroll to it)
-    setTimeout(() => {
-      const replyForm = document.querySelector('[data-reply-form]')
-      if (replyForm) {
-        replyForm.scrollIntoView({ behavior: 'smooth', block: 'center' })
-        const textarea = replyForm.querySelector('textarea')
-        if (textarea) {
-          textarea.focus()
-        }
-      }
-    }, 100)
-  }, [setReplyContent])
+  const totalReplyCount = useMemo(() => {
+    return enableThreading ? countAllReplies(threadedReplies) : localReplies.length
+  }, [threadedReplies, localReplies, enableThreading])
 
   const supportsCalStick = context === "stick"
 
@@ -235,7 +198,7 @@ export const UnifiedReplies: React.FC<UnifiedRepliesProps> = ({
       if (onAddReply && setIsSubmittingReply) {
         setIsSubmittingReply(true)
         try {
-          await onAddReply(noteId, trimmedContent, false, null)
+          await onAddReply(noteId, trimmedContent, false, null, replyingTo?.id || null)
           setReplyContent("")
           setReplyingTo(null)
         } catch (error) {
@@ -247,15 +210,45 @@ export const UnifiedReplies: React.FC<UnifiedRepliesProps> = ({
         onStickReply(e)
       }
     },
-    [replyContent, isSubmittingReply, onAddReply, onStickReply, noteId, setReplyContent, setIsSubmittingReply],
+    [replyContent, isSubmittingReply, onAddReply, onStickReply, noteId, setReplyContent, setIsSubmittingReply, replyingTo],
+  )
+
+  const handleReplyToReply = useCallback((parentReply: ThreadedReply) => {
+    setReplyingTo(parentReply)
+    // Scroll to reply form if needed
+    setTimeout(() => {
+      const form = document.getElementById("threaded-reply-form")
+      if (form) {
+        form.scrollIntoView({ behavior: "smooth", block: "center" })
+      }
+    }, 100)
+  }, [])
+
+  const handleCancelReplyTo = useCallback(() => {
+    setReplyingTo(null)
+  }, [])
+
+  const handleSubmitInlineReply = useCallback(
+    async (content: string, parentReplyId: string) => {
+      if (!onAddReply || !content.trim()) return
+
+      try {
+        await onAddReply(noteId, content.trim(), false, null, parentReplyId)
+        // The reply will be added via the parent component's state update
+      } catch (error) {
+        console.error("Error submitting inline reply:", error)
+        throw error
+      }
+    },
+    [onAddReply, noteId]
   )
 
   const handleGenerateSummary = useCallback(
     async (tone: string) => {
-      if (replies.length === 0 || isGeneratingSummary || !onGenerateSummary) return
+      if (localReplies.length === 0 || isGeneratingSummary || !onGenerateSummary) return
       onGenerateSummary(tone)
     },
-    [replies, isGeneratingSummary, onGenerateSummary],
+    [localReplies, isGeneratingSummary, onGenerateSummary],
   )
 
   const handleDeleteReply = useCallback(
@@ -264,8 +257,19 @@ export const UnifiedReplies: React.FC<UnifiedRepliesProps> = ({
 
       try {
         await onDeleteReply(noteId, replyId)
-        setLocalReplies((prev) => prev.filter((r) => r.id !== replyId))
-      } catch (error) {}
+        // Remove reply and any nested replies from local state
+        const removeReply = (replies: ThreadedReply[]): ThreadedReply[] => {
+          return replies
+            .filter(r => r.id !== replyId)
+            .map(r => ({
+              ...r,
+              replies: r.replies ? removeReply(r.replies) : []
+            }))
+        }
+        setLocalReplies(prev => removeReply(prev))
+      } catch (error) {
+        console.error("Error deleting reply:", error)
+      }
     },
     [onDeleteReply, noteId],
   )
@@ -276,12 +280,21 @@ export const UnifiedReplies: React.FC<UnifiedRepliesProps> = ({
 
       try {
         await onEditReply(noteId, replyId, content)
-        // Update local state after successful edit
-        setLocalReplies((prev) =>
-          prev.map((r) => (r.id === replyId ? { ...r, content, updated_at: new Date().toISOString() } : r)),
-        )
+        // Update local state
+        const updateReply = (replies: ThreadedReply[]): ThreadedReply[] => {
+          return replies.map(r => {
+            if (r.id === replyId) {
+              return { ...r, content, updated_at: new Date().toISOString() }
+            }
+            if (r.replies && r.replies.length > 0) {
+              return { ...r, replies: updateReply(r.replies) }
+            }
+            return r
+          })
+        }
+        setLocalReplies(prev => updateReply(prev))
       } catch (error) {
-        throw error // Re-throw so ReplyItem can handle it
+        throw error
       }
     },
     [onEditReply, noteId],
@@ -314,19 +327,24 @@ export const UnifiedReplies: React.FC<UnifiedRepliesProps> = ({
 
         if (!response.ok) throw new Error("Failed to update CalStick")
 
-        setLocalReplies((prev) =>
-          prev.map((r) =>
-            r.id === replyId
-              ? {
-                  ...r,
-                  is_calstick: false,
-                  calstick_date: null,
-                  calstick_completed: false,
-                  calstick_completed_at: null,
-                }
-              : r,
-          ),
-        )
+        const updateCalStick = (replies: ThreadedReply[]): ThreadedReply[] => {
+          return replies.map(r => {
+            if (r.id === replyId) {
+              return {
+                ...r,
+                is_calstick: false,
+                calstick_date: null,
+                calstick_completed: false,
+                calstick_completed_at: null,
+              }
+            }
+            if (r.replies && r.replies.length > 0) {
+              return { ...r, replies: updateCalStick(r.replies) }
+            }
+            return r
+          })
+        }
+        setLocalReplies(prev => updateCalStick(prev))
 
         toast.success("CalStick removed")
       } catch (error) {
@@ -364,9 +382,18 @@ export const UnifiedReplies: React.FC<UnifiedRepliesProps> = ({
 
         if (!response.ok) throw new Error("Failed to save CalStick date")
 
-        setLocalReplies((prev) =>
-          prev.map((r) => (r.id === replyId ? { ...r, is_calstick: true, calstick_date: date } : r)),
-        )
+        const updateCalStick = (replies: ThreadedReply[]): ThreadedReply[] => {
+          return replies.map(r => {
+            if (r.id === replyId) {
+              return { ...r, is_calstick: true, calstick_date: date }
+            }
+            if (r.replies && r.replies.length > 0) {
+              return { ...r, replies: updateCalStick(r.replies) }
+            }
+            return r
+          })
+        }
+        setLocalReplies(prev => updateCalStick(prev))
 
         toast.success("CalStick task created")
         setEditingCalStick(null)
@@ -392,23 +419,33 @@ export const UnifiedReplies: React.FC<UnifiedRepliesProps> = ({
 
       if (!response.ok) throw new Error("Failed to update completion status")
 
-      setLocalReplies((prev) =>
-        prev.map((r) =>
-          r.id === replyId
-            ? {
-                ...r,
-                calstick_completed: newCompleted,
-                calstick_completed_at: newCompleted ? new Date().toISOString() : null,
-              }
-            : r,
-        ),
-      )
+      const updateCalStick = (replies: ThreadedReply[]): ThreadedReply[] => {
+        return replies.map(r => {
+          if (r.id === replyId) {
+            return {
+              ...r,
+              calstick_completed: newCompleted,
+              calstick_completed_at: newCompleted ? new Date().toISOString() : null,
+            }
+          }
+          if (r.replies && r.replies.length > 0) {
+            return { ...r, replies: updateCalStick(r.replies) }
+          }
+          return r
+        })
+      }
+      setLocalReplies(prev => updateCalStick(prev))
 
       toast.success(newCompleted ? "Task completed!" : "Task marked incomplete")
     } catch (error) {
       console.error("Error toggling completion:", error)
       toast.error("Failed to update task")
     }
+  }, [])
+
+  const getDisplayName = useCallback((r: ThreadedReply) => {
+    if (!r.user) return "User"
+    return r.user.full_name || r.user.username || r.user.email || "User"
   }, [])
 
   if (isNewNote) return null
@@ -419,7 +456,7 @@ export const UnifiedReplies: React.FC<UnifiedRepliesProps> = ({
     return (
       <div className="mb-3 space-y-2">
         <div className="flex items-center gap-2">
-          {replyCount > 0 && enableFullscreenButton && onOpenFullscreen && (
+          {totalReplyCount > 0 && enableFullscreenButton && onOpenFullscreen && (
             <Button
               variant="outline"
               size="sm"
@@ -430,7 +467,7 @@ export const UnifiedReplies: React.FC<UnifiedRepliesProps> = ({
               className="text-xs h-6"
             >
               <MessageSquare className="h-3 w-3 mr-1" />
-              {replyCount} {replyCount === 1 ? "Reply" : "Replies"}
+              {totalReplyCount} {totalReplyCount === 1 ? "Reply" : "Replies"}
             </Button>
           )}
 
@@ -459,8 +496,15 @@ export const UnifiedReplies: React.FC<UnifiedRepliesProps> = ({
   const renderHeader = () => (
     <div className="p-4 border-b flex-shrink-0">
       <div className="flex items-center justify-between">
-        <h3 className="font-medium text-gray-900">Replies ({replyCount})</h3>
-        {replies.length > 0 ? (
+        <h3 className="font-medium text-gray-900">
+          Replies ({totalReplyCount})
+          {enableThreading && threadedReplies.length > 0 && (
+            <span className="text-xs text-gray-500 ml-2">
+              {threadedReplies.length} thread{threadedReplies.length !== 1 ? "s" : ""}
+            </span>
+          )}
+        </h3>
+        {localReplies.length > 0 ? (
           <div className="flex items-center gap-2">
             {enableExport && onExportAll && (
               <DropdownMenu>
@@ -560,33 +604,33 @@ export const UnifiedReplies: React.FC<UnifiedRepliesProps> = ({
         </div>
       )}
 
-      {localReplies.length > 0 && (
-        <ul className="space-y-3 mb-4" key="replies-list">
-          {[...localReplies]
-            .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
-            .map((reply, index) => (
-              <ReplyItem
-                key={reply.id || `reply-${index}`}
-                reply={reply}
-                context={context}
-                supportsCalStick={supportsCalStick}
-                editingCalStick={editingCalStick}
-                calStickDate={calStickDates[reply.id] || ""}
-                currentUserId={currentUserId}
-                onDelete={onDeleteReply ? handleDeleteReply : undefined}
-                onEdit={onEditReply ? handleEditReply : undefined}
-                onReply={enableReplyToReply && canEdit ? handleReplyToReply : undefined}
-                onToggleCalStick={handleToggleCalStick}
-                onCalStickDateChange={handleCalStickDateChange}
-                onSaveCalStickDate={handleSaveCalStickDate}
-                onCancelCalStickEdit={() => setEditingCalStick(null)}
-                onToggleCalStickComplete={handleToggleCalStickComplete}
-              />
-            ))}
-        </ul>
+      {threadedReplies.length > 0 && (
+        <div className="space-y-3 mb-4">
+          {threadedReplies.map((reply) => (
+            <ThreadedReplyItem
+              key={reply.id}
+              reply={reply}
+              depth={0}
+              context={context}
+              supportsCalStick={supportsCalStick}
+              editingCalStick={editingCalStick}
+              calStickDate={calStickDates[reply.id] || ""}
+              currentUserId={currentUserId}
+              onDelete={onDeleteReply ? handleDeleteReply : undefined}
+              onEdit={onEditReply ? handleEditReply : undefined}
+              onReply={enableThreading ? handleReplyToReply : undefined}
+              onSubmitInlineReply={enableThreading && onAddReply ? handleSubmitInlineReply : undefined}
+              onToggleCalStick={handleToggleCalStick}
+              onCalStickDateChange={handleCalStickDateChange}
+              onSaveCalStickDate={handleSaveCalStickDate}
+              onCancelCalStickEdit={() => setEditingCalStick(null)}
+              onToggleCalStickComplete={handleToggleCalStickComplete}
+            />
+          ))}
+        </div>
       )}
 
-      {localReplies.length === 0 && <p className="text-gray-500 text-sm text-center py-8">No replies yet</p>}
+      {threadedReplies.length === 0 && <p className="text-gray-500 text-sm text-center py-8">No replies yet</p>}
     </>
   )
 
@@ -596,21 +640,25 @@ export const UnifiedReplies: React.FC<UnifiedRepliesProps> = ({
         {renderHeader()}
 
         {canEdit && !isNewNote && (
-          <div className="p-4 border-b bg-white flex-shrink-0" data-reply-form>
+          <div id="threaded-reply-form" className="p-4 border-b bg-white flex-shrink-0">
+            {/* Replying to indicator */}
             {replyingTo && (
-              <div className="mb-2 flex items-center justify-between text-sm text-blue-600 bg-blue-50 px-3 py-2 rounded-lg">
-                <span>Replying to @{replyingTo.user?.username || replyingTo.user?.email || "User"}</span>
-                <button
-                  onClick={() => {
-                    setReplyingTo(null)
-                    setReplyContent("")
-                  }}
-                  className="text-blue-400 hover:text-blue-600"
+              <div className="mb-2 flex items-center justify-between bg-blue-50 rounded-lg p-2 border border-blue-200">
+                <div className="flex items-center gap-2 text-sm text-blue-700">
+                  <MessageSquare className="h-4 w-4" />
+                  <span>Replying to <strong>@{getDisplayName(replyingTo)}</strong></span>
+                </div>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={handleCancelReplyTo}
+                  className="h-6 w-6 p-0 text-blue-600 hover:text-blue-800 hover:bg-blue-100"
                 >
                   <X className="h-4 w-4" />
-                </button>
+                </Button>
               </div>
             )}
+
             {enableCollaboration ? (
               <CollaborativeReplyForm
                 replyId={`${noteId}-new-reply`}

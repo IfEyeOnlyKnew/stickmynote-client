@@ -29,7 +29,7 @@ export async function DELETE(request: NextRequest, context: { params: Promise<{ 
 
     const db = await createServiceDatabaseClient()
 
-    const orgContext = await getOrgContext(user.id)
+    const orgContext = await getOrgContext()
     if (!orgContext) {
       return NextResponse.json({ error: "No organization context" }, { status: 403 })
     }
@@ -111,7 +111,7 @@ export async function POST(request: NextRequest, context: { params: Promise<{ pa
 
     const db = await createServiceDatabaseClient()
 
-    const orgContext = await getOrgContext(user.id)
+    const orgContext = await getOrgContext()
     if (!orgContext) {
       return NextResponse.json({ error: "No organization context" }, { status: 403 })
     }

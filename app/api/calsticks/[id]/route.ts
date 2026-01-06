@@ -23,7 +23,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
 
     const user = authResult.user
 
-    const orgContext = await getOrgContext(user.id)
+    const orgContext = await getOrgContext()
     if (!orgContext) {
       return NextResponse.json({ error: "No organization context" }, { status: 403 })
     }
@@ -71,7 +71,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
 
     const user = authResult.user
 
-    const orgContext = await getOrgContext(user.id)
+    const orgContext = await getOrgContext()
     if (!orgContext) {
       return NextResponse.json({ error: "No organization context" }, { status: 403 })
     }

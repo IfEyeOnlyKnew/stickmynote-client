@@ -198,7 +198,7 @@ export async function GET(request: NextRequest, context: { params: Promise<{ id:
 
     const db = await createServiceDatabaseClient()
 
-    const orgContext = await getOrgContext(user.id)
+    const orgContext = await getOrgContext()
     if (!orgContext) {
       return NextResponse.json({ error: "Organization context required" }, { status: 403 })
     }
@@ -354,7 +354,7 @@ export async function POST(request: NextRequest, context: { params: Promise<{ id
 
     const db = await createServiceDatabaseClient()
 
-    const orgContext = await getOrgContext(user.id)
+    const orgContext = await getOrgContext()
     if (!orgContext) {
       return NextResponse.json({ error: "Organization context required" }, { status: 403 })
     }
@@ -466,7 +466,7 @@ export async function PUT(request: NextRequest, context: { params: Promise<{ id:
 
     const db = await createServiceDatabaseClient()
 
-    const orgContext = await getOrgContext(user.id)
+    const orgContext = await getOrgContext()
     if (!orgContext) {
       return NextResponse.json({ error: "Organization context required" }, { status: 403 })
     }

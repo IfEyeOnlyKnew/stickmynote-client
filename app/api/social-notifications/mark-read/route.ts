@@ -12,7 +12,7 @@ export async function POST(req: NextRequest) {
     }
     const user = session.user
 
-    const orgContext = await getOrgContext(user.id)
+    const orgContext = await getOrgContext()
     if (!orgContext) {
       return NextResponse.json({ error: "No organization context" }, { status: 403 })
     }

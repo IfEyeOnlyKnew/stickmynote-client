@@ -480,7 +480,7 @@ export async function POST(request: NextRequest) {
     const user = authResult.user
 
     // Org context check
-    const orgContext = await getOrgContext(user.id) as OrgContext | null
+    const orgContext = await getOrgContext() as OrgContext | null
     if (!orgContext) {
       return Errors.noOrgContext()
     }

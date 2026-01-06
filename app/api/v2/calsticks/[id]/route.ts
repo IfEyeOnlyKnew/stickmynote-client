@@ -27,7 +27,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
 
     const user = authResult.user
 
-    const orgContext = await getOrgContext(user.id)
+    const orgContext = await getOrgContext()
     if (!orgContext) {
       return new Response(JSON.stringify({ error: 'No organization context' }), { status: 403 })
     }

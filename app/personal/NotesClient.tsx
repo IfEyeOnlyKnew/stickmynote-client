@@ -710,6 +710,7 @@ export function NotesClient({ initialNotes, userId, stats }: Readonly<NotesClien
                     onDetailsChange={(noteId: string, details: string) => handleNoteDetailsChange(noteId, details)}
                     onUpdateColor={handleUpdateNoteColor}
                     onGenerateTags={handleGenerateTagsWrapper}
+                    generatingTags={generatingTags}
                     onSummarizeLinks={handleSummarizeLinks}
                     summarizingLinks={summarizingLinks}
                     onAddReply={handleAddReply}

@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import { Trash2, Pencil, Check, X } from "lucide-react"
+import { Trash2, Pencil, Check, X, MessageSquare } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
 import { getTimestampDisplay } from "@/utils/noteUtils"
@@ -34,6 +34,7 @@ interface ReplyItemProps {
   currentUserId?: string | null
   onDelete?: (replyId: string) => void
   onEdit?: (replyId: string, content: string) => Promise<void>
+  onReply?: (reply: Reply) => void
   onToggleCalStick: (replyId: string, currentIsCalStick: boolean, currentDate: string | null) => void
   onCalStickDateChange: (replyId: string, date: string) => void
   onSaveCalStickDate: (replyId: string) => void
@@ -50,6 +51,7 @@ export const ReplyItem: React.FC<ReplyItemProps> = ({
   currentUserId,
   onDelete,
   onEdit,
+  onReply,
   onToggleCalStick,
   onCalStickDateChange,
   onSaveCalStickDate,
@@ -108,33 +110,46 @@ export const ReplyItem: React.FC<ReplyItemProps> = ({
             <span>{displayTime}</span>
             {wasEdited && <span className="text-gray-400 ml-1">(edited)</span>}
           </div>
-          {isOwner && !isEditing && (
-            <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-              {onEdit && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={handleStartEdit}
-                  className="h-6 w-6 p-0 text-gray-500 hover:text-blue-600 hover:bg-blue-50"
-                  title="Edit reply"
-                >
-                  <Pencil className="h-3 w-3" />
-                </Button>
-              )}
-              {onDelete && (
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => onDelete(reply.id)}
-                  className="h-6 w-6 p-0 text-red-500 hover:text-red-700 hover:bg-red-50"
-                  title="Delete reply"
-                >
-                  <Trash2 className="h-3 w-3" />
-                </Button>
-              )}
-            </div>
-          )}
+          <div className="flex items-center gap-1">
+            {onReply && !isEditing && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => onReply(reply)}
+                className="h-6 w-6 p-0 text-blue-500 hover:text-blue-600 hover:bg-blue-50"
+                title="Reply to this"
+              >
+                <MessageSquare className="h-3 w-3" />
+              </Button>
+            )}
+            {isOwner && !isEditing && (
+              <>
+                {onEdit && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={handleStartEdit}
+                    className="h-6 w-6 p-0 text-gray-400 hover:text-blue-600 hover:bg-blue-50 opacity-0 group-hover:opacity-100 transition-opacity"
+                    title="Edit reply"
+                  >
+                    <Pencil className="h-3 w-3" />
+                  </Button>
+                )}
+                {onDelete && (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => onDelete(reply.id)}
+                    className="h-6 w-6 p-0 text-gray-400 hover:text-red-700 hover:bg-red-50 opacity-0 group-hover:opacity-100 transition-opacity"
+                    title="Delete reply"
+                  >
+                    <Trash2 className="h-3 w-3" />
+                  </Button>
+                )}
+              </>
+            )}
+          </div>
         </div>
 
         {isEditing ? (

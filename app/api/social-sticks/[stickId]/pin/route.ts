@@ -17,7 +17,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ sti
     }
 
     const user = authResult.user
-    const orgContext = await getOrgContext(user.id)
+    const orgContext = await getOrgContext()
     if (!orgContext) {
       return NextResponse.json({ error: "No organization context" }, { status: 403 })
     }
@@ -108,7 +108,7 @@ export async function PUT(request: Request, { params }: { params: Promise<{ stic
     }
 
     const user = authResult.user
-    const orgContext = await getOrgContext(user.id)
+    const orgContext = await getOrgContext()
     if (!orgContext) {
       return NextResponse.json({ error: "No organization context" }, { status: 403 })
     }

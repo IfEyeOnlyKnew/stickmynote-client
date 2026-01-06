@@ -25,7 +25,7 @@ export async function POST(request: Request) {
 
     const user = authResult.user
 
-    const orgContext = await getOrgContext(user.id)
+    const orgContext = await getOrgContext()
     if (!orgContext) {
       return new Response(JSON.stringify({ error: 'No organization context' }), { status: 403 })
     }

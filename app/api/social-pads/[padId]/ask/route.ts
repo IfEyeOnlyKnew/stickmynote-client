@@ -29,7 +29,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ padId: 
     }
     const user = authResult.user
 
-    const orgContext = await getOrgContext(user.id)
+    const orgContext = await getOrgContext()
     if (!orgContext) {
       return new NextResponse("No organization context", { status: 403 })
     }
