@@ -147,6 +147,12 @@ export const UnifiedReplies: React.FC<UnifiedRepliesProps> = ({
   // Refs for polling
   const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null)
   const lastReplyIdsRef = useRef<string>("")
+  const localRepliesRef = useRef<Reply[]>(replies)
+
+  // Keep the ref in sync with state
+  useEffect(() => {
+    localRepliesRef.current = localReplies
+  }, [localReplies])
 
   useEffect(() => {
     setLocalReplies(replies)
@@ -176,18 +182,40 @@ export const UnifiedReplies: React.FC<UnifiedRepliesProps> = ({
 
         if (response.ok) {
           const data = await response.json()
-          const newReplies: Reply[] = data.replies || []
+          const serverReplies: Reply[] = data.replies || []
+          const currentLocalReplies = localRepliesRef.current
 
-          // Create a hash of reply IDs to detect changes
-          const newReplyIds = newReplies.map((r: Reply) => r.id).join(",")
-          const hasChanges = newReplyIds !== lastReplyIdsRef.current
+          // Create sets for comparison
+          const serverReplyIds = new Set(serverReplies.map((r: Reply) => r.id))
+          const localReplyIds = new Set(currentLocalReplies.map((r: Reply) => r.id))
 
-          if (hasChanges) {
-            setLocalReplies(newReplies)
-            lastReplyIdsRef.current = newReplyIds
+          // Check if server has new replies we don't have locally
+          const hasNewFromServer = serverReplies.some((r: Reply) => !localReplyIds.has(r.id))
+
+          // Check if we have local replies not yet on server (optimistic additions)
+          const hasLocalOnlyReplies = currentLocalReplies.some((r: Reply) => !serverReplyIds.has(r.id))
+
+          if (hasNewFromServer) {
+            // Merge: keep local-only replies + add all server replies
+            const localOnlyReplies = currentLocalReplies.filter((r: Reply) => !serverReplyIds.has(r.id))
+            const mergedReplies = [...serverReplies, ...localOnlyReplies]
+
+            setLocalReplies(mergedReplies)
+            lastReplyIdsRef.current = mergedReplies.map((r: Reply) => r.id).join(",")
             // Notify parent of updates if callback provided
-            onRepliesUpdated?.(newReplies)
+            onRepliesUpdated?.(mergedReplies)
+          } else if (!hasLocalOnlyReplies) {
+            // No local-only replies and no new from server - just update to server state
+            // This handles cases where replies were deleted on server
+            const serverIds = serverReplies.map((r: Reply) => r.id).join(",")
+            if (serverIds !== lastReplyIdsRef.current) {
+              setLocalReplies(serverReplies)
+              lastReplyIdsRef.current = serverIds
+              onRepliesUpdated?.(serverReplies)
+            }
           }
+          // If we have local-only replies and no new from server, keep local state
+          // This preserves optimistically-added replies until server confirms them
         }
       } catch (error) {
         console.error("Error polling replies:", error)

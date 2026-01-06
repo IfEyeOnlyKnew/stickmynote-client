@@ -43,6 +43,8 @@ interface NoteFullscreenRepliesProps {
   // Real-time polling for chat-like experience
   enablePolling?: boolean
   onRepliesUpdated?: (replies: Reply[]) => void
+  // Allow editing/replying (defaults to true)
+  canEdit?: boolean
 }
 
 export const NoteFullscreenReplies: React.FC<NoteFullscreenRepliesProps> = (props) => {

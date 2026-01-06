@@ -686,7 +686,7 @@ export function NotesClient({ initialNotes, userId, stats }: Readonly<NotesClien
       {/* Fullscreen Note Modal: edit a single note in depth */}
       {fullscreenHook.fullscreenNoteId && (
         <Dialog open={true} onOpenChange={() => fullscreenHook.closeFullscreen()}>
-          <DialogContent className="max-w-[95vw] w-full h-[calc(100dvh-2rem)] max-h-[calc(100dvh-2rem)] p-0 overflow-hidden z-[9999]">
+          <DialogContent className="max-w-[95vw] w-full h-[calc(100dvh-2rem)] max-h-[calc(100dvh-2rem)] p-0 overflow-hidden">
             <div className="h-full flex flex-col">
               <DialogHeader className="px-6 py-4 border-b">
                 <DialogTitle className="flex items-center justify-between"></DialogTitle>
