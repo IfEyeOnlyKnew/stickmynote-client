@@ -289,16 +289,19 @@ export function NotesClient({ initialNotes, userId, stats }: Readonly<NotesClien
   )
 
   // Reply handlers - inline to match /panel implementation
-  const handleAddReply = useCallback(async (noteId: string, content: string): Promise<void> => {
+  const handleAddReply = useCallback(async (noteId: string, content: string, color?: string, parentReplyId?: string | null): Promise<void> => {
+    console.log("[Personal handleAddReply] Called with:", { noteId, content: content.substring(0, 30), color, parentReplyId })
     try {
       const currentCsrfToken = csrfTokenRef.current
+      const requestBody = { content, color: color || "#f3f4f6", parent_reply_id: parentReplyId || null }
+      console.log("[Personal handleAddReply] Request body:", requestBody)
       const response = await fetch(`/api/notes/${noteId}/replies`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
           ...(currentCsrfToken ? { "X-CSRF-Token": currentCsrfToken } : {}),
         },
-        body: JSON.stringify({ content, color: "#f3f4f6" }),
+        body: JSON.stringify(requestBody),
       })
 
       if (!response.ok) {

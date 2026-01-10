@@ -111,6 +111,7 @@ export const replySchema = z.object({
   created_at: timestampSchema,
   updated_at: timestampSchema,
   user: userSchema.optional(),
+  parent_reply_id: z.string().uuid().nullable().optional(),
 })
 
 export type Reply = z.infer<typeof replySchema>

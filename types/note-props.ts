@@ -20,7 +20,7 @@ export interface NoteEventHandlers {
 }
 
 export interface NoteReplyHandlers {
-  onAddReply: (noteId: string, content: string, color?: string) => Promise<void>
+  onAddReply: (noteId: string, content: string, color?: string, parentReplyId?: string | null) => Promise<void>
   onEditReply?: (noteId: string, replyId: string, content: string) => Promise<void>
   onDeleteReply?: (noteId: string, replyId: string) => Promise<void>
   onReplyFormToggle?: (noteId: string, isVisible: boolean) => void

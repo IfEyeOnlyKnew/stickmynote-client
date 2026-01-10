@@ -7,10 +7,20 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Textarea } from "@/components/ui/textarea"
 import { UserMenu } from "@/components/user-menu"
-import { Trash2, Edit2, MessageSquare, Save, X } from "lucide-react"
+import { Trash2, Edit2, MessageSquare, Save, X, ChevronDown, ChevronRight, CornerDownRight } from "lucide-react"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { BreadcrumbNav } from "@/components/breadcrumb-nav"
 import { ReplyModal } from "@/components/social/reply-modal"
+
+// Depth-based colors for visual distinction of thread levels
+const DEPTH_COLORS = [
+  { line: "border-blue-400", bg: "bg-blue-50/50", text: "text-blue-600" },
+  { line: "border-green-400", bg: "bg-green-50/50", text: "text-green-600" },
+  { line: "border-purple-400", bg: "bg-purple-50/50", text: "text-purple-600" },
+  { line: "border-orange-400", bg: "bg-orange-50/50", text: "text-orange-600" },
+  { line: "border-pink-400", bg: "bg-pink-50/50", text: "text-pink-600" },
+  { line: "border-cyan-400", bg: "bg-cyan-50/50", text: "text-cyan-600" },
+]
 
 interface Reply {
   id: string
@@ -52,6 +62,7 @@ interface ReplyCardProps {
   editingReplyId: string | null
   editContent: string
   userId?: string
+  parentAuthor?: string
   onEditContentChange: (content: string) => void
   onStartEdit: (reply: Reply) => void
   onCancelEdit: () => void
@@ -67,6 +78,7 @@ function ReplyCard({
   editingReplyId,
   editContent,
   userId,
+  parentAuthor,
   onEditContentChange,
   onStartEdit,
   onCancelEdit,
@@ -75,88 +87,148 @@ function ReplyCard({
   getDisplayName,
   getInitials,
 }: Readonly<ReplyCardProps>) {
+  const [isCollapsed, setIsCollapsed] = useState(false)
   const isEditing = editingReplyId === reply.id
   const isOwner = reply.user_id === userId
+  const hasReplies = reply.replies && reply.replies.length > 0
+  const replyCount = reply.replies?.length || 0
+
+  // Get depth-based styling
+  const depthColors = DEPTH_COLORS[depth % DEPTH_COLORS.length]
+  const indentPx = depth * 24 // 24px per level
 
   return (
-    <div className={depth > 0 ? "ml-12 mt-4" : ""}>
-      <Card className="bg-white border-2 shadow-lg hover:shadow-xl transition-shadow">
-        <CardContent className="pt-6">
-          <div className="flex items-start gap-4">
-            <Avatar className="h-10 w-10">
-              {reply.users?.avatar_url && (
-                <AvatarImage src={reply.users.avatar_url || "/placeholder.svg"} alt={getDisplayName(reply)} />
-              )}
-              <AvatarFallback>{getInitials(reply)}</AvatarFallback>
-            </Avatar>
-            <div className="flex-1">
-              <div className="flex items-center justify-between mb-2">
-                <div className="flex items-center gap-2">
-                  <span className="font-semibold text-gray-900">{getDisplayName(reply)}</span>
-                  <span className="text-sm text-gray-500">{new Date(reply.created_at).toLocaleString()}</span>
-                  {reply.updated_at !== reply.created_at && <span className="text-xs text-gray-400">(edited)</span>}
-                </div>
-                <div className="flex gap-2">
-                  {isOwner && !isEditing && (
-                    <Button variant="ghost" size="sm" onClick={() => onStartEdit(reply)}>
-                      <Edit2 className="h-4 w-4" />
+    <div className="relative">
+      {/* Thread line for nested replies */}
+      {depth > 0 && (
+        <div
+          className={`absolute left-0 top-0 bottom-0 w-0.5 ${depthColors.line}`}
+          style={{ marginLeft: `${(depth - 1) * 24 + 8}px` }}
+        />
+      )}
+
+      <div
+        className="relative"
+        style={{ marginLeft: `${indentPx}px` }}
+      >
+        {/* Horizontal connector line */}
+        {depth > 0 && (
+          <div
+            className={`absolute left-0 top-5 w-4 h-0.5 ${depthColors.line}`}
+            style={{ marginLeft: "-16px" }}
+          />
+        )}
+
+        <Card className={`border-2 shadow-lg hover:shadow-xl transition-shadow ${depth > 0 ? depthColors.bg : "bg-white"}`}>
+          <CardContent className="pt-6">
+            <div className="flex items-start gap-4">
+              <Avatar className="h-10 w-10">
+                {reply.users?.avatar_url && (
+                  <AvatarImage src={reply.users.avatar_url || "/placeholder.svg"} alt={getDisplayName(reply)} />
+                )}
+                <AvatarFallback>{getInitials(reply)}</AvatarFallback>
+              </Avatar>
+              <div className="flex-1">
+                <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center gap-2">
+                    <span className="font-semibold text-gray-900">{getDisplayName(reply)}</span>
+                    <span className="text-sm text-gray-500">{new Date(reply.created_at).toLocaleString()}</span>
+                    {reply.updated_at !== reply.created_at && <span className="text-xs text-gray-400">(edited)</span>}
+                  </div>
+                  <div className="flex gap-2">
+                    {isOwner && !isEditing && (
+                      <Button variant="ghost" size="sm" onClick={() => onStartEdit(reply)}>
+                        <Edit2 className="h-4 w-4" />
+                      </Button>
+                    )}
+                    <Button variant="ghost" size="sm" onClick={() => onOpenReplyModal(reply)}>
+                      <MessageSquare className="h-4 w-4" />
                     </Button>
-                  )}
-                  <Button variant="ghost" size="sm" onClick={() => onOpenReplyModal(reply)}>
-                    <MessageSquare className="h-4 w-4" />
-                  </Button>
-                </div>
-              </div>
-              {isEditing ? (
-                <div className="space-y-2">
-                  <Textarea
-                    value={editContent}
-                    onChange={(e) => onEditContentChange(e.target.value)}
-                    rows={3}
-                    maxLength={1000}
-                  />
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm text-gray-500">{editContent.length}/1000</span>
-                    <div className="flex gap-2">
-                      <Button variant="outline" size="sm" onClick={onCancelEdit}>
-                        <X className="h-4 w-4 mr-1" />
-                        Cancel
-                      </Button>
-                      <Button size="sm" onClick={() => onSaveEdit(reply.id)}>
-                        <Save className="h-4 w-4 mr-1" />
-                        Save
-                      </Button>
-                    </div>
                   </div>
                 </div>
-              ) : (
-                <p className="text-gray-800 whitespace-pre-wrap">{reply.content}</p>
-              )}
+
+                {/* Replying to indicator */}
+                {parentAuthor && depth > 0 && (
+                  <div className={`flex items-center gap-1 text-xs ${depthColors.text} mb-2`}>
+                    <CornerDownRight className="h-3 w-3" />
+                    <span>Replying to @{parentAuthor}</span>
+                  </div>
+                )}
+
+                {isEditing ? (
+                  <div className="space-y-2">
+                    <Textarea
+                      value={editContent}
+                      onChange={(e) => onEditContentChange(e.target.value)}
+                      rows={3}
+                      maxLength={1000}
+                    />
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm text-gray-500">{editContent.length}/1000</span>
+                      <div className="flex gap-2">
+                        <Button variant="outline" size="sm" onClick={onCancelEdit}>
+                          <X className="h-4 w-4 mr-1" />
+                          Cancel
+                        </Button>
+                        <Button size="sm" onClick={() => onSaveEdit(reply.id)}>
+                          <Save className="h-4 w-4 mr-1" />
+                          Save
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <p className="text-gray-800 whitespace-pre-wrap">{reply.content}</p>
+                )}
+
+                {/* Collapse/expand button for nested replies */}
+                {hasReplies && (
+                  <button
+                    onClick={() => setIsCollapsed(!isCollapsed)}
+                    className={`flex items-center gap-1 text-xs ${depthColors.text} hover:underline mt-2`}
+                  >
+                    {isCollapsed ? (
+                      <>
+                        <ChevronRight className="h-3 w-3" />
+                        Show {replyCount} {replyCount === 1 ? "reply" : "replies"}
+                      </>
+                    ) : (
+                      <>
+                        <ChevronDown className="h-3 w-3" />
+                        Hide {replyCount} {replyCount === 1 ? "reply" : "replies"}
+                      </>
+                    )}
+                  </button>
+                )}
+              </div>
             </div>
+          </CardContent>
+        </Card>
+
+        {/* Nested replies */}
+        {hasReplies && !isCollapsed && (
+          <div className="space-y-4 mt-4">
+            {reply.replies!.map((nestedReply) => (
+              <ReplyCard
+                key={nestedReply.id}
+                reply={nestedReply}
+                depth={depth + 1}
+                editingReplyId={editingReplyId}
+                editContent={editContent}
+                userId={userId}
+                parentAuthor={getDisplayName(reply)}
+                onEditContentChange={onEditContentChange}
+                onStartEdit={onStartEdit}
+                onCancelEdit={onCancelEdit}
+                onSaveEdit={onSaveEdit}
+                onOpenReplyModal={onOpenReplyModal}
+                getDisplayName={getDisplayName}
+                getInitials={getInitials}
+              />
+            ))}
           </div>
-        </CardContent>
-      </Card>
-      {reply.replies && reply.replies.length > 0 && (
-        <div className="space-y-4 mt-4">
-          {reply.replies.map((nestedReply) => (
-            <ReplyCard
-              key={nestedReply.id}
-              reply={nestedReply}
-              depth={depth + 1}
-              editingReplyId={editingReplyId}
-              editContent={editContent}
-              userId={userId}
-              onEditContentChange={onEditContentChange}
-              onStartEdit={onStartEdit}
-              onCancelEdit={onCancelEdit}
-              onSaveEdit={onSaveEdit}
-              onOpenReplyModal={onOpenReplyModal}
-              getDisplayName={getDisplayName}
-              getInitials={getInitials}
-            />
-          ))}
-        </div>
-      )}
+        )}
+      </div>
     </div>
   )
 }

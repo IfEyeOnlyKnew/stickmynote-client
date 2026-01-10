@@ -33,11 +33,57 @@ interface Reply {
   user?: {
     username?: string
     email?: string
+    full_name?: string
   }
   is_calstick?: boolean
   calstick_date?: string | null
   calstick_completed?: boolean
   calstick_completed_at?: string | null
+  parent_reply_id?: string | null
+  replies?: Reply[]
+}
+
+// Build a tree structure from flat replies array
+function buildReplyTree(replies: Reply[]): Reply[] {
+  const replyMap = new Map<string, Reply>()
+  const rootReplies: Reply[] = []
+
+  // First pass: create map with empty replies array
+  replies.forEach((reply) => {
+    replyMap.set(reply.id, { ...reply, replies: [] })
+  })
+
+  // Second pass: build tree by parent_reply_id
+  replies.forEach((reply) => {
+    const replyWithChildren = replyMap.get(reply.id)!
+    if (reply.parent_reply_id && replyMap.has(reply.parent_reply_id)) {
+      const parent = replyMap.get(reply.parent_reply_id)!
+      parent.replies = parent.replies || []
+      parent.replies.push(replyWithChildren)
+    } else {
+      rootReplies.push(replyWithChildren)
+    }
+  })
+
+  // All replies: oldest first (natural conversation flow, like chat)
+  rootReplies.sort((a, b) => {
+    const timeA = new Date(a.created_at).getTime()
+    const timeB = new Date(b.created_at).getTime()
+    return timeA - timeB // Oldest first (smaller timestamp first)
+  })
+
+  // Nested replies: also oldest first
+  const sortNestedReplies = (reps: Reply[]) => {
+    reps.forEach((reply) => {
+      if (reply.replies && reply.replies.length > 0) {
+        reply.replies.sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime())
+        sortNestedReplies(reply.replies)
+      }
+    })
+  }
+  sortNestedReplies(rootReplies)
+
+  return rootReplies
 }
 
 interface Tone {
@@ -82,7 +128,7 @@ interface UnifiedRepliesProps {
   onAddReplyClick?: (e: React.MouseEvent) => void
   onCancelReply?: (e: React.MouseEvent) => void
   onStickReply?: (e: React.MouseEvent) => void
-  onAddReply?: (noteId: string, content: string, isCalStick: boolean, calStickDate: string | null) => Promise<void>
+  onAddReply?: (noteId: string, content: string, color?: string, parentReplyId?: string | null) => Promise<void>
   onGenerateSummary?: (tone: string) => void
 
   // Additional props for different contexts
@@ -263,7 +309,8 @@ export const UnifiedReplies: React.FC<UnifiedRepliesProps> = ({
       if (onAddReply && setIsSubmittingReply) {
         setIsSubmittingReply(true)
         try {
-          await onAddReply(noteId, trimmedContent, false, null)
+          const parentReplyId = replyingTo?.id || null
+          await onAddReply(noteId, trimmedContent, undefined, parentReplyId)
           setReplyContent("")
           setReplyingTo(null)
         } catch (error) {
@@ -275,7 +322,7 @@ export const UnifiedReplies: React.FC<UnifiedRepliesProps> = ({
         onStickReply(e)
       }
     },
-    [replyContent, isSubmittingReply, onAddReply, onStickReply, noteId, setReplyContent, setIsSubmittingReply],
+    [replyContent, isSubmittingReply, onAddReply, onStickReply, noteId, setReplyContent, setIsSubmittingReply, replyingTo],
   )
 
   const handleGenerateSummary = useCallback(
@@ -284,6 +331,15 @@ export const UnifiedReplies: React.FC<UnifiedRepliesProps> = ({
       onGenerateSummary(tone)
     },
     [replies, isGeneratingSummary, onGenerateSummary],
+  )
+
+  // Direct inline reply submit handler - called from ReplyItem with parentReplyId
+  const handleSubmitInlineReply = useCallback(
+    async (content: string, parentReplyId: string) => {
+      if (!onAddReply) return
+      await onAddReply(noteId, content, undefined, parentReplyId)
+    },
+    [onAddReply, noteId],
   )
 
   const handleDeleteReply = useCallback(
@@ -441,7 +497,12 @@ export const UnifiedReplies: React.FC<UnifiedRepliesProps> = ({
 
   if (isNewNote) return null
 
-  const isCompactLayout = context === "card" || context === "panel" || (context === "stick" && showReplyForm)
+  // Build threaded reply tree from flat list
+  const threadedReplies = buildReplyTree(localReplies)
+
+  // Card context uses compact layout (just buttons)
+  // Panel context now shows full threaded replies
+  const isCompactLayout = context === "card" || (context === "stick" && showReplyForm)
 
   if (isCompactLayout) {
     return (
@@ -479,6 +540,88 @@ export const UnifiedReplies: React.FC<UnifiedRepliesProps> = ({
             isSubmitting={isSubmittingReply}
             isCompact={true}
           />
+        )}
+      </div>
+    )
+  }
+
+  // Panel context - show full threaded replies inline
+  if (context === "panel") {
+    return (
+      <div className="mt-4 space-y-3">
+        {/* Header */}
+        <div className="flex items-center justify-between">
+          <h4 className="text-sm font-medium text-gray-700">Replies ({replyCount})</h4>
+          {replyCount > 0 && enableFullscreenButton && onOpenFullscreen && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={(e) => {
+                e.stopPropagation()
+                onOpenFullscreen(noteId)
+              }}
+              className="text-xs h-6 text-blue-600 hover:text-blue-700"
+            >
+              Open Fullscreen
+            </Button>
+          )}
+        </div>
+
+        {/* Threaded replies list */}
+        {threadedReplies.length > 0 && (
+          <ul className="space-y-2">
+            {threadedReplies.map((reply, index) => (
+              <ReplyItem
+                key={reply.id || `reply-${index}`}
+                reply={reply}
+                depth={0}
+                context={context}
+                supportsCalStick={supportsCalStick}
+                editingCalStick={editingCalStick}
+                calStickDate={calStickDates[reply.id] || ""}
+                currentUserId={currentUserId}
+                onDelete={onDeleteReply ? handleDeleteReply : undefined}
+                onEdit={onEditReply ? handleEditReply : undefined}
+                onReply={undefined}
+                onSubmitReply={enableReplyToReply && canEdit && onAddReply ? handleSubmitInlineReply : undefined}
+                onToggleCalStick={handleToggleCalStick}
+                onCalStickDateChange={handleCalStickDateChange}
+                onSaveCalStickDate={handleSaveCalStickDate}
+                onCancelCalStickEdit={() => setEditingCalStick(null)}
+                onToggleCalStickComplete={handleToggleCalStickComplete}
+              />
+            ))}
+          </ul>
+        )}
+
+        {localReplies.length === 0 && (
+          <p className="text-gray-400 text-xs text-center py-4">No replies yet</p>
+        )}
+
+        {/* Add new top-level reply button/form */}
+        {canEdit && (
+          <div className="pt-2 border-t">
+            {!showReplyForm ? (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={onAddReplyClick}
+                className="text-xs h-7 w-full bg-transparent"
+              >
+                <Plus className="h-3 w-3 mr-1" />
+                Add Reply
+              </Button>
+            ) : (
+              <ReplyForm
+                content={replyContent}
+                onContentChange={setReplyContent}
+                onSubmit={handleStickReply}
+                onCancel={onCancelReply}
+                isSubmitting={isSubmittingReply}
+                isCompact={true}
+              />
+            )}
+          </div>
         )}
       </div>
     )
@@ -588,14 +731,13 @@ export const UnifiedReplies: React.FC<UnifiedRepliesProps> = ({
         </div>
       )}
 
-      {localReplies.length > 0 && (
+      {threadedReplies.length > 0 && (
         <ul className="space-y-3 mb-4" key="replies-list">
-          {[...localReplies]
-            .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
-            .map((reply, index) => (
+          {threadedReplies.map((reply, index) => (
               <ReplyItem
                 key={reply.id || `reply-${index}`}
                 reply={reply}
+                depth={0}
                 context={context}
                 supportsCalStick={supportsCalStick}
                 editingCalStick={editingCalStick}
@@ -603,7 +745,8 @@ export const UnifiedReplies: React.FC<UnifiedRepliesProps> = ({
                 currentUserId={currentUserId}
                 onDelete={onDeleteReply ? handleDeleteReply : undefined}
                 onEdit={onEditReply ? handleEditReply : undefined}
-                onReply={enableReplyToReply && canEdit ? handleReplyToReply : undefined}
+                onReply={enableReplyToReply && canEdit && onAddReply ? undefined : (enableReplyToReply && canEdit ? handleReplyToReply : undefined)}
+                onSubmitReply={enableReplyToReply && canEdit && onAddReply ? handleSubmitInlineReply : undefined}
                 onToggleCalStick={handleToggleCalStick}
                 onCalStickDateChange={handleCalStickDateChange}
                 onSaveCalStickDate={handleSaveCalStickDate}

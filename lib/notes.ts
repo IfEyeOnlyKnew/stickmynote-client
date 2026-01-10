@@ -65,6 +65,7 @@ interface DatabaseReplyRow {
   color: string
   created_at: string
   updated_at: string
+  parent_reply_id?: string | null
 }
 
 interface ReplyInsertPayload {
@@ -121,6 +122,7 @@ function transformReply(reply: DatabaseReplyRow): Reply {
     updated_at: reply.updated_at || reply.created_at,
     user_id: reply.user_id,
     note_id: reply.personal_stick_id,
+    parent_reply_id: reply.parent_reply_id || null,
   }
 }
 
@@ -131,7 +133,7 @@ function transformReplyFromRaw(r: any): Reply {
   const now = new Date().toISOString()
   const createdAt = typeof r.created_at === "string" && r.created_at ? r.created_at : now
   const updatedAt = typeof r.updated_at === "string" && r.updated_at ? r.updated_at : createdAt
-  
+
   return {
     id: typeof r.id === "string" && r.id ? r.id : "unknown-reply-id",
     content: r.content || "",
@@ -140,6 +142,7 @@ function transformReplyFromRaw(r: any): Reply {
     updated_at: updatedAt,
     user_id: typeof r.user_id === "string" && r.user_id ? r.user_id : "unknown-user",
     note_id: typeof r.personal_stick_id === "string" && r.personal_stick_id ? r.personal_stick_id : "unknown-note-id",
+    parent_reply_id: r.parent_reply_id || null,
   }
 }
 
@@ -339,7 +342,7 @@ export async function getNotes(
       ((notes || []) as DatabaseNoteRow[]).map(async (note) => {
         const { data: replies, error: repliesError } = await db
           .from("personal_sticks_replies")
-          .select(`id, content, color, created_at, updated_at, user_id, personal_stick_id`)
+          .select(`id, content, color, created_at, updated_at, user_id, personal_stick_id, parent_reply_id`)
           .eq("personal_stick_id", note.id)
           .order("created_at", { ascending: true })
 
@@ -527,7 +530,7 @@ export async function updateNote(noteData: UpdateNoteData): Promise<Note> {
 
     const { data: repliesData } = await db
       .from("personal_sticks_replies")
-      .select(`id, content, color, created_at, updated_at, user_id, personal_stick_id`)
+      .select(`id, content, color, created_at, updated_at, user_id, personal_stick_id, parent_reply_id`)
       .eq("personal_stick_id", typeof note.id === "string" && note.id ? note.id : "")
       .order("created_at", { ascending: true })
 
@@ -601,7 +604,7 @@ export async function updateNotePosition(noteId: string, x: number, y: number): 
 
     const { data: replies } = await db
       .from("personal_sticks_replies")
-      .select(`id, content, color, created_at, updated_at, user_id, personal_stick_id`)
+      .select(`id, content, color, created_at, updated_at, user_id, personal_stick_id, parent_reply_id`)
       .eq("personal_stick_id", noteIdStr)
       .order("created_at", { ascending: true })
 
@@ -668,7 +671,7 @@ export async function createReply(replyData: CreateReplyData): Promise<Reply> {
     const { data: replyRaw, error } = await (db as any)
       .from("personal_sticks_replies")
       .insert([replyToCreate])
-      .select(`id, content, color, created_at, updated_at, user_id, personal_stick_id`)
+      .select(`id, content, color, created_at, updated_at, user_id, personal_stick_id, parent_reply_id`)
       .single()
 
     const reply = replyRaw as DatabaseReplyRow | null

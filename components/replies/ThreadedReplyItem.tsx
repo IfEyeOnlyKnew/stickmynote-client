@@ -377,7 +377,7 @@ export const ThreadedReplyItem = memo(function ThreadedReplyItem({
                       ) : (
                         <>
                           <Check className="h-3 w-3 mr-1" />
-                          Reply
+                          Stick
                         </>
                       )}
                     </Button>

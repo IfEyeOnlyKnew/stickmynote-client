@@ -504,7 +504,7 @@ export function StickDetailModal({ open, onOpenChange, stickId, onUpdate }: Stic
     return grouped
   }
 
-  const renderReply = useCallback((reply: Reply, depth = 0) => {
+  const renderReply = useCallback((reply: Reply, depth = 0, parentAuthor?: string) => {
     if (!reply) return null
 
     return (
@@ -515,6 +515,7 @@ export function StickDetailModal({ open, onOpenChange, stickId, onUpdate }: Stic
         currentUserId={currentUserId || undefined}
         isPadOwner={isPadOwner}
         isAdmin={isAdmin}
+        parentAuthor={parentAuthor}
         onEdit={handleEditReply}
         onDelete={handleDeleteReply}
         onReply={handleOpenReplyModal}
