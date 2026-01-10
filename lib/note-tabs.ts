@@ -66,6 +66,7 @@ interface DatabaseReplyRow {
   color: string
   created_at: string
   updated_at: string
+  parent_reply_id?: string | null
 }
 
 interface ReplyInsertPayload {
@@ -331,6 +332,7 @@ export async function getNotes(
           updated_at: reply.updated_at || reply.created_at,
           user_id: reply.user_id,
           note_id: reply.personal_stick_id, // Keep note_id for backwards compatibility
+          parent_reply_id: reply.parent_reply_id || null,
         })),
       }
 

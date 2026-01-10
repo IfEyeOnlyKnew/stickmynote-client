@@ -52,6 +52,7 @@ interface Reply {
   view_count: number
   org_id: string
   personal_stick_id?: string
+  parent_reply_id?: string | null
 }
 
 interface UserInfo {
@@ -81,7 +82,8 @@ const REPLY_SELECT_FIELDS = `
   updated_at,
   user_id,
   view_count,
-  org_id
+  org_id,
+  parent_reply_id
 `
 
 const USER_SELECT_FIELDS = "id, email, full_name, avatar_url"
@@ -232,6 +234,7 @@ function buildCompleteReply(reply: Reply, userData: UserInfo | null, fallbackEma
     updated_at: reply.updated_at,
     user_id: reply.user_id,
     view_count: reply.view_count || 0,
+    parent_reply_id: reply.parent_reply_id || null,
     user: {
       id: userData?.id || reply.user_id,
       username: userData?.full_name || fallbackEmail?.split("@")[0] || "User",
@@ -360,7 +363,10 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
 
     const { user, orgContext, db } = authResult.context
     const body = await request.json()
-    const { content, color = DEFAULT_REPLY_COLOR } = body
+    const { content, color = DEFAULT_REPLY_COLOR, parent_reply_id = null } = body
+
+    console.log("[Replies POST] Request body:", body)
+    console.log("[Replies POST] Parsed parent_reply_id:", parent_reply_id)
 
     if (!content?.trim()) {
       return Errors.contentRequired()
@@ -386,6 +392,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
         content: content.trim(),
         color,
         org_id: orgContext.orgId,
+        parent_reply_id: parent_reply_id || null,
       })
       .select()
       .single()

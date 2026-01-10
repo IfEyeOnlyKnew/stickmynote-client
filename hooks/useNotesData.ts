@@ -32,6 +32,7 @@ interface ReplyRow {
   updated_at?: string
   user_id: string
   personal_stick_id: string
+  parent_reply_id?: string | null
 }
 
 interface UseNotesDataReturn {
@@ -165,6 +166,7 @@ function transformNote(
       updated_at: reply.updated_at || reply.created_at,
       user_id: reply.user_id,
       note_id: reply.personal_stick_id,
+      parent_reply_id: reply.parent_reply_id || null,
     })),
     z_index: 1,
   }

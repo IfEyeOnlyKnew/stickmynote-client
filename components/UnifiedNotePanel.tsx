@@ -33,6 +33,9 @@ export const UnifiedNotePanel: React.FC = () => {
     onNoteUpdate,
     onNoteInteraction,
     onAddReply,
+    onEditReply,
+    onDeleteReply,
+    currentUserId,
     onOpenFullscreen,
   } = context
 
@@ -244,10 +247,15 @@ export const UnifiedNotePanel: React.FC = () => {
           showReplyForm={showReplyForm}
           replyContent={replyContent}
           isSubmittingReply={isSubmittingReply}
+          setIsSubmittingReply={setIsSubmittingReply}
           onOpenFullscreen={onOpenFullscreen}
           onAddReplyClick={handleAddReplyClick}
           onCancelReply={handleCancelReply}
           onStickReply={handleStickReply}
+          onAddReply={onAddReply}
+          onEditReply={onEditReply}
+          onDeleteReply={onDeleteReply}
+          currentUserId={currentUserId}
           onReplyContentChange={setReplyContent}
         />
 

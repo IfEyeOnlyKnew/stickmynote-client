@@ -40,6 +40,7 @@ interface ReplyData {
   updated_at?: string
   user_id?: string
   personal_stick_id: string
+  parent_reply_id?: string | null
   user?: ReplyUser
 }
 
@@ -145,7 +146,7 @@ async function fetchRepliesForNotes(db: DatabaseClient, noteIds: string[]): Prom
   try {
     const { data: replies } = await db
       .from("personal_sticks_replies")
-      .select("id, content, color, created_at, updated_at, user_id, personal_stick_id")
+      .select("id, content, color, created_at, updated_at, user_id, personal_stick_id, parent_reply_id")
       .in("personal_stick_id", noteIds)
       .order("created_at", { ascending: true })
 

@@ -28,7 +28,7 @@ interface NoteContextValue {
   onSummarizeLinks?: (noteId: string) => void
   onMouseDown?: (e: React.MouseEvent, noteId: string) => void
   onFocusTopicTextarea?: (noteId: string) => void
-  onAddReply: (noteId: string, content: string, color?: string) => Promise<void>
+  onAddReply: (noteId: string, content: string, color?: string, parentReplyId?: string | null) => Promise<void>
   onEditReply?: (noteId: string, replyId: string, content: string) => Promise<void>
   onDeleteReply?: (noteId: string, replyId: string) => Promise<void>
 

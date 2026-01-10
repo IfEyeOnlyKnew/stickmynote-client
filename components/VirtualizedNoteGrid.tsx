@@ -45,7 +45,8 @@ interface VirtualizedNoteGridProps {
   onAddReply?: (
     noteId: string,
     content: string,
-    color?: string
+    color?: string,
+    parentReplyId?: string | null
   ) => Promise<void>;
   onUpdateSharing?: (noteId: string, isShared: boolean) => void;
   onUpdateColor?: (noteId: string, color: string) => void;
