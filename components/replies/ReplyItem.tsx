@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useRef, useEffect } from "react"
-import { Trash2, Pencil, Check, X, MessageSquare, ChevronDown, ChevronRight, CornerDownRight, Send } from "lucide-react"
+import { Trash2, Pencil, Check, X, MessageSquare, ChevronDown, ChevronRight, CornerDownRight, Send, MessageCircle } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
@@ -18,6 +18,9 @@ const DEPTH_COLORS = [
   { line: "border-pink-400", bg: "bg-pink-50", text: "text-pink-600" },
   { line: "border-cyan-400", bg: "bg-cyan-50", text: "text-cyan-600" },
 ]
+
+// Maximum nesting depth before showing "Start a Chat" instead of reply button
+export const MAX_REPLY_DEPTH = 5
 
 interface Reply {
   id: string
@@ -53,6 +56,8 @@ interface ReplyItemProps {
   onReply?: (reply: Reply) => void
   // New: direct submit handler for inline reply
   onSubmitReply?: (content: string, parentReplyId: string) => Promise<void>
+  // Start a chat when depth >= MAX_REPLY_DEPTH
+  onStartChat?: (parentReply: Reply) => void
   onToggleCalStick: (replyId: string, currentIsCalStick: boolean, currentDate: string | null) => void
   onCalStickDateChange: (replyId: string, date: string) => void
   onSaveCalStickDate: (replyId: string) => void
@@ -73,6 +78,7 @@ export const ReplyItem: React.FC<ReplyItemProps> = ({
   onEdit,
   onReply,
   onSubmitReply,
+  onStartChat,
   onToggleCalStick,
   onCalStickDateChange,
   onSaveCalStickDate,
@@ -231,16 +237,31 @@ export const ReplyItem: React.FC<ReplyItemProps> = ({
                 </div>
               </div>
               <div className="flex items-center gap-1">
-                {(onReply || onSubmitReply) && !isEditing && !isReplying && (
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={handleReplyClick}
-                    className="h-6 w-6 p-0 text-blue-500 hover:text-blue-600 hover:bg-blue-50"
-                    title="Reply to this"
-                  >
-                    <MessageSquare className="h-3 w-3" />
-                  </Button>
+                {(onReply || onSubmitReply || onStartChat) && !isEditing && !isReplying && (
+                  depth >= MAX_REPLY_DEPTH && onStartChat ? (
+                    // At max depth - show "Start a Chat" button
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => onStartChat(reply)}
+                      className="h-6 px-2 text-xs text-purple-500 hover:text-purple-600 hover:bg-purple-50 flex items-center gap-1"
+                      title="Continue this discussion in a chat"
+                    >
+                      <MessageCircle className="h-3 w-3" />
+                      <span>Start Chat</span>
+                    </Button>
+                  ) : (onReply || onSubmitReply) ? (
+                    // Below max depth - show normal reply button
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={handleReplyClick}
+                      className="h-6 w-6 p-0 text-blue-500 hover:text-blue-600 hover:bg-blue-50"
+                      title="Reply to this"
+                    >
+                      <MessageSquare className="h-3 w-3" />
+                    </Button>
+                  ) : null
                 )}
                 {isOwner && !isEditing && (
                   <>
@@ -442,6 +463,7 @@ export const ReplyItem: React.FC<ReplyItemProps> = ({
                 onEdit={onEdit}
                 onReply={onReply}
                 onSubmitReply={onSubmitReply}
+                onStartChat={onStartChat}
                 onToggleCalStick={onToggleCalStick}
                 onCalStickDateChange={onCalStickDateChange}
                 onSaveCalStickDate={onSaveCalStickDate}

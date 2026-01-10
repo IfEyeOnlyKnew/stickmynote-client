@@ -44,9 +44,9 @@ export async function GET(
       }
     }
 
-    // Get replies with user data
+    // Get replies with user data (include parent_reply_id for threading)
     const repliesResult = await db.query(
-      `SELECT r.id, r.content, r.color, r.created_at, r.updated_at, r.user_id, r.view_count,
+      `SELECT r.id, r.content, r.color, r.created_at, r.updated_at, r.user_id, r.view_count, r.parent_reply_id,
               u.id as uid, u.username, u.full_name, u.avatar_url
        FROM personal_sticks_replies r
        LEFT JOIN users u ON r.user_id = u.id
@@ -63,6 +63,7 @@ export async function GET(
       updated_at: r.updated_at,
       user_id: r.user_id,
       view_count: r.view_count || 0,
+      parent_reply_id: r.parent_reply_id || null,
       user: {
         id: r.uid,
         username: r.username,

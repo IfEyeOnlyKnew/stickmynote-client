@@ -74,14 +74,14 @@ export default async function NotesPage() {
         }
       }
 
-      // Fetch replies with user info
+      // Fetch replies with user info (include parent_reply_id for threading)
       const repliesResult = await db.query(
-        `SELECT r.id, r.content, r.color, r.created_at, r.updated_at, r.user_id, r.personal_stick_id,
+        `SELECT r.id, r.content, r.color, r.created_at, r.updated_at, r.user_id, r.personal_stick_id, r.parent_reply_id,
                 u.full_name, u.email
          FROM personal_sticks_replies r
          LEFT JOIN users u ON u.id = r.user_id
          WHERE r.personal_stick_id = ANY($1)
-         ORDER BY r.created_at DESC`,
+         ORDER BY r.created_at ASC`,
         [noteIds]
       )
 
@@ -95,6 +95,7 @@ export default async function NotesPage() {
           updated_at: reply.updated_at || reply.created_at,
           user_id: reply.user_id,
           note_id: reply.personal_stick_id,
+          parent_reply_id: reply.parent_reply_id || null,
           user: {
             username: reply.full_name || null,
             email: reply.email || null,

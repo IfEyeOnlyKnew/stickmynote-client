@@ -64,11 +64,11 @@ export async function listNotes(session: NotesSession, limit = 50, offset = 0) {
       console.log('[notes-handler] No note IDs to query tabs for')
     }
 
-    // Fetch replies for all notes
+    // Fetch replies for all notes (include parent_reply_id for threading)
     let replies: any[] = []
     if (noteIds.length > 0) {
       replies = await query(
-        `SELECT id, content, color, created_at, updated_at, user_id, personal_stick_id
+        `SELECT id, content, color, created_at, updated_at, user_id, personal_stick_id, parent_reply_id
          FROM personal_sticks_replies
          WHERE personal_stick_id = ANY($1)
          ORDER BY created_at ASC`,

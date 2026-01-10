@@ -1,5 +1,5 @@
-const CACHE_NAME = "stickmynote-v1"
-const API_CACHE_NAME = "stickmynote-api-v1"
+const CACHE_NAME = "stickmynote-v2"
+const API_CACHE_NAME = "stickmynote-api-v2"
 
 // Assets to cache immediately
 const PRECACHE_ASSETS = ["/", "/manifest.json", "/placeholder-logo.png", "/globals.css"]

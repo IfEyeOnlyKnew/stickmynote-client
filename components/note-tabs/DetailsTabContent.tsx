@@ -197,7 +197,11 @@ export const DetailsTabContent = memo(function DetailsTabContent({
               >
                 <div className="flex-1">
                   <div className="text-sm font-medium text-gray-900">
-                    {exportLink.type === "link_summary" ? "Link Summary Report" : "Complete Note Export"}
+                    {exportLink.type === "link_summary"
+                      ? "Link Summary Report"
+                      : exportLink.type === "chat_export"
+                        ? "Chat Conversation Export"
+                        : "Complete Note Export"}
                   </div>
                   <div className="text-xs text-gray-500">
                     Generated on {new Date(exportLink.created_at).toLocaleDateString()} at{" "}

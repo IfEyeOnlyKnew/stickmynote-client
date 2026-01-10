@@ -6,8 +6,9 @@ import { Button } from "@/components/ui/button"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { ReplyItem } from "@/components/replies/ReplyItem"
 import { ReplyForm } from "@/components/replies/ReplyForm"
+import { ChatModal } from "@/components/chat/ChatModal"
 import type React from "react"
-import { useCallback, useState, useEffect, useRef } from "react"
+import { useCallback, useState, useEffect, useRef, useMemo } from "react"
 
 // CollaborativeReplyForm uses Tiptap which requires client-side only rendering
 const CollaborativeReplyForm = dynamic(
@@ -190,6 +191,10 @@ export const UnifiedReplies: React.FC<UnifiedRepliesProps> = ({
   const [localReplies, setLocalReplies] = useState<Reply[]>(replies)
   const [replyingTo, setReplyingTo] = useState<Reply | null>(null)
 
+  // Chat modal state
+  const [chatModalOpen, setChatModalOpen] = useState(false)
+  const [chatParentReply, setChatParentReply] = useState<Reply | null>(null)
+
   // Refs for polling
   const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null)
   const lastReplyIdsRef = useRef<string>("")
@@ -297,6 +302,12 @@ export const UnifiedReplies: React.FC<UnifiedRepliesProps> = ({
       }
     }, 100)
   }, [setReplyContent])
+
+  // Handler for starting a chat when depth limit is reached
+  const handleStartChat = useCallback((parentReply: Reply) => {
+    setChatParentReply(parentReply)
+    setChatModalOpen(true)
+  }, [])
 
   const supportsCalStick = context === "stick"
 
@@ -495,10 +506,13 @@ export const UnifiedReplies: React.FC<UnifiedRepliesProps> = ({
     }
   }, [])
 
-  if (isNewNote) return null
-
   // Build threaded reply tree from flat list
-  const threadedReplies = buildReplyTree(localReplies)
+  // Use localReplies if it has data, otherwise fall back to props.replies
+  // This handles the initial render before the useEffect syncs state
+  const repliesToThread = localReplies.length > 0 ? localReplies : replies
+  const threadedReplies = useMemo(() => buildReplyTree(repliesToThread), [repliesToThread])
+
+  if (isNewNote) return null
 
   // Card context uses compact layout (just buttons)
   // Panel context now shows full threaded replies
@@ -584,6 +598,7 @@ export const UnifiedReplies: React.FC<UnifiedRepliesProps> = ({
                 onEdit={onEditReply ? handleEditReply : undefined}
                 onReply={undefined}
                 onSubmitReply={enableReplyToReply && canEdit && onAddReply ? handleSubmitInlineReply : undefined}
+                onStartChat={handleStartChat}
                 onToggleCalStick={handleToggleCalStick}
                 onCalStickDateChange={handleCalStickDateChange}
                 onSaveCalStickDate={handleSaveCalStickDate}
@@ -747,6 +762,7 @@ export const UnifiedReplies: React.FC<UnifiedRepliesProps> = ({
                 onEdit={onEditReply ? handleEditReply : undefined}
                 onReply={enableReplyToReply && canEdit && onAddReply ? undefined : (enableReplyToReply && canEdit ? handleReplyToReply : undefined)}
                 onSubmitReply={enableReplyToReply && canEdit && onAddReply ? handleSubmitInlineReply : undefined}
+                onStartChat={handleStartChat}
                 onToggleCalStick={handleToggleCalStick}
                 onCalStickDateChange={handleCalStickDateChange}
                 onSaveCalStickDate={handleSaveCalStickDate}
@@ -763,58 +779,86 @@ export const UnifiedReplies: React.FC<UnifiedRepliesProps> = ({
 
   if (context === "fullscreen" || context === "stick") {
     return (
-      <div className="bg-white rounded-lg shadow-md border h-full flex flex-col">
-        {renderHeader()}
+      <>
+        <div className="bg-white rounded-lg shadow-md border h-full flex flex-col">
+          {renderHeader()}
 
-        {canEdit && !isNewNote && (
-          <div className="p-4 border-b bg-white flex-shrink-0" data-reply-form>
-            {replyingTo && (
-              <div className="mb-2 flex items-center justify-between text-sm text-blue-600 bg-blue-50 px-3 py-2 rounded-lg">
-                <span>Replying to @{replyingTo.user?.username || replyingTo.user?.email || "User"}</span>
-                <button
-                  onClick={() => {
-                    setReplyingTo(null)
-                    setReplyContent("")
-                  }}
-                  className="text-blue-400 hover:text-blue-600"
-                >
-                  <X className="h-4 w-4" />
-                </button>
-              </div>
-            )}
-            {enableCollaboration ? (
-              <CollaborativeReplyForm
-                replyId={`${noteId}-new-reply`}
-                content={replyContent}
-                onContentChange={setReplyContent}
-                onSubmit={handleStickReply}
-                isSubmitting={isSubmittingReply}
-                isCompact={false}
-                enableCollaboration={enableCollaboration}
-              />
-            ) : (
-              <ReplyForm
-                content={replyContent}
-                onContentChange={setReplyContent}
-                onSubmit={handleStickReply}
-                isSubmitting={isSubmittingReply}
-                isCompact={false}
-              />
-            )}
-          </div>
+          {canEdit && !isNewNote && (
+            <div className="p-4 border-b bg-white flex-shrink-0" data-reply-form>
+              {replyingTo && (
+                <div className="mb-2 flex items-center justify-between text-sm text-blue-600 bg-blue-50 px-3 py-2 rounded-lg">
+                  <span>Replying to @{replyingTo.user?.username || replyingTo.user?.email || "User"}</span>
+                  <button
+                    onClick={() => {
+                      setReplyingTo(null)
+                      setReplyContent("")
+                    }}
+                    className="text-blue-400 hover:text-blue-600"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                </div>
+              )}
+              {enableCollaboration ? (
+                <CollaborativeReplyForm
+                  replyId={`${noteId}-new-reply`}
+                  content={replyContent}
+                  onContentChange={setReplyContent}
+                  onSubmit={handleStickReply}
+                  isSubmitting={isSubmittingReply}
+                  isCompact={false}
+                  enableCollaboration={enableCollaboration}
+                />
+              ) : (
+                <ReplyForm
+                  content={replyContent}
+                  onContentChange={setReplyContent}
+                  onSubmit={handleStickReply}
+                  isSubmitting={isSubmittingReply}
+                  isCompact={false}
+                />
+              )}
+            </div>
+          )}
+
+          <div className="p-4 flex-1 overflow-y-auto text-gray-900">{renderReplies()}</div>
+        </div>
+
+        {/* Chat Modal for deep thread conversations */}
+        {chatParentReply && (
+          <ChatModal
+            open={chatModalOpen}
+            onOpenChange={setChatModalOpen}
+            parentReply={chatParentReply}
+            parentNoteId={noteId}
+            context={context === "stick" ? "stick" : "note"}
+            currentUserId={currentUserId || ""}
+          />
         )}
-
-        <div className="p-4 flex-1 overflow-y-auto text-gray-900">{renderReplies()}</div>
-      </div>
+      </>
     )
   }
 
   return (
-    <div className="w-full lg:w-1/2 lg:flex-shrink-0 mt-6 lg:mt-0">
-      <div className="bg-white rounded-lg shadow-md border h-fit">
-        {renderHeader()}
-        <div className="p-4 max-h-[600px] overflow-y-auto text-gray-900">{renderReplies()}</div>
+    <>
+      <div className="w-full lg:w-1/2 lg:flex-shrink-0 mt-6 lg:mt-0">
+        <div className="bg-white rounded-lg shadow-md border h-fit">
+          {renderHeader()}
+          <div className="p-4 max-h-[600px] overflow-y-auto text-gray-900">{renderReplies()}</div>
+        </div>
       </div>
-    </div>
+
+      {/* Chat Modal for deep thread conversations */}
+      {chatParentReply && (
+        <ChatModal
+          open={chatModalOpen}
+          onOpenChange={setChatModalOpen}
+          parentReply={chatParentReply}
+          parentNoteId={noteId}
+          context={context === "stick" ? "stick" : "note"}
+          currentUserId={currentUserId || ""}
+        />
+      )}
+    </>
   )
 }
