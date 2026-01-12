@@ -124,8 +124,9 @@ pnpm run build
 3. [ ] Verify `certs/` folder has SSL certificates (`server.crt`, `server.key`)
 4. [ ] Run `pnpm run build` successfully
 5. [ ] Restart the Windows service (nssm restart StickyMyNote)
-6. [ ] Test https://stickmynotes.com loads correctly
+6. [ ] Test https://stickmynote.com loads correctly
 7. [ ] Verify port 443 is listening: `netstat -an | findstr :443`
+8. [ ] **Verify DNS resolution:** `nslookup stickmynote.com` should return `192.168.50.20`
 
 ---
 
@@ -246,3 +247,91 @@ nssm restart StickyMyNote
 **Prevention:**
 - All routes using LDAP must have `export const dynamic = 'force-dynamic'`
 - All functions importing ldapjs must check `process.env.BUILDING` before import
+
+---
+
+### 2026-01-11: Production Outage - Internal DNS Misconfiguration (CSRF Error)
+
+**What happened:**
+- Users received "Invalid CSRF token" error when trying to sign in
+- Site appeared to load but all API calls failed with 404 from IIS
+
+**Symptoms:**
+- `curl -k https://stickmynote.com/api/csrf` returned IIS 404 page
+- Error message: `Server: Microsoft-IIS/10.0`
+
+**Root cause:**
+- Active Directory domain name is `stickmynote.com` (same as public website)
+- This creates an internal DNS zone on the domain controller (192.168.50.11)
+- The `@` A record in this zone pointed to `192.168.50.11` (the DC itself)
+- Internal clients resolved `stickmynote.com` to the DC instead of the app server
+- IIS on the DC responded with 404 for all Next.js routes
+
+**How to diagnose:**
+```powershell
+# From any internal machine - check where DNS resolves
+nslookup stickmynote.com              # Internal DNS result
+nslookup stickmynote.com 8.8.8.8      # Public DNS result (should be Cloudflare IPs)
+
+# If these differ, internal DNS is overriding Cloudflare
+```
+
+**Resolution:**
+On domain controller (192.168.50.11):
+```powershell
+# Check the DNS zone records
+Get-DnsServerResourceRecord -ZoneName "stickmynote.com" -RRType A
+
+# Remove wrong A record
+Remove-DnsServerResourceRecord -ZoneName "stickmynote.com" -Name "@" -RRType A -RecordData "192.168.50.11" -Force
+
+# Add correct A record pointing to app server
+Add-DnsServerResourceRecordA -ZoneName "stickmynote.com" -Name "@" -IPv4Address "192.168.50.20"
+```
+
+Then flush DNS on client machines:
+```cmd
+ipconfig /flushdns
+```
+
+**Prevention:**
+- AD domain = public domain creates "split-brain DNS" - internal DNS zone overrides Cloudflare
+- The `@` A record in the internal `stickmynote.com` zone **MUST** point to `192.168.50.20`
+- Add DNS verification to post-update checklist
+- If DNS issues suspected, always check: `nslookup stickmynote.com` vs `nslookup stickmynote.com 8.8.8.8`
+
+---
+
+## Network Architecture Reference
+
+| Server | IP Address | Role |
+|--------|------------|------|
+| WIN-R0HEEUG88NH | 192.168.50.11 | Domain Controller, DNS Server |
+| HOL-DC2-IIS | 192.168.50.20 | **Application Server (StickyMyNote)** |
+| HOL-DC3-PGSQL | 192.168.50.30 | PostgreSQL Database Server |
+| HOL-DC4-EXCH | 192.168.50.40 | Exchange Server |
+| HOL-DC5-REDIS | 192.168.50.50 | Redis Cache Server |
+| HOL-OLLAMA | 192.168.50.70 | Ollama AI Server |
+
+---
+
+## DNS Configuration (Critical)
+
+Because the AD domain is `stickmynote.com`, the domain controller has an authoritative DNS zone that overrides external DNS for internal clients.
+
+**Required DNS records in `stickmynote.com` zone on DC (192.168.50.11):**
+
+| Name | Type | Value | Purpose |
+|------|------|-------|---------|
+| `@` | A | `192.168.50.20` | Root domain points to app server |
+| `www` | A | `192.168.50.20` | WWW subdomain (if used) |
+
+**Do NOT change these records (AD-managed):**
+- `_msdcs`, `_gc._tcp`, `_kerberos.*`, `_ldap.*` - Active Directory service records
+- `DomainDnsZones`, `ForestDnsZones` - AD replication zones
+
+**Verification command:**
+```powershell
+Get-DnsServerResourceRecord -ZoneName "stickmynote.com" -Name "@" -RRType A
+# Should show: 192.168.50.20
+```
