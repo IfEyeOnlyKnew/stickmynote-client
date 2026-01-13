@@ -70,11 +70,14 @@ export function useNoteTabs(noteId: string, resetKey: number | undefined, config
       ;(window as any)[config.globalRefreshFunctionName] = refreshTabs
 
       // Also listen for custom event
-      const handleRefreshEvent = () => refreshTabs()
-      window.addEventListener(config.globalRefreshFunctionName, handleRefreshEvent)
+      const eventName = config.globalRefreshFunctionName
+      if (eventName) {
+        const handleRefreshEvent = () => refreshTabs()
+        window.addEventListener(eventName, handleRefreshEvent)
 
-      return () => {
-        window.removeEventListener(config.globalRefreshFunctionName, handleRefreshEvent)
+        return () => {
+          window.removeEventListener(eventName, handleRefreshEvent)
+        }
       }
     }
   }, [refreshTabs, config.globalRefreshFunctionName])

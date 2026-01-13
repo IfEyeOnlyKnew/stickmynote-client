@@ -107,7 +107,8 @@ export const ReplyItem: React.FC<ReplyItemProps> = ({
   // Get depth-based styling
   const depthColors = DEPTH_COLORS[depth % DEPTH_COLORS.length]
   const nextDepthColors = DEPTH_COLORS[(depth + 1) % DEPTH_COLORS.length]
-  const indentPx = depth * 24 // 24px per level
+  // Reduce indentation for deeper nesting to prevent overflow (16px per level, max 80px)
+  const indentPx = Math.min(depth * 16, 80)
 
   // Focus textarea when opening reply form
   useEffect(() => {
@@ -184,25 +185,28 @@ export const ReplyItem: React.FC<ReplyItemProps> = ({
     }
   }
 
+  // Calculate thread line position based on reduced indentation
+  const threadLineLeft = depth > 0 ? Math.min((depth - 1) * 16, 64) + 6 : 0
+
   return (
-    <li className="list-none relative">
+    <li className="list-none relative overflow-hidden">
       {/* Thread line for nested replies */}
       {depth > 0 && (
         <div
           className={`absolute left-0 top-0 bottom-0 w-0.5 ${depthColors.line}`}
-          style={{ marginLeft: `${(depth - 1) * 24 + 8}px` }}
+          style={{ marginLeft: `${threadLineLeft}px` }}
         />
       )}
 
       <div
-        className="relative"
+        className="relative min-w-0"
         style={{ marginLeft: `${indentPx}px` }}
       >
         {/* Horizontal connector line */}
         {depth > 0 && (
           <div
-            className={`absolute left-0 top-5 w-4 h-0.5 ${depthColors.line}`}
-            style={{ marginLeft: "-16px" }}
+            className={`absolute left-0 top-5 w-3 h-0.5 ${depthColors.line}`}
+            style={{ marginLeft: "-12px" }}
           />
         )}
 
@@ -394,7 +398,7 @@ export const ReplyItem: React.FC<ReplyItemProps> = ({
         {isReplying && onSubmitReply && (
           <div
             className={`mt-2 p-3 rounded-lg border-2 border-dashed ${nextDepthColors.line} ${nextDepthColors.bg}`}
-            style={{ marginLeft: "24px" }}
+            style={{ marginLeft: "16px" }}
           >
             <div className={`flex items-center gap-1 text-xs ${nextDepthColors.text} mb-2`}>
               <CornerDownRight className="h-3 w-3" />

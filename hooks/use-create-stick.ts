@@ -12,7 +12,9 @@ interface CreateStickData extends StickForm {
   color: string
 }
 
-export function useCreateStick(padId: string) {
+type StickContext = "paks" | "social"
+
+export function useCreateStick(padId: string, context: StickContext = "paks") {
   const [form, setForm] = useState<StickForm>({
     topic: "",
     content: "",
@@ -40,14 +42,18 @@ export function useCreateStick(padId: string) {
     setError(null)
 
     try {
-      const response = await fetch("/api/sticks", {
+      // Use different API endpoints based on context
+      const endpoint = context === "social" ? "/api/social-sticks" : "/api/sticks"
+      const padIdField = context === "social" ? "social_pad_id" : "pad_id"
+
+      const response = await fetch(endpoint, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
           ...stickData,
-          pad_id: padId,
+          [padIdField]: padId,
         }),
       })
 

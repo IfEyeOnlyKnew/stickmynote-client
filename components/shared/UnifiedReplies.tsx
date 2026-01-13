@@ -780,7 +780,7 @@ export const UnifiedReplies: React.FC<UnifiedRepliesProps> = ({
   if (context === "fullscreen" || context === "stick") {
     return (
       <>
-        <div className="bg-white rounded-lg shadow-md border h-full flex flex-col">
+        <div className="bg-white rounded-lg shadow-md border flex flex-col min-w-0">
           {renderHeader()}
 
           {canEdit && !isNewNote && (
@@ -821,7 +821,7 @@ export const UnifiedReplies: React.FC<UnifiedRepliesProps> = ({
             </div>
           )}
 
-          <div className="p-4 flex-1 overflow-y-auto text-gray-900">{renderReplies()}</div>
+          <div className="p-4 flex-1 overflow-y-auto overflow-x-hidden text-gray-900 min-w-0">{renderReplies()}</div>
         </div>
 
         {/* Chat Modal for deep thread conversations */}

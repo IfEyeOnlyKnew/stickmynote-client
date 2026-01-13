@@ -9,36 +9,38 @@ const createStickAction = createSafeAction(
     rateLimit: "sticks_create",
   },
   async (input, { user, db }) => {
+    if (!user) {
+      return error("Unauthorized", 401)
+    }
+
     const orgContext = await getOrgContext()
     if (!orgContext) {
       return error("No organization context", 403)
     }
 
+    // Find the pad without org_id filter - we'll check permissions separately
+    // This allows creating sticks on shared pads from other orgs
     const { data: pad } = await db
       .from("paks_pads")
       .select("owner_id, org_id")
       .eq("id", input.pad_id)
-      .eq("org_id", orgContext.orgId)
       .maybeSingle()
 
     if (!pad) {
       return error("Pad not found", 404)
     }
 
-    if (!user) {
-      return error("Unauthorized", 401)
-    }
-
     const isOwner = pad.owner_id === user.id
 
     let canCreate = isOwner
+
     if (!isOwner) {
+      // Check membership - for shared pads, membership may exist across orgs
       const { data: membership } = await db
         .from("paks_pad_members")
         .select("role")
         .eq("pad_id", input.pad_id)
         .eq("user_id", user.id)
-        .eq("org_id", orgContext.orgId)
         .eq("accepted", true)
         .maybeSingle()
 
@@ -49,6 +51,8 @@ const createStickAction = createSafeAction(
       return error("Insufficient permissions to create Sticks", 403)
     }
 
+    // Use the pad's org_id for the stick, not the user's current org context
+    // This keeps sticks in the same org as the pad they belong to
     const { data: newStick, error: dbError } = await db
       .from("paks_pad_sticks")
       .insert({
@@ -60,7 +64,7 @@ const createStickAction = createSafeAction(
         position_x: input.position_x || 0,
         position_y: input.position_y || 0,
         user_id: user.id,
-        org_id: orgContext.orgId,
+        org_id: pad.org_id,
       })
       .select()
       .single()

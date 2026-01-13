@@ -19,10 +19,11 @@ interface CreateStickModalProps {
   isOpen: boolean
   onClose: () => void
   padId: string
+  context?: "paks" | "social"
 }
 
-export function CreateStickModal({ isOpen, onClose, padId }: CreateStickModalProps) {
-  const { form, updateForm, resetForm, createStick, isLoading, isValid } = useCreateStick(padId)
+export function CreateStickModal({ isOpen, onClose, padId, context = "social" }: CreateStickModalProps) {
+  const { form, updateForm, resetForm, createStick, isLoading, isValid } = useCreateStick(padId, context)
 
   const { lastSaved, isSaving, deleteDraft } = useAutoSaveDraft({
     padId,

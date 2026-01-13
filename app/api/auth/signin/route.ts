@@ -1,6 +1,7 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { authenticateWithAD } from "@/lib/auth/ldap-auth"
 import { createToken } from "@/lib/auth/local-auth"
+import { checkLockout, recordLoginAttempt } from "@/lib/auth/lockout"
 import { validateCSRFMiddleware } from "@/lib/csrf"
 import { cookies } from "next/headers"
 
@@ -22,41 +23,26 @@ export async function POST(request: NextRequest) {
 
     const normalizedEmail = email.trim().toLowerCase()
 
-    // Check lockout before attempting sign in
-    const lockoutCheck = await fetch(`${request.nextUrl.origin}/api/auth/check-lockout`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email: normalizedEmail }),
-    })
-
-    if (lockoutCheck.ok) {
-      const lockoutData = await lockoutCheck.json()
-      if (lockoutData.locked) {
-        return NextResponse.json(
-          {
-            error: `Account is temporarily locked. Please try again in ${lockoutData.remainingMinutes} minute${lockoutData.remainingMinutes === 1 ? "" : "s"}.`,
-            locked: true,
-            remainingMinutes: lockoutData.remainingMinutes,
-          },
-          { status: 429 }
-        )
-      }
+    // Check lockout before attempting sign in (direct DB call)
+    const lockoutData = await checkLockout(normalizedEmail)
+    if (lockoutData.locked) {
+      return NextResponse.json(
+        {
+          error: `Account is temporarily locked. Please try again in ${lockoutData.remainingMinutes} minute${lockoutData.remainingMinutes === 1 ? "" : "s"}.`,
+          locked: true,
+          remainingMinutes: lockoutData.remainingMinutes,
+        },
+        { status: 429 }
+      )
     }
 
     // Attempt sign in with Active Directory
     const result = await authenticateWithAD(email, password)
 
     if (!result.success || !result.user) {
-      // Record failed attempt
-      await fetch(`${request.nextUrl.origin}/api/auth/record-attempt`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ 
-          email: normalizedEmail, 
-          success: false,
-          ipAddress: request.headers.get("x-forwarded-for") || request.headers.get("x-real-ip")
-        }),
-      })
+      // Record failed attempt (direct DB call)
+      const ipAddress = request.headers.get("x-forwarded-for") || request.headers.get("x-real-ip")
+      await recordLoginAttempt(normalizedEmail, false, ipAddress)
 
       return NextResponse.json(
         { error: result.error || "Invalid credentials" },
@@ -67,12 +53,8 @@ export async function POST(request: NextRequest) {
     // Create JWT token for the authenticated user
     const token = await createToken(result.user.id)
 
-    // Record successful attempt
-    await fetch(`${request.nextUrl.origin}/api/auth/record-attempt`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email: normalizedEmail, success: true }),
-    })
+    // Record successful attempt (direct DB call)
+    await recordLoginAttempt(normalizedEmail, true)
 
     // Set auth cookie
     const cookieStore = cookies()
