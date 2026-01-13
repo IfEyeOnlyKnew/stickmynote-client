@@ -335,3 +335,58 @@ Because the AD domain is `stickmynote.com`, the domain controller has an authori
 Get-DnsServerResourceRecord -ZoneName "stickmynote.com" -Name "@" -RRType A
 # Should show: 192.168.50.20
 ```
+
+---
+
+## Code Patterns to Avoid in Production
+
+### Never Use Internal fetch() for API-to-API Calls
+
+**Problem:** Node.js v24 has stricter TLS defaults. When server-side code calls itself via HTTPS (e.g., `fetch('https://stickmynote.com/api/...')`), it can fail with SSL errors like `ERR_SSL_PACKET_LENGTH_TOO_LONG`.
+
+**Bad pattern:**
+```typescript
+// DON'T DO THIS - fails on Node v24 with self-signed certs
+const response = await fetch(`${request.nextUrl.origin}/api/auth/check-lockout`, {
+  method: "POST",
+  body: JSON.stringify({ email }),
+})
+```
+
+**Good pattern:**
+```typescript
+// DO THIS - direct function call, no HTTP overhead
+import { checkLockout } from "@/lib/auth/lockout"
+const lockoutData = await checkLockout(email)
+```
+
+**Affected files to check:**
+- `app/api/auth/signin/route.ts` - Must use direct `checkLockout()` and `recordLoginAttempt()` calls
+- Any API route that calls another API route internally
+
+### 2026-01-13: Production Outage - Sign-in Failed (SSL/TLS Error)
+
+**What happened:**
+- Users could not sign in - received 500 Internal Server Error
+- Console showed: `POST https://stickmynote.com/api/auth/check-lockout 500`
+
+**Root cause:**
+- `signin/route.ts` used `fetch()` to call `/api/auth/check-lockout` and `/api/auth/record-attempt`
+- Node.js v24 has stricter TLS requirements
+- Self-referential HTTPS fetch calls failed with `ERR_SSL_PACKET_LENGTH_TOO_LONG`
+
+**Resolution:**
+Changed `signin/route.ts` to use direct database function calls:
+```typescript
+// Before (broken):
+const lockoutCheck = await fetch(`${request.nextUrl.origin}/api/auth/check-lockout`, {...})
+
+// After (fixed):
+import { checkLockout, recordLoginAttempt } from "@/lib/auth/lockout"
+const lockoutData = await checkLockout(normalizedEmail)
+```
+
+**Prevention:**
+- Never use `fetch()` for internal API-to-API calls
+- Always use direct function imports for server-side operations
+- Add this check to code review process

@@ -150,3 +150,34 @@ nssm restart StickyMyNote
 - Verify `server.js` wasn't overwritten: check for `require("https")`
 - Restore from backup: `cp server.js.backup server.js`
 - Restart service: `nssm restart StickyMyNote`
+
+### Sign-in Returns 500 Error (SSL/TLS Issue)
+- **Cause:** Node.js v24 has stricter TLS. Internal `fetch()` calls to HTTPS endpoints fail.
+- **Fix:** API routes must NOT use `fetch()` to call other API routes internally.
+- **Example:** `signin/route.ts` must use `checkLockout()` directly, not `fetch('/api/auth/check-lockout')`
+
+## Code Patterns to Avoid
+
+### Never Use Internal fetch() for API-to-API Calls
+
+Production runs Node.js v24 with stricter TLS. Self-referential HTTPS fetch calls will fail.
+
+**BAD - Will fail in production:**
+```typescript
+// DON'T DO THIS
+const response = await fetch(`${request.nextUrl.origin}/api/auth/check-lockout`, {
+  method: "POST",
+  body: JSON.stringify({ email }),
+})
+```
+
+**GOOD - Direct function call:**
+```typescript
+// DO THIS
+import { checkLockout } from "@/lib/auth/lockout"
+const lockoutData = await checkLockout(email)
+```
+
+**Files that must use direct calls (not fetch):**
+- `app/api/auth/signin/route.ts` - uses `checkLockout()` and `recordLoginAttempt()`
+- Any API route calling another API route internally
