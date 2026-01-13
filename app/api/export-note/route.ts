@@ -217,7 +217,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Note ID is required" }, { status: 400 })
     }
 
-    if (!generateText) {
+    if (!isAIAvailable()) {
       return NextResponse.json({ error: "AI service not available" }, { status: 500 })
     }
 
