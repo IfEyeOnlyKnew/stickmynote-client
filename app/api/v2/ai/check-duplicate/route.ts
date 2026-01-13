@@ -1,6 +1,6 @@
 // v2 AI Check Duplicate API: production-quality, check for duplicate content
 import { db } from '@/lib/database/pg-client'
-import { GrokService } from '@/lib/ai/grok-service'
+import { AIService } from '@/lib/ai/ai-service'
 import { getOrgContext } from '@/lib/auth/get-org-context'
 import { getCachedAuthUser } from '@/lib/auth/cached-auth'
 import { handleApiError } from '@/lib/api/handle-api-error'
@@ -48,7 +48,7 @@ export async function POST(request: Request) {
       [padId, orgContext.orgId]
     )
 
-    const result = await GrokService.checkDuplicate(content, sticksResult.rows || [])
+    const result = await AIService.checkDuplicate(content, sticksResult.rows || [])
 
     return new Response(JSON.stringify(result), { status: 200 })
   } catch (error) {

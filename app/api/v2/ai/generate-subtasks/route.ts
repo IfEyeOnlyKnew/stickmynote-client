@@ -1,5 +1,5 @@
 // v2 AI Generate Subtasks API: production-quality, generate subtasks from task
-import { generateText } from 'ai'
+import { generateText, isAIAvailable } from '@/lib/ai/ai-provider'
 import { getCachedAuthUser } from '@/lib/auth/cached-auth'
 import { handleApiError } from '@/lib/api/handle-api-error'
 
@@ -9,6 +9,10 @@ export const maxDuration = 30
 // POST /api/v2/ai/generate-subtasks - Generate subtasks from task content
 export async function POST(request: Request) {
   try {
+    if (!isAIAvailable()) {
+      return new Response(JSON.stringify({ error: 'AI service not configured' }), { status: 500 })
+    }
+
     const authResult = await getCachedAuthUser()
 
     if (authResult.rateLimited) {
@@ -32,7 +36,6 @@ export async function POST(request: Request) {
     }
 
     const { text } = await generateText({
-      model: 'xai/grok-2-1212' as any,
       prompt: `Break down the following task into 3-5 actionable subtasks. Return ONLY a JSON array of strings.
 
       Task: "${taskContent}"

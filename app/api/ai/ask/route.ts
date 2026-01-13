@@ -1,12 +1,16 @@
 import { NextResponse } from "next/server"
 import { createDatabaseClient } from "@/lib/database/database-adapter"
-import { generateText } from "ai"
+import { generateText, isAIAvailable } from "@/lib/ai/ai-provider"
 import { getCachedAuthUser } from "@/lib/auth/cached-auth"
 
 export const dynamic = "force-dynamic"
 
 export async function POST(request: Request) {
   try {
+    if (!isAIAvailable()) {
+      return NextResponse.json({ error: "AI service not configured" }, { status: 500 })
+    }
+
     const db = await createDatabaseClient()
     const authResult = await getCachedAuthUser()
 
@@ -76,7 +80,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Daily AI session limit reached. Try again tomorrow." }, { status: 429 })
     }
 
-    // Generate answer using AI SDK with Vercel AI Gateway
+    // Generate answer using unified AI provider
     const prompt = `You are a helpful assistant. Please provide a clear, concise, and informative answer to the following question:
 
 Question: ${question}
@@ -84,9 +88,8 @@ Question: ${question}
 Provide a helpful answer. If you need more context to answer properly, explain what additional information would be helpful.`
 
     const { text: answer } = await generateText({
-      model: "xai/grok-3-mini" as any,
       prompt,
-      maxOutputTokens: 500,
+      maxTokens: 500,
     })
 
     // Log the session (ignore errors if table doesn't exist)

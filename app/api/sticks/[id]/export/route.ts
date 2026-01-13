@@ -381,6 +381,9 @@ export async function POST(
       return NextResponse.json({ error: "Access denied" }, { status: 403 });
     }
 
+    // Use the stick's org_id for saving export link, not user's current context
+    const stickOrgId = stickData.org_id || orgContext.orgId;
+
     // Fetch stick replies
     const { data: replies } = await db
       .from("paks_pad_stick_replies")
@@ -719,7 +722,7 @@ export async function POST(
       type: "complete_export",
     };
 
-    await saveExportLink(db, stickId, user.id, orgContext.orgId, exportLink);
+    await saveExportLink(db, stickId, user.id, stickOrgId, exportLink);
 
     return NextResponse.json({
       success: true,

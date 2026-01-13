@@ -4,6 +4,7 @@ import { validateCSRFMiddleware } from "@/lib/csrf"
 import { getCachedAuthUser, createRateLimitResponse, createUnauthorizedResponse } from "@/lib/auth/cached-auth"
 import { getOrgContext } from "@/lib/auth/get-org-context"
 import { put } from "@/lib/storage/local-storage"
+import { generateText as aiGenerateText, isAIAvailable } from "@/lib/ai/ai-provider"
 
 /**
  * CHAT EXPORT API
@@ -51,8 +52,7 @@ interface ReplyContext {
   }
 }
 
-// Dynamic module references
-let generateText: typeof import("ai").generateText | undefined
+// Dynamic module references (docx only, AI uses unified provider)
 let Document: typeof import("docx").Document | undefined
 let Packer: typeof import("docx").Packer | undefined
 let Paragraph: typeof import("docx").Paragraph | undefined
@@ -60,13 +60,6 @@ let TextRun: typeof import("docx").TextRun | undefined
 let HeadingLevel: typeof import("docx").HeadingLevel | undefined
 
 const initializeModules = async () => {
-  try {
-    const aiModule = await import("ai")
-    generateText = aiModule.generateText
-  } catch (error) {
-    console.warn("[ChatExport] ai module not available:", error instanceof Error ? error.message : String(error))
-  }
-
   try {
     const docxModule = await import("docx")
     Document = docxModule.Document
@@ -244,7 +237,7 @@ export async function POST(
       return NextResponse.json({ error: "Note ID is required" }, { status: 400 })
     }
 
-    if (!generateText) {
+    if (!isAIAvailable()) {
       return NextResponse.json({ error: "AI service not available" }, { status: 500 })
     }
 
@@ -319,11 +312,18 @@ export async function POST(
     // Generate AI summary
     const prompt = buildChatExportPrompt(threadContext, messages)
 
-    const { text: summary } = await generateText({
-      model: "xai/grok-3" as any,
-      prompt,
-      maxOutputTokens: 1500,
-    })
+    let summary = "AI service unavailable"
+    if (isAIAvailable()) {
+      try {
+        const result = await aiGenerateText({
+          prompt,
+          maxTokens: 1500,
+        })
+        summary = result.text
+      } catch (e) {
+        console.error("[ChatExport] AI generation failed:", e)
+      }
+    }
 
     // Build DOCX document
     const summaryParagraphs = summary

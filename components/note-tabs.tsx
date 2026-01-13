@@ -30,6 +30,7 @@ const noteTabsConfig: NoteTabsConfig = {
   idFieldName: "noteId",
   supportsExportDeletion: true,
   isTeamNote: false,
+  globalRefreshFunctionName: "refreshNoteTabs",
 }
 
 export function NoteTabs(props: NoteTabsProps) {

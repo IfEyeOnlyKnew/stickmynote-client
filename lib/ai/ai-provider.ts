@@ -2,20 +2,17 @@
  * AI Provider Configuration
  *
  * This module provides a unified interface for AI text generation that supports
- * multiple providers. Use Azure OpenAI for enterprise privacy - your data stays
- * within your Azure tenant and is not used for model training.
+ * multiple providers. Ollama is the default for maximum privacy.
  *
  * Supported providers:
- * - ollama: Local Ollama models (Maximum privacy - runs on your own hardware)
+ * - ollama: Local Ollama models (Maximum privacy - runs on your own hardware) [DEFAULT]
  * - azure: Azure OpenAI Service (Enterprise, private, data stays in your tenant)
  * - anthropic: Anthropic Claude (High-quality, safety-focused)
- * - xai: xAI Grok (External API)
  *
  * Priority order:
- * 1. Ollama (if configured) - Maximum privacy, runs locally
- * 2. Azure OpenAI (if configured) - Recommended for enterprise/privacy
+ * 1. Ollama (if configured) - Maximum privacy, runs locally [RECOMMENDED]
+ * 2. Azure OpenAI (if configured) - Enterprise/privacy
  * 3. Anthropic Claude (if configured)
- * 4. xAI Grok (fallback)
  */
 
 import { generateText as aiGenerateText } from "ai"
@@ -72,7 +69,7 @@ export async function checkOllamaHealth(): Promise<{ available: boolean; error?:
   }
 }
 
-export type AIProvider = "ollama" | "azure" | "anthropic" | "xai" | "auto"
+export type AIProvider = "ollama" | "azure" | "anthropic" | "auto"
 
 interface AIProviderConfig {
   provider: AIProvider
@@ -91,10 +88,6 @@ interface AIProviderConfig {
     endpoint?: string
   }
   anthropic?: {
-    apiKey: string
-    model?: string
-  }
-  xai?: {
     apiKey: string
     model?: string
   }
@@ -138,14 +131,6 @@ export function getAIProviderConfig(): AIProviderConfig {
     }
   }
 
-  // xAI configuration
-  if (process.env.XAI_API_KEY) {
-    config.xai = {
-      apiKey: process.env.XAI_API_KEY,
-      model: process.env.XAI_MODEL || "xai/grok-3",
-    }
-  }
-
   return config
 }
 
@@ -167,19 +152,14 @@ export function getActiveProvider(): AIProvider {
     return "anthropic"
   }
 
-  if (config.provider === "xai" && config.xai) {
-    return "xai"
-  }
-
-  // Auto mode: prefer Ollama for maximum privacy, then Azure, Anthropic, fall back to xAI
+  // Auto mode: prefer Ollama for maximum privacy, then Azure, then Anthropic
   if (config.provider === "auto") {
     if (config.ollama) return "ollama"
     if (config.azure) return "azure"
     if (config.anthropic) return "anthropic"
-    if (config.xai) return "xai"
   }
 
-  throw new Error("No AI provider configured. Set OLLAMA_MODEL, AZURE_OPENAI_API_KEY, ANTHROPIC_API_KEY, or XAI_API_KEY.")
+  throw new Error("No AI provider configured. Set OLLAMA_MODEL, AZURE_OPENAI_API_KEY, or ANTHROPIC_API_KEY.")
 }
 
 /**
@@ -187,7 +167,7 @@ export function getActiveProvider(): AIProvider {
  */
 export function isAIAvailable(): boolean {
   const config = getAIProviderConfig()
-  return !!(config.ollama || config.azure || config.anthropic || config.xai)
+  return !!(config.ollama || config.azure || config.anthropic)
 }
 
 /**
@@ -203,8 +183,6 @@ export function getProviderDisplayName(): string {
       return "Azure OpenAI (Private)"
     case "anthropic":
       return "Anthropic Claude"
-    case "xai":
-      return "xAI Grok"
     default:
       return "Unknown"
   }
@@ -293,18 +271,6 @@ export async function generateText(options: GenerateTextOptions): Promise<{ text
     })
 
     return { text: result.text, provider: "anthropic" }
-  }
-
-  if (provider === "xai" && config.xai) {
-    const result = await aiGenerateText({
-      model: config.xai.model as any,
-      prompt: options.prompt,
-      maxOutputTokens: options.maxTokens,
-      temperature: options.temperature,
-      system: options.systemPrompt,
-    })
-
-    return { text: result.text, provider: "xai" }
   }
 
   throw new Error("No AI provider available")

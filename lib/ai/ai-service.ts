@@ -1,6 +1,12 @@
 import { generateText } from "@/lib/ai/ai-provider"
 
-export class GrokService {
+/**
+ * AIService - Unified AI service for Stick My Note
+ * 
+ * Uses the configured AI provider (Ollama by default for maximum privacy).
+ * All AI operations go through this service.
+ */
+export class AIService {
   /**
    * Generate tags for stick content using configured AI provider
    */
@@ -27,7 +33,7 @@ Return ONLY a comma-separated list of tags, nothing else.`
 
       return tags
     } catch (error) {
-      console.error("Error generating tags with Grok:", error)
+      console.error("[AIService] Error generating tags:", error)
       return []
     }
   }
@@ -50,7 +56,7 @@ Return ONLY the summary, nothing else.`
 
       return text.trim().substring(0, maxLength)
     } catch (error) {
-      console.error("Error summarizing content with Grok:", error)
+      console.error("[AIService] Error summarizing content:", error)
       return content.substring(0, maxLength) + "..."
     }
   }
@@ -101,7 +107,7 @@ Be strict - only mark as duplicate if content is very similar (>80% match).`
         similarity,
       }
     } catch (error) {
-      console.error("Error checking duplicate with Grok:", error)
+      console.error("[AIService] Error checking duplicate:", error)
       return { isDuplicate: false }
     }
   }
@@ -131,7 +137,7 @@ Return ONLY 3 reply suggestions, one per line, nothing else.`
 
       return suggestions
     } catch (error) {
-      console.error("Error generating reply suggestions with Grok:", error)
+      console.error("[AIService] Error generating reply suggestions:", error)
       return []
     }
   }
@@ -165,7 +171,7 @@ CONFIDENCE: [0-100 percentage]`
 
       return { sentiment, confidence }
     } catch (error) {
-      console.error("Error analyzing sentiment with Grok:", error)
+      console.error("[AIService] Error analyzing sentiment:", error)
       return { sentiment: "neutral", confidence: 50 }
     }
   }
@@ -195,7 +201,7 @@ Return ONLY the category name that best fits, or "none" if no good match. Return
 
       return matchedCategory || null
     } catch (error) {
-      console.error("Error categorizing stick with Grok:", error)
+      console.error("[AIService] Error categorizing stick:", error)
       return null
     }
   }
@@ -401,7 +407,7 @@ CITATIONS: [1], [3] - [brief relevance note]`
 
       return { answer, citations }
     } catch (error) {
-      console.error("Error answering pad question:", error)
+      console.error("[AIService] Error answering pad question:", error)
       return {
         answer: "I couldn't process your question. Please try rephrasing it.",
         citations: [],
@@ -409,3 +415,7 @@ CITATIONS: [1], [3] - [brief relevance note]`
     }
   }
 }
+
+// Backwards compatibility alias - will be removed in future version
+/** @deprecated Use AIService instead */
+export const GrokService = AIService

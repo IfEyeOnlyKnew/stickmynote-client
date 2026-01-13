@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server"
 import { createDatabaseClient } from "@/lib/database/database-adapter"
-import { GrokService } from "@/lib/ai/grok-service"
+import { AIService } from "@/lib/ai/ai-service"
 import { getOrgContext } from "@/lib/auth/get-org-context"
 import { getCachedAuthUser } from "@/lib/auth/cached-auth"
 
@@ -45,7 +45,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Failed to fetch existing sticks" }, { status: 500 })
     }
 
-    const result = await GrokService.checkDuplicate(content, existingSticks || [])
+    const result = await AIService.checkDuplicate(content, existingSticks || [])
 
     return NextResponse.json(result)
   } catch (error) {

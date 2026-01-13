@@ -17,7 +17,7 @@ export async function GET() {
       features: {
         authentication: !!process.env.JWT_SECRET,
         database: !!process.env.POSTGRES_HOST || !!process.env.DATABASE_URL,
-        ai_integration: !!process.env.XAI_API_KEY,
+        ai_integration: !!process.env.OLLAMA_BASE_URL || !!process.env.OLLAMA_MODEL,
         email: !!process.env.RESEND_API_KEY || !!process.env.SMTP_HOST,
         blob_storage: !!process.env.BLOB_READ_WRITE_TOKEN,
         redis: !!process.env.UPSTASH_REDIS_REST_URL || !!process.env.REDIS_URL,

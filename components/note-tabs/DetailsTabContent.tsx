@@ -201,7 +201,9 @@ export const DetailsTabContent = memo(function DetailsTabContent({
                       ? "Link Summary Report"
                       : exportLink.type === "chat_export"
                         ? "Chat Conversation Export"
-                        : "Complete Note Export"}
+                        : exportLink.type === "reply-summary"
+                          ? "Reply Summary Report"
+                          : "Complete Note Export"}
                   </div>
                   <div className="text-xs text-gray-500">
                     Generated on {new Date(exportLink.created_at).toLocaleDateString()} at{" "}

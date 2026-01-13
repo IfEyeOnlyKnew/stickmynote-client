@@ -3,11 +3,12 @@ import { type NextRequest } from 'next/server'
 import { db } from '@/lib/database/pg-client'
 import { getCachedAuthUser } from '@/lib/auth/cached-auth'
 import { getOrgContext } from '@/lib/auth/get-org-context'
-import { GrokService } from '@/lib/ai/grok-service'
+import { AIService } from '@/lib/ai/ai-service'
 import { handleApiError } from '@/lib/api/handle-api-error'
+import { isAIAvailable, checkOllamaHealth, getProviderDisplayName } from '@/lib/ai/ai-provider'
 
 export const dynamic = 'force-dynamic'
-export const maxDuration = 30
+export const maxDuration = 60 // Increase timeout for AI processing
 
 // POST /api/v2/social-sticks/[stickId]/summarize - Generate AI summary
 export async function POST(
@@ -26,6 +27,23 @@ export async function POST(
     }
     if (!authResult.user) {
       return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401 })
+    }
+
+    // Check if AI is available before proceeding
+    if (!isAIAvailable()) {
+      return new Response(
+        JSON.stringify({ error: 'AI service not configured. Please set OLLAMA_MODEL or other AI provider credentials.' }),
+        { status: 503 }
+      )
+    }
+
+    // Check Ollama health if using Ollama
+    const ollamaHealth = await checkOllamaHealth()
+    if (!ollamaHealth.available && process.env.AI_PROVIDER === 'ollama') {
+      return new Response(
+        JSON.stringify({ error: `Ollama server not available: ${ollamaHealth.error}. Make sure Ollama is running.` }),
+        { status: 503 }
+      )
     }
 
     const orgContext = await getOrgContext()
@@ -64,22 +82,22 @@ export async function POST(
       created_at: r.created_at,
     }))
 
-    // Generate AI summary
-    const summary = await GrokService.generateLiveSummary({
+    // Generate AI summary using configured provider (Ollama by default)
+    const summary = await AIService.generateLiveSummary({
       topic: stick.topic || 'Untitled',
       content: stick.content,
       replies: formattedReplies,
     })
 
     // Extract action items
-    const actionItems = await GrokService.extractActionItems({
+    const actionItems = await AIService.extractActionItems({
       topic: stick.topic || 'Untitled',
       content: stick.content,
       replies: formattedReplies,
     })
 
     // Generate suggested questions
-    const suggestedQuestions = await GrokService.generateNextQuestions({
+    const suggestedQuestions = await AIService.generateNextQuestions({
       topic: stick.topic || 'Untitled',
       content: stick.content,
       summary,
@@ -95,12 +113,15 @@ export async function POST(
       [summary, JSON.stringify(actionItems), JSON.stringify(suggestedQuestions), repliesResult.rows.length, stickId]
     )
 
+    console.log(`[v2/Summarize] Generated summary for stick ${stickId} using ${getProviderDisplayName()}`)
+
     return new Response(
       JSON.stringify({
         summary,
         actionItems,
         suggestedQuestions,
         replyCount: repliesResult.rows.length,
+        provider: getProviderDisplayName(),
       }),
       { status: 200 }
     )

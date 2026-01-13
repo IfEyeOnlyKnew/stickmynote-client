@@ -15,7 +15,7 @@ type EnvStatus = {
   hasPostgresHost?: boolean
   hasPostgresDatabase?: boolean
   hasPostgresUser?: boolean
-  hasXaiKey?: boolean
+  hasOllamaConfig?: boolean
   hasAiFallback?: boolean
   nodeEnv?: string
 }

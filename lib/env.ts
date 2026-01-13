@@ -56,8 +56,9 @@ const serverSchema = z.object({
   REDIS_URL: z.string().url().optional(),
 
   // AI Services - OPTIONAL
-  // Provider selection: "auto" | "ollama" | "azure" | "anthropic" | "xai"
-  AI_PROVIDER: z.enum(["auto", "ollama", "azure", "anthropic", "xai"]).optional(),
+  // Provider selection: "auto" | "ollama" | "azure" | "anthropic"
+  // Note: "ollama" is recommended for maximum privacy (runs on your own hardware)
+  AI_PROVIDER: z.enum(["auto", "ollama", "azure", "anthropic"]).optional(),
 
   // Ollama (local AI - maximum privacy, runs on your own hardware)
   OLLAMA_BASE_URL: z.string().url().optional(),
@@ -74,9 +75,6 @@ const serverSchema = z.object({
   // Anthropic Claude (high-quality, safety-focused)
   ANTHROPIC_API_KEY: z.string().optional(),
   ANTHROPIC_MODEL: z.string().optional(),
-
-  // xAI Grok (external API)
-  XAI_API_KEY: z.string().optional(),
 
   // Email (Resend) - OPTIONAL
   RESEND_API_KEY: z.string().optional(),

@@ -1,5 +1,5 @@
 // v2 AI Query Tasks API: production-quality, interpret natural language task queries
-import { generateText } from 'ai'
+import { generateText, isAIAvailable } from '@/lib/ai/ai-provider'
 import { getCachedAuthUser } from '@/lib/auth/cached-auth'
 import { handleApiError } from '@/lib/api/handle-api-error'
 
@@ -9,6 +9,10 @@ export const maxDuration = 30
 // POST /api/v2/ai/query-tasks - Interpret natural language query for task filtering
 export async function POST(request: Request) {
   try {
+    if (!isAIAvailable()) {
+      return new Response(JSON.stringify({ error: 'AI service not configured' }), { status: 500 })
+    }
+
     const authResult = await getCachedAuthUser()
 
     if (authResult.rateLimited) {
@@ -30,7 +34,6 @@ export async function POST(request: Request) {
 
     // Interpret the natural language query into filter criteria
     const { text } = await generateText({
-      model: 'xai/grok-2-1212' as any,
       prompt: `Interpret the following natural language query for filtering tasks and return a JSON object with filter criteria.
 
       Query: "${query}"

@@ -4,7 +4,7 @@ import { db } from '@/lib/database/pg-client'
 import { getCachedAuthUser } from '@/lib/auth/cached-auth'
 import { getOrgContext } from '@/lib/auth/get-org-context'
 import { handleApiError } from '@/lib/api/handle-api-error'
-import { GrokService } from '@/lib/ai/grok-service'
+import { AIService } from '@/lib/ai/ai-service'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 30
@@ -64,7 +64,7 @@ export async function POST(
     }
 
     // Use AI to answer the question
-    const result = await GrokService.answerPadQuestion({
+    const result = await AIService.answerPadQuestion({
       question,
       sticks: sticks.map((s: any) => ({
         topic: s.topic || 'Untitled',

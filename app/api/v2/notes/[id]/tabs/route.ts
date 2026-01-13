@@ -26,9 +26,9 @@ export async function GET(
     }
     const user = authResult.user
 
-    // Verify note belongs to user
+    // Verify note belongs to user OR is shared (for /panel community notes)
     const noteResult = await db.query(
-      `SELECT id FROM personal_sticks WHERE id = $1 AND user_id = $2`,
+      `SELECT id, user_id FROM personal_sticks WHERE id = $1 AND (user_id = $2 OR is_shared = true)`,
       [noteId, user.id]
     )
 
@@ -36,13 +36,15 @@ export async function GET(
       return new Response(JSON.stringify({ error: 'Note not found' }), { status: 404 })
     }
 
-    // Get all tabs for this note
+    const noteOwnerId = noteResult.rows[0].user_id
+
+    // Get all tabs for this note (owned by the note owner)
     const tabsResult = await db.query(
       `SELECT id, personal_stick_id, user_id, tab_type, tab_name, tab_content, tab_data, tab_order, created_at, updated_at
        FROM personal_sticks_tabs
        WHERE personal_stick_id = $1 AND user_id = $2
        ORDER BY tab_order ASC`,
-      [noteId, user.id]
+      [noteId, noteOwnerId]
     )
 
     return new Response(JSON.stringify({ tabs: tabsResult.rows }), { status: 200 })

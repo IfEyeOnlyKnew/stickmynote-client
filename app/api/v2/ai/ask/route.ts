@@ -1,6 +1,6 @@
 // v2 AI Ask API: production-quality, AI Q&A with session tracking
 import { db } from '@/lib/database/pg-client'
-import { generateText } from 'ai'
+import { generateText, isAIAvailable } from '@/lib/ai/ai-provider'
 import { getCachedAuthUser } from '@/lib/auth/cached-auth'
 import { handleApiError } from '@/lib/api/handle-api-error'
 
@@ -9,6 +9,10 @@ export const dynamic = 'force-dynamic'
 // POST /api/v2/ai/ask - Ask AI a question
 export async function POST(request: Request) {
   try {
+    if (!isAIAvailable()) {
+      return new Response(JSON.stringify({ error: 'AI service not configured' }), { status: 500 })
+    }
+
     const authResult = await getCachedAuthUser()
 
     if (authResult.rateLimited) {
@@ -83,9 +87,8 @@ Question: ${question}
 Provide a helpful answer. If you need more context to answer properly, explain what additional information would be helpful.`
 
     const { text: answer } = await generateText({
-      model: 'xai/grok-3-mini' as any,
       prompt,
-      maxOutputTokens: 500,
+      maxTokens: 500,
     })
 
     // Log the session

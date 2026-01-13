@@ -1,5 +1,5 @@
 // v2 AI Summarize Pad API: production-quality, summarize pad content and progress
-import { generateText } from 'ai'
+import { generateText, isAIAvailable } from '@/lib/ai/ai-provider'
 import { db } from '@/lib/database/pg-client'
 import { getOrgContext } from '@/lib/auth/get-org-context'
 import { getCachedAuthUser } from '@/lib/auth/cached-auth'
@@ -11,6 +11,10 @@ export const maxDuration = 30
 // POST /api/v2/ai/summarize-pad - Summarize a pad's content and progress
 export async function POST(request: Request) {
   try {
+    if (!isAIAvailable()) {
+      return new Response(JSON.stringify({ error: 'AI service not configured' }), { status: 500 })
+    }
+
     const authResult = await getCachedAuthUser()
 
     if (authResult.rateLimited) {
@@ -68,7 +72,6 @@ export async function POST(request: Request) {
       .join('\n')
 
     const { text } = await generateText({
-      model: 'xai/grok-2-1212' as any,
       prompt: `Summarize the progress and content of this project pad named "${pad.name}".
 
       Pad Description: ${pad.description || 'None'}

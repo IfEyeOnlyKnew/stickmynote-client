@@ -1,9 +1,9 @@
 // v2 Sticks Generate Tags API: production-quality, AI tag generation
 import { type NextRequest } from 'next/server'
-import { generateText } from 'ai'
 import { db } from '@/lib/database/pg-client'
 import { getCachedAuthUser } from '@/lib/auth/cached-auth'
 import { handleApiError } from '@/lib/api/handle-api-error'
+import { isAIAvailable, generateText } from '@/lib/ai/ai-provider'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 30
@@ -95,8 +95,8 @@ export async function POST(
       return new Response(JSON.stringify({ error: 'Missing topic or content' }), { status: 400 })
     }
 
-    if (!process.env.XAI_API_KEY) {
-      return new Response(JSON.stringify({ error: 'XAI_API_KEY not configured' }), { status: 500 })
+    if (!isAIAvailable()) {
+      return new Response(JSON.stringify({ error: 'AI service not configured' }), { status: 500 })
     }
 
     const authResult = await getCachedAuthUser()
@@ -132,7 +132,6 @@ export async function POST(
 
     // Generate tags
     const tagsResult = await generateText({
-      model: 'xai/grok-3' as any,
       prompt: `Analyze the following note content and generate 3-5 relevant tags. Return only the tags as a JSON array of strings.
 
 Note content: "${noteText}"
@@ -143,7 +142,6 @@ Example response format: ["technology", "productivity", "planning"]`,
 
     // Generate search queries
     const searchQueriesResult = await generateText({
-      model: 'xai/grok-3' as any,
       prompt: `Based on the following note content, generate 3-5 specific search queries that would help find relevant resources.
 
 Note content: "${noteText}"

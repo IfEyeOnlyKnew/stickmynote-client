@@ -158,17 +158,16 @@ export async function checkExternalAPIsHealth(): Promise<HealthCheckResult> {
   const checks: Record<string, boolean> = {}
 
   try {
-    // Check Grok AI if configured
-    if (process.env.XAI_API_KEY) {
+    // Check Ollama AI if configured
+    if (process.env.OLLAMA_BASE_URL || process.env.OLLAMA_MODEL) {
       try {
-        const response = await fetch("https://api.x.ai/v1/models", {
-          headers: {
-            Authorization: `Bearer ${process.env.XAI_API_KEY}`,
-          },
+        const ollamaUrl = process.env.OLLAMA_BASE_URL || "http://localhost:11434"
+        const response = await fetch(`${ollamaUrl}/api/tags`, {
+          signal: AbortSignal.timeout(5000),
         })
-        checks.grok = response.ok
+        checks.ollama = response.ok
       } catch {
-        checks.grok = false
+        checks.ollama = false
       }
     }
 

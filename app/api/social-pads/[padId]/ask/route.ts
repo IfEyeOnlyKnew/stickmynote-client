@@ -1,6 +1,6 @@
 import { createDatabaseClient } from "@/lib/database/database-adapter"
 import { NextResponse } from "next/server"
-import { GrokService } from "@/lib/ai/grok-service"
+import { AIService } from "@/lib/ai/ai-service"
 import { getOrgContext } from "@/lib/auth/get-org-context"
 import { getCachedAuthUser } from "@/lib/auth/cached-auth"
 
@@ -64,7 +64,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ padId: 
     }
 
     // Use AI to answer the question
-    const result = await GrokService.answerPadQuestion({
+    const result = await AIService.answerPadQuestion({
       question,
       sticks: sticks.map((s) => ({
         topic: s.topic || "Untitled",
