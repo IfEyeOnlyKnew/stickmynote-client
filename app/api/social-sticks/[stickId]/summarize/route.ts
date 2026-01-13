@@ -1,10 +1,11 @@
 import { createDatabaseClient } from "@/lib/database/database-adapter"
 import { NextResponse } from "next/server"
-import { GrokService } from "@/lib/ai/grok-service"
+import { AIService } from "@/lib/ai/ai-service"
 import { getOrgContext } from "@/lib/auth/get-org-context"
 import { getCachedAuthUser } from "@/lib/auth/cached-auth"
+import { isAIAvailable, checkOllamaHealth, getProviderDisplayName } from "@/lib/ai/ai-provider"
 
-export const maxDuration = 30
+export const maxDuration = 60 // Increase timeout for AI processing
 
 export async function POST(req: Request, { params }: { params: Promise<{ stickId: string }> }) {
   try {
@@ -14,16 +15,33 @@ export async function POST(req: Request, { params }: { params: Promise<{ stickId
     const { user, error: authError, rateLimited } = await getCachedAuthUser()
 
     if (rateLimited) {
-      return new NextResponse("Too many requests", { status: 429 })
+      return NextResponse.json({ error: "Too many requests" }, { status: 429 })
     }
 
     if (authError || !user) {
-      return new NextResponse("Unauthorized", { status: 401 })
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    }
+
+    // Check if AI is available before proceeding
+    if (!isAIAvailable()) {
+      return NextResponse.json(
+        { error: "AI service not configured. Please set OLLAMA_MODEL or other AI provider credentials." },
+        { status: 503 }
+      )
+    }
+
+    // Check Ollama health if using Ollama
+    const ollamaHealth = await checkOllamaHealth()
+    if (!ollamaHealth.available && process.env.AI_PROVIDER === "ollama") {
+      return NextResponse.json(
+        { error: `Ollama server not available: ${ollamaHealth.error}. Make sure Ollama is running at ${process.env.OLLAMA_BASE_URL || 'http://localhost:11434'}` },
+        { status: 503 }
+      )
     }
 
     const orgContext = await getOrgContext()
     if (!orgContext) {
-      return new NextResponse("No organization context", { status: 403 })
+      return NextResponse.json({ error: "No organization context" }, { status: 403 })
     }
 
     const { data: stick, error: stickError } = await db
@@ -34,7 +52,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ stickId
       .maybeSingle()
 
     if (stickError || !stick) {
-      return new NextResponse("Stick not found", { status: 404 })
+      return NextResponse.json({ error: "Stick not found" }, { status: 404 })
     }
 
     // Fetch replies
@@ -68,22 +86,24 @@ export async function POST(req: Request, { params }: { params: Promise<{ stickId
         }
       }) || []
 
-    // Generate AI summary
-    const summary = await GrokService.generateLiveSummary({
+    console.log(`[Summarize Stick] Generating summary for stick ${stickId} with ${formattedReplies.length} replies using ${getProviderDisplayName()}`)
+
+    // Generate AI summary using configured provider (Ollama, Azure, etc.)
+    const summary = await AIService.generateLiveSummary({
       topic: stick.topic || "Untitled",
       content: stick.content,
       replies: formattedReplies,
     })
 
     // Extract action items
-    const actionItems = await GrokService.extractActionItems({
+    const actionItems = await AIService.extractActionItems({
       topic: stick.topic || "Untitled",
       content: stick.content,
       replies: formattedReplies,
     })
 
     // Generate suggested questions
-    const suggestedQuestions = await GrokService.generateNextQuestions({
+    const suggestedQuestions = await AIService.generateNextQuestions({
       topic: stick.topic || "Untitled",
       content: stick.content,
       summary,
@@ -104,17 +124,21 @@ export async function POST(req: Request, { params }: { params: Promise<{ stickId
 
     if (updateError) {
       console.error("Error updating stick with AI data:", updateError)
-      return new NextResponse("Error updating stick", { status: 500 })
+      return NextResponse.json({ error: "Error saving summary to database" }, { status: 500 })
     }
+
+    console.log(`[Summarize Stick] Successfully generated summary for stick ${stickId}`)
 
     return NextResponse.json({
       summary,
       actionItems,
       suggestedQuestions,
       replyCount: replies?.length || 0,
+      provider: getProviderDisplayName(),
     })
   } catch (error) {
     console.error("[Summarize Stick] Error:", error)
-    return new NextResponse("Internal Error", { status: 500 })
+    const errorMessage = error instanceof Error ? error.message : "Internal Error"
+    return NextResponse.json({ error: errorMessage }, { status: 500 })
   }
 }

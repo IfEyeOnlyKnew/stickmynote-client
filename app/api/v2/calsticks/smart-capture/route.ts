@@ -1,14 +1,11 @@
 // v2 Calsticks Smart Capture API: production-quality, AI-powered task extraction
 import { type NextRequest } from 'next/server'
-import { generateObject } from 'ai'
-import { createXai } from '@ai-sdk/xai'
 import { z } from 'zod'
 import { getCachedAuthUser } from '@/lib/auth/cached-auth'
 import { handleApiError } from '@/lib/api/handle-api-error'
+import { generateText, isAIAvailable } from '@/lib/ai/ai-provider'
 
 export const dynamic = 'force-dynamic'
-
-const xai = createXai({ apiKey: process.env.XAI_API_KEY })
 
 const tasksSchema = z.object({
   tasks: z.array(
@@ -26,6 +23,10 @@ const tasksSchema = z.object({
 // POST /api/v2/calsticks/smart-capture - Parse text and extract tasks
 export async function POST(request: NextRequest) {
   try {
+    if (!isAIAvailable()) {
+      return new Response(JSON.stringify({ error: 'AI service not configured' }), { status: 500 })
+    }
+
     const authResult = await getCachedAuthUser()
     if (authResult.rateLimited) {
       return new Response(
@@ -44,10 +45,7 @@ export async function POST(request: NextRequest) {
       return new Response(JSON.stringify({ error: 'Text is required' }), { status: 400 })
     }
 
-    const { object } = await generateObject({
-      model: xai('grok-3-mini') as any,
-      schema: tasksSchema,
-      prompt: `Parse the following text and extract individual tasks. For each task, identify:
+    const prompt = `Parse the following text and extract individual tasks. For each task, identify:
 - A clear, concise title
 - Any additional description or context
 - Due date or scheduled date (convert relative dates like "Friday" or "next week" to actual dates based on today being ${new Date().toISOString()})
@@ -58,10 +56,20 @@ export async function POST(request: NextRequest) {
 Text to parse:
 ${text}
 
-Return a structured list of tasks. If multiple tasks are mentioned, separate them. Be intelligent about parsing natural language.`,
-    })
+Return a JSON object with a "tasks" array. Each task should have: title (string), description (optional string), date (optional ISO string), priority (optional: "low" | "medium" | "high"), tags (optional string array), estimatedHours (optional number).
+Return ONLY valid JSON, no additional text.`
 
-    return new Response(JSON.stringify({ tasks: object.tasks }), { status: 200 })
+    const { text: responseText } = await generateText({ prompt, maxTokens: 1000 })
+
+    // Parse the JSON response
+    try {
+      const parsed = JSON.parse(responseText.trim())
+      const validated = tasksSchema.parse(parsed)
+      return new Response(JSON.stringify({ tasks: validated.tasks }), { status: 200 })
+    } catch {
+      // If parsing fails, try to extract tasks from text
+      return new Response(JSON.stringify({ tasks: [], error: 'Failed to parse AI response' }), { status: 200 })
+    }
   } catch (error) {
     return handleApiError(error)
   }

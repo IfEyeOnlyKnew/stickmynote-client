@@ -39,6 +39,7 @@ interface NoteFullscreenRepliesProps {
   onAddReply: (noteId: string, content: string, color?: string, parentReplyId?: string | null) => Promise<void>
   onEditReply?: (noteId: string, replyId: string, content: string) => Promise<void>
   onDeleteReply?: (noteId: string, replyId: string) => Promise<void>
+  onGenerateSummary?: (tone: string) => void
   currentUserId?: string | null
   // Real-time polling for chat-like experience
   enablePolling?: boolean
@@ -48,10 +49,7 @@ interface NoteFullscreenRepliesProps {
 }
 
 export const NoteFullscreenReplies: React.FC<NoteFullscreenRepliesProps> = (props) => {
-  const { noteId, onEditReply, onDeleteReply, currentUserId, enablePolling = true, onRepliesUpdated, onAddReply, canEdit, ...restProps } = props
-
-  console.log("[NoteFullscreenReplies] onAddReply:", typeof onAddReply)
-  console.log("[NoteFullscreenReplies] canEdit:", canEdit)
+  const { noteId, onEditReply, onDeleteReply, onGenerateSummary, currentUserId, enablePolling = true, onRepliesUpdated, onAddReply, canEdit, ...restProps } = props
 
   return (
     <UnifiedReplies
@@ -62,6 +60,7 @@ export const NoteFullscreenReplies: React.FC<NoteFullscreenRepliesProps> = (prop
       onAddReply={onAddReply}
       onEditReply={onEditReply}
       onDeleteReply={onDeleteReply}
+      onGenerateSummary={onGenerateSummary}
       currentUserId={currentUserId}
       enablePolling={enablePolling}
       onRepliesUpdated={onRepliesUpdated}

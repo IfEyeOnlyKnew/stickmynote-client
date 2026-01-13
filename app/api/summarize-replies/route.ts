@@ -297,14 +297,73 @@ async function generateDocxDocument(
   })
 
   const buffer = await Packer.toBuffer(doc)
-  const docxBlob = new Blob([buffer], {
-    type: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-  })
-
   const filename = `reply-summary-${noteId}-${Date.now()}.docx`
   const blob = await put(filename, Buffer.from(buffer), { folder: "documents" })
 
   return { url: blob.url, filename }
+}
+
+interface ExportLink {
+  url: string
+  filename: string
+  created_at: string
+  type: string
+}
+
+async function saveExportLinkToDetailsTab(
+  db: any,
+  noteId: string,
+  userId: string,
+  exportLink: ExportLink
+): Promise<void> {
+  try {
+    // Check if details tab exists
+    const { data: existingTab } = await db
+      .from("personal_sticks_tabs")
+      .select("id, tab_data")
+      .eq("personal_stick_id", noteId)
+      .eq("tab_type", "details")
+      .maybeSingle()
+
+    if (existingTab) {
+      // Update existing tab
+      let currentData: { exports?: ExportLink[]; [key: string]: any } = {}
+      try {
+        if (typeof existingTab.tab_data === "string") {
+          currentData = JSON.parse(existingTab.tab_data)
+        } else if (existingTab.tab_data && typeof existingTab.tab_data === "object") {
+          currentData = existingTab.tab_data
+        }
+      } catch {
+        currentData = {}
+      }
+
+      const updatedExports = [...(currentData.exports || []), exportLink]
+      const newTabData = { ...currentData, exports: updatedExports }
+
+      await db
+        .from("personal_sticks_tabs")
+        .update({
+          tab_data: newTabData,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", existingTab.id)
+    } else {
+      // Create new details tab
+      await db.from("personal_sticks_tabs").insert({
+        personal_stick_id: noteId,
+        user_id: userId,
+        tab_type: "details",
+        tab_name: "Details",
+        tab_content: "Note details and exports",
+        tab_data: { exports: [exportLink] },
+        tab_order: 3,
+      })
+    }
+  } catch (error) {
+    console.error("[summarize-replies] Failed to save export link:", error)
+    // Don't throw - export was still successful
+  }
 }
 
 async function tryCleanupDocx(blobUrl: string, filename: string): Promise<string | null> {
@@ -393,12 +452,24 @@ export async function POST(request: NextRequest) {
     if (generateDocx) {
       const { url: docxUrl, filename } = await generateDocxDocument(summary, replies, tone, noteId)
       const cleanedUrl = await tryCleanupDocx(docxUrl, filename)
+      const finalUrl = cleanedUrl || docxUrl
+
+      // Save export link to the note's Details tab
+      if (authResult.user?.id) {
+        const exportLink: ExportLink = {
+          url: finalUrl,
+          filename,
+          created_at: new Date().toISOString(),
+          type: "reply-summary",
+        }
+        await saveExportLinkToDetailsTab(db, noteId, authResult.user.id, exportLink)
+      }
 
       return NextResponse.json({
         summary,
         replyCount: replies.length,
         tone,
-        docxUrl: cleanedUrl || docxUrl,
+        docxUrl: finalUrl,
         filename,
       })
     }

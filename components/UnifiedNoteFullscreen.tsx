@@ -105,6 +105,43 @@ export const UnifiedNoteFullscreen: React.FC = () => {
     }
   }, [note.id, onDeleteNote, onClose])
 
+  const handleGenerateSummary = useCallback(async (tone: string) => {
+    if (replies.length === 0 || isGeneratingSummary) return
+
+    setIsGeneratingSummary(true)
+    setSelectedTone(tone)
+
+    try {
+      const response = await fetch("/api/summarize-replies", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          noteId: note.id,
+          tone,
+          generateDocx: true,
+        }),
+      })
+
+      if (response.ok) {
+        const data = await response.json()
+        setReplySummary(data.summary || "Summary generated successfully.")
+
+        // Refresh note tabs to show the new export in Details tab
+        if (typeof window !== "undefined") {
+          window.dispatchEvent(new CustomEvent("refreshNoteTabs"))
+        }
+      } else {
+        const errorData = await response.json().catch(() => ({ error: "Unknown error" }))
+        setReplySummary(`Failed to generate summary: ${errorData.error || "Please try again."}`)
+      }
+    } catch (error) {
+      console.error("Error generating summary:", error)
+      setReplySummary("Failed to generate summary. Please try again.")
+    } finally {
+      setIsGeneratingSummary(false)
+    }
+  }, [note.id, replies.length, isGeneratingSummary, setIsGeneratingSummary, setSelectedTone, setReplySummary])
+
   const renderMetadata = useCallback(() => {
     return (
       <>
@@ -302,6 +339,7 @@ export const UnifiedNoteFullscreen: React.FC = () => {
               onAddReply={onAddReply}
               onEditReply={onEditReply}
               onDeleteReply={onDeleteReply}
+              onGenerateSummary={handleGenerateSummary}
               currentUserId={currentUserId}
             />
           </div>

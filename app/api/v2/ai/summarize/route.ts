@@ -1,5 +1,5 @@
 // v2 AI Summarize API: production-quality, summarize content
-import { GrokService } from '@/lib/ai/grok-service'
+import { AIService } from '@/lib/ai/ai-service'
 import { getCachedAuthUser } from '@/lib/auth/cached-auth'
 import { handleApiError } from '@/lib/api/handle-api-error'
 
@@ -27,8 +27,8 @@ export async function POST(request: Request) {
       return new Response(JSON.stringify({ error: 'Content is required' }), { status: 400 })
     }
 
-    // Generate summary using Grok
-    const summary = await GrokService.summarizeContent(content, maxLength)
+    // Generate summary using configured AI provider (Ollama by default)
+    const summary = await AIService.summarizeContent(content, maxLength)
 
     return new Response(JSON.stringify({ summary }), { status: 200 })
   } catch (error) {

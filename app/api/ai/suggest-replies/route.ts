@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server"
 import { createDatabaseClient } from "@/lib/database/database-adapter"
-import { GrokService } from "@/lib/ai/grok-service"
+import { AIService } from "@/lib/ai/ai-service"
 import { getCachedAuthUser } from "@/lib/auth/cached-auth"
 
 export async function POST(request: Request) {
@@ -25,8 +25,8 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Content is required" }, { status: 400 })
     }
 
-    // Generate reply suggestions using Grok
-    const suggestions = await GrokService.suggestReplies(content, topic)
+    // Generate reply suggestions using AI
+    const suggestions = await AIService.suggestReplies(content, topic)
 
     return NextResponse.json({ suggestions })
   } catch (error) {

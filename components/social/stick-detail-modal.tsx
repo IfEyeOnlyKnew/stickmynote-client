@@ -22,6 +22,7 @@ import { AddCitationModal } from "@/components/social/add-citation-modal"
 import { StickSummaryCard } from "@/components/social/stick-summary-card"
 import { RelatedKBArticles } from "@/components/social/related-kb-articles"
 import { FollowButton } from "@/components/social/follow-button"
+import { toast } from "sonner"
 
 interface Reply {
   id: string
@@ -571,8 +572,9 @@ export function StickDetailModal({ open, onOpenChange, stickId, onUpdate }: Stic
         method: "POST",
       })
 
+      const data = await response.json()
+
       if (response.ok) {
-        const data = await response.json()
         setStick((prev) =>
           prev
             ? {
@@ -585,9 +587,16 @@ export function StickDetailModal({ open, onOpenChange, stickId, onUpdate }: Stic
               }
             : null,
         )
+        toast.success(`Summary generated using ${data.provider || 'AI'}`)
+      } else {
+        // Show error message from API
+        const errorMessage = data.error || "Failed to generate summary"
+        toast.error(errorMessage)
+        console.error("[Summarize] Error:", errorMessage)
       }
     } catch (error) {
-      console.error("[v0] Error regenerating summary:", error)
+      console.error("[Summarize] Network error:", error)
+      toast.error("Network error. Please check your connection and try again.")
     } finally {
       setIsSummarizing(false)
     }

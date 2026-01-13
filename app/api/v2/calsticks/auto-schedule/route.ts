@@ -1,14 +1,11 @@
 // v2 Calsticks Auto-Schedule API: production-quality, AI-powered task scheduling
 import { type NextRequest } from 'next/server'
-import { generateObject } from 'ai'
-import { createXai } from '@ai-sdk/xai'
 import { z } from 'zod'
 import { getCachedAuthUser } from '@/lib/auth/cached-auth'
 import { handleApiError } from '@/lib/api/handle-api-error'
+import { generateText, isAIAvailable } from '@/lib/ai/ai-provider'
 
 export const dynamic = 'force-dynamic'
-
-const xai = createXai({ apiKey: process.env.XAI_API_KEY })
 
 const scheduleSchema = z.object({
   schedule: z.array(
@@ -24,6 +21,10 @@ const scheduleSchema = z.object({
 // POST /api/v2/calsticks/auto-schedule - Auto-schedule tasks
 export async function POST(request: NextRequest) {
   try {
+    if (!isAIAvailable()) {
+      return new Response(JSON.stringify({ error: 'AI service not configured' }), { status: 500 })
+    }
+
     const authResult = await getCachedAuthUser()
     if (authResult.rateLimited) {
       return new Response(
@@ -50,10 +51,7 @@ export async function POST(request: NextRequest) {
     endDate.setDate(endDate.getDate() + 7)
     const endDateStr = endDate.toISOString()
 
-    const { object } = await generateObject({
-      model: xai('grok-3-mini') as any,
-      schema: scheduleSchema,
-      prompt: `You are an intelligent task scheduler. Schedule the following tasks optimally within the next 7 days.
+    const prompt = `You are an intelligent task scheduler. Schedule the following tasks optimally within the next 7 days.
 
 Current date/time: ${currentDateStr}
 Scheduling window: ${currentDateStr} to ${endDateStr}
@@ -70,16 +68,24 @@ Rules:
 6. Try to batch similar tasks together
 7. Schedule tasks back-to-back if they are short (< 2 hours)
 
-For each task, provide:
+Return a JSON object with a "schedule" array. Each item must have:
 - id: The task ID (must match input)
 - startDate: When the task should start (ISO format with time)
 - endDate: When the task should end (ISO format with time)
-- reasoning: Brief explanation of why this time slot
+- reasoning: Brief explanation of why this time slot (optional)
 
-Return the schedule optimized for productivity.`,
-    })
+Return ONLY valid JSON, no additional text.`
 
-    return new Response(JSON.stringify({ schedule: object.schedule }), { status: 200 })
+    const { text: responseText } = await generateText({ prompt, maxTokens: 1000 })
+
+    // Parse the JSON response
+    try {
+      const parsed = JSON.parse(responseText.trim())
+      const validated = scheduleSchema.parse(parsed)
+      return new Response(JSON.stringify({ schedule: validated.schedule }), { status: 200 })
+    } catch {
+      return new Response(JSON.stringify({ schedule: [], error: 'Failed to parse AI response' }), { status: 200 })
+    }
   } catch (error) {
     return handleApiError(error)
   }

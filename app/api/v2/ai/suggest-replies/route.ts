@@ -1,5 +1,5 @@
 // v2 AI Suggest Replies API: production-quality, generate reply suggestions
-import { GrokService } from '@/lib/ai/grok-service'
+import { AIService } from '@/lib/ai/ai-service'
 import { getCachedAuthUser } from '@/lib/auth/cached-auth'
 import { handleApiError } from '@/lib/api/handle-api-error'
 
@@ -27,8 +27,8 @@ export async function POST(request: Request) {
       return new Response(JSON.stringify({ error: 'Content is required' }), { status: 400 })
     }
 
-    // Generate reply suggestions using Grok
-    const suggestions = await GrokService.suggestReplies(content, topic)
+    // Generate reply suggestions using AI
+    const suggestions = await AIService.suggestReplies(content, topic)
 
     return new Response(JSON.stringify({ suggestions }), { status: 200 })
   } catch (error) {

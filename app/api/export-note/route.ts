@@ -3,6 +3,7 @@ import { createDatabaseClient } from "@/lib/database/database-adapter"
 import { validateCSRFMiddleware } from "@/lib/csrf"
 import { getCachedAuthUser } from "@/lib/auth/cached-auth"
 import type { DatabaseClient } from "@/lib/database/database-adapter"
+import { generateText as aiGenerateText, isAIAvailable } from "@/lib/ai/ai-provider"
 
 interface ExportLink {
   url: string
@@ -23,8 +24,7 @@ interface TabData {
 
 import { put } from "@/lib/storage/local-storage"
 
-// Dynamic module references
-let generateText: typeof import("ai").generateText | undefined
+// Dynamic module references for docx only (AI now uses unified provider)
 let Document: typeof import("docx").Document | undefined
 let Packer: typeof import("docx").Packer | undefined
 let Paragraph: typeof import("docx").Paragraph | undefined
@@ -32,12 +32,6 @@ let TextRun: typeof import("docx").TextRun | undefined
 let HeadingLevel: typeof import("docx").HeadingLevel | undefined
 
 const initializeModules = async () => {
-  try {
-    const aiModule = await import("ai")
-    generateText = aiModule.generateText
-  } catch (error) {
-    console.warn("ai module not available:", error instanceof Error ? error.message : String(error))
-  }
 
   try {
     const docxModule = await import("docx")
@@ -320,10 +314,9 @@ export async function POST(request: NextRequest) {
     const prompt = buildExportPrompt(tone, noteData, videoLinks, imageLinks, tags, replies)
 
     // Generate AI summary
-    const { text: comprehensiveSummary } = await generateText({
-      model: "xai/grok-3" as any,
+    const { text: comprehensiveSummary } = await aiGenerateText({
       prompt,
-      maxOutputTokens: 2000,
+      maxTokens: 2000,
     })
 
     // Build DOCX document

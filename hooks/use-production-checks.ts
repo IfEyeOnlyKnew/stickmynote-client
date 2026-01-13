@@ -144,14 +144,14 @@ export function useProductionChecks() {
 
   const runAIChecks = async (): Promise<Check[]> => {
     const checks: Check[] = []
-    let hasXaiKey = false
+    let hasOllamaConfig = false
     let hasAiFallback = true
 
     try {
       // Get AI configuration
       const envResponse = await fetch("/api/debug-env", { cache: "no-store" })
       const envData = await envResponse.json()
-      hasXaiKey = !!envData?.hasXaiKey
+      hasOllamaConfig = !!envData?.hasOllamaConfig
       hasAiFallback = !!envData?.hasAiFallback
 
       // Test AI tag generation
@@ -171,8 +171,8 @@ export function useProductionChecks() {
 
       const status: Check["status"] = ok ? "success" : "warning"
       const message = ok
-        ? usedFallback && !hasXaiKey && hasAiFallback
-          ? "Tags API succeeded via fallback (XAI optional)"
+        ? usedFallback && !hasOllamaConfig && hasAiFallback
+          ? "Tags API succeeded via fallback (Ollama optional)"
           : "Tags API returned tags"
         : "Tags API failed"
 
@@ -183,20 +183,20 @@ export function useProductionChecks() {
         details: data,
       })
 
-      // XAI key check
-      if (!hasXaiKey && usedFallback && ok) {
+      // Ollama config check
+      if (!hasOllamaConfig && usedFallback && ok) {
         checks.push({
-          name: "Environment: XAI_API_KEY",
+          name: "Environment: Ollama",
           status: "success",
-          message: "XAI key not set, but AI fallback is active and healthy",
-          details: { hasXaiKey, hasAiFallback },
+          message: "Ollama not configured, but AI fallback is active and healthy",
+          details: { hasOllamaConfig, hasAiFallback },
         })
       } else {
         checks.push({
-          name: "Environment: XAI_API_KEY",
-          status: hasXaiKey ? "success" : "warning",
-          message: hasXaiKey ? "XAI key configured" : "XAI key missing (fallback available)",
-          details: { hasXaiKey, hasAiFallback },
+          name: "Environment: Ollama",
+          status: hasOllamaConfig ? "success" : "warning",
+          message: hasOllamaConfig ? "Ollama configured" : "Ollama not configured (fallback available)",
+          details: { hasOllamaConfig, hasAiFallback },
         })
       }
 

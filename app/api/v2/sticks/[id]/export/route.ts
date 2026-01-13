@@ -3,13 +3,13 @@ import { type NextRequest } from 'next/server'
 import { db } from '@/lib/database/pg-client'
 import { getCachedAuthUser } from '@/lib/auth/cached-auth'
 import { handleApiError } from '@/lib/api/handle-api-error'
+import { isAIAvailable, generateText as aiGenerateText } from '@/lib/ai/ai-provider'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 60
 
 import { put } from '@/lib/storage/local-storage'
 
-let generateText: typeof import('ai').generateText | undefined
 let Document: typeof import('docx').Document | undefined
 let Packer: typeof import('docx').Packer | undefined
 let Paragraph: typeof import('docx').Paragraph | undefined
@@ -17,11 +17,6 @@ let TextRun: typeof import('docx').TextRun | undefined
 let HeadingLevel: typeof import('docx').HeadingLevel | undefined
 
 const initializeModules = async () => {
-  try {
-    const aiModule = await import('ai')
-    generateText = aiModule.generateText
-  } catch {}
-
   try {
     const docxModule = await import('docx')
     Document = docxModule.Document
@@ -54,7 +49,7 @@ export async function POST(
     const { id: stickId } = await params
     const { tone = 'formal' } = await request.json()
 
-    if (!process.env.XAI_API_KEY) {
+    if (!isAIAvailable()) {
       return new Response(JSON.stringify({ error: 'AI service not configured' }), { status: 500 })
     }
 
@@ -158,11 +153,18 @@ ${repliesFormatted}
 Provide a well-structured summary.`
 
     // Generate AI summary
-    const { text: summary } = await generateText?.({
-      model: 'xai/grok-3' as any,
-      prompt,
-      maxOutputTokens: 2000,
-    }) || { text: 'AI service unavailable' }
+    let summary = 'AI service unavailable'
+    if (isAIAvailable()) {
+      try {
+        const result = await aiGenerateText({
+          prompt,
+          maxTokens: 2000,
+        })
+        summary = result.text
+      } catch (e) {
+        console.error('AI generation failed:', e)
+      }
+    }
 
     if (!Document || !Paragraph || !TextRun || !Packer) {
       return new Response(JSON.stringify({ error: 'DOCX generation not available' }), { status: 500 })
@@ -251,7 +253,8 @@ Provide a well-structured summary.`
     const filename = `${sanitizedTopic}-export-${Date.now()}.docx`
     const blob = await put(filename, Buffer.from(await docxBlob.arrayBuffer()), { folder: 'documents' })
 
-    // Save export link to details tab
+    // Save export link to details tab using stick's org_id
+    const stickOrgId = stickData.org_id
     const exportLink = {
       url: blob.url,
       filename,
@@ -260,8 +263,8 @@ Provide a well-structured summary.`
     }
 
     const existingTab = await db.query(
-      `SELECT id, tab_data FROM paks_pad_stick_tabs WHERE stick_id = $1 AND tab_type = 'details'`,
-      [stickId]
+      `SELECT id, tab_data FROM paks_pad_stick_tabs WHERE stick_id = $1 AND tab_type = 'details' AND org_id = $2`,
+      [stickId, stickOrgId]
     )
 
     if (existingTab.rows.length > 0) {
@@ -274,14 +277,14 @@ Provide a well-structured summary.`
 
       const updatedExports = [...(currentData.exports || []), exportLink]
       await db.query(
-        `UPDATE paks_pad_stick_tabs SET tab_data = $1, updated_at = NOW() WHERE id = $2`,
-        [JSON.stringify({ ...currentData, exports: updatedExports }), existingTab.rows[0].id]
+        `UPDATE paks_pad_stick_tabs SET tab_data = $1, updated_at = NOW() WHERE id = $2 AND org_id = $3`,
+        [JSON.stringify({ ...currentData, exports: updatedExports }), existingTab.rows[0].id, stickOrgId]
       )
     } else {
       await db.query(
-        `INSERT INTO paks_pad_stick_tabs (stick_id, user_id, tab_type, tab_name, tab_content, tab_data, tab_order)
-         VALUES ($1, $2, 'details', 'Details', 'Stick details and exports', $3, 3)`,
-        [stickId, user.id, JSON.stringify({ exports: [exportLink] })]
+        `INSERT INTO paks_pad_stick_tabs (stick_id, user_id, org_id, tab_type, tab_name, tab_content, tab_data, tab_order)
+         VALUES ($1, $2, $3, 'details', 'Details', 'Stick details and exports', $4, 3)`,
+        [stickId, user.id, stickOrgId, JSON.stringify({ exports: [exportLink] })]
       )
     }
 

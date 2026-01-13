@@ -1,6 +1,6 @@
 // v2 AI Generate Tags API: production-quality, generate tags from content
 import { getCachedAuthUser, createRateLimitResponse, createUnauthorizedResponse } from '@/lib/auth/cached-auth'
-import { GrokService } from '@/lib/ai/grok-service'
+import { AIService } from '@/lib/ai/ai-service'
 import { handleApiError } from '@/lib/api/handle-api-error'
 
 export const dynamic = 'force-dynamic'
@@ -24,8 +24,8 @@ export async function POST(request: Request) {
       return new Response(JSON.stringify({ error: 'Content is required' }), { status: 400 })
     }
 
-    // Generate tags using Grok
-    const tags = await GrokService.generateTags(content, topic)
+    // Generate tags using AI
+    const tags = await AIService.generateTags(content, topic)
 
     return new Response(JSON.stringify({ tags }), { status: 200 })
   } catch (error) {

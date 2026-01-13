@@ -1,4 +1,4 @@
-import { generateText } from "ai"
+import { generateText, isAIAvailable } from "@/lib/ai/ai-provider"
 import { createDatabaseClient } from "@/lib/database/database-adapter"
 import { NextResponse } from "next/server"
 import { getOrgContext } from "@/lib/auth/get-org-context"
@@ -8,6 +8,10 @@ export const maxDuration = 30
 
 export async function POST(req: Request) {
   try {
+    if (!isAIAvailable()) {
+      return NextResponse.json({ error: "AI service not configured" }, { status: 500 })
+    }
+
     const db = await createDatabaseClient()
     const authResult = await getCachedAuthUser()
 
@@ -80,7 +84,6 @@ export async function POST(req: Request) {
       .join("\n")
 
     const { text } = await generateText({
-      model: "xai/grok-2-1212" as any,
       prompt: `Summarize the progress and content of this project pad named "${pad.name}".
       
       Pad Description: ${pad.description || "None"}
