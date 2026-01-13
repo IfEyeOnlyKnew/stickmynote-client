@@ -8,9 +8,12 @@ import { isAIAvailable, checkOllamaHealth, getProviderDisplayName } from "@/lib/
 export const maxDuration = 60 // Increase timeout for AI processing
 
 export async function POST(req: Request, { params }: { params: Promise<{ stickId: string }> }) {
+  console.log("[Summarize Stick] API route called")
   try {
     const { stickId } = await params
+    console.log("[Summarize Stick] stickId:", stickId)
     const db = await createDatabaseClient()
+    console.log("[Summarize Stick] Database client created")
 
     const { user, error: authError, rateLimited } = await getCachedAuthUser()
 

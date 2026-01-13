@@ -246,9 +246,9 @@ export const UnifiedNoteFullscreen: React.FC = () => {
       role="dialog"
       aria-modal="true"
     >
-      <div className="w-full max-w-[1400px] mx-auto p-2 md:p-4 pt-4 md:pt-8">
+      <div className="w-full max-w-[95vw] xl:max-w-[1600px] mx-auto p-2 md:p-4 pt-4 md:pt-8">
         <div className="flex flex-col md:flex-row gap-4 md:gap-6 items-stretch">
-          <div className="w-full md:w-1/2 md:flex-shrink-0 rounded-lg shadow-md border overflow-hidden bg-white">
+          <div className="w-full md:w-[45%] md:flex-shrink-0 md:min-w-0 rounded-lg shadow-md border overflow-hidden bg-white">
             <div className="flex items-center justify-between px-3 md:px-4 py-2 md:py-3 bg-white/80 border-b">
               <div className="flex items-center gap-2">
                 <NoteFullscreenHeader onClose={onClose} />
@@ -320,7 +320,7 @@ export const UnifiedNoteFullscreen: React.FC = () => {
             </div>
           </div>
 
-          <div className="w-full md:w-1/2 md:flex-shrink-0">
+          <div className="w-full md:w-[55%] md:flex-shrink-0 md:min-w-0">
             <NoteFullscreenReplies
               noteId={note.id}
               replies={replies}

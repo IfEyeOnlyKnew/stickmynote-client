@@ -1,23 +1,25 @@
 "use client"
 
-import { useState, memo, useCallback, useEffect } from "react"
-import { Card, CardContent } from "@/components/ui/card"
+import { useState, memo, useCallback, useEffect, useRef } from "react"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
 import { Badge } from "@/components/ui/badge"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
-import { Pencil, Trash2, MessageSquare, CheckSquare, AlertCircle, RefreshCw, ChevronDown, ChevronRight, CornerDownRight } from "lucide-react"
+import { Pencil, Trash2, MessageSquare, CheckSquare, AlertCircle, RefreshCw, ChevronDown, ChevronRight, CornerDownRight, Send, X, Check } from "lucide-react"
 import { formatDistanceToNow } from "date-fns"
+
+// Maximum nesting depth before showing message
+export const MAX_REPLY_DEPTH = 5
 
 // Depth-based colors for visual distinction of thread levels
 const DEPTH_COLORS = [
-  { line: "border-blue-400", bg: "bg-blue-50/50", text: "text-blue-600" },
-  { line: "border-green-400", bg: "bg-green-50/50", text: "text-green-600" },
-  { line: "border-purple-400", bg: "bg-purple-50/50", text: "text-purple-600" },
-  { line: "border-orange-400", bg: "bg-orange-50/50", text: "text-orange-600" },
-  { line: "border-pink-400", bg: "bg-pink-50/50", text: "text-pink-600" },
-  { line: "border-cyan-400", bg: "bg-cyan-50/50", text: "text-cyan-600" },
+  { line: "border-blue-400", bg: "bg-blue-50", text: "text-blue-600" },
+  { line: "border-green-400", bg: "bg-green-50", text: "text-green-600" },
+  { line: "border-purple-400", bg: "bg-purple-50", text: "text-purple-600" },
+  { line: "border-orange-400", bg: "bg-orange-50", text: "text-orange-600" },
+  { line: "border-pink-400", bg: "bg-pink-50", text: "text-pink-600" },
+  { line: "border-cyan-400", bg: "bg-cyan-50", text: "text-cyan-600" },
 ]
 
 interface Reply {
@@ -56,6 +58,7 @@ interface ReplyCardProps {
   onEdit: (replyId: string, content: string) => Promise<void>
   onDelete: (replyId: string) => void
   onReply: (reply: Reply) => void
+  onSubmitReply?: (content: string, parentReplyId: string) => Promise<void>
   onSyncFromCalStick?: (replyId: string, calstickId: string) => Promise<void>
   renderNestedReply: (reply: Reply, depth: number, parentAuthor?: string) => React.ReactNode
 }
@@ -70,6 +73,7 @@ export const ReplyCard = memo(function ReplyCard({
   onEdit,
   onDelete,
   onReply,
+  onSubmitReply,
   onSyncFromCalStick,
   renderNestedReply,
 }: ReplyCardProps) {
@@ -82,15 +86,33 @@ export const ReplyCard = memo(function ReplyCard({
   const [hasCalstickChanges, setHasCalstickChanges] = useState(false)
   const [isCollapsed, setIsCollapsed] = useState(false)
 
+  // Inline reply state
+  const [isReplying, setIsReplying] = useState(false)
+  const [replyContent, setReplyContent] = useState("")
+  const [isSubmittingReply, setIsSubmittingReply] = useState(false)
+  const replyTextareaRef = useRef<HTMLTextAreaElement>(null)
+
   const isOwner = reply.user_id === currentUserId
   const canDelete = isOwner || isPadOwner || isAdmin
   const canEdit = isOwner
   const hasReplies = reply.replies && reply.replies.length > 0
   const replyCount = reply.replies?.length || 0
+  const wasEdited = reply.updated_at !== reply.created_at
 
   // Get depth-based styling
   const depthColors = DEPTH_COLORS[depth % DEPTH_COLORS.length]
-  const indentPx = depth * 24 // 24px per level
+  const nextDepthColors = DEPTH_COLORS[(depth + 1) % DEPTH_COLORS.length]
+  // Reduce indentation for deeper nesting to prevent overflow (16px per level, max 80px)
+  const indentPx = Math.min(depth * 16, 80)
+  // Calculate thread line position based on reduced indentation
+  const threadLineLeft = depth > 0 ? Math.min((depth - 1) * 16, 64) + 6 : 0
+
+  // Focus textarea when opening reply form
+  useEffect(() => {
+    if (isReplying && replyTextareaRef.current) {
+      replyTextareaRef.current.focus()
+    }
+  }, [isReplying])
 
   // Check if CalStick content differs from reply content
   useEffect(() => {
@@ -178,213 +200,322 @@ export const ReplyCard = memo(function ReplyCard({
     }
   }, [editContent, reply.id, reply.content, onEdit])
 
+  const handleReplyClick = useCallback(() => {
+    if (onSubmitReply) {
+      // Use inline reply form
+      setIsReplying(true)
+      setReplyContent("")
+    } else if (onReply) {
+      // Fallback to old behavior (scroll to main reply form)
+      onReply(reply)
+    }
+  }, [onSubmitReply, onReply, reply])
+
+  const handleCancelReply = useCallback(() => {
+    setIsReplying(false)
+    setReplyContent("")
+  }, [])
+
+  const handleSubmitInlineReply = useCallback(async () => {
+    if (!onSubmitReply || !replyContent.trim() || isSubmittingReply) return
+
+    setIsSubmittingReply(true)
+    try {
+      await onSubmitReply(replyContent.trim(), reply.id)
+      setReplyContent("")
+      setIsReplying(false)
+    } catch (error) {
+      console.error("Error submitting reply:", error)
+    } finally {
+      setIsSubmittingReply(false)
+    }
+  }, [onSubmitReply, replyContent, isSubmittingReply, reply.id])
+
   return (
-    <div className="relative">
+    <li className="list-none relative overflow-hidden">
       {/* Thread line for nested replies */}
       {depth > 0 && (
         <div
           className={`absolute left-0 top-0 bottom-0 w-0.5 ${depthColors.line}`}
-          style={{ marginLeft: `${(depth - 1) * 24 + 8}px` }}
+          style={{ marginLeft: `${threadLineLeft}px` }}
         />
       )}
 
       <div
-        className="relative"
+        className="relative min-w-0"
         style={{ marginLeft: `${indentPx}px` }}
       >
         {/* Horizontal connector line */}
         {depth > 0 && (
           <div
-            className={`absolute left-0 top-5 w-4 h-0.5 ${depthColors.line}`}
-            style={{ marginLeft: "-16px" }}
+            className={`absolute left-0 top-5 w-3 h-0.5 ${depthColors.line}`}
+            style={{ marginLeft: "-12px" }}
           />
         )}
 
-        <Card className={`border shadow-sm ${depth > 0 ? depthColors.bg : "bg-white"}`}>
-          <CardContent className="pt-4">
-            <div className="flex items-start gap-3">
-              <Avatar className="h-8 w-8">
-                {reply.users?.avatar_url && (
-                  <AvatarImage src={reply.users.avatar_url} alt={getDisplayName(reply)} />
-                )}
-                <AvatarFallback className="text-xs">{getInitials(reply)}</AvatarFallback>
-              </Avatar>
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center justify-between mb-1">
-                  <div className="flex items-center gap-2 text-sm flex-wrap">
-                    <span className="font-semibold text-gray-900">{getDisplayName(reply)}</span>
-                    <Badge variant="secondary" className="text-xs">
+        <div
+          className={`rounded-lg p-3 border border-l-4 group transition-colors ${
+            depth > 0 ? depthColors.bg : "bg-gray-50"
+          }`}
+          style={{
+            borderLeftColor: depth === 0 ? (reply.color || "#d1d5db") : undefined,
+          }}
+        >
+          <div className="space-y-2">
+            {/* Header with user info, timestamp, and actions */}
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Avatar className="h-6 w-6">
+                  {reply.users?.avatar_url && (
+                    <AvatarImage src={reply.users.avatar_url} alt={getDisplayName(reply)} />
+                  )}
+                  <AvatarFallback className="text-xs bg-gray-200">{getInitials(reply)}</AvatarFallback>
+                </Avatar>
+                <div className="flex items-center gap-2 text-xs flex-wrap">
+                  <span className="font-medium text-gray-900">{getDisplayName(reply)}</span>
+                  <span className="text-gray-500">·</span>
+                  <span className="text-gray-500">
+                    {formatDistanceToNow(new Date(reply.created_at), { addSuffix: true })}
+                  </span>
+                  {wasEdited && <span className="text-gray-400">(edited)</span>}
+                  <span className="text-gray-400 text-[10px]" title={`Reply ID: ${reply.id}`}>
+                    #{reply.id.substring(0, 8)}
+                  </span>
+                  {reply.category && (
+                    <Badge variant="secondary" className="text-[10px] px-1.5 py-0">
                       {reply.category}
                     </Badge>
-                    {reply.calstick_id && (
-                      <TooltipProvider>
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <Badge
-                              variant="outline"
-                              className={`text-xs flex items-center gap-1 ${
-                                hasCalstickChanges
-                                  ? "border-amber-400 bg-amber-50 text-amber-700"
-                                  : "border-purple-400 bg-purple-50 text-purple-700"
-                              }`}
-                            >
-                              {isCheckingSync ? (
-                                <RefreshCw className="h-3 w-3 animate-spin" />
-                              ) : hasCalstickChanges ? (
-                                <AlertCircle className="h-3 w-3" />
-                              ) : (
-                                <CheckSquare className="h-3 w-3" />
-                              )}
-                              CalStick
-                            </Badge>
-                          </TooltipTrigger>
-                          <TooltipContent>
-                            {hasCalstickChanges
-                              ? "CalStick content has changed. Click sync to update."
-                              : "This reply is linked to a CalStick task"}
-                          </TooltipContent>
-                        </Tooltip>
-                      </TooltipProvider>
-                    )}
-                    <span className="text-gray-500">
-                      {formatDistanceToNow(new Date(reply.created_at), { addSuffix: true })}
-                    </span>
-                    {reply.updated_at !== reply.created_at && (
-                      <span className="text-xs text-gray-400">(edited)</span>
-                    )}
-                  </div>
-                  <div className="flex gap-1">
-                    {hasCalstickChanges && onSyncFromCalStick && !isEditing && (
-                      <TooltipProvider>
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-8 w-8 text-amber-600 hover:text-amber-700 hover:bg-amber-50"
-                              onClick={handleSyncFromCalStick}
-                              disabled={isSyncing}
-                              title="Sync from CalStick"
-                            >
-                              <RefreshCw className={`h-4 w-4 ${isSyncing ? "animate-spin" : ""}`} />
-                            </Button>
-                          </TooltipTrigger>
-                          <TooltipContent>
-                            Update reply with CalStick changes
-                          </TooltipContent>
-                        </Tooltip>
-                      </TooltipProvider>
-                    )}
-                    {canEdit && !isEditing && (
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-8 w-8"
-                        onClick={handleStartEdit}
-                        title="Edit reply"
-                      >
-                        <Pencil className="h-4 w-4" />
-                      </Button>
-                    )}
-                    {canDelete && !isEditing && (
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-8 w-8 text-red-600 hover:text-red-700 hover:bg-red-50"
-                        onClick={() => onDelete(reply.id)}
-                        title="Delete reply"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    )}
-                    {!isEditing && (
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-8 w-8"
-                        onClick={() => onReply(reply)}
-                        title="Reply to this comment"
-                      >
-                        <MessageSquare className="h-4 w-4" />
-                      </Button>
-                    )}
-                  </div>
+                  )}
+                  {reply.calstick_id && (
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Badge
+                            variant="outline"
+                            className={`text-[10px] px-1.5 py-0 flex items-center gap-1 ${
+                              hasCalstickChanges
+                                ? "border-amber-400 bg-amber-50 text-amber-700"
+                                : "border-purple-400 bg-purple-50 text-purple-700"
+                            }`}
+                          >
+                            {isCheckingSync ? (
+                              <RefreshCw className="h-2.5 w-2.5 animate-spin" />
+                            ) : hasCalstickChanges ? (
+                              <AlertCircle className="h-2.5 w-2.5" />
+                            ) : (
+                              <CheckSquare className="h-2.5 w-2.5" />
+                            )}
+                            CalStick
+                          </Badge>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          {hasCalstickChanges
+                            ? "CalStick content has changed. Click sync to update."
+                            : "This reply is linked to a CalStick task"}
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+                  )}
                 </div>
-
-                {/* Replying to indicator */}
-                {parentAuthor && depth > 0 && (
-                  <div className={`flex items-center gap-1 text-xs ${depthColors.text} mb-2`}>
-                    <CornerDownRight className="h-3 w-3" />
-                    <span>Replying to @{parentAuthor}</span>
-                  </div>
-                )}
-
-                {isEditing ? (
-                  <div className="space-y-2" onClick={(e) => e.stopPropagation()}>
-                    <Textarea
-                      value={editContent}
-                      onChange={(e) => setEditContent(e.target.value)}
-                      rows={3}
-                      maxLength={1000}
-                      className="text-sm resize-none"
-                      style={{ minHeight: "80px", height: "80px" }}
-                    />
-                    <div className="flex justify-between items-center">
-                      <span className="text-xs text-gray-500">{editContent.length}/1000</span>
-                      <div className="flex gap-2">
+              </div>
+              <div className="flex items-center gap-1">
+                {hasCalstickChanges && onSyncFromCalStick && !isEditing && !isReplying && (
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
                         <Button
-                          variant="outline"
+                          variant="ghost"
                           size="sm"
-                          onClick={handleCancelEdit}
-                          disabled={isSaving}
+                          className="h-6 w-6 p-0 text-amber-600 hover:text-amber-700 hover:bg-amber-50"
+                          onClick={handleSyncFromCalStick}
+                          disabled={isSyncing}
+                          title="Sync from CalStick"
                         >
-                          Cancel
+                          <RefreshCw className={`h-3 w-3 ${isSyncing ? "animate-spin" : ""}`} />
                         </Button>
-                        <Button
-                          size="sm"
-                          onClick={handleSaveEdit}
-                          disabled={isSaving || !editContent.trim()}
-                        >
-                          {isSaving ? "Saving..." : "Save"}
-                        </Button>
-                      </div>
-                    </div>
-                  </div>
-                ) : (
-                  <p className="text-sm text-gray-800 whitespace-pre-wrap break-words">{reply.content}</p>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        Update reply with CalStick changes
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
                 )}
-
-                {/* Collapse/expand button for nested replies */}
-                {hasReplies && (
-                  <button
-                    onClick={() => setIsCollapsed(!isCollapsed)}
-                    className={`flex items-center gap-1 text-xs ${depthColors.text} hover:underline mt-2`}
+                {!isEditing && !isReplying && depth < MAX_REPLY_DEPTH && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={handleReplyClick}
+                    className="h-6 w-6 p-0 text-blue-500 hover:text-blue-600 hover:bg-blue-50"
+                    title="Reply to this"
                   >
-                    {isCollapsed ? (
-                      <>
-                        <ChevronRight className="h-3 w-3" />
-                        Show {replyCount} {replyCount === 1 ? "reply" : "replies"}
-                      </>
-                    ) : (
-                      <>
-                        <ChevronDown className="h-3 w-3" />
-                        Hide {replyCount} {replyCount === 1 ? "reply" : "replies"}
-                      </>
-                    )}
-                  </button>
+                    <MessageSquare className="h-3 w-3" />
+                  </Button>
+                )}
+                {canEdit && !isEditing && !isReplying && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={handleStartEdit}
+                    className="h-6 w-6 p-0 text-gray-400 hover:text-blue-600 hover:bg-blue-50 opacity-0 group-hover:opacity-100 transition-opacity"
+                    title="Edit reply"
+                  >
+                    <Pencil className="h-3 w-3" />
+                  </Button>
+                )}
+                {canDelete && !isEditing && !isReplying && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => onDelete(reply.id)}
+                    className="h-6 w-6 p-0 text-gray-400 hover:text-red-700 hover:bg-red-50 opacity-0 group-hover:opacity-100 transition-opacity"
+                    title="Delete reply"
+                  >
+                    <Trash2 className="h-3 w-3" />
+                  </Button>
                 )}
               </div>
             </div>
-          </CardContent>
-        </Card>
+
+            {/* Replying to indicator */}
+            {parentAuthor && depth > 0 && (
+              <div className={`flex items-center gap-1 text-xs ${depthColors.text}`}>
+                <CornerDownRight className="h-3 w-3" />
+                <span>Replying to @{parentAuthor}</span>
+              </div>
+            )}
+
+            {/* Reply content */}
+            {isEditing ? (
+              <div className="space-y-2" onClick={(e) => e.stopPropagation()}>
+                <Textarea
+                  value={editContent}
+                  onChange={(e) => setEditContent(e.target.value)}
+                  className="text-sm text-gray-900 min-h-[60px] resize-none"
+                  maxLength={1000}
+                  autoFocus
+                />
+                <div className="flex items-center justify-between">
+                  <span className="text-xs text-gray-500">{editContent.length}/1000</span>
+                  <div className="flex gap-1">
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={handleCancelEdit}
+                      disabled={isSaving}
+                      className="h-6 px-2 text-xs"
+                    >
+                      <X className="h-3 w-3 mr-1" />
+                      Cancel
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="default"
+                      size="sm"
+                      onClick={handleSaveEdit}
+                      disabled={isSaving || !editContent.trim()}
+                      className="h-6 px-2 text-xs"
+                    >
+                      {isSaving ? (
+                        <div className="h-3 w-3 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                      ) : (
+                        <>
+                          <Check className="h-3 w-3 mr-1" />
+                          Save
+                        </>
+                      )}
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="text-sm text-gray-900 whitespace-pre-wrap break-words">{reply.content}</div>
+            )}
+
+            {/* Collapse/expand button for nested replies */}
+            {hasReplies && (
+              <button
+                onClick={() => setIsCollapsed(!isCollapsed)}
+                className={`flex items-center gap-1 text-xs ${depthColors.text} hover:underline mt-2`}
+              >
+                {isCollapsed ? (
+                  <>
+                    <ChevronRight className="h-3 w-3" />
+                    Show {replyCount} {replyCount === 1 ? "reply" : "replies"}
+                  </>
+                ) : (
+                  <>
+                    <ChevronDown className="h-3 w-3" />
+                    Hide {replyCount} {replyCount === 1 ? "reply" : "replies"}
+                  </>
+                )}
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* INLINE REPLY FORM - appears directly below this reply */}
+        {isReplying && onSubmitReply && (
+          <div
+            className={`mt-2 p-3 rounded-lg border-2 border-dashed ${nextDepthColors.line} ${nextDepthColors.bg}`}
+            style={{ marginLeft: "16px" }}
+          >
+            <div className={`flex items-center gap-1 text-xs ${nextDepthColors.text} mb-2`}>
+              <CornerDownRight className="h-3 w-3" />
+              <span>Replying to @{getDisplayName(reply)}</span>
+              <span className="text-gray-400">→ parent: #{reply.id.substring(0, 8)}</span>
+            </div>
+            <Textarea
+              ref={replyTextareaRef}
+              value={replyContent}
+              onChange={(e) => setReplyContent(e.target.value)}
+              placeholder={`Reply to ${getDisplayName(reply)}...`}
+              className="text-sm text-gray-900 min-h-[60px] resize-none mb-2"
+              maxLength={1000}
+            />
+            <div className="flex items-center justify-between">
+              <span className="text-xs text-gray-500">{replyContent.length}/1000</span>
+              <div className="flex gap-1">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={handleCancelReply}
+                  disabled={isSubmittingReply}
+                  className="h-6 px-2 text-xs"
+                >
+                  <X className="h-3 w-3 mr-1" />
+                  Cancel
+                </Button>
+                <Button
+                  type="button"
+                  variant="default"
+                  size="sm"
+                  onClick={handleSubmitInlineReply}
+                  disabled={isSubmittingReply || !replyContent.trim()}
+                  className="h-6 px-2 text-xs bg-blue-600 hover:bg-blue-700"
+                >
+                  {isSubmittingReply ? (
+                    <div className="h-3 w-3 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                  ) : (
+                    <>
+                      <Send className="h-3 w-3 mr-1" />
+                      Reply
+                    </>
+                  )}
+                </Button>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Nested replies */}
         {hasReplies && !isCollapsed && (
-          <div className="space-y-3 mt-3">
+          <ul className="mt-2 space-y-2">
             {reply.replies!.map((nestedReply) => renderNestedReply(nestedReply, depth + 1, getDisplayName(reply)))}
-          </div>
+          </ul>
         )}
       </div>
-    </div>
+    </li>
   )
 })

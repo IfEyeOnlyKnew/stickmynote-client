@@ -123,10 +123,12 @@ pnpm run build
 2. [ ] Verify `.env` files are intact
 3. [ ] Verify `certs/` folder has SSL certificates (`server.crt`, `server.key`)
 4. [ ] Run `pnpm run build` successfully
-5. [ ] Restart the Windows service (nssm restart StickyMyNote)
-6. [ ] Test https://stickmynote.com loads correctly
-7. [ ] Verify port 443 is listening: `netstat -an | findstr :443`
-8. [ ] **Verify DNS resolution:** `nslookup stickmynote.com` should return `192.168.50.20`
+5. [ ] **CRITICAL: Remove `.env.local` after build** (or verify it doesn't have `BUILDING=true`)
+6. [ ] Restart the Windows service (nssm restart StickyMyNote)
+7. [ ] Test https://stickmynote.com loads correctly
+8. [ ] Test sign-in works (catches database connection issues)
+9. [ ] Verify port 443 is listening: `netstat -an | findstr :443`
+10. [ ] **Verify DNS resolution:** `nslookup stickmynote.com` should return `192.168.50.20`
 
 ---
 
@@ -390,3 +392,29 @@ const lockoutData = await checkLockout(normalizedEmail)
 - Never use `fetch()` for internal API-to-API calls
 - Always use direct function imports for server-side operations
 - Add this check to code review process
+
+### 2026-01-13: Production Outage - Database Connection Failed (Empty Password)
+
+**What happened:**
+- Users could not sign in - received 500 Internal Server Error
+- Server console showed: `SASL: SCRAM-SERVER-FIRST-MESSAGE: client password must be a string`
+
+**Root cause:**
+- After running `pnpm run build`, the `.env.local` file was not removed
+- `.env.local` contained build-time config with `POSTGRES_PASSWORD=` (empty)
+- `.env.local` overrides `.env`, so production used empty database password
+- PostgreSQL SCRAM authentication failed because password was empty string
+
+**Resolution:**
+```powershell
+# Remove the build-time .env.local
+Remove-Item 'C:\stick-my-note-prod\stickmynote-client\.env.local'
+
+# Restart service
+nssm restart StickyMyNote
+```
+
+**Prevention:**
+- Added "Remove `.env.local` after build" to Post-Update Checklist (step 5)
+- Added "Test sign-in works" to Post-Update Checklist (step 8)
+- Always verify `.env.local` is removed or doesn't contain `BUILDING=true` after deployment

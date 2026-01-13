@@ -88,12 +88,14 @@ cp .env.local.build-only .env.local
 # Build
 pnpm run build
 
-# Remove build-only env after build
+# CRITICAL: Remove build-only env after build (prevents empty POSTGRES_PASSWORD)
 rm .env.local
 
 # Restore production env if it was backed up
 cp .env.local.backup .env.local
 ```
+
+> **WARNING:** If you forget to remove `.env.local` after build, sign-in will fail with "SASL: client password must be a string" because the build-time config has an empty `POSTGRES_PASSWORD`.
 
 ### Step 5: Restart Service
 
@@ -106,8 +108,9 @@ nssm restart StickyMyNote
 
 1. Check `server.js` is HTTPS version: `findstr "require(\"https\")" server.js`
 2. Test site loads: https://stickmynote.com
-3. Verify port 443: `netstat -an | findstr :443`
-4. Check DNS: `nslookup stickmynote.com` should return `192.168.50.20`
+3. **Test sign-in works** (catches database connection issues)
+4. Verify port 443: `netstat -an | findstr :443`
+5. Check DNS: `nslookup stickmynote.com` should return `192.168.50.20`
 
 ## Quick Reference Commands
 

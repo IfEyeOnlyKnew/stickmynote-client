@@ -505,27 +505,6 @@ export function StickDetailModal({ open, onOpenChange, stickId, onUpdate }: Stic
     return grouped
   }
 
-  const renderReply = useCallback((reply: Reply, depth = 0, parentAuthor?: string) => {
-    if (!reply) return null
-
-    return (
-      <ReplyCard
-        key={reply.id}
-        reply={reply}
-        depth={depth}
-        currentUserId={currentUserId || undefined}
-        isPadOwner={isPadOwner}
-        isAdmin={isAdmin}
-        parentAuthor={parentAuthor}
-        onEdit={handleEditReply}
-        onDelete={handleDeleteReply}
-        onReply={handleOpenReplyModal}
-        onSyncFromCalStick={handleSyncFromCalStick}
-        renderNestedReply={renderReply}
-      />
-    )
-  }, [currentUserId, isPadOwner, isAdmin, handleEditReply, handleDeleteReply, handleOpenReplyModal, handleSyncFromCalStick])
-
   const handleFocus = () => {
     if (stick && stick.user_id === user?.id && !isEditing) {
       setIsEditing(true)
@@ -602,6 +581,66 @@ export function StickDetailModal({ open, onOpenChange, stickId, onUpdate }: Stic
     }
   }, [stickId])
 
+  const handleInlineReply = useCallback(async (content: string, parentReplyId: string) => {
+    if (!stick) return
+
+    try {
+      console.log("[v0] Submitting inline reply to parent:", parentReplyId)
+      const response = await fetch(`/api/social-sticks/${stickId}/replies`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          content,
+          color: "#fef3c7",
+          parent_reply_id: parentReplyId,
+          category: "comment", // Default category for inline replies
+        }),
+      })
+
+      if (response.ok) {
+        const data = await response.json()
+        console.log("[v0] Inline reply created successfully:", data.reply.id)
+
+        // Refresh stick to get updated replies
+        await fetchStick()
+
+        if (stick.last_summarized_at) {
+          handleRegenerateSummary()
+        }
+
+        onUpdate?.()
+      } else {
+        console.error("[v0] Failed to create inline reply:", response.status)
+        throw new Error("Failed to create reply")
+      }
+    } catch (error) {
+      console.error("[v0] Error submitting inline reply:", error)
+      throw error
+    }
+  }, [stick, stickId, onUpdate, handleRegenerateSummary])
+
+  const renderReply = useCallback((reply: Reply, depth = 0, parentAuthor?: string) => {
+    if (!reply) return null
+
+    return (
+      <ReplyCard
+        key={reply.id}
+        reply={reply}
+        depth={depth}
+        currentUserId={currentUserId || undefined}
+        isPadOwner={isPadOwner}
+        isAdmin={isAdmin}
+        parentAuthor={parentAuthor}
+        onEdit={handleEditReply}
+        onDelete={handleDeleteReply}
+        onReply={handleOpenReplyModal}
+        onSubmitReply={handleInlineReply}
+        onSyncFromCalStick={handleSyncFromCalStick}
+        renderNestedReply={renderReply}
+      />
+    )
+  }, [currentUserId, isPadOwner, isAdmin, handleEditReply, handleDeleteReply, handleOpenReplyModal, handleInlineReply, handleSyncFromCalStick])
+
   const handleInsertQuestion = useCallback((_question: string) => {
     setParentReply(null)
     setReplyModalOpen(true)
@@ -654,24 +693,31 @@ export function StickDetailModal({ open, onOpenChange, stickId, onUpdate }: Stic
     <>
       <Dialog open={open} onOpenChange={onOpenChange}>
         <DialogContent
-          className="max-w-[95vw] h-[95vh] w-full p-0 gap-0 overflow-hidden"
-          style={{ display: 'flex', flexDirection: 'column' }}
+          className="max-w-[95vw] w-full p-0"
+          style={{
+            height: '95vh',
+            maxHeight: '95vh',
+            display: 'flex',
+            flexDirection: 'column',
+            top: '2.5vh',
+            transform: 'translateX(-50%)',
+          }}
         >
           <DialogTitle className="sr-only">Stick Details</DialogTitle>
           <DialogDescription className="sr-only">View and manage stick content, replies, and media</DialogDescription>
 
-          <div className="flex items-center justify-between p-6 border-b bg-white shrink-0">
+          <div style={{ padding: '24px', borderBottom: '1px solid #e5e7eb', backgroundColor: 'white', flexShrink: 0 }}>
             <h2 className="text-2xl font-bold text-gray-900">Stick Details</h2>
           </div>
 
-          <div className="flex-1 overflow-y-auto min-h-0">
+          <div className="custom-scrollbar" style={{ flex: '1 1 0%', minHeight: 0, overflowY: 'auto', overflowX: 'hidden' }}>
               {loading && (
                 <div className="flex items-center justify-center h-full">
                   <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600" />
                 </div>
               )}
               {!loading && stick && (
-                <div className="p-6 bg-gray-50">
+                <div className="p-6 pb-16 bg-gray-50">
                   <div className="max-w-4xl mx-auto space-y-6">
                     <Card className="bg-white border-2 shadow-lg">
                       <CardHeader>
@@ -858,7 +904,7 @@ export function StickDetailModal({ open, onOpenChange, stickId, onUpdate }: Stic
                                 {category}
                                 <Badge variant="outline">{replies.length}</Badge>
                               </h4>
-                              <div className="space-y-4">{replies.map((reply) => renderReply(reply))}</div>
+                              <ul className="space-y-2">{replies.map((reply) => renderReply(reply))}</ul>
                             </div>
                           ))}
                         </div>
