@@ -19,9 +19,9 @@ import { SearchFiltersPanel, type SearchFilters } from "@/components/panel/Searc
 import { SearchEmptyState } from "@/components/panel/SearchEmptyState"
 import { SearchResultsSkeletonGrid } from "@/components/panel/SearchResultSkeleton"
 import { OptimisticSearchResultCard } from "@/components/panel/OptimisticSearchResultCard"
-import { UnifiedFullscreen } from "@/components/UnifiedFullscreen"
 import { UnifiedNote } from "@/components/UnifiedNote"
 import { SearchStatsDialog } from "@/components/SearchStatsDialog"
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 
 const DEFAULT_CHUNK_SIZE = 9
 
@@ -749,33 +749,33 @@ export default function CommunityPanelPage() {
           const fullscreenNote = communityNotes.find((n) => n.id === fullscreenHook.fullscreenItem)
           if (!fullscreenNote) return null
           return (
-            <UnifiedFullscreen
-              item={fullscreenNote}
-              mode="panel"
-              readOnly={true}
-              onClose={fullscreenHook.closeFullscreen}
-            >
-              <UnifiedNote
-                note={fullscreenNote}
-                mode="fullscreen"
-                windowSize={windowSize}
-                currentUserId={user?.id}
-                readOnly={true}
-                onClose={fullscreenHook.closeFullscreen}
-                onAddReply={handleAddReply}
-                onEditReply={handleEditReply}
-                onDeleteReply={handleDeleteReply}
-                onNoteUpdate={handleNoteUpdateInFullscreen}
-                onDeleteNote={handleDeleteNoteInFullscreen}
-                onUpdateSharing={handleUpdateSharingInFullscreen}
-                onUpdateColor={handleUpdateColorInFullscreen}
-                onTopicChange={handleTopicChangeInFullscreen}
-                onContentChange={handleContentChangeInFullscreen}
-                onDetailsChange={() => {}}
-                onGenerateTags={handleGenerateTagsInFullscreen}
-                hideGenerateTags={true}
-              />
-            </UnifiedFullscreen>
+            <Dialog open={true} onOpenChange={() => fullscreenHook.closeFullscreen()}>
+              <DialogContent className="max-w-[95vw] xl:max-w-[1600px] w-full h-[calc(100dvh-2rem)] max-h-[calc(100dvh-2rem)] p-4 overflow-y-auto">
+                <DialogHeader className="sr-only">
+                  <DialogTitle>Community Note Details</DialogTitle>
+                </DialogHeader>
+                <UnifiedNote
+                  note={fullscreenNote}
+                  mode="fullscreen"
+                  windowSize={windowSize}
+                  currentUserId={user?.id}
+                  readOnly={true}
+                  onClose={fullscreenHook.closeFullscreen}
+                  onAddReply={handleAddReply}
+                  onEditReply={handleEditReply}
+                  onDeleteReply={handleDeleteReply}
+                  onNoteUpdate={handleNoteUpdateInFullscreen}
+                  onDeleteNote={handleDeleteNoteInFullscreen}
+                  onUpdateSharing={handleUpdateSharingInFullscreen}
+                  onUpdateColor={handleUpdateColorInFullscreen}
+                  onTopicChange={handleTopicChangeInFullscreen}
+                  onContentChange={handleContentChangeInFullscreen}
+                  onDetailsChange={() => {}}
+                  onGenerateTags={handleGenerateTagsInFullscreen}
+                  hideGenerateTags={true}
+                />
+              </DialogContent>
+            </Dialog>
           )
         })()}
 

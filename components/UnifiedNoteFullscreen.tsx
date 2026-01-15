@@ -240,109 +240,106 @@ export const UnifiedNoteFullscreen: React.FC = () => {
     onSummarizeLinks,
   ])
 
+  // Render as content-only (no modal overlay) - parent container handles the modal
   return (
-    <div
-      className="fixed inset-0 bg-black/50 flex items-start justify-center z-50 overflow-y-auto"
-      role="dialog"
-      aria-modal="true"
-    >
-      <div className="w-full max-w-[95vw] xl:max-w-[1600px] mx-auto p-2 md:p-4 pt-4 md:pt-8">
-        <div className="flex flex-col md:flex-row gap-4 md:gap-6 items-stretch">
-          <div className="w-full md:w-[45%] md:flex-shrink-0 md:min-w-0 rounded-lg shadow-md border overflow-hidden bg-white">
-            <div className="flex items-center justify-between px-3 md:px-4 py-2 md:py-3 bg-white/80 border-b">
-              <div className="flex items-center gap-2">
-                <NoteFullscreenHeader onClose={onClose} />
-              </div>
-              <div className="flex items-center gap-1 md:gap-2">
-                {!isNewNote && isOwner && (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={handleSharingToggle}
-                    className="flex items-center gap-1 bg-transparent text-xs md:text-sm px-2 md:px-3"
-                    title={note.is_shared ? "Make Personal" : "Make Shared"}
-                  >
-                    {note.is_shared ? (
-                      <>
-                        <Share2 className="h-3 w-3 md:h-4 md:w-4" />
-                        <span className="hidden sm:inline">Shared</span>
-                      </>
-                    ) : (
-                      <>
-                        <Lock className="h-3 w-3 md:h-4 md:w-4" />
-                        <span className="hidden sm:inline">Personal</span>
-                      </>
-                    )}
-                  </Button>
-                )}
-
-                {!isNewNote && isOwner && (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={handleDelete}
-                    className="flex items-center gap-1 text-red-600 hover:text-red-700 hover:bg-red-50 bg-transparent px-2 md:px-3"
-                    title="Delete Note"
-                  >
-                    <Trash2 className="h-3 w-3 md:h-4 md:w-4" />
-                  </Button>
-                )}
-              </div>
+    <div className="w-full">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 lg:gap-6">
+        {/* Left Panel: Note Content */}
+        <div className="rounded-lg shadow-md border bg-white flex flex-col max-h-[calc(100vh-8rem)]">
+          <div className="flex items-center justify-between px-3 md:px-4 py-2 md:py-3 bg-white/80 border-b flex-shrink-0">
+            <div className="flex items-center gap-2">
+              <NoteFullscreenHeader onClose={onClose} />
             </div>
-            <div className="p-3 md:p-4 lg:p-6 bg-transparent text-gray-900">
-              <NoteFullscreenContent
-                noteId={note.id}
-                topic={note.topic || note.title || ""}
-                content={note.content || ""}
-                onTopicChange={handleTopicChangeInternal}
-                onContentChange={handleContentChangeInternal}
-                onDetailsChange={handleDetailsChangeInternal}
-                onTopicFocus={() => !isNewNote && !isEditing && !readOnly && handleStartEditing()}
-                onContentFocus={() => !isNewNote && !isEditing && !readOnly && handleStartEditing()}
-                readOnly={readOnly || (!isOwner && !isNewNote)}
-                resetKey={resetKey}
-                onNoteInteraction={onNoteInteraction}
-                onTabChange={() => {}}
-                isEditing={isEditing}
-                isNewNote={isNewNote}
-                onCancel={isNewNote ? () => onCancelNewNote?.(note.id) : handleCancelEdit}
-                onStick={
-                  isNewNote
-                    ? () => {
-                        onStickNewNote?.(note.id)
-                        setIsEditing(false)
-                      }
-                    : handleStickEdit
-                }
-                isSaving={isSaving}
-              />
-              {renderMetadata()}
+            <div className="flex items-center gap-1 md:gap-2">
+              {!isNewNote && isOwner && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleSharingToggle}
+                  className="flex items-center gap-1 bg-transparent text-xs md:text-sm px-2 md:px-3"
+                  title={note.is_shared ? "Make Personal" : "Make Shared"}
+                >
+                  {note.is_shared ? (
+                    <>
+                      <Share2 className="h-3 w-3 md:h-4 md:w-4" />
+                      <span className="hidden sm:inline">Shared</span>
+                    </>
+                  ) : (
+                    <>
+                      <Lock className="h-3 w-3 md:h-4 md:w-4" />
+                      <span className="hidden sm:inline">Personal</span>
+                    </>
+                  )}
+                </Button>
+              )}
+
+              {!isNewNote && isOwner && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleDelete}
+                  className="flex items-center gap-1 text-red-600 hover:text-red-700 hover:bg-red-50 bg-transparent px-2 md:px-3"
+                  title="Delete Note"
+                >
+                  <Trash2 className="h-3 w-3 md:h-4 md:w-4" />
+                </Button>
+              )}
             </div>
           </div>
-
-          <div className="w-full md:w-[55%] md:flex-shrink-0 md:min-w-0">
-            <NoteFullscreenReplies
+          <div className="p-3 md:p-4 lg:p-6 bg-transparent text-gray-900 flex-1 overflow-y-auto">
+            <NoteFullscreenContent
               noteId={note.id}
-              replies={replies}
-              replyCount={replyCount}
-              replyContent={replyContent}
-              setReplyContent={setReplyContent}
-              isSubmittingReply={isSubmittingReply}
-              setIsSubmittingReply={setIsSubmittingReply}
-              isGeneratingSummary={isGeneratingSummary}
-              setIsGeneratingSummary={setIsGeneratingSummary}
-              replySummary={replySummary}
-              setReplySummary={setReplySummary}
-              selectedTone={selectedTone}
-              setSelectedTone={setSelectedTone}
-              tones={tones}
-              onAddReply={onAddReply}
-              onEditReply={onEditReply}
-              onDeleteReply={onDeleteReply}
-              onGenerateSummary={handleGenerateSummary}
-              currentUserId={currentUserId}
+              topic={note.topic || note.title || ""}
+              content={note.content || ""}
+              onTopicChange={handleTopicChangeInternal}
+              onContentChange={handleContentChangeInternal}
+              onDetailsChange={handleDetailsChangeInternal}
+              onTopicFocus={() => !isNewNote && !isEditing && !readOnly && handleStartEditing()}
+              onContentFocus={() => !isNewNote && !isEditing && !readOnly && handleStartEditing()}
+              readOnly={readOnly || (!isOwner && !isNewNote)}
+              resetKey={resetKey}
+              onNoteInteraction={onNoteInteraction}
+              onTabChange={() => {}}
+              isEditing={isEditing}
+              isNewNote={isNewNote}
+              onCancel={isNewNote ? () => onCancelNewNote?.(note.id) : handleCancelEdit}
+              onStick={
+                isNewNote
+                  ? () => {
+                      onStickNewNote?.(note.id)
+                      setIsEditing(false)
+                    }
+                  : handleStickEdit
+              }
+              isSaving={isSaving}
             />
+            {renderMetadata()}
           </div>
+        </div>
+
+        {/* Right Panel: Replies */}
+        <div className="max-h-[calc(100vh-8rem)]">
+          <NoteFullscreenReplies
+            noteId={note.id}
+            replies={replies}
+            replyCount={replyCount}
+            replyContent={replyContent}
+            setReplyContent={setReplyContent}
+            isSubmittingReply={isSubmittingReply}
+            setIsSubmittingReply={setIsSubmittingReply}
+            isGeneratingSummary={isGeneratingSummary}
+            setIsGeneratingSummary={setIsGeneratingSummary}
+            replySummary={replySummary}
+            setReplySummary={setReplySummary}
+            selectedTone={selectedTone}
+            setSelectedTone={setSelectedTone}
+            tones={tones}
+            onAddReply={onAddReply}
+            onEditReply={onEditReply}
+            onDeleteReply={onDeleteReply}
+            onGenerateSummary={handleGenerateSummary}
+            currentUserId={currentUserId}
+          />
         </div>
       </div>
     </div>
