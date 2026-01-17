@@ -43,13 +43,9 @@ export async function getUserChats(
   let paramIndex = 2
 
   // Build additional filter conditions
+  // Note: We don't filter by org_id for chats because users should see all chats
+  // they're explicitly invited to, regardless of which org context they're in
   let filterConditions = ""
-
-  if (orgId) {
-    filterConditions += ` AND (sc.org_id = $${paramIndex} OR sc.org_id IS NULL)`
-    params.push(orgId)
-    paramIndex++
-  }
 
   if (filters?.stick_id) {
     filterConditions += ` AND sc.stick_id = $${paramIndex}`
