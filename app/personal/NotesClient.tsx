@@ -689,46 +689,42 @@ export function NotesClient({ initialNotes, userId, stats }: Readonly<NotesClien
       {/* Fullscreen Note Modal: edit a single note in depth */}
       {fullscreenHook.fullscreenNoteId && (
         <Dialog open={true} onOpenChange={() => fullscreenHook.closeFullscreen()}>
-          <DialogContent className="max-w-[95vw] w-full h-[calc(100dvh-2rem)] max-h-[calc(100dvh-2rem)] p-0 overflow-hidden">
-            <div className="h-full flex flex-col">
-              <DialogHeader className="px-6 py-4 border-b">
-                <DialogTitle className="flex items-center justify-between"></DialogTitle>
-              </DialogHeader>
-              <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain">
-                {fullscreenHook.fullscreenNoteId && (
-                  <UnifiedNote
-                    note={allNotes.find((n) => n.id === fullscreenHook.fullscreenNoteId)!}
-                    mode="fullscreen"
-                    currentUserId={userId}
-                    onClose={fullscreenHook.closeFullscreen}
-                    onUpdateSharing={(noteId: string, isShared: boolean) =>
-                      handleUpdateNoteSharing?.(noteId, isShared)
-                    }
-                    onTopicChange={(noteId: string, topic: string) =>
-                      handleNoteTopicChange?.(noteId, topic)
-                    }
-                    onContentChange={(noteId: string, content: string) =>
-                      handleNoteContentChange?.(noteId, content)
-                    }
-                    onDetailsChange={(noteId: string, details: string) => handleNoteDetailsChange(noteId, details)}
-                    onUpdateColor={handleUpdateNoteColor}
-                    onGenerateTags={handleGenerateTagsWrapper}
-                    generatingTags={generatingTags}
-                    onSummarizeLinks={handleSummarizeLinks}
-                    summarizingLinks={summarizingLinks}
-                    onAddReply={handleAddReply}
-                    onEditReply={handleEditReply}
-                    onDeleteReply={handleDeleteReply}
-                    onNoteUpdate={(updatedNote) => {
-                      setAllNotes((prev) => prev.map((n) => (n.id === updatedNote.id ? updatedNote : n)))
-                      handleNoteUpdate(updatedNote.id)
-                    }}
-                    readOnly={false}
-                    onDeleteNote={handleDeleteNote}
-                  />
-                )}
-              </div>
-            </div>
+          <DialogContent className="max-w-[95vw] xl:max-w-[1600px] w-full h-[calc(100dvh-2rem)] max-h-[calc(100dvh-2rem)] p-4 overflow-y-auto">
+            <DialogHeader className="sr-only">
+              <DialogTitle>Note Details</DialogTitle>
+            </DialogHeader>
+            {fullscreenHook.fullscreenNoteId && (
+              <UnifiedNote
+                note={allNotes.find((n) => n.id === fullscreenHook.fullscreenNoteId)!}
+                mode="fullscreen"
+                currentUserId={userId}
+                onClose={fullscreenHook.closeFullscreen}
+                onUpdateSharing={(noteId: string, isShared: boolean) =>
+                  handleUpdateNoteSharing?.(noteId, isShared)
+                }
+                onTopicChange={(noteId: string, topic: string) =>
+                  handleNoteTopicChange?.(noteId, topic)
+                }
+                onContentChange={(noteId: string, content: string) =>
+                  handleNoteContentChange?.(noteId, content)
+                }
+                onDetailsChange={(noteId: string, details: string) => handleNoteDetailsChange(noteId, details)}
+                onUpdateColor={handleUpdateNoteColor}
+                onGenerateTags={handleGenerateTagsWrapper}
+                generatingTags={generatingTags}
+                onSummarizeLinks={handleSummarizeLinks}
+                summarizingLinks={summarizingLinks}
+                onAddReply={handleAddReply}
+                onEditReply={handleEditReply}
+                onDeleteReply={handleDeleteReply}
+                onNoteUpdate={(updatedNote) => {
+                  setAllNotes((prev) => prev.map((n) => (n.id === updatedNote.id ? updatedNote : n)))
+                  handleNoteUpdate(updatedNote.id)
+                }}
+                readOnly={false}
+                onDeleteNote={handleDeleteNote}
+              />
+            )}
           </DialogContent>
         </Dialog>
       )}

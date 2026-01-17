@@ -780,7 +780,7 @@ export const UnifiedReplies: React.FC<UnifiedRepliesProps> = ({
   if (context === "fullscreen" || context === "stick") {
     return (
       <>
-        <div className="bg-white rounded-lg shadow-md border flex flex-col min-w-0">
+        <div className="bg-white rounded-lg shadow-md border flex flex-col min-w-0 h-full">
           {renderHeader()}
 
           {canEdit && !isNewNote && (
