@@ -1,6 +1,6 @@
 "use client"
 
-import React, { useState, useEffect, useRef, useCallback } from "react"
+import React, { useState, useEffect, useRef, useCallback, useMemo } from "react"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
@@ -14,9 +14,12 @@ import {
   AlertTriangle,
   UserPlus,
   Settings,
+  PanelRightClose,
+  PanelRightOpen,
 } from "lucide-react"
 import { formatDistanceToNow } from "date-fns"
 import { useCSRF } from "@/hooks/useCSRF"
+import { useUserPresence } from "@/hooks/usePresence"
 import type {
   StickChatWithDetails,
   StickChatMessageWithUser,
@@ -51,9 +54,18 @@ export const ChatRoomView: React.FC<ChatRoomViewProps> = ({
   const [isExporting, setIsExporting] = useState(false)
   const [hasMore, setHasMore] = useState(false)
   const [cursor, setCursor] = useState<string | undefined>()
+  const [showMembersPanel, setShowMembersPanel] = useState(true)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const messagesContainerRef = useRef<HTMLDivElement>(null)
   const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null)
+
+  // Get member IDs for presence tracking
+  const memberIds = useMemo(() => {
+    return chat.members?.map((m) => m.user_id) || []
+  }, [chat.members])
+
+  // Track presence for all members
+  const { presence } = useUserPresence(memberIds)
 
   // Fetch messages
   const fetchMessages = useCallback(
@@ -173,6 +185,11 @@ export const ChatRoomView: React.FC<ChatRoomViewProps> = ({
   const expiringSoon = isChatExpiringSoon(chat)
   const daysUntilExpiry = getDaysUntilExpiry(chat)
 
+  // Count online members
+  const onlineCount = useMemo(() => {
+    return memberIds.filter((id) => presence[id]?.isOnline).length
+  }, [memberIds, presence])
+
   // Get user display name
   const getDisplayName = (msg: StickChatMessageWithUser) => {
     if (!msg.user) return "User"
@@ -213,6 +230,11 @@ export const ChatRoomView: React.FC<ChatRoomViewProps> = ({
               <p className="text-sm text-gray-500">
                 {chat.members?.length || 1} member
                 {(chat.members?.length || 1) !== 1 ? "s" : ""}
+                {onlineCount > 0 && (
+                  <span className="ml-2 text-green-600">
+                    • {onlineCount} online
+                  </span>
+                )}
                 {chat.stick_topic && (
                   <span className="ml-2 text-purple-600">
                     • {chat.stick_topic}
@@ -258,11 +280,27 @@ export const ChatRoomView: React.FC<ChatRoomViewProps> = ({
                 <Settings className="w-4 h-4" />
               </Button>
             )}
+
+            {/* Toggle members panel */}
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setShowMembersPanel(!showMembersPanel)}
+              title={showMembersPanel ? "Hide members" : "Show members"}
+            >
+              {showMembersPanel ? (
+                <PanelRightClose className="w-4 h-4" />
+              ) : (
+                <PanelRightOpen className="w-4 h-4" />
+              )}
+            </Button>
           </div>
         </div>
       </div>
 
-      {/* Messages area */}
+      {/* Main content area with messages and optional members panel */}
+      <div className="flex flex-1 overflow-hidden">
+        {/* Messages area */}
       <div
         ref={messagesContainerRef}
         className="flex-1 overflow-y-auto p-4 space-y-4"
@@ -342,6 +380,66 @@ export const ChatRoomView: React.FC<ChatRoomViewProps> = ({
           })
         )}
         <div ref={messagesEndRef} />
+        </div>
+
+        {/* Members panel */}
+        {showMembersPanel && chat.members && chat.members.length > 0 && (
+          <div className="w-64 border-l bg-gray-50 flex-shrink-0 overflow-y-auto">
+            <div className="p-4">
+              <h3 className="text-sm font-semibold text-gray-700 mb-3">
+                Members ({chat.members.length})
+              </h3>
+              <div className="space-y-2">
+                {chat.members.map((member) => {
+                  const isOnline = presence[member.user_id]?.isOnline
+                  const memberName =
+                    member.user?.full_name ||
+                    member.user?.username ||
+                    member.user?.email ||
+                    "User"
+                  const isOwner = member.user_id === chat.owner_id
+
+                  return (
+                    <div
+                      key={member.id}
+                      className="flex items-center gap-2 p-2 rounded-lg hover:bg-gray-100"
+                    >
+                      <div className="relative">
+                        <Avatar className="w-8 h-8">
+                          <AvatarFallback className="text-xs bg-gray-200">
+                            {memberName.substring(0, 2).toUpperCase()}
+                          </AvatarFallback>
+                        </Avatar>
+                        {/* Online indicator */}
+                        <span
+                          className={`absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full border-2 border-gray-50 ${
+                            isOnline ? "bg-green-500" : "bg-gray-300"
+                          }`}
+                        />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium text-gray-900 truncate">
+                          {memberName}
+                          {member.user_id === currentUserId && (
+                            <span className="text-gray-400 ml-1">(you)</span>
+                          )}
+                        </p>
+                        <p className="text-xs text-gray-500">
+                          {isOwner && <span className="text-purple-600">Owner • </span>}
+                          {isOnline ? (
+                            <span className="text-green-600">Online</span>
+                          ) : (
+                            <span>Offline</span>
+                          )}
+                        </p>
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Input area */}
