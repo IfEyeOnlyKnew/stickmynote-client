@@ -10,7 +10,7 @@ import { db } from "@/lib/database/pg-client"
  */
 
 // Online threshold in minutes - users seen within this time are considered online
-export const ONLINE_THRESHOLD_MINUTES = 5
+const ONLINE_THRESHOLD_MINUTES = 5
 
 /**
  * POST /api/user/presence
