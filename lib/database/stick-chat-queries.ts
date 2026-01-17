@@ -42,41 +42,37 @@ export async function getUserChats(
   const params: any[] = [userId]
   let paramIndex = 2
 
-  let whereConditions = `
-    (sc.owner_id = $1 OR scm.user_id = $1)
-    AND sc.expires_at > NOW()
-  `
+  // Build additional filter conditions
+  let filterConditions = ""
 
   if (orgId) {
-    whereConditions += ` AND (sc.org_id = $${paramIndex} OR sc.org_id IS NULL)`
+    filterConditions += ` AND (sc.org_id = $${paramIndex} OR sc.org_id IS NULL)`
     params.push(orgId)
     paramIndex++
   }
 
   if (filters?.stick_id) {
-    whereConditions += ` AND sc.stick_id = $${paramIndex}`
+    filterConditions += ` AND sc.stick_id = $${paramIndex}`
     params.push(filters.stick_id)
     paramIndex++
   }
 
   if (filters?.stick_type) {
-    whereConditions += ` AND sc.stick_type = $${paramIndex}`
+    filterConditions += ` AND sc.stick_type = $${paramIndex}`
     params.push(filters.stick_type)
     paramIndex++
   }
 
   if (filters?.is_group !== undefined) {
-    whereConditions += ` AND sc.is_group = $${paramIndex}`
+    filterConditions += ` AND sc.is_group = $${paramIndex}`
     params.push(filters.is_group)
     paramIndex++
   }
 
-  if (filters?.include_expired) {
-    whereConditions = whereConditions.replace("AND sc.expires_at > NOW()", "")
-  }
+  const expiryCondition = filters?.include_expired ? "" : "AND sc.expires_at > NOW()"
 
   const query = `
-    SELECT DISTINCT ON (sc.id)
+    SELECT
       sc.*,
       u.id as owner_user_id,
       u.username as owner_username,
@@ -105,12 +101,17 @@ export async function getUserChats(
       )::int as unread_count,
       COALESCE(ps.topic, ss.topic) as stick_topic
     FROM stick_chats sc
-    LEFT JOIN stick_chat_members scm ON sc.id = scm.chat_id
     LEFT JOIN users u ON sc.owner_id = u.id
     LEFT JOIN personal_sticks ps ON sc.stick_id = ps.id AND sc.stick_type = 'personal'
     LEFT JOIN social_sticks ss ON sc.stick_id = ss.id AND sc.stick_type = 'social'
-    WHERE ${whereConditions}
-    ORDER BY sc.id, sc.updated_at DESC
+    WHERE sc.id IN (
+      SELECT chat_id FROM stick_chat_members WHERE user_id = $1
+      UNION
+      SELECT id FROM stick_chats WHERE owner_id = $1
+    )
+    ${expiryCondition}
+    ${filterConditions}
+    ORDER BY sc.updated_at DESC
   `
 
   const rows = await queryMany<any>(query, params)
