@@ -16,6 +16,7 @@ import {
   Settings,
   PanelRightClose,
   PanelRightOpen,
+  Video,
 } from "lucide-react"
 import { formatDistanceToNow } from "date-fns"
 import { useCSRF } from "@/hooks/useCSRF"
@@ -254,6 +255,16 @@ export const ChatRoomView: React.FC<ChatRoomViewProps> = ({
             )}
 
             {/* Action buttons */}
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => window.open("/video", "_blank")}
+              title="Start video call"
+            >
+              <Video className="w-4 h-4 mr-1" />
+              Video
+            </Button>
+
             <Button
               variant="outline"
               size="sm"

@@ -5,7 +5,7 @@ import { useState, useEffect } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { StickyNote, Users, FileText, ArrowRight, Share2, AlertCircle, MessageSquare } from "lucide-react"
+import { StickyNote, Users, FileText, ArrowRight, Share2, AlertCircle, MessageSquare, Video } from "lucide-react"
 import { UserMenu } from "@/components/user-menu"
 import { useUser } from "@/contexts/user-context"
 import { useOrganization } from "@/contexts/organization-context"
@@ -100,7 +100,7 @@ export default function DashboardPage() {
         </div>
 
         {/* Main Choice Cards */}
-        <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+        <div className="grid md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-6 mb-8">
           {/* Notes Section */}
           <Card className="hover:shadow-xl transition-all duration-300 hover:scale-105 border-2 hover:border-blue-300">
             <CardHeader className="text-center pb-4">
@@ -280,6 +280,47 @@ export default function DashboardPage() {
               </Button>
             </CardContent>
           </Card>
+
+          {/* Video Hub Section */}
+          <Card className="hover:shadow-xl transition-all duration-300 hover:scale-105 border-2 hover:border-rose-300">
+            <CardHeader className="text-center pb-4">
+              <div className="mx-auto w-16 h-16 bg-rose-100 rounded-full flex items-center justify-center mb-4">
+                <Video className="h-8 w-8 text-rose-600" />
+              </div>
+              <CardTitle className="text-2xl text-gray-900">Video Hub</CardTitle>
+              <CardDescription className="text-base">
+                Face-to-face video calls and screen sharing with your team
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-3">
+                <div className="flex items-center text-sm text-gray-600">
+                  <div className="w-2 h-2 bg-rose-500 rounded-full mr-2"></div>
+                  One-on-one video calls
+                </div>
+                <div className="flex items-center text-sm text-gray-600">
+                  <div className="w-2 h-2 bg-rose-500 rounded-full mr-2"></div>
+                  Group video meetings
+                </div>
+                <div className="flex items-center text-sm text-gray-600">
+                  <div className="w-2 h-2 bg-rose-500 rounded-full mr-2"></div>
+                  Screen sharing
+                </div>
+                <div className="flex items-center text-sm text-gray-600">
+                  <div className="w-2 h-2 bg-rose-500 rounded-full mr-2"></div>
+                  No downloads required
+                </div>
+              </div>
+              <Button
+                onClick={() => router.push("/video")}
+                className="w-full bg-rose-600 hover:bg-rose-700 text-white font-semibold py-3 text-lg"
+                size="lg"
+              >
+                Go to Video Hub
+                <ArrowRight className="h-5 w-5 ml-2" />
+              </Button>
+            </CardContent>
+          </Card>
         </div>
 
         {/* Quick Info Section */}
@@ -300,6 +341,10 @@ export default function DashboardPage() {
             <Badge variant="secondary" className="px-4 py-2">
               <MessageSquare className="h-4 w-4 mr-2" />
               Chats: Real-time Conversations
+            </Badge>
+            <Badge variant="secondary" className="px-4 py-2">
+              <Video className="h-4 w-4 mr-2" />
+              Video: Face-to-Face Meetings
             </Badge>
           </div>
           <p className="text-gray-500 text-sm max-w-3xl mx-auto">
