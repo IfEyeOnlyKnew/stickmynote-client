@@ -47,12 +47,17 @@ export async function POST(request: NextRequest) {
 
     const result = await syncAllADUsers()
 
+    const { success, created, updated, skipped, errors } = result
+
     return NextResponse.json({
-      success: result.success,
-      message: result.success 
-        ? `Sync complete: ${result.created} created, ${result.updated} updated, ${result.skipped} skipped`
+      success,
+      message: success
+        ? `Sync complete: ${created} created, ${updated} updated, ${skipped} skipped`
         : "Sync completed with errors",
-      ...result,
+      created,
+      updated,
+      skipped,
+      errors,
     })
   } catch (error) {
     console.error("[AD Sync] API error:", error)
