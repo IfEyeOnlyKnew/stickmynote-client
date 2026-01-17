@@ -11,6 +11,7 @@ import { ErrorBoundary } from "@/components/error-boundary"
 import { CookieConsentBanner } from "@/components/cookie-consent-banner"
 import { ServiceWorkerRegister } from "@/components/ServiceWorkerRegister"
 import { ChatRequestNotifications } from "@/components/chat/ChatRequestNotifications"
+import { PresenceTracker } from "@/components/PresenceTracker"
 
 const inter = Inter({ subsets: ["latin"] })
 
@@ -102,6 +103,7 @@ export default function RootLayout({
             <UserProvider>
               <OrganizationProvider>
                 <OrgThemeProvider>
+                  <PresenceTracker />
                   <main id="main-content">{children}</main>
                   <Toaster />
                   <ChatRequestNotifications />

@@ -488,3 +488,274 @@ export async function testLDAPConnection(): Promise<{ success: boolean; message:
     }
   }
 }
+
+// ============================================================================
+// LDAP User Search (for invites, etc.)
+// ============================================================================
+
+export interface LDAPSearchResult {
+  dn: string
+  sAMAccountName: string
+  email: string
+  displayName: string
+  givenName: string
+  surname: string
+}
+
+/**
+ * Search Active Directory for users matching a query string.
+ * Searches by displayName, sAMAccountName, mail, givenName, and sn.
+ */
+export async function searchLDAPUsers(
+  query: string,
+  limit: number = 10
+): Promise<{ success: boolean; users?: LDAPSearchResult[]; error?: string }> {
+  if (isBuildTime) {
+    return { success: false, error: "LDAP not available during build" }
+  }
+
+  if (!query || query.length < 2) {
+    return { success: true, users: [] }
+  }
+
+  const config = getLDAPConfig()
+  const client = await createLDAPClient(config.url)
+
+  try {
+    // Bind with service account
+    await bindLDAP(client, config.bindDN, config.bindPassword)
+
+    // Build search filter for partial matching
+    // Search by displayName, sAMAccountName, mail, givenName, or sn
+    const escapedQuery = query.replace(/[\\*()]/g, (char) => `\\${char}`)
+    const searchFilter = `(&(objectClass=user)(objectCategory=person)(|(displayName=*${escapedQuery}*)(sAMAccountName=*${escapedQuery}*)(mail=*${escapedQuery}*)(givenName=*${escapedQuery}*)(sn=*${escapedQuery}*)))`
+
+    const users = await searchLDAPUsersInternal(client, config, searchFilter, limit)
+
+    safeUnbind(client)
+    return { success: true, users }
+  } catch (error) {
+    console.error("[LDAP] User search error:", error)
+    safeUnbind(client)
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Search failed",
+    }
+  }
+}
+
+async function searchLDAPUsersInternal(
+  client: any,
+  config: LDAPConfig,
+  searchFilter: string,
+  limit: number
+): Promise<LDAPSearchResult[]> {
+  return new Promise((resolve, reject) => {
+    const opts = {
+      filter: searchFilter,
+      scope: "sub" as const,
+      attributes: [...LDAP_SEARCH_ATTRIBUTES],
+      sizeLimit: limit,
+    }
+
+    console.log(`[LDAP] Searching users with filter: ${searchFilter}`)
+
+    client.search(config.userBaseDN, opts, (err: Error | null, res: any) => {
+      if (err) {
+        console.error("[LDAP] Search error:", err.message)
+        reject(err)
+        return
+      }
+
+      const users: LDAPSearchResult[] = []
+
+      res.on("searchEntry", (entry: LDAPSearchEntry) => {
+        try {
+          const ldapUser = parseSearchEntry(entry)
+          users.push({
+            dn: ldapUser.dn,
+            sAMAccountName: ldapUser.sAMAccountName,
+            email: ldapUser.mail || ldapUser.userPrincipalName,
+            displayName: ldapUser.displayName,
+            givenName: ldapUser.givenName,
+            surname: ldapUser.sn,
+          })
+        } catch (parseErr) {
+          console.warn("[LDAP] Error parsing search entry:", parseErr)
+        }
+      })
+
+      res.on("error", (searchErr: Error) => {
+        // Size limit exceeded is not a fatal error - we still have results
+        if (searchErr.message?.includes("Size Limit Exceeded")) {
+          console.log("[LDAP] Size limit reached, returning partial results")
+          resolve(users)
+        } else {
+          reject(searchErr)
+        }
+      })
+
+      res.on("end", () => {
+        console.log(`[LDAP] Search complete, found ${users.length} users`)
+        resolve(users)
+      })
+    })
+  })
+}
+
+// ============================================================================
+// Bulk AD User Sync
+// ============================================================================
+
+export interface SyncResult {
+  success: boolean
+  created: number
+  updated: number
+  skipped: number
+  errors: string[]
+  totalFromAD: number
+}
+
+/**
+ * Sync all users from Active Directory to the database.
+ * Creates new users and updates existing ones.
+ */
+export async function syncAllADUsers(): Promise<SyncResult> {
+  if (isBuildTime) {
+    return { success: false, created: 0, updated: 0, skipped: 0, errors: ["LDAP not available during build"], totalFromAD: 0 }
+  }
+
+  const config = getLDAPConfig()
+  const client = await createLDAPClient(config.url)
+  const result: SyncResult = { success: true, created: 0, updated: 0, skipped: 0, errors: [], totalFromAD: 0 }
+
+  try {
+    // Bind with service account
+    await bindLDAP(client, config.bindDN, config.bindPassword)
+    console.log("[LDAP Sync] Service account bind successful")
+
+    // Search for all user objects
+    const searchFilter = "(&(objectClass=user)(objectCategory=person)(mail=*))"
+    const users = await searchAllLDAPUsers(client, config, searchFilter)
+    result.totalFromAD = users.length
+    console.log(`[LDAP Sync] Found ${users.length} users in Active Directory`)
+
+    safeUnbind(client)
+
+    // Process each user
+    for (const ldapUser of users) {
+      try {
+        if (!ldapUser.email) {
+          result.skipped++
+          continue
+        }
+
+        const fullName = ldapUser.displayName || `${ldapUser.givenName} ${ldapUser.surname}`.trim()
+
+        // Check if user already exists
+        const existingUser = await db.query(
+          `SELECT id, email, full_name, distinguished_name FROM users
+           WHERE email = $1 OR distinguished_name = $2
+           LIMIT 1`,
+          [ldapUser.email, ldapUser.dn]
+        )
+
+        if (existingUser.rows.length > 0) {
+          // Update existing user
+          await db.query(
+            `UPDATE users
+             SET full_name = $1,
+                 username = $2,
+                 distinguished_name = $3,
+                 email_verified = true,
+                 updated_at = NOW()
+             WHERE id = $4`,
+            [fullName, ldapUser.sAMAccountName, ldapUser.dn, existingUser.rows[0].id]
+          )
+          result.updated++
+        } else {
+          // Create new user
+          await db.query(
+            `INSERT INTO users (email, full_name, username, distinguished_name, email_verified, hub_mode, created_at, updated_at)
+             VALUES ($1, $2, $3, $4, true, 'full_access', NOW(), NOW())`,
+            [ldapUser.email, fullName, ldapUser.sAMAccountName, ldapUser.dn]
+          )
+          result.created++
+        }
+      } catch (userErr) {
+        const errMsg = userErr instanceof Error ? userErr.message : String(userErr)
+        result.errors.push(`Error processing ${ldapUser.email}: ${errMsg}`)
+        console.error(`[LDAP Sync] Error processing user ${ldapUser.email}:`, userErr)
+      }
+    }
+
+    console.log(`[LDAP Sync] Complete: ${result.created} created, ${result.updated} updated, ${result.skipped} skipped`)
+    return result
+  } catch (error) {
+    console.error("[LDAP Sync] Error:", error)
+    safeUnbind(client)
+    return {
+      ...result,
+      success: false,
+      errors: [...result.errors, error instanceof Error ? error.message : "Sync failed"],
+    }
+  }
+}
+
+async function searchAllLDAPUsers(
+  client: any,
+  config: LDAPConfig,
+  searchFilter: string
+): Promise<LDAPSearchResult[]> {
+  return new Promise((resolve, reject) => {
+    const opts = {
+      filter: searchFilter,
+      scope: "sub" as const,
+      attributes: [...LDAP_SEARCH_ATTRIBUTES],
+      paged: true, // Enable paging for large directories
+    }
+
+    console.log(`[LDAP Sync] Searching with filter: ${searchFilter}`)
+
+    client.search(config.userBaseDN, opts, (err: Error | null, res: any) => {
+      if (err) {
+        console.error("[LDAP Sync] Search error:", err.message)
+        reject(err)
+        return
+      }
+
+      const users: LDAPSearchResult[] = []
+
+      res.on("searchEntry", (entry: LDAPSearchEntry) => {
+        try {
+          const ldapUser = parseSearchEntry(entry)
+          if (ldapUser.mail || ldapUser.userPrincipalName) {
+            users.push({
+              dn: ldapUser.dn,
+              sAMAccountName: ldapUser.sAMAccountName,
+              email: ldapUser.mail || ldapUser.userPrincipalName,
+              displayName: ldapUser.displayName,
+              givenName: ldapUser.givenName,
+              surname: ldapUser.sn,
+            })
+          }
+        } catch (parseErr) {
+          console.warn("[LDAP Sync] Error parsing entry:", parseErr)
+        }
+      })
+
+      res.on("error", (searchErr: Error) => {
+        if (searchErr.message?.includes("Size Limit Exceeded")) {
+          console.log("[LDAP Sync] Size limit reached, returning partial results")
+          resolve(users)
+        } else {
+          reject(searchErr)
+        }
+      })
+
+      res.on("end", () => {
+        resolve(users)
+      })
+    })
+  })
+}

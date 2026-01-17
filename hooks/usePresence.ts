@@ -1,0 +1,96 @@
+"use client"
+
+import { useEffect, useRef, useState } from "react"
+import { useUser } from "@/contexts/user-context"
+
+// Heartbeat interval in milliseconds (30 seconds)
+const HEARTBEAT_INTERVAL = 30000
+
+/**
+ * Hook to track user presence by sending periodic heartbeats.
+ * Should be used once at the app level (e.g., in layout or a provider).
+ */
+export function usePresenceHeartbeat() {
+  const { user } = useUser()
+  const intervalRef = useRef<NodeJS.Timeout | null>(null)
+
+  useEffect(() => {
+    if (!user) {
+      // Clear interval if user logs out
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current)
+        intervalRef.current = null
+      }
+      return
+    }
+
+    // Send initial heartbeat
+    sendHeartbeat()
+
+    // Set up periodic heartbeat
+    intervalRef.current = setInterval(sendHeartbeat, HEARTBEAT_INTERVAL)
+
+    // Also send heartbeat on visibility change (when user returns to tab)
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        sendHeartbeat()
+      }
+    }
+    document.addEventListener("visibilitychange", handleVisibilityChange)
+
+    return () => {
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current)
+      }
+      document.removeEventListener("visibilitychange", handleVisibilityChange)
+    }
+  }, [user])
+}
+
+async function sendHeartbeat() {
+  try {
+    await fetch("/api/user/presence", { method: "POST" })
+  } catch (err) {
+    // Silent fail - presence is not critical
+    console.debug("[Presence] Heartbeat failed:", err)
+  }
+}
+
+/**
+ * Hook to get presence status for a list of user IDs.
+ * Returns a map of userId -> { isOnline, lastSeenAt }
+ */
+export function useUserPresence(userIds: string[]) {
+  const [presence, setPresence] = useState<Record<string, { isOnline: boolean; lastSeenAt: string | null }>>({})
+  const [loading, setLoading] = useState(false)
+
+  useEffect(() => {
+    if (userIds.length === 0) {
+      setPresence({})
+      return
+    }
+
+    const fetchPresence = async () => {
+      setLoading(true)
+      try {
+        const response = await fetch(`/api/user/presence?ids=${userIds.join(",")}`)
+        if (response.ok) {
+          const data = await response.json()
+          setPresence(data.presence || {})
+        }
+      } catch (err) {
+        console.error("[Presence] Fetch error:", err)
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    fetchPresence()
+
+    // Refresh presence every 30 seconds
+    const interval = setInterval(fetchPresence, 30000)
+    return () => clearInterval(interval)
+  }, [userIds.join(",")])
+
+  return { presence, loading }
+}
