@@ -1,18 +1,18 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useCallback } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Textarea } from "@/components/ui/textarea"
-import { Video, Plus, Users, Clock, Copy, Trash2, Info, Mail } from "lucide-react"
+import { Video, Plus, Users, Clock, Copy, Trash2, Info } from "lucide-react"
 import { UserMenu } from "@/components/user-menu"
 import { useToast } from "@/hooks/use-toast"
 import { BreadcrumbNav } from "@/components/breadcrumb-nav"
 import { VideoRoomModal } from "@/components/video-room-modal"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { useHubModeGuard } from "@/hooks/use-hub-mode-guard"
+import { VideoInviteUserSearch } from "@/components/video/VideoInviteUserSearch"
 
 interface VideoRoom {
   id: string
@@ -30,7 +30,7 @@ export default function VideoPage() {
   const [rooms, setRooms] = useState<VideoRoom[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [newRoomName, setNewRoomName] = useState("")
-  const [inviteEmails, setInviteEmails] = useState("")
+  const [inviteEmails, setInviteEmails] = useState<string[]>([])
   const [isCreating, setIsCreating] = useState(false)
   const [activeRoomUrl, setActiveRoomUrl] = useState<string | null>(null)
 
@@ -98,16 +98,12 @@ export default function VideoPage() {
     console.log("[v0] Invite emails:", inviteEmails)
 
     try {
-      const emailList = inviteEmails.trim()
-        ? inviteEmails.split(",").map((e) => e.trim()).filter((e) => e)
-        : []
-
       const response = await fetch("/api/video/rooms", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           name: newRoomName,
-          inviteEmails: emailList,
+          inviteEmails: inviteEmails,
         }),
       })
 
@@ -124,13 +120,13 @@ export default function VideoPage() {
 
       toast({
         title: "Success",
-        description: emailList.length > 0
+        description: inviteEmails.length > 0
           ? "Video room created and invitations sent"
           : "Video room created successfully",
       })
 
       setNewRoomName("")
-      setInviteEmails("")
+      setInviteEmails([])
 
       console.log("[v0] About to fetch rooms after creation...")
       await fetchRooms()
@@ -205,6 +201,11 @@ export default function VideoPage() {
     }
   }
 
+  // Memoized callback to prevent infinite re-renders in VideoInviteUserSearch
+  const handleEmailsChange = useCallback((emails: string[]) => {
+    setInviteEmails(emails)
+  }, [])
+
   return (
     <div className="container mx-auto px-4 py-8 max-w-6xl">
       <BreadcrumbNav
@@ -254,21 +255,10 @@ export default function VideoPage() {
               />
             </div>
             <div>
-              <Label htmlFor="inviteEmails">
-                <div className="flex items-center gap-2">
-                  <Mail className="h-4 w-4" />
-                  Invite Participants (Optional)
-                </div>
-              </Label>
-              <Textarea
-                id="inviteEmails"
-                placeholder="Enter email addresses separated by commas"
-                value={inviteEmails}
-                onChange={(e) => setInviteEmails(e.target.value)}
-                rows={3}
-                className="resize-none mt-2"
+              <VideoInviteUserSearch
+                selectedEmails={inviteEmails}
+                onEmailsChange={handleEmailsChange}
               />
-              <p className="text-xs text-gray-500 mt-1">Invitations will be sent with a link to join the room</p>
             </div>
             <Button onClick={handleCreateRoom} disabled={isCreating} className="w-full bg-blue-600 hover:bg-blue-700">
               {isCreating ? "Creating..." : "Create Room & Send Invites"}
