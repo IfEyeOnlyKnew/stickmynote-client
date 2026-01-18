@@ -393,6 +393,69 @@ const lockoutData = await checkLockout(normalizedEmail)
 - Always use direct function imports for server-side operations
 - Add this check to code review process
 
+---
+
+## Scheduled Tasks / Cron Jobs
+
+The application has scheduled tasks that need to be configured in production.
+
+### Cleanup Expired Chats
+
+**Endpoint:** `/api/cron/cleanup-expired-chats`
+**Purpose:** Deletes stick chats that have passed their 30-day expiration
+**Recommended Schedule:** Daily at 3 AM
+
+#### Option 1: Windows Task Scheduler (Recommended for Windows Server)
+
+1. Open Task Scheduler on HOL-DC2-IIS (192.168.50.20)
+2. Create Basic Task:
+   - Name: `StickyMyNote - Cleanup Expired Chats`
+   - Trigger: Daily at 3:00 AM
+   - Action: Start a program
+   - Program: `curl`
+   - Arguments: `-k https://localhost/api/cron/cleanup-expired-chats`
+
+Or use PowerShell:
+```powershell
+# Create scheduled task
+$action = New-ScheduledTaskAction -Execute "curl.exe" -Argument "-k https://localhost/api/cron/cleanup-expired-chats"
+$trigger = New-ScheduledTaskTrigger -Daily -At 3:00AM
+Register-ScheduledTask -TaskName "StickyMyNote-CleanupChats" -Action $action -Trigger $trigger -User "SYSTEM"
+```
+
+#### Option 2: Add CRON_SECRET for Security (Optional)
+
+1. Add to `.env` on production:
+
+   ```env
+   CRON_SECRET=your-secure-random-string
+   ```
+
+2. Update scheduled task to include auth header:
+
+   ```powershell
+   $action = New-ScheduledTaskAction -Execute "curl.exe" -Argument "-k -H `"Authorization: Bearer your-secure-random-string`" https://localhost/api/cron/cleanup-expired-chats"
+   ```
+
+#### Manual Testing
+
+```bash
+# Test the endpoint manually (from the app server)
+curl -k https://localhost/api/cron/cleanup-expired-chats
+
+# Expected response:
+# {"success":true,"deletedCount":0,"duration":"5ms","timestamp":"2026-01-16T03:00:00.000Z"}
+```
+
+### Other Scheduled Tasks
+
+| Endpoint | Purpose | Schedule |
+|----------|---------|----------|
+| `/api/cron/cleanup-social-sticks` | Archive/delete old social sticks per pad policies | Daily at 2 AM |
+| `/api/cron/cleanup-expired-chats` | Delete chats older than 30 days | Daily at 3 AM |
+
+---
+
 ### 2026-01-13: Production Outage - Database Connection Failed (Empty Password)
 
 **What happened:**

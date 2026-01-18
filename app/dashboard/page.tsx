@@ -5,7 +5,7 @@ import { useState, useEffect } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { StickyNote, Users, FileText, ArrowRight, Share2, AlertCircle } from "lucide-react"
+import { StickyNote, Users, FileText, ArrowRight, Share2, AlertCircle, MessageSquare } from "lucide-react"
 import { UserMenu } from "@/components/user-menu"
 import { useUser } from "@/contexts/user-context"
 import { useOrganization } from "@/contexts/organization-context"
@@ -19,6 +19,7 @@ export default function DashboardPage() {
   const { loading: orgLoading } = useOrganization()
   const [setupModalOpen, setSetupModalOpen] = useState(false)
   const [openCalSticksCount, setOpenCalSticksCount] = useState(0)
+  const [unreadChatsCount, setUnreadChatsCount] = useState(0)
 
   useEffect(() => {
     if (!loading && !user) {
@@ -41,6 +42,27 @@ export default function DashboardPage() {
     }
 
     fetchCalSticksCount()
+  }, [user])
+
+  useEffect(() => {
+    const fetchUnreadChats = async () => {
+      if (!user) return
+
+      try {
+        const response = await fetch("/api/stick-chats")
+        const data = await response.json()
+        const totalUnread = (data.chats || []).reduce(
+          (sum: number, chat: { unread_count?: number }) => sum + (chat.unread_count || 0),
+          0
+        )
+        setUnreadChatsCount(totalUnread)
+      } catch (err) {
+        console.error("[Dashboard] Chats fetch error:", err)
+        setUnreadChatsCount(0)
+      }
+    }
+
+    fetchUnreadChats()
   }, [user])
 
   if (loading || orgLoading) {
@@ -78,7 +100,7 @@ export default function DashboardPage() {
         </div>
 
         {/* Main Choice Cards */}
-        <div className="grid md:grid-cols-3 gap-6 mb-8">
+        <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
           {/* Notes Section */}
           <Card className="hover:shadow-xl transition-all duration-300 hover:scale-105 border-2 hover:border-blue-300">
             <CardHeader className="text-center pb-4">
@@ -212,6 +234,52 @@ export default function DashboardPage() {
               </Button>
             </CardContent>
           </Card>
+
+          {/* Chats Hub Section */}
+          <Card className="hover:shadow-xl transition-all duration-300 hover:scale-105 border-2 hover:border-teal-300">
+            <CardHeader className="text-center pb-4">
+              <div className="mx-auto w-16 h-16 bg-teal-100 rounded-full flex items-center justify-center mb-4 relative">
+                <MessageSquare className="h-8 w-8 text-teal-600" />
+                {unreadChatsCount > 0 && (
+                  <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs font-bold rounded-full min-w-[20px] h-5 flex items-center justify-center px-1">
+                    {unreadChatsCount > 99 ? "99+" : unreadChatsCount}
+                  </span>
+                )}
+              </div>
+              <CardTitle className="text-2xl text-gray-900">Chats Hub</CardTitle>
+              <CardDescription className="text-base">
+                Real-time conversations with teammates and per-stick discussions
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-3">
+                <div className="flex items-center text-sm text-gray-600">
+                  <div className="w-2 h-2 bg-teal-500 rounded-full mr-2"></div>
+                  Per-stick chat rooms
+                </div>
+                <div className="flex items-center text-sm text-gray-600">
+                  <div className="w-2 h-2 bg-teal-500 rounded-full mr-2"></div>
+                  Standalone group chats
+                </div>
+                <div className="flex items-center text-sm text-gray-600">
+                  <div className="w-2 h-2 bg-teal-500 rounded-full mr-2"></div>
+                  Export chats to DOCX
+                </div>
+                <div className="flex items-center text-sm text-gray-600">
+                  <div className="w-2 h-2 bg-teal-500 rounded-full mr-2"></div>
+                  30-day auto-expiration
+                </div>
+              </div>
+              <Button
+                onClick={() => router.push("/chats")}
+                className="w-full bg-teal-600 hover:bg-teal-700 text-white font-semibold py-3 text-lg"
+                size="lg"
+              >
+                Go to Chats Hub
+                <ArrowRight className="h-5 w-5 ml-2" />
+              </Button>
+            </CardContent>
+          </Card>
         </div>
 
         {/* Quick Info Section */}
@@ -228,6 +296,10 @@ export default function DashboardPage() {
             <Badge variant="secondary" className="px-4 py-2">
               <Share2 className="h-4 w-4 mr-2" />
               Social Hub: Enterprise Collaboration
+            </Badge>
+            <Badge variant="secondary" className="px-4 py-2">
+              <MessageSquare className="h-4 w-4 mr-2" />
+              Chats: Real-time Conversations
             </Badge>
           </div>
           <p className="text-gray-500 text-sm max-w-3xl mx-auto">
