@@ -49,10 +49,16 @@ git push origin main
 # Navigate to production
 cd C:\stick-my-note-prod\stickmynote-client
 
-# Backup protected files FIRST
+# Stop service and kill node processes first
+net stop StickyMyNote
+taskkill /F /IM node.exe
+
+# Delete old build folder
+Remove-Item -Recurse -Force .next -ErrorAction SilentlyContinue
+
+# Backup protected files
 cp server.js server.js.backup
 cp .env .env.backup
-cp .env.local .env.local.backup
 cp .env.production .env.production.backup
 
 # Fetch latest without merging
@@ -90,18 +96,15 @@ pnpm run build
 
 # CRITICAL: Remove build-only env after build (prevents empty POSTGRES_PASSWORD)
 rm .env.local
-
-# Restore production env if it was backed up
-cp .env.local.backup .env.local
 ```
 
-> **WARNING:** If you forget to remove `.env.local` after build, sign-in will fail with "SASL: client password must be a string" because the build-time config has an empty `POSTGRES_PASSWORD`.
+> **WARNING:** You MUST delete `.env.local` after the build completes. Production does NOT need `.env.local` - it uses `.env` and `.env.production` which have the correct database credentials. If `.env.local` remains, sign-in will fail with "SASL: client password must be a string" because the build-time config has an empty `POSTGRES_PASSWORD`.
 
-### Step 5: Restart Service
+### Step 5: Start Service
 
 ```bash
 # Requires admin privileges
-nssm restart StickyMyNote
+net start StickyMyNote
 ```
 
 ### Step 6: Verify Production
@@ -126,7 +129,7 @@ cd C:\stick-my-note-prod\stickmynote-client
 git fetch origin main
 git checkout origin/main -- app/ components/ lib/ hooks/ types/ public/
 pnpm run build
-nssm restart StickyMyNote
+net stop StickyMyNote && net start StickyMyNote
 ```
 
 ## Network Architecture
@@ -152,7 +155,7 @@ nssm restart StickyMyNote
 ### Site Down After Update
 - Verify `server.js` wasn't overwritten: check for `require("https")`
 - Restore from backup: `cp server.js.backup server.js`
-- Restart service: `nssm restart StickyMyNote`
+- Restart service: `net stop StickyMyNote && net start StickyMyNote`
 
 ### Sign-in Returns 500 Error (SSL/TLS Issue)
 - **Cause:** Node.js v24 has stricter TLS. Internal `fetch()` calls to HTTPS endpoints fail.
