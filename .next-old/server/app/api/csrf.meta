@@ -1,0 +1,9 @@
+{
+  "headers": {
+    "content-type": "application/json",
+    "set-cookie": "csrf-token=4f611954224210c043eb83b44a929e5268bb3433e7cfff4ee6a79b2e26dd6119.1767452635185.50d8af1906f167c803f954827059aa6d11887a90144da5ccb9d097201c3f4776; Path=/; Expires=Sun, 04 Jan 2026 15:03:55 GMT; Max-Age=86400; Secure; HttpOnly; SameSite=strict",
+    "x-middleware-set-cookie": "csrf-token=4f611954224210c043eb83b44a929e5268bb3433e7cfff4ee6a79b2e26dd6119.1767452635185.50d8af1906f167c803f954827059aa6d11887a90144da5ccb9d097201c3f4776; Path=/; Expires=Sun, 04 Jan 2026 15:03:55 GMT; Max-Age=86400; Secure; HttpOnly; SameSite=strict",
+    "x-next-cache-tags": "_N_T_/layout,_N_T_/api/layout,_N_T_/api/csrf/layout,_N_T_/api/csrf/route,_N_T_/api/csrf"
+  },
+  "status": 200
+}

@@ -106,16 +106,7 @@ export default function ChatRoomPage() {
     <div className="min-h-screen bg-gray-50 flex flex-col">
       {/* Breadcrumb */}
       <div className="container mx-auto px-4 pt-4 max-w-4xl">
-        <div className="flex items-center gap-4 mb-4">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => router.push("/chats")}
-            className="flex-shrink-0"
-          >
-            <ArrowLeft className="w-4 h-4 mr-2" />
-            Back
-          </Button>
+        <div className="mb-4">
           <BreadcrumbNav
             items={[
               { label: "Dashboard", href: "/dashboard" },

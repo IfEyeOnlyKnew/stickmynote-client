@@ -1,0 +1,236 @@
+  ▲ Next.js 14.2.35
+  - Local:        http://localhost:3000
+
+ ✓ Starting...
+ ✓ Ready in 582ms
+SSL certificates found, starting HTTPS server...
+> HTTPS Ready on https://0.0.0.0:443
+> HTTP Redirect on http://0.0.0.0:3000 -> HTTPS
+SSL certificates found, starting HTTPS server...
+> HTTPS Ready on https://0.0.0.0:443
+> HTTP Redirect on http://0.0.0.0:3000 -> HTTPS
+SSL certificates found, starting HTTPS server...
+> HTTPS Ready on https://0.0.0.0:443
+> HTTP Redirect on http://0.0.0.0:3000 -> HTTPS
+SSL certificates found, starting HTTPS server...
+> HTTPS Ready on https://0.0.0.0:443
+> HTTP Redirect on http://0.0.0.0:3000 -> HTTPS
+SSL certificates found, starting HTTPS server...
+> HTTPS Ready on https://0.0.0.0:443
+> HTTP Redirect on http://0.0.0.0:3000 -> HTTPS
+SSL certificates found, starting HTTPS server...
+> HTTPS Ready on https://0.0.0.0:443
+> HTTP Redirect on http://0.0.0.0:3000 -> HTTPS
+SSL certificates found, starting HTTPS server...
+> HTTPS Ready on https://0.0.0.0:443
+> HTTP Redirect on http://0.0.0.0:3000 -> HTTPS
+SSL certificates found, starting HTTPS server...
+> HTTPS Ready on https://0.0.0.0:443
+> HTTP Redirect on http://0.0.0.0:3000 -> HTTPS
+SSL certificates found, starting HTTPS server...
+> HTTPS Ready on https://0.0.0.0:443
+> HTTP Redirect on http://0.0.0.0:3000 -> HTTPS
+SSL certificates found, starting HTTPS server...
+> HTTPS Ready on https://0.0.0.0:443
+> HTTP Redirect on http://0.0.0.0:3000 -> HTTPS
+SSL certificates found, starting HTTPS server...
+> HTTPS Ready on https://0.0.0.0:443
+> HTTP Redirect on http://0.0.0.0:3000 -> HTTPS
+SSL certificates found, starting HTTPS server...
+> HTTPS Ready on https://0.0.0.0:443
+> HTTP Redirect on http://0.0.0.0:3000 -> HTTPS
+SSL certificates found, starting HTTPS server...
+> HTTPS Ready on https://0.0.0.0:443
+> HTTP Redirect on http://0.0.0.0:3000 -> HTTPS
+SSL certificates found, starting HTTPS server...
+> HTTPS Ready on https://0.0.0.0:443
+> HTTP Redirect on http://0.0.0.0:3000 -> HTTPS
+SSL certificates found, starting HTTPS server...
+> HTTPS Ready on https://0.0.0.0:443
+> HTTP Redirect on http://0.0.0.0:3000 -> HTTPS
+SSL certificates found, starting HTTPS server...
+> HTTPS Ready on https://0.0.0.0:443
+> HTTP Redirect on http://0.0.0.0:3000 -> HTTPS
+SSL certificates found, starting HTTPS server...
+> HTTPS Ready on https://0.0.0.0:443
+> HTTP Redirect on http://0.0.0.0:3000 -> HTTPS
+SSL certificates found, starting HTTPS server...
+> HTTPS Ready on https://0.0.0.0:443
+> HTTP Redirect on http://0.0.0.0:3000 -> HTTPS
+SSL certificates found, starting HTTPS server...
+> HTTPS Ready on https://0.0.0.0:443
+> HTTP Redirect on http://0.0.0.0:3000 -> HTTPS
+> Ready on http://localhost:80
+> Ready on http://localhost:80
+> HTTPS Ready on https://0.0.0.0:443
+> HTTP redirect on http://0.0.0.0:80
+> HTTPS Ready on https://0.0.0.0:443
+> HTTP redirect on http://0.0.0.0:80
+> HTTPS Ready on https://0.0.0.0:443
+> HTTP redirect on http://0.0.0.0:80
+> HTTPS Ready on https://0.0.0.0:443
+> HTTP redirect on http://0.0.0.0:80
+> HTTPS Ready on https://0.0.0.0:443
+> HTTP redirect on http://0.0.0.0:80
+> HTTPS Ready on https://0.0.0.0:443
+> HTTP redirect on http://0.0.0.0:80
+> HTTPS Ready on https://0.0.0.0:443
+> HTTP redirect on http://0.0.0.0:80
+> HTTPS Ready on https://0.0.0.0:443
+> HTTP redirect on http://0.0.0.0:80
+> HTTPS Ready on https://0.0.0.0:443
+> HTTP redirect on http://0.0.0.0:80
+> HTTPS Ready on https://0.0.0.0:443
+> HTTP redirect on http://0.0.0.0:80
+> HTTPS Ready on https://0.0.0.0:443
+> HTTP redirect on http://0.0.0.0:80
+> HTTPS Ready on https://0.0.0.0:443
+> HTTP redirect on http://0.0.0.0:80
+> HTTPS Ready on https://0.0.0.0:443
+> HTTP redirect on http://0.0.0.0:80
+> HTTPS Ready on https://0.0.0.0:443
+> HTTP redirect on http://0.0.0.0:80
+> HTTPS Ready on https://0.0.0.0:443
+> HTTP redirect on http://0.0.0.0:80
+> HTTPS Ready on https://0.0.0.0:443
+> HTTP redirect on http://0.0.0.0:80
+[dotenv@17.2.3] injecting env (32) from .env.production -- tip: ⚙️  load multiple .env files with { path: ['.env.local', '.env'] }
+[dotenv@17.2.3] injecting env (12) from .env -- tip: ⚙️  write to custom object with { processEnv: myObject }
+=== Production Server Starting ===
+NODE_ENV: production
+LDAP_URL: ldaps://192.168.50.11:636
+Ports: HTTPS=443, HTTP=80
+==================================
+> HTTPS Ready on https://0.0.0.0:443
+> HTTP redirect on http://0.0.0.0:80
+[dotenv@17.2.3] injecting env (32) from .env.production -- tip: ✅ audit secrets and track compliance: https://dotenvx.com/ops
+[dotenv@17.2.3] injecting env (12) from .env -- tip: 🔑 add access controls to secrets: https://dotenvx.com/ops
+=== Production Server Starting ===
+NODE_ENV: production
+LDAP_URL: ldaps://192.168.50.11:636
+Ports: HTTPS=443, HTTP=80
+==================================
+> HTTPS Ready on https://0.0.0.0:443
+> HTTP redirect on http://0.0.0.0:80
+[dotenv@17.2.3] injecting env (32) from .env.production -- tip: ⚙️  specify custom .env file path with { path: '/custom/path/.env' }
+[dotenv@17.2.3] injecting env (12) from .env -- tip: 🗂️ backup and recover secrets: https://dotenvx.com/ops
+=== Production Server Starting ===
+NODE_ENV: production
+LDAP_URL: ldaps://192.168.50.11:636
+LDAP_BIND_DN: svc_ldap@stickmynote.com
+LDAP_BIND_PASSWORD: [SET]
+LDAP_USER_BASE_DN: DC=stickmynote,DC=com
+LDAP_USER_SEARCH_FILTER: (sAMAccountName={username})
+LDAP_REJECT_UNAUTHORIZED: false
+Ports: HTTPS=443, HTTP=80
+==================================
+> HTTPS Ready on https://0.0.0.0:443
+> HTTP redirect on http://0.0.0.0:80
+[dotenv@17.2.3] injecting env (32) from .env.production -- tip: ⚙️  override existing env vars with { override: true }
+[dotenv@17.2.3] injecting env (12) from .env -- tip: ⚙️  specify custom .env file path with { path: '/custom/path/.env' }
+=== Production Server Starting ===
+NODE_ENV: production
+LDAP_URL: ldaps://192.168.50.11:636
+LDAP_BIND_DN: svc_ldap@stickmynote.com
+LDAP_BIND_PASSWORD: [SET]
+LDAP_USER_BASE_DN: DC=stickmynote,DC=com
+LDAP_USER_SEARCH_FILTER: (sAMAccountName={username})
+LDAP_REJECT_UNAUTHORIZED: false
+Ports: HTTPS=443, HTTP=80
+==================================
+> HTTPS Ready on https://0.0.0.0:443
+> HTTP redirect on http://0.0.0.0:80
+[dotenv@17.2.3] injecting env (32) from .env.production -- tip: ✅ audit secrets and track compliance: https://dotenvx.com/ops
+[dotenv@17.2.3] injecting env (12) from .env -- tip: ⚙️  load multiple .env files with { path: ['.env.local', '.env'] }
+> Ready on https://0.0.0.0:443
+[dotenv@17.2.3] injecting env (33) from .env.production -- tip: ⚙️  load multiple .env files with { path: ['.env.local', '.env'] }
+[dotenv@17.2.3] injecting env (12) from .env -- tip: ⚙️  write to custom object with { processEnv: myObject }
+> Ready on https://0.0.0.0:443
+[dotenv@17.2.3] injecting env (33) from .env.production -- tip: 🔐 prevent committing .env to code: https://dotenvx.com/precommit
+[dotenv@17.2.3] injecting env (12) from .env -- tip: ✅ audit secrets and track compliance: https://dotenvx.com/ops
+> Ready on https://0.0.0.0:443
+[dotenv@17.2.3] injecting env (33) from .env.production -- tip: 🛠️  run anywhere with `dotenvx run -- yourcommand`
+[dotenv@17.2.3] injecting env (12) from .env -- tip: 🔐 prevent committing .env to code: https://dotenvx.com/precommit
+> Ready on https://0.0.0.0:443
+> Ready on http://localhost:80
+> Ready on http://localhost:80
+> HTTPS Ready on https://0.0.0.0:443
+> HTTP redirect server on http://0.0.0.0:80
+> HTTPS Ready on https://0.0.0.0:443
+> HTTP redirect server on http://0.0.0.0:80
+> HTTPS Ready on https://0.0.0.0:443
+> HTTP redirect server on http://0.0.0.0:80
+> HTTPS Ready on https://0.0.0.0:443
+> HTTP redirect server on http://0.0.0.0:80
+> HTTPS Ready on https://0.0.0.0:443
+> HTTP redirect server on http://0.0.0.0:80
+> HTTPS Ready on https://0.0.0.0:443
+> HTTP redirect server on http://0.0.0.0:80
+> HTTPS Ready on https://0.0.0.0:443
+> HTTP redirect server on http://0.0.0.0:80
+> HTTPS Ready on https://0.0.0.0:443
+> HTTP redirect server on http://0.0.0.0:80
+> HTTPS Ready on https://0.0.0.0:443
+> HTTP redirect server on http://0.0.0.0:80
+> HTTPS Ready on https://0.0.0.0:443
+> HTTP redirect server on http://0.0.0.0:80
+> HTTPS Ready on https://0.0.0.0:443
+> HTTP redirect server on http://0.0.0.0:80
+> HTTPS Ready on https://0.0.0.0:443
+> HTTP redirect server on http://0.0.0.0:80
+> HTTPS Ready on https://0.0.0.0:443
+> HTTP redirect server on http://0.0.0.0:80
+> HTTPS Ready on https://0.0.0.0:443
+> HTTP redirect server on http://0.0.0.0:80
+> HTTPS Ready on https://0.0.0.0:443
+> HTTP redirect server on http://0.0.0.0:80
+> HTTPS Ready on https://0.0.0.0:443
+> HTTP redirect server on http://0.0.0.0:80
+> HTTPS Ready on https://0.0.0.0:443
+> HTTP redirect server on http://0.0.0.0:80
+> HTTPS Ready on https://0.0.0.0:443
+> HTTP redirect server on http://0.0.0.0:80
+> HTTPS Ready on https://0.0.0.0:443
+> HTTP redirect server on http://0.0.0.0:80
+> HTTPS Ready on https://0.0.0.0:443
+> HTTP redirect server on http://0.0.0.0:80
+> HTTPS Ready on https://0.0.0.0:443
+> HTTP redirect server on http://0.0.0.0:80
+> HTTPS Ready on https://0.0.0.0:443
+> HTTP redirect server on http://0.0.0.0:80
+> HTTPS Ready on https://0.0.0.0:443
+> HTTP redirect server on http://0.0.0.0:80
+> Ready on http://localhost:80
+> Ready on http://localhost:80
+> Ready on https://localhost:443
+> HTTP redirect on port 80
+> Ready on https://localhost:443
+> HTTP redirect on port 80
+> Ready on https://localhost:443
+> HTTP redirect on port 80
+> Ready on https://localhost:443
+> HTTP redirect on port 80
+> Ready on https://localhost:443
+> HTTP redirect on port 80
+> Ready on https://localhost:443
+> HTTP redirect on port 80
+> Ready on https://localhost:443
+> HTTP redirect on port 80
+> Ready on https://localhost:443
+> HTTP redirect on port 80
+> Ready on https://localhost:443
+> HTTP redirect on port 80
+> Ready on https://localhost:443
+> HTTP redirect on port 80
+> Ready on https://localhost:443
+> HTTP redirect on port 80
+> Ready on https://localhost:443
+> HTTP redirect on port 80
+> Ready on https://localhost:443
+> HTTP redirect on port 80
+> Ready on https://localhost:443
+> HTTP redirect on port 80
+> Ready on https://localhost:443
+> HTTP redirect on port 80
+> Ready on https://localhost:443
+> HTTP redirect on port 80

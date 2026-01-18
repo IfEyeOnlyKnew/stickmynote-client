@@ -119,7 +119,7 @@ export async function POST(request: NextRequest) {
       session: { user: result.user }
     })
 
-    const cookieStore = cookies()
+    const cookieStore = await cookies()
     cookieStore.set("session", token, {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",

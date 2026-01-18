@@ -12,7 +12,7 @@ import {
 import { useUser } from "@/contexts/user-context"
 import { useOrganization } from "@/contexts/organization-context"
 import { useRouter } from "next/navigation"
-import { User, Settings, LogOut, BarChart3, FolderKanban, Users, Building, StickyNote } from "lucide-react"
+import { User, Settings, LogOut, BarChart3, FolderKanban, Users, Building, StickyNote, MessageSquare, Video } from "lucide-react"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 
 interface UserMenuProps {
@@ -130,6 +130,14 @@ export function UserMenu({
         <DropdownMenuItem onClick={() => router.push("/social")}>
           <Users className="mr-2 h-4 w-4" />
           <span>Social Hub</span>
+        </DropdownMenuItem>
+        <DropdownMenuItem onClick={() => router.push("/chats")}>
+          <MessageSquare className="mr-2 h-4 w-4" />
+          <span>Chats Hub</span>
+        </DropdownMenuItem>
+        <DropdownMenuItem onClick={() => router.push("/video")}>
+          <Video className="mr-2 h-4 w-4" />
+          <span>Video Hub</span>
         </DropdownMenuItem>
         <DropdownMenuSeparator />
         <DropdownMenuItem onClick={() => router.push("/profile")}>

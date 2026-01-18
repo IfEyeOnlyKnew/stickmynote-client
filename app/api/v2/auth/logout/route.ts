@@ -15,7 +15,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Clear auth cookies
-    const cookieStore = cookies()
+    const cookieStore = await cookies()
     const cookiesToClear = [
       'auth-token',
       'csrf-token',

@@ -71,7 +71,7 @@ function cleanupCache() {
  */
 export async function getCachedAuthUser(): Promise<CachedAuthResult> {
   try {
-    const cookieStore = cookies()
+    const cookieStore = await cookies()
     const cacheKey = getCacheKey(cookieStore.toString())
     const now = Date.now()
 

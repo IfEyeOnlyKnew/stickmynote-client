@@ -279,7 +279,7 @@ export const ChatRoomView: React.FC<ChatRoomViewProps> = ({
               Export
             </Button>
 
-            {chat.is_group && chat.owner_id === currentUserId && (
+            {chat.owner_id === currentUserId && (
               <Button variant="outline" size="sm" onClick={onInviteMembers}>
                 <UserPlus className="w-4 h-4 mr-1" />
                 Invite
