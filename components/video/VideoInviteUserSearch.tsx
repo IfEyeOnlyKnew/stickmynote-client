@@ -161,20 +161,6 @@ export const VideoInviteUserSearch: React.FC<VideoInviteUserSearchProps> = ({
       .slice(0, 2)
   }
 
-  // Reset internal state when needed
-  const resetSelection = () => {
-    setSelectedUsers([])
-    setSearchQuery("")
-    setSearchResults([])
-  }
-
-  // Expose reset function via ref (optional enhancement)
-  React.useImperativeHandle(
-    React.useRef(null),
-    () => ({ reset: resetSelection }),
-    []
-  )
-
   return (
     <div className="space-y-3">
       {/* Selected users */}
