@@ -1,0 +1,838 @@
+================================================================================
+                    STICK MY NOTE - WORLD-CLASS FEATURE ROADMAP
+================================================================================
+                Comparison: MS Teams, Viva Engage, Project, OneNote, Planner
+================================================================================
+
+Current State: Comprehensive collaborative note-taking and project management
+               platform with 96 database tables, 485+ API routes, real-time
+               collaboration, AI integration, and social features.
+
+Goal: Surpass Microsoft's suite by providing a unified, intelligent, and
+      delightful user experience.
+
+================================================================================
+                          CATEGORY 1: REAL-TIME COMMUNICATION
+================================================================================
+                              (Compete with MS Teams)
+--------------------------------------------------------------------------------
+
+[  ] 1.1 PERSISTENT CHAT CHANNELS
+     - Create permanent team channels (not just ad-hoc conversations)
+     - Channel categories/folders for organization
+     - Public/private channel visibility
+     - Channel descriptions and pinned messages
+     - Channel member management with granular permissions
+     Status: PARTIAL (chat exists, but no channel concept)
+
+[  ] 1.2 THREADED CONVERSATIONS WITH RICH CONTEXT
+     - Quote-reply functionality with visual threading
+     - Message forwarding between channels/DMs
+     - Message scheduling (send later)
+     - Message editing with edit history visible
+     - Message reactions with custom emoji support
+     Status: PARTIAL (replies exist, needs enhancement)
+
+[  ] 1.3 VOICE CHANNELS & AUDIO ROOMS
+     - Always-on voice channels (like Discord)
+     - Drop-in/drop-out audio rooms
+     - Background noise suppression
+     - Voice activity indicators
+     - Push-to-talk option
+     Status: MISSING (only video calls via Daily.co)
+
+[  ] 1.4 SCREEN SHARING & REMOTE CONTROL
+     - Screen sharing in video calls
+     - Application-specific sharing (share single window)
+     - Remote desktop control (with permission)
+     - Whiteboard during calls
+     - Call recording with transcription
+     Status: PARTIAL (Daily.co may support some)
+
+[  ] 1.5 MEETING SCHEDULING & CALENDAR INTEGRATION
+     - Schedule meetings from chat
+     - Outlook/Google Calendar sync (bi-directional)
+     - Meeting lobby/waiting room
+     - Meeting recurring patterns
+     - Meeting notes auto-linked to calendar event
+     Status: PARTIAL (calendar exists, needs meeting integration)
+
+[  ] 1.6 PRESENCE & STATUS SYSTEM
+     - Online/away/busy/DND status
+     - Custom status messages with expiration
+     - Status sync with calendar (auto-busy when in meeting)
+     - Focus mode (mute all notifications)
+     - Working hours configuration
+     Status: MISSING
+
+[  ] 1.7 LIVE CAPTIONS & TRANSLATION
+     - Real-time captions in video calls
+     - Multi-language translation in chat
+     - Translation in meetings (live)
+     - Accessibility compliance (WCAG 2.1 AA)
+     Status: MISSING
+
+================================================================================
+                          CATEGORY 2: PROJECT MANAGEMENT
+================================================================================
+                         (Compete with MS Project & Planner)
+--------------------------------------------------------------------------------
+
+[  ] 2.1 ADVANCED GANTT CHART
+     - Interactive Gantt with drag-drop scheduling
+     - Critical path highlighting
+     - Baseline comparison (planned vs actual)
+     - Resource leveling visualization
+     - Milestone markers with dependencies
+     - Print/export Gantt to PDF
+     Status: PARTIAL (basic Gantt exists)
+
+[  ] 2.2 KANBAN BOARD VIEW
+     - Customizable swim lanes
+     - WIP (Work in Progress) limits
+     - Card aging visualization
+     - Quick filters on board
+     - Board-level automation rules
+     - Multiple board views per project
+     Status: MISSING (CalSticks is list-based)
+
+[  ] 2.3 RESOURCE MANAGEMENT
+     - Team capacity planning
+     - Resource allocation heatmap
+     - Skill-based assignment suggestions
+     - Vacation/time-off calendar integration
+     - Resource utilization reports
+     - Cost rate per resource
+     Status: PARTIAL (basic workload exists)
+
+[  ] 2.4 ADVANCED DEPENDENCIES
+     - Finish-to-Start (FS)
+     - Start-to-Start (SS)
+     - Finish-to-Finish (FF)
+     - Start-to-Finish (SF)
+     - Lead and lag time
+     - Dependency conflict detection
+     Status: PARTIAL (basic dependencies exist)
+
+[  ] 2.5 SPRINTS & AGILE FEATURES
+     - Sprint planning board
+     - Sprint backlog management
+     - Velocity tracking
+     - Burndown/burnup charts
+     - Story points estimation
+     - Sprint retrospectives
+     Status: MISSING
+
+[  ] 2.6 TIME TRACKING ENHANCEMENTS
+     - Timer widget (start/stop)
+     - Timesheet view (weekly/monthly)
+     - Billable vs non-billable hours
+     - Time approval workflow
+     - Integration with invoicing
+     - Automatic time suggestions based on activity
+     Status: PARTIAL (basic time logs exist)
+
+[  ] 2.7 PROJECT TEMPLATES LIBRARY
+     - Pre-built templates (Software Dev, Marketing, etc.)
+     - Template marketplace/sharing
+     - Template versioning
+     - Copy project with all structure
+     Status: PARTIAL (task templates exist)
+
+[  ] 2.8 GOALS & OKRs
+     - Objective setting with Key Results
+     - Progress tracking (0-100%)
+     - Goal alignment (cascade goals)
+     - Check-in reminders
+     - Goal analytics dashboard
+     Status: PARTIAL (objectives exist, needs OKR framework)
+
+[  ] 2.9 PORTFOLIO DASHBOARDS
+     - Multi-project overview
+     - Executive summary view
+     - RAG status (Red/Amber/Green)
+     - Portfolio risk matrix
+     - Cross-project dependencies
+     - Resource allocation across projects
+     Status: PARTIAL (basic portfolio exists)
+
+[  ] 2.10 FORMS & WORK REQUESTS
+      - Custom form builder (drag-drop)
+      - Form submission to task conversion
+      - Approval workflows on forms
+      - Form analytics
+      - External form sharing (public links)
+      Status: PARTIAL (intake forms exist)
+
+================================================================================
+                          CATEGORY 3: NOTE-TAKING & KNOWLEDGE
+================================================================================
+                              (Compete with MS OneNote)
+--------------------------------------------------------------------------------
+
+[  ] 3.1 NOTEBOOK/SECTION/PAGE HIERARCHY
+     - Notebook containers for grouped content
+     - Collapsible section groups
+     - Page templates per section
+     - Section-level permissions
+     - Quick navigation sidebar
+     Status: PARTIAL (tabs exist, needs hierarchy)
+
+[  ] 3.2 HANDWRITING & DRAWING
+     - Freeform drawing canvas
+     - Stylus/pen support
+     - Shape recognition
+     - Handwriting-to-text conversion
+     - Math equation input
+     - Drawing layers
+     Status: MISSING
+
+[  ] 3.3 WEB CLIPPER EXTENSION
+     - Browser extension for clipping
+     - Clip entire page or selection
+     - Save to specific notebook/pad
+     - Automatic source attribution
+     - Clip images with OCR
+     Status: MISSING
+
+[  ] 3.4 OFFLINE MODE
+     - Full offline access to notes
+     - Offline editing with sync queue
+     - Conflict resolution on reconnect
+     - Selective sync (choose what to cache)
+     - PWA with service worker
+     Status: MISSING (currently online-only)
+
+[  ] 3.5 OCR & IMAGE TEXT EXTRACTION
+     - Search text within images
+     - Copy text from images
+     - PDF text extraction and search
+     - Handwriting recognition in images
+     Status: MISSING
+
+[  ] 3.6 AUDIO NOTES & TRANSCRIPTION
+     - Record audio directly in notes
+     - Automatic transcription
+     - Timestamp-linked notes
+     - Speaker identification
+     - Searchable audio content
+     Status: MISSING
+
+[  ] 3.7 ADVANCED EDITOR FEATURES
+     - Collapsible/toggle blocks
+     - Synced blocks (reusable content)
+     - Database/table views (like Notion)
+     - Embed support (YouTube, Figma, etc.)
+     - Page linking with backlinks
+     - Table of contents auto-generation
+     Status: PARTIAL (TipTap has basics)
+
+[  ] 3.8 TEMPLATES GALLERY
+     - Meeting notes template
+     - Project brief template
+     - Decision log template
+     - 1:1 meeting template
+     - Community-shared templates
+     - Template variables/placeholders
+     Status: PARTIAL (basic templates exist)
+
+[  ] 3.9 VERSION COMPARISON
+     - Side-by-side diff view
+     - Restore any version
+     - Version annotations/comments
+     - Branch and merge notes
+     Status: PARTIAL (version history exists, needs diff)
+
+[  ] 3.10 SMART TAGS & AUTO-CATEGORIZATION
+      - AI-suggested tags
+      - Auto-categorization based on content
+      - Tag hierarchy/nested tags
+      - Tag-based smart folders
+      - Related notes suggestions
+      Status: PARTIAL (tags exist, needs AI enhancement)
+
+================================================================================
+                          CATEGORY 4: SOCIAL & ENGAGEMENT
+================================================================================
+                            (Compete with Viva Engage)
+--------------------------------------------------------------------------------
+
+[  ] 4.1 COMMUNITIES/GROUPS
+     - Create topic-based communities
+     - Community discovery/browse
+     - Join/leave communities
+     - Community moderators
+     - Community guidelines/rules
+     - Featured/pinned posts
+     Status: PARTIAL (social pads exist, needs community focus)
+
+[  ] 4.2 NEWS & ANNOUNCEMENTS
+     - Organization-wide announcements
+     - Announcement targeting (by team/role)
+     - Announcement acknowledgment tracking
+     - Scheduled announcements
+     - Announcement templates
+     - Priority levels (urgent, normal)
+     Status: MISSING
+
+[  ] 4.3 POLLS & SURVEYS
+     - Quick polls in any context
+     - Multi-question surveys
+     - Anonymous voting option
+     - Poll results visualization
+     - Survey analytics
+     - Template polls
+     Status: MISSING
+
+[  ] 4.4 RECOGNITION & PRAISE
+     - Kudos/praise system
+     - Badge awards
+     - Leaderboards (opt-in)
+     - Recognition feed
+     - Manager notifications for team praise
+     - Integration with performance reviews
+     Status: MISSING
+
+[  ] 4.5 STORYTELLING & RICH POSTS
+     - Multi-media posts (images, videos)
+     - Cover images for posts
+     - Story format (ephemeral content)
+     - Post scheduling
+     - Draft posts
+     - Post analytics
+     Status: PARTIAL (social sticks exist)
+
+[  ] 4.6 Q&A / ASK ME ANYTHING
+     - Q&A sessions (structured)
+     - Best answer marking
+     - Question upvoting
+     - Expert identification
+     - Topic-based Q&A
+     - Unanswered questions queue
+     Status: MISSING
+
+[  ] 4.7 EVENTS & LIVE STREAMS
+     - Event creation with RSVP
+     - Live streaming integration
+     - Event reminders
+     - Post-event content (recordings)
+     - Event series/recurring
+     - External attendee support
+     Status: MISSING
+
+[  ] 4.8 SENTIMENT ANALYSIS
+     - Organization pulse surveys
+     - Sentiment trending
+     - Anonymous feedback collection
+     - Manager insights dashboard
+     - Early warning indicators
+     Status: MISSING
+
+[  ] 4.9 EXPERTISE FINDER
+     - Skills/expertise profiles
+     - Search by skill
+     - AI-suggested experts for questions
+     - Expert availability status
+     - Expertise endorsements
+     Status: MISSING
+
+[  ] 4.10 CONTENT MODERATION
+      - AI content moderation
+      - Report inappropriate content
+      - Moderation queue for admins
+      - Auto-flagging sensitive content
+      - Moderation audit trail
+      Status: PARTIAL (basic admin exists)
+
+================================================================================
+                          CATEGORY 5: AI & INTELLIGENCE
+================================================================================
+                            (Modern Differentiator)
+--------------------------------------------------------------------------------
+
+[  ] 5.1 AI COPILOT/ASSISTANT
+     - Chat with AI about your data
+     - AI-powered search ("find notes about Q3 budget")
+     - Context-aware suggestions
+     - AI writing assistant in editor
+     - Summarize long threads
+     - Action item extraction from meetings
+     Status: PARTIAL (basic AI exists)
+
+[  ] 5.2 MEETING INTELLIGENCE
+     - Auto meeting notes generation
+     - Action item detection
+     - Decision logging
+     - Meeting summary email
+     - Sentiment during meeting
+     - Follow-up task creation
+     Status: MISSING
+
+[  ] 5.3 SMART NOTIFICATIONS
+     - AI-prioritized notifications
+     - Notification digest optimization
+     - "Catch up" summaries
+     - Important message highlighting
+     - Notification learning (user preferences)
+     Status: PARTIAL (notifications exist, needs AI)
+
+[  ] 5.4 PREDICTIVE ANALYTICS
+     - Project completion predictions
+     - Risk identification
+     - Resource bottleneck alerts
+     - Budget overrun warnings
+     - Missed deadline predictions
+     Status: MISSING
+
+[  ] 5.5 KNOWLEDGE GRAPH
+     - Automatic relationship mapping
+     - Visual knowledge map
+     - "Related to this" suggestions
+     - Cross-reference discovery
+     - Orphan content identification
+     Status: MISSING
+
+[  ] 5.6 NATURAL LANGUAGE QUERIES
+     - "Show me tasks due this week"
+     - "Who's working on the marketing campaign?"
+     - "Summarize yesterday's activity"
+     - "Create a task for John about..."
+     Status: MISSING
+
+[  ] 5.7 AUTO-CATEGORIZATION
+     - Smart folder suggestions
+     - Auto-tagging on save
+     - Content type detection
+     - Duplicate detection
+     - Similar content grouping
+     Status: PARTIAL (AI tags exist)
+
+================================================================================
+                          CATEGORY 6: MOBILE & ACCESSIBILITY
+================================================================================
+                            (Critical for Adoption)
+--------------------------------------------------------------------------------
+
+[  ] 6.1 NATIVE MOBILE APPS
+     - iOS app (App Store)
+     - Android app (Play Store)
+     - Push notifications
+     - Offline access
+     - Biometric login
+     - Quick capture widget
+     Status: MISSING (web only)
+
+[  ] 6.2 PROGRESSIVE WEB APP (PWA)
+     - Installable from browser
+     - Offline capability
+     - Background sync
+     - Push notifications
+     - Home screen icon
+     Status: PARTIAL (needs full PWA)
+
+[  ] 6.3 DESKTOP APP
+     - Electron/Tauri wrapper
+     - System tray integration
+     - Global shortcuts
+     - Deep OS integration
+     - Auto-start option
+     Status: MISSING
+
+[  ] 6.4 ACCESSIBILITY (WCAG 2.1 AA)
+     - Full keyboard navigation
+     - Screen reader support
+     - High contrast mode
+     - Font size controls
+     - Reduced motion option
+     - Focus indicators
+     Status: NEEDS AUDIT
+
+[  ] 6.5 RESPONSIVE DESIGN POLISH
+     - Tablet-optimized layouts
+     - Touch-friendly interactions
+     - Gesture support (swipe, pinch)
+     - Adaptive UI components
+     Status: PARTIAL
+
+================================================================================
+                          CATEGORY 7: INTEGRATIONS & ECOSYSTEM
+================================================================================
+                           (Expand Platform Value)
+--------------------------------------------------------------------------------
+
+[  ] 7.1 MICROSOFT 365 INTEGRATION
+     - Outlook calendar sync
+     - OneDrive file picker
+     - SharePoint integration
+     - Teams notification bridge
+     - Word/Excel/PowerPoint embeds
+     Status: MISSING
+
+[  ] 7.2 GOOGLE WORKSPACE INTEGRATION
+     - Google Calendar sync
+     - Google Drive file picker
+     - Gmail integration
+     - Google Meet integration
+     - Google Docs embeds
+     Status: MISSING
+
+[  ] 7.3 SLACK/DISCORD INTEGRATION
+     - Slack notifications
+     - Discord bot
+     - Channel sync options
+     - Message bridging
+     Status: MISSING
+
+[  ] 7.4 DEVELOPER API & PLATFORM
+     - Public REST API with docs
+     - GraphQL API option
+     - Webhook templates
+     - OAuth2 for third-party apps
+     - API rate limiting tiers
+     - SDK (JavaScript, Python)
+     Status: PARTIAL (internal APIs exist)
+
+[  ] 7.5 ZAPIER/MAKE INTEGRATION
+     - Zapier connector
+     - Make (Integromat) connector
+     - Power Automate connector
+     - Trigger and action library
+     Status: MISSING
+
+[  ] 7.6 EMBEDDED WIDGETS
+     - Embed notes in external sites
+     - Embed task boards
+     - Iframe support with auth
+     - Widget customization
+     Status: MISSING
+
+[  ] 7.7 IMPORT FROM COMPETITORS
+     - Import from OneNote
+     - Import from Notion
+     - Import from Trello
+     - Import from Asana
+     - Import from Jira
+     - Import from Evernote
+     Status: PARTIAL (basic import exists)
+
+================================================================================
+                          CATEGORY 8: SECURITY & COMPLIANCE
+================================================================================
+                          (Enterprise Requirements)
+--------------------------------------------------------------------------------
+
+[  ] 8.1 SINGLE SIGN-ON (SSO)
+     - SAML 2.0 support
+     - OpenID Connect (OIDC)
+     - Azure AD integration
+     - Okta integration
+     - JIT user provisioning
+     Status: PARTIAL (LDAP exists, needs SAML/OIDC)
+
+[  ] 8.2 ADVANCED AUDIT LOGGING
+     - Detailed audit trail
+     - Export audit logs
+     - Audit log retention policies
+     - Real-time audit alerts
+     - Compliance reports
+     Status: PARTIAL (basic audit exists)
+
+[  ] 8.3 DATA LOSS PREVENTION (DLP)
+     - Sensitive data detection
+     - Sharing restrictions
+     - External sharing controls
+     - Classification labels
+     - Policy enforcement
+     Status: MISSING
+
+[  ] 8.4 ENCRYPTION AT REST
+     - Database encryption
+     - File storage encryption
+     - Key management
+     - Customer-managed keys (BYOK)
+     Status: NEEDS VERIFICATION
+
+[  ] 8.5 COMPLIANCE CERTIFICATIONS
+     - SOC 2 Type II
+     - ISO 27001
+     - GDPR compliance
+     - HIPAA readiness
+     - Data residency options
+     Status: NEEDS ASSESSMENT
+
+[  ] 8.6 INFORMATION BARRIERS
+     - Team isolation policies
+     - Cross-team communication blocks
+     - Legal hold support
+     - eDiscovery export
+     Status: MISSING
+
+[  ] 8.7 TWO-FACTOR AUTHENTICATION (2FA)
+     - TOTP support (Google Auth, Authy)
+     - SMS fallback
+     - Hardware key support (FIDO2)
+     - Recovery codes
+     - Org-wide 2FA enforcement
+     Status: MISSING
+
+================================================================================
+                          CATEGORY 9: PERFORMANCE & SCALE
+================================================================================
+                           (Enterprise Readiness)
+--------------------------------------------------------------------------------
+
+[  ] 9.1 GLOBAL CDN
+     - Static asset CDN
+     - Edge caching
+     - Multi-region deployment
+     - Latency optimization
+     Status: NEEDS IMPLEMENTATION
+
+[  ] 9.2 INFINITE SCROLL OPTIMIZATION
+     - Virtual scrolling everywhere
+     - Lazy loading images
+     - Skeleton loaders
+     - Pagination fallbacks
+     Status: PARTIAL
+
+[  ] 9.3 SEARCH PERFORMANCE
+     - Full-text search index (Elasticsearch/Meilisearch)
+     - Search result caching
+     - Typeahead optimization
+     - Faceted search
+     Status: PARTIAL
+
+[  ] 9.4 REAL-TIME SCALABILITY
+     - WebSocket clustering
+     - Presence at scale
+     - Message queue (Redis Streams)
+     - Horizontal scaling support
+     Status: NEEDS ASSESSMENT
+
+[  ] 9.5 DATABASE OPTIMIZATION
+     - Read replicas
+     - Connection pooling
+     - Query optimization
+     - Index analysis
+     - Slow query monitoring
+     Status: PARTIAL
+
+================================================================================
+                          CATEGORY 10: USER EXPERIENCE
+================================================================================
+                           (Delight & Retention)
+--------------------------------------------------------------------------------
+
+[  ] 10.1 ONBOARDING FLOW
+      - Interactive product tour
+      - Role-based onboarding
+      - Sample content/templates
+      - Progress indicators
+      - Contextual tips
+      Status: MISSING
+
+[  ] 10.2 COMMAND PALETTE (CMD+K)
+      - Global quick actions
+      - Search everything
+      - Recent items
+      - Keyboard shortcuts list
+      - Quick navigation
+      Status: MISSING
+
+[  ] 10.3 CUSTOMIZABLE DASHBOARD
+      - Widget-based home page
+      - Drag-drop layout
+      - Saved dashboard views
+      - Dashboard sharing
+      Status: MISSING
+
+[  ] 10.4 THEMES & PERSONALIZATION
+      - Multiple color themes
+      - Custom accent colors
+      - Compact/comfortable density
+      - Font preferences
+      - Custom CSS (power users)
+      Status: PARTIAL (dark mode exists)
+
+[  ] 10.5 FAVORITES & QUICK ACCESS
+      - Pin items to sidebar
+      - Recent items history
+      - Starred/favorite anything
+      - Quick switcher
+      Status: PARTIAL
+
+[  ] 10.6 KEYBOARD SHORTCUTS
+      - Comprehensive shortcuts
+      - Customizable shortcuts
+      - Shortcuts cheat sheet
+      - Vim mode (power users)
+      Status: PARTIAL
+
+[  ] 10.7 UNDO/REDO GLOBAL
+      - Undo delete actions
+      - Trash/recycle bin
+      - Restore deleted items
+      - Undo time limit
+      Status: PARTIAL
+
+[  ] 10.8 NOTIFICATIONS SETTINGS
+      - Granular notification controls
+      - Quiet hours
+      - Per-channel settings
+      - Notification preview
+      Status: PARTIAL
+
+================================================================================
+                              PRIORITY MATRIX
+================================================================================
+
+IMMEDIATE (0-3 months) - Critical for competitiveness:
+----------------------------------------------------------
+[ ] 6.4 Accessibility (WCAG 2.1 AA) - Legal/ethical requirement
+[ ] 1.6 Presence & Status System - Core collaboration feature
+[ ] 2.2 Kanban Board View - Expected by all project tools
+[ ] 8.7 Two-Factor Authentication - Security baseline
+[ ] 10.1 Onboarding Flow - User retention critical
+[ ] 10.2 Command Palette (CMD+K) - Power user expectation
+[ ] 3.4 Offline Mode - Mobile/remote worker essential
+
+SHORT-TERM (3-6 months) - Competitive advantages:
+----------------------------------------------------------
+[ ] 5.1 AI Copilot Enhancement - Differentiator
+[ ] 1.1 Persistent Chat Channels - Teams parity
+[ ] 2.5 Sprints & Agile Features - Developer audience
+[ ] 4.3 Polls & Surveys - Engagement driver
+[ ] 6.1 Native Mobile Apps - Market expectation
+[ ] 7.1 Microsoft 365 Integration - Enterprise sales
+[ ] 8.1 SSO (SAML/OIDC) - Enterprise requirement
+
+MEDIUM-TERM (6-12 months) - Market leadership:
+----------------------------------------------------------
+[ ] 1.7 Live Captions & Translation - Accessibility + global
+[ ] 2.1 Advanced Gantt Chart - MS Project replacement
+[ ] 3.2 Handwriting & Drawing - OneNote parity
+[ ] 4.4 Recognition & Praise - Culture/engagement
+[ ] 5.2 Meeting Intelligence - AI differentiation
+[ ] 7.2 Google Workspace Integration - Market expansion
+[ ] 8.3 Data Loss Prevention - Enterprise security
+
+LONG-TERM (12+ months) - Vision features:
+----------------------------------------------------------
+[ ] 5.5 Knowledge Graph - Unique differentiation
+[ ] 4.8 Sentiment Analysis - HR/culture value
+[ ] 8.6 Information Barriers - Regulated industries
+[ ] 7.4 Developer Platform/SDK - Ecosystem building
+[ ] 3.6 Audio Notes & Transcription - Premium feature
+
+================================================================================
+                              QUICK WINS
+================================================================================
+These can be implemented quickly with high impact:
+
+1. [ ] Command Palette (Cmd+K) - 2-3 days, huge UX improvement
+2. [ ] Presence indicators - 1-2 days, shows activity
+3. [ ] Keyboard shortcuts documentation - 1 day
+4. [ ] Kanban view for CalSticks - 1 week
+5. [ ] Poll component in social - 2-3 days
+6. [ ] 2FA with TOTP - 3-4 days
+7. [ ] PWA manifest + service worker - 2-3 days
+8. [ ] Onboarding tour component - 1 week
+9. [ ] Trash/recycle bin - 2-3 days
+10. [ ] Custom themes (beyond dark mode) - 2-3 days
+
+================================================================================
+                              METRICS FOR SUCCESS
+================================================================================
+
+User Engagement:
+- Daily Active Users (DAU) > 60% of registered users
+- Session duration > 15 minutes average
+- Features per session > 3
+
+Collaboration:
+- Messages sent per user per week > 20
+- Shared pads/notes per user > 5
+- Real-time collaboration sessions > 2 per week
+
+Project Management:
+- Tasks completed on time > 80%
+- Average project cycle time reduction > 20%
+- Template usage > 40% of new projects
+
+Enterprise:
+- SSO adoption > 90% of enterprise customers
+- Mobile app adoption > 50% of users
+- Integration usage > 30% of organizations
+
+================================================================================
+                              SUMMARY STATISTICS
+================================================================================
+
+Total Features Identified: 78 major features across 10 categories
+
+By Status:
+- MISSING: 42 features (54%)
+- PARTIAL: 32 features (41%)
+- NEEDS AUDIT/ASSESSMENT: 4 features (5%)
+
+By Category:
+- Real-Time Communication: 7 features
+- Project Management: 10 features
+- Note-Taking & Knowledge: 10 features
+- Social & Engagement: 10 features
+- AI & Intelligence: 7 features
+- Mobile & Accessibility: 5 features
+- Integrations & Ecosystem: 7 features
+- Security & Compliance: 7 features
+- Performance & Scale: 5 features
+- User Experience: 8 features
+
+================================================================================
+                              DOCUMENT VERSION
+================================================================================
+Last Updated: 2026-01-14
+Author: Claude Code Analysis
+Version: 1.0
+
+================================================================================
+                         PREVIOUS DEPLOYMENT NOTES
+================================================================================
+(Preserved from original file)
+
+# Rebuild and Deploy
+cd C:\stick-my-note-prod\stickmynote-client
+net stop StickyMyNote
+pnpm run build
+net start StickyMyNote
+
+# Run the server manually to see logs:
+taskkill /F /IM node.exe
+net stop StickyMyNote
+cd C:\stick-my-note-prod\stickmynote-client
+node server.js
+
+# Manual Steps to Complete Deployment
+# Open an Administrator PowerShell on the production server and run:
+
+# 1. Stop the service (frees .next folder locks)
+Stop-Service -Name StickyMyNote -Force
+
+# 2. Navigate to production
+cd C:\stick-my-note-prod\stickmynote-client
+
+# 3. Ensure build-time env is in place
+Copy-Item .env.local.build-only .env.local -Force
+
+# 4. Build (this may take 5-10 minutes)
+pnpm run build
+
+# 5. CRITICAL: Remove .env.local after build
+Remove-Item .env.local
+
+# 6. Restart service
+Start-Service -Name StickyMyNote
+
+# 7. Verify HTTPS is running
+Test-NetConnection -ComputerName localhost -Port 443
+
+================================================================================

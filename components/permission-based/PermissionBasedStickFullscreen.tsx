@@ -16,7 +16,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
-import { X, Trash2, Zap } from "lucide-react"
+import { X, Trash2, Zap, MessageSquare, Video } from "lucide-react"
 import { GenericStickTabs } from "@/components/GenericStickTabs"
 import { ThreadedReplies } from "@/components/replies/ThreadedReplies"
 import type { Stick } from "@/types/pad"
@@ -658,6 +658,24 @@ export function PermissionBasedStickFullscreen({
                     <Zap className="h-3 w-3 text-yellow-600" />
                     QuickStick
                   </Label>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-7 w-7 p-0 ml-1"
+                    title="Start chat for this stick"
+                    onClick={() => window.open(`/chats?stick_id=${stick.id}&stick_type=pad`, "_blank")}
+                  >
+                    <MessageSquare className="h-4 w-4 text-teal-600" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-7 w-7 p-0"
+                    title="Start video call"
+                    onClick={() => window.open("/video", "_blank")}
+                  >
+                    <Video className="h-4 w-4 text-rose-600" />
+                  </Button>
                 </div>
               )}
             </div>

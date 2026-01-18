@@ -3,7 +3,7 @@ import { cookies } from "next/headers"
 
 export async function POST(_request: NextRequest) {
   try {
-    const cookieStore = cookies()
+    const cookieStore = await cookies()
     
     // Clear the JWT session cookie
     cookieStore.delete("jwt_session")

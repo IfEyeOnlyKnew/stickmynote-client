@@ -46,7 +46,8 @@
       "Bash(xargs sed:*)",
       "Bash(npm run build:*)",
       "Bash(xcopy:*)",
-      "Bash(xargs cat:*)"
+      "Bash(xargs cat:*)",
+      "Bash(/c/Users/chris.doran/.local/share/pnpm/pnpm.exe run build:*)"
     ]
   }
 }

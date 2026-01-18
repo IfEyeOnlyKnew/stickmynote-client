@@ -100,7 +100,7 @@ export default function DashboardPage() {
         </div>
 
         {/* Main Choice Cards */}
-        <div className="grid md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-6 mb-8">
+        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
           {/* Notes Section */}
           <Card className="hover:shadow-xl transition-all duration-300 hover:scale-105 border-2 hover:border-blue-300">
             <CardHeader className="text-center pb-4">
