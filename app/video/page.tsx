@@ -5,11 +5,10 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Video, Plus, Users, Clock, Copy, Trash2, Info } from "lucide-react"
+import { Video, Plus, Clock, Copy, Trash2, Info, ExternalLink } from "lucide-react"
 import { UserMenu } from "@/components/user-menu"
 import { useToast } from "@/hooks/use-toast"
 import { BreadcrumbNav } from "@/components/breadcrumb-nav"
-import { VideoRoomModal } from "@/components/video-room-modal"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { useHubModeGuard } from "@/hooks/use-hub-mode-guard"
 import { VideoInviteUserSearch } from "@/components/video/VideoInviteUserSearch"
@@ -32,7 +31,6 @@ export default function VideoPage() {
   const [newRoomName, setNewRoomName] = useState("")
   const [inviteEmails, setInviteEmails] = useState<string[]>([])
   const [isCreating, setIsCreating] = useState(false)
-  const [activeRoomUrl, setActiveRoomUrl] = useState<string | null>(null)
 
   // Memoized callback to prevent infinite re-renders in VideoInviteUserSearch
   // MUST be defined before any conditional returns (Rules of Hooks)
@@ -298,10 +296,10 @@ export default function VideoPage() {
                     Copy Link
                   </Button>
                   <Button
-                    onClick={() => setActiveRoomUrl(room.room_url)}
+                    onClick={() => window.open(room.room_url, "_blank")}
                     className="w-full bg-green-600 hover:bg-green-700"
                   >
-                    <Users className="h-4 w-4 mr-2" />
+                    <ExternalLink className="h-4 w-4 mr-2" />
                     Join Room
                   </Button>
                   <Button onClick={() => handleDeleteRoom(room.id, room.name)} variant="destructive" className="w-full">
@@ -323,8 +321,6 @@ export default function VideoPage() {
           </Card>
         )}
       </div>
-
-      {activeRoomUrl && <VideoRoomModal roomUrl={activeRoomUrl} onClose={() => setActiveRoomUrl(null)} />}
     </div>
   )
 }
