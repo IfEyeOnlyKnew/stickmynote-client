@@ -41,15 +41,15 @@ export const VideoInviteUserSearch: React.FC<VideoInviteUserSearchProps> = ({
   // Track selected user emails in a ref to avoid re-triggering search useEffect
   const selectedUserEmailsRef = useRef<Set<string>>(new Set())
 
+  // Track if we're the one updating the parent to avoid sync loops
+  const isUpdatingParentRef = useRef(false)
+
   // Keep ref in sync with state
   useEffect(() => {
     selectedUserEmailsRef.current = new Set(
       selectedUsers.map((u) => u.email?.toLowerCase()).filter((e): e is string => !!e)
     )
   }, [selectedUsers])
-
-  // Track if we're the one updating the parent to avoid sync loops
-  const isUpdatingParentRef = useRef(false)
 
   // Sync FROM parent only when parent explicitly resets to empty
   // This handles the case when parent clears the selection after room creation
