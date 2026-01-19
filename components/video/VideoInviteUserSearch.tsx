@@ -48,23 +48,30 @@ export const VideoInviteUserSearch: React.FC<VideoInviteUserSearchProps> = ({
     )
   }, [selectedUsers])
 
-  // Sync selectedEmails prop to internal state
+  // Track if we're the one updating the parent to avoid sync loops
+  const isUpdatingParentRef = useRef(false)
+
+  // Sync FROM parent only when parent explicitly resets to empty
+  // This handles the case when parent clears the selection after room creation
   useEffect(() => {
-    const currentEmails = selectedUsers.map((u) => u.email).filter((e): e is string => !!e)
-    if (JSON.stringify(currentEmails) !== JSON.stringify(selectedEmails)) {
-      // If external state changed, update internal state
-      // This handles the case when parent resets the emails
-      if (selectedEmails.length === 0 && selectedUsers.length > 0) {
-        setSelectedUsers([])
-      }
+    // Skip if we're the one who triggered the parent update
+    if (isUpdatingParentRef.current) {
+      isUpdatingParentRef.current = false
+      return
     }
-  }, [selectedEmails, selectedUsers])
+    // Only reset internal state if parent explicitly clears
+    if (selectedEmails.length === 0 && selectedUsers.length > 0) {
+      setSelectedUsers([])
+    }
+  }, [selectedEmails]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Notify parent when selected users change
   useEffect(() => {
     const emails = selectedUsers
       .map((u) => u.email)
       .filter((e): e is string => !!e)
+    // Mark that we're updating parent to avoid sync loop
+    isUpdatingParentRef.current = true
     onEmailsChange(emails)
   }, [selectedUsers, onEmailsChange])
 
