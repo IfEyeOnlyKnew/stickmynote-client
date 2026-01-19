@@ -32,51 +32,21 @@ export default function VideoPage() {
   const [inviteEmails, setInviteEmails] = useState<string[]>([])
   const [isCreating, setIsCreating] = useState(false)
 
-  // Memoized callback to prevent infinite re-renders in VideoInviteUserSearch
-  // MUST be defined before any conditional returns (Rules of Hooks)
+  // All callbacks MUST be defined before any conditional returns (Rules of Hooks)
   const handleEmailsChange = useCallback((emails: string[]) => {
     setInviteEmails(emails)
   }, [])
 
-  /* eslint-disable react-hooks/exhaustive-deps */
-  useEffect(() => {
-    if (!guardLoading && isAuthorized) {
-      fetchRooms()
-    }
-  }, [guardLoading, isAuthorized])
-  /* eslint-enable react-hooks/exhaustive-deps */
-
-  if (guardLoading || !isAuthorized) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
-      </div>
-    )
-  }
-
-  const fetchRooms = async () => {
-    console.log("[v0] Fetching video rooms...")
+  const fetchRooms = useCallback(async () => {
     try {
       const response = await fetch("/api/video/rooms")
-      console.log("[v0] Fetch response status:", response.status)
-      console.log("[v0] Fetch response ok:", response.ok)
-
       if (!response.ok) {
-        const errorText = await response.text()
-        console.error("[v0] Fetch error response:", errorText)
         throw new Error("Failed to fetch rooms")
       }
-
       const data = await response.json()
-      console.log("[v0] Received rooms data:", data)
-      console.log("[v0] Number of rooms:", data.rooms?.length || 0)
-      console.log("[v0] Rooms array:", data.rooms)
-
-      console.log("[v0] Current rooms state before update:", rooms)
       setRooms(data.rooms || [])
-      console.log("[v0] Set rooms state to:", data.rooms || [])
     } catch (error) {
-      console.error("[v0] Error fetching rooms:", error)
+      console.error("[Video] Error fetching rooms:", error)
       toast({
         title: "Error",
         description: "Failed to load video rooms",
@@ -85,9 +55,9 @@ export default function VideoPage() {
     } finally {
       setIsLoading(false)
     }
-  }
+  }, [toast])
 
-  const handleCreateRoom = async () => {
+  const handleCreateRoom = useCallback(async () => {
     if (!newRoomName.trim()) {
       toast({
         title: "Error",
@@ -98,8 +68,6 @@ export default function VideoPage() {
     }
 
     setIsCreating(true)
-    console.log("[v0] Creating room with name:", newRoomName)
-    console.log("[v0] Invite emails:", inviteEmails)
 
     try {
       const response = await fetch("/api/video/rooms", {
@@ -111,16 +79,9 @@ export default function VideoPage() {
         }),
       })
 
-      console.log("[v0] Create response status:", response.status)
-
       if (!response.ok) {
-        const errorText = await response.text()
-        console.error("[v0] Create error response:", errorText)
         throw new Error("Failed to create room")
       }
-
-      const data = await response.json()
-      console.log("[v0] Created room data:", data)
 
       toast({
         title: "Success",
@@ -131,12 +92,9 @@ export default function VideoPage() {
 
       setNewRoomName("")
       setInviteEmails([])
-
-      console.log("[v0] About to fetch rooms after creation...")
       await fetchRooms()
-      console.log("[v0] Finished fetching rooms after creation")
     } catch (error) {
-      console.error("[v0] Error creating room:", error)
+      console.error("[Video] Error creating room:", error)
       toast({
         title: "Error",
         description: "Failed to create video room",
@@ -145,9 +103,9 @@ export default function VideoPage() {
     } finally {
       setIsCreating(false)
     }
-  }
+  }, [newRoomName, inviteEmails, toast, fetchRooms])
 
-  const handleCopyLink = async (roomUrl: string, roomName: string) => {
+  const handleCopyLink = useCallback(async (roomUrl: string, roomName: string) => {
     try {
       await navigator.clipboard.writeText(roomUrl)
       toast({
@@ -161,48 +119,52 @@ export default function VideoPage() {
         variant: "destructive",
       })
     }
-  }
+  }, [toast])
 
-  const handleDeleteRoom = async (roomId: string, roomName: string) => {
+  const handleDeleteRoom = useCallback(async (roomId: string, roomName: string) => {
     if (!confirm(`Are you sure you want to delete "${roomName}"? This action cannot be undone.`)) {
       return
     }
-
-    console.log("[v0] Deleting room:", roomId, roomName)
-    console.log("[v0] Current rooms before delete:", rooms)
 
     try {
       const response = await fetch(`/api/video/rooms?id=${roomId}`, {
         method: "DELETE",
       })
 
-      console.log("[v0] Delete response status:", response.status)
-
       if (!response.ok) {
-        const errorText = await response.text()
-        console.error("[v0] Delete error response:", errorText)
         throw new Error("Failed to delete room")
       }
-
-      const data = await response.json()
-      console.log("[v0] Delete response data:", data)
 
       toast({
         title: "Success",
         description: `"${roomName}" has been deleted`,
       })
 
-      console.log("[v0] About to fetch rooms after deletion...")
       await fetchRooms()
-      console.log("[v0] Finished fetching rooms after deletion")
     } catch (error) {
-      console.error("[v0] Error deleting room:", error)
+      console.error("[Video] Error deleting room:", error)
       toast({
         title: "Error",
         description: "Failed to delete video room",
         variant: "destructive",
       })
     }
+  }, [toast, fetchRooms])
+
+  // useEffect AFTER all useCallback definitions
+  useEffect(() => {
+    if (!guardLoading && isAuthorized) {
+      fetchRooms()
+    }
+  }, [guardLoading, isAuthorized, fetchRooms])
+
+  // Early return AFTER all hooks
+  if (guardLoading || !isAuthorized) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
+      </div>
+    )
   }
 
   return (
