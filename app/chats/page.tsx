@@ -4,7 +4,7 @@ import React, { useState, useEffect, useCallback } from "react"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Plus, MessageSquare, Users, User, Loader2 } from "lucide-react"
+import { Plus, MessagesSquare, Users, User, Loader2 } from "lucide-react"
 import { useUser } from "@/contexts/user-context"
 import { UserMenu } from "@/components/user-menu"
 import { BreadcrumbNav } from "@/components/breadcrumb-nav"
@@ -140,7 +140,7 @@ export default function ChatsPage() {
         <div className="flex justify-between items-center mb-6">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 bg-purple-100 rounded-full flex items-center justify-center">
-              <MessageSquare className="w-5 h-5 text-purple-600" />
+              <MessagesSquare className="w-5 h-5 text-purple-600" />
             </div>
             <div>
               <h1 className="text-2xl font-bold text-gray-900">Chats Hub</h1>
@@ -163,7 +163,7 @@ export default function ChatsPage() {
         <Tabs value={filter} onValueChange={(v) => setFilter(v as TabFilter)} className="mb-6">
           <TabsList>
             <TabsTrigger value="all" className="flex items-center gap-2">
-              <MessageSquare className="w-4 h-4" />
+              <MessagesSquare className="w-4 h-4" />
               All ({chats.length})
             </TabsTrigger>
             <TabsTrigger value="groups" className="flex items-center gap-2">
@@ -185,7 +185,7 @@ export default function ChatsPage() {
         ) : chats.length === 0 ? (
           <div className="text-center py-16">
             <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
-              <MessageSquare className="w-8 h-8 text-gray-400" />
+              <MessagesSquare className="w-8 h-8 text-gray-400" />
             </div>
             <h2 className="text-xl font-semibold text-gray-900 mb-2">No chats yet</h2>
             <p className="text-gray-500 mb-6">

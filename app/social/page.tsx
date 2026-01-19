@@ -14,6 +14,8 @@ import {
   Globe,
   Lock,
   MessageSquare,
+  MessagesSquare,
+  Video,
   Calendar,
   ChevronDown,
   ChevronRight,
@@ -57,6 +59,7 @@ import { KnowledgeBaseDrawer } from "@/components/social/knowledge-base-drawer"
 import { FollowButton } from "@/components/social/follow-button"
 import { WorkflowStatusBadge } from "@/components/social/workflow-status-badge"
 import { SocialAnalyticsSidebar } from "@/components/social/social-analytics-sidebar"
+import { CreateChatModal } from "@/components/stick-chats/CreateChatModal"
 
 async function fetchWithRetry(
   url: string,
@@ -233,6 +236,9 @@ const StickTableRow = React.memo(function StickTableRow({
   onPromoteReply,
   onNavigateToCalstick,
 }: StickTableRowProps) {
+  const router = useRouter()
+  const [chatModalOpen, setChatModalOpen] = useState(false)
+
   const handleRowClick = useCallback(() => {
     onToggle(stick.id)
   }, [onToggle, stick.id])
@@ -244,6 +250,14 @@ const StickTableRow = React.memo(function StickTableRow({
   const handleOpenClick = useCallback(() => {
     onOpen(stick.id)
   }, [onOpen, stick.id])
+
+  const handleChatClick = useCallback(() => {
+    setChatModalOpen(true)
+  }, [])
+
+  const handleVideoClick = useCallback(() => {
+    router.push("/video")
+  }, [router])
 
   const stopPropagation = useCallback((e: React.MouseEvent) => {
     e.stopPropagation()
@@ -294,11 +308,27 @@ const StickTableRow = React.memo(function StickTableRow({
           {formatDistanceToNow(new Date(stick.created_at), { addSuffix: true })}
         </TableCell>
         <TableCell className="text-center" onClick={stopPropagation}>
-          <Button variant="ghost" size="sm" onClick={handleOpenClick} title="View and edit stick">
-            <Eye className="h-4 w-4" />
-          </Button>
+          <div className="flex items-center justify-center gap-1">
+            <Button variant="ghost" size="sm" onClick={handleOpenClick} title="View and edit stick">
+              <Eye className="h-4 w-4" />
+            </Button>
+            <Button variant="ghost" size="sm" onClick={handleChatClick} title="New chat">
+              <MessagesSquare className="h-4 w-4 text-purple-500 hover:text-purple-600" />
+            </Button>
+            <Button variant="ghost" size="sm" onClick={handleVideoClick} title="Start video call">
+              <Video className="h-4 w-4 text-blue-500 hover:text-blue-600" />
+            </Button>
+          </div>
         </TableCell>
       </TableRow>
+
+      {/* Chat Modal */}
+      <CreateChatModal
+        open={chatModalOpen}
+        onOpenChange={setChatModalOpen}
+        defaultName={stick.topic}
+        autoSubmit
+      />
 
       {isExpanded && (
         <TableRow>

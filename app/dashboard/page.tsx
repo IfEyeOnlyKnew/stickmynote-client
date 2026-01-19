@@ -5,7 +5,7 @@ import { useState, useEffect } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { StickyNote, Users, FileText, ArrowRight, Share2, AlertCircle, MessageSquare, Video } from "lucide-react"
+import { StickyNote, Users, FileText, ArrowRight, Share2, AlertCircle, MessagesSquare, Video } from "lucide-react"
 import { UserMenu } from "@/components/user-menu"
 import { useUser } from "@/contexts/user-context"
 import { useOrganization } from "@/contexts/organization-context"
@@ -239,7 +239,7 @@ export default function DashboardPage() {
           <Card className="hover:shadow-xl transition-all duration-300 hover:scale-105 border-2 hover:border-teal-300">
             <CardHeader className="text-center pb-4">
               <div className="mx-auto w-16 h-16 bg-teal-100 rounded-full flex items-center justify-center mb-4 relative">
-                <MessageSquare className="h-8 w-8 text-teal-600" />
+                <MessagesSquare className="h-8 w-8 text-teal-600" />
                 {unreadChatsCount > 0 && (
                   <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs font-bold rounded-full min-w-[20px] h-5 flex items-center justify-center px-1">
                     {unreadChatsCount > 99 ? "99+" : unreadChatsCount}
@@ -339,7 +339,7 @@ export default function DashboardPage() {
               Social Hub: Enterprise Collaboration
             </Badge>
             <Badge variant="secondary" className="px-4 py-2">
-              <MessageSquare className="h-4 w-4 mr-2" />
+              <MessagesSquare className="h-4 w-4 mr-2" />
               Chats: Real-time Conversations
             </Badge>
             <Badge variant="secondary" className="px-4 py-2">

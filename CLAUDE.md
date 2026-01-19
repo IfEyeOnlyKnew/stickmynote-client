@@ -6,8 +6,8 @@ This document provides instructions for updating the production folder and GitHu
 
 | Environment | Local Path | GitHub Remote |
 |-------------|------------|---------------|
-| Development | `C:\stick-my-note-dev\stickmynote-client-install` | origin/main |
-| Production | `C:\stick-my-note-prod\stickmynote-client` | origin/main |
+| Development | `C:\stick-my-note-dev\stickmynote-client-install` | origin/master |
+| Production | `C:\stick-my-note-prod\stickmynote-client` | origin/master |
 
 ## Critical: Files to NEVER Overwrite in Production
 
@@ -40,7 +40,7 @@ git add .
 git commit -m "Your commit message"
 
 # Push to GitHub
-git push origin main
+git push origin master
 ```
 
 ### Step 2: Update Production (Selective Checkout - RECOMMENDED)
@@ -62,21 +62,21 @@ cp .env .env.backup
 cp .env.production .env.production.backup
 
 # Fetch latest without merging
-git fetch origin main
+git fetch origin master
 
 # Selectively update directories (NEVER include server.js or .env files)
-git checkout origin/main -- app/
-git checkout origin/main -- components/
-git checkout origin/main -- lib/
-git checkout origin/main -- hooks/
-git checkout origin/main -- types/
-git checkout origin/main -- public/
-git checkout origin/main -- styles/
-git checkout origin/main -- package.json
-git checkout origin/main -- pnpm-lock.yaml
-git checkout origin/main -- next.config.mjs
-git checkout origin/main -- tailwind.config.ts
-git checkout origin/main -- tsconfig.json
+git checkout origin/master -- app/
+git checkout origin/master -- components/
+git checkout origin/master -- lib/
+git checkout origin/master -- hooks/
+git checkout origin/master -- types/
+git checkout origin/master -- public/
+git checkout origin/master -- styles/
+git checkout origin/master -- package.json
+git checkout origin/master -- pnpm-lock.yaml
+git checkout origin/master -- next.config.mjs
+git checkout origin/master -- tailwind.config.ts
+git checkout origin/master -- tsconfig.json
 ```
 
 ### Step 3: Install Dependencies (if package.json changed)
@@ -120,14 +120,14 @@ net start StickyMyNote
 ### Development (commit and push)
 ```bash
 cd C:\stick-my-note-dev\stickmynote-client-install
-git add . && git commit -m "message" && git push origin main
+git add . && git commit -m "message" && git push origin master
 ```
 
 ### Production (safe update)
 ```bash
 cd C:\stick-my-note-prod\stickmynote-client
-git fetch origin main
-git checkout origin/main -- app/ components/ lib/ hooks/ types/ public/
+git fetch origin master
+git checkout origin/master -- app/ components/ lib/ hooks/ types/ public/
 pnpm run build
 net stop StickyMyNote && net start StickyMyNote
 ```

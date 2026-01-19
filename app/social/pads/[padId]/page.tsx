@@ -24,12 +24,15 @@ import {
   Clock,
   Heart,
   MessageCircle,
+  MessagesSquare,
+  Video,
   Sparkles,
   Plus,
   Pin,
   PinOff,
   BarChart3,
 } from "lucide-react"
+import { CreateChatModal } from "@/components/stick-chats/CreateChatModal"
 
 interface SocialPad {
   id: string
@@ -74,6 +77,8 @@ export default function SocialPadPage({ params }: Readonly<{ params: { padId: st
   const [manageStickMembersOpen, setManageStickMembersOpen] = useState(false)
   const [selectedStickId, setSelectedStickId] = useState<string | null>(null)
   const [selectedStick, setSelectedStick] = useState<{ id: string; topic: string } | null>(null)
+  const [chatModalOpen, setChatModalOpen] = useState(false)
+  const [chatStickTopic, setChatStickTopic] = useState("")
 
   /* eslint-disable react-hooks/exhaustive-deps */
   useEffect(() => {
@@ -235,6 +240,17 @@ export default function SocialPadPage({ params }: Readonly<{ params: { padId: st
     setSelectedStickId(stickId)
   }
 
+  const handleChatClick = (e: React.MouseEvent, stickTopic: string) => {
+    e.stopPropagation()
+    setChatStickTopic(stickTopic)
+    setChatModalOpen(true)
+  }
+
+  const handleVideoClick = (e: React.MouseEvent) => {
+    e.stopPropagation()
+    router.push("/video")
+  }
+
   if (loading || loadingData) {
     return (
       <div className="flex items-center justify-center min-h-screen bg-gray-50">
@@ -386,6 +402,24 @@ export default function SocialPadPage({ params }: Readonly<{ params: { padId: st
                               {stick.topic}
                             </CardTitle>
                             <div className="flex items-center gap-1">
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-7 w-7 p-0"
+                                onClick={(e) => handleChatClick(e, stick.topic)}
+                                title="New chat"
+                              >
+                                <MessagesSquare className="h-4 w-4 text-purple-500 hover:text-purple-600" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-7 w-7 p-0"
+                                onClick={handleVideoClick}
+                                title="Start video call"
+                              >
+                                <Video className="h-4 w-4 text-blue-500 hover:text-blue-600" />
+                              </Button>
                               {canManageSticks && (
                                 <>
                                   <Button
@@ -459,6 +493,24 @@ export default function SocialPadPage({ params }: Readonly<{ params: { padId: st
                               {stick.topic}
                             </CardTitle>
                             <div className="flex items-center gap-1">
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-7 w-7 p-0"
+                                onClick={(e) => handleChatClick(e, stick.topic)}
+                                title="New chat"
+                              >
+                                <MessagesSquare className="h-4 w-4 text-purple-500 hover:text-purple-600" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-7 w-7 p-0"
+                                onClick={handleVideoClick}
+                                title="Start video call"
+                              >
+                                <Video className="h-4 w-4 text-blue-500 hover:text-blue-600" />
+                              </Button>
                               {canManageSticks && (
                                 <>
                                   <Button
@@ -552,6 +604,14 @@ export default function SocialPadPage({ params }: Readonly<{ params: { padId: st
       )}
 
       <CreateStickModal isOpen={createStickOpen} onClose={handleStickCreated} padId={padId} />
+
+      {/* Chat Modal */}
+      <CreateChatModal
+        open={chatModalOpen}
+        onOpenChange={setChatModalOpen}
+        defaultName={chatStickTopic}
+        autoSubmit
+      />
     </div>
   )
 }

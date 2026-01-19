@@ -1,6 +1,6 @@
 "use client"
 
-import React, { useState } from "react"
+import React, { useState, useEffect, useRef } from "react"
 import { useRouter } from "next/navigation"
 import {
   Dialog,
@@ -19,6 +19,10 @@ import { useCSRF } from "@/hooks/useCSRF"
 interface CreateChatModalProps {
   open: boolean
   onOpenChange: (open: boolean) => void
+  /** Pre-fill the chat name (e.g., from a stick topic) */
+  defaultName?: string
+  /** Automatically create the chat when modal opens (skips the form) */
+  autoSubmit?: boolean
 }
 
 /**
@@ -27,13 +31,34 @@ interface CreateChatModalProps {
 export const CreateChatModal: React.FC<CreateChatModalProps> = ({
   open,
   onOpenChange,
+  defaultName = "",
+  autoSubmit = false,
 }) => {
   const router = useRouter()
   const { csrfToken } = useCSRF()
-  const [name, setName] = useState("")
+  const [name, setName] = useState(defaultName)
   const [isGroup, setIsGroup] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const hasAutoSubmitted = useRef(false)
+
+  // Update name when defaultName changes
+  useEffect(() => {
+    if (defaultName) {
+      setName(defaultName)
+    }
+  }, [defaultName])
+
+  // Auto-submit when modal opens with autoSubmit=true
+  useEffect(() => {
+    if (open && autoSubmit && defaultName && !hasAutoSubmitted.current) {
+      hasAutoSubmitted.current = true
+      handleCreate()
+    }
+    if (!open) {
+      hasAutoSubmitted.current = false
+    }
+  }, [open, autoSubmit, defaultName])
 
   const handleCreate = async () => {
     if (isGroup && !name.trim()) {
@@ -45,6 +70,7 @@ export const CreateChatModal: React.FC<CreateChatModalProps> = ({
     setError(null)
 
     try {
+      // The API will check for existing chats with the same name and return that instead
       const response = await fetch("/api/stick-chats", {
         method: "POST",
         headers: {
@@ -74,7 +100,7 @@ export const CreateChatModal: React.FC<CreateChatModalProps> = ({
   }
 
   const handleClose = () => {
-    setName("")
+    setName(defaultName)
     setIsGroup(false)
     setError(null)
     onOpenChange(false)

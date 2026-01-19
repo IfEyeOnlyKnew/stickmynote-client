@@ -7,6 +7,7 @@ import {
   createChat,
   addChatMember,
   findChatForStick,
+  findChatByName,
 } from "@/lib/database/stick-chat-queries"
 import type { CreateStickChatRequest, StickChatFilters } from "@/types/stick-chat"
 
@@ -154,6 +155,14 @@ export async function POST(request: NextRequest) {
       const existingChat = await findChatForStick(stick_id, stick_type, user.id)
       if (existingChat) {
         return NextResponse.json({ chat: existingChat, existing: true })
+      }
+    }
+
+    // Check if a chat with this name already exists for the user
+    if (name && name.trim()) {
+      const existingChatByName = await findChatByName(name.trim(), user.id, orgContextResult?.orgId || null)
+      if (existingChatByName) {
+        return NextResponse.json({ chat: existingChatByName, existing: true })
       }
     }
 

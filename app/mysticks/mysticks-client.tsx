@@ -6,11 +6,13 @@ import type { StickWithRole } from "@/lib/data/sticks-data"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
-import { Search, FileText } from "lucide-react"
+import { Search, FileText, MessagesSquare, Video } from "lucide-react"
 import { UserMenu } from "@/components/user-menu"
 import { BreadcrumbNav } from "@/components/breadcrumb-nav"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { PermissionBasedStickFullscreen } from "@/components/permission-based/PermissionBasedStickFullscreen"
+import { CreateChatModal } from "@/components/stick-chats/CreateChatModal"
+import { Button } from "@/components/ui/button"
 import type { Stick } from "@/types/pad"
 
 interface MySticksClientProps {
@@ -25,6 +27,8 @@ export function MySticksClient({ initialSticks }: MySticksClientProps) {
   const [mounted, setMounted] = useState(false)
   const [selectedStick, setSelectedStick] = useState<StickWithRole | null>(null)
   const [isFullscreenOpen, setIsFullscreenOpen] = useState(false)
+  const [chatModalOpen, setChatModalOpen] = useState(false)
+  const [chatStickTopic, setChatStickTopic] = useState("")
 
   useEffect(() => {
     setMounted(true)
@@ -80,6 +84,17 @@ export function MySticksClient({ initialSticks }: MySticksClientProps) {
   const handleCloseFullscreen = () => {
     setIsFullscreenOpen(false)
     setSelectedStick(null)
+  }
+
+  const handleChatClick = (e: React.MouseEvent, stickTopic: string) => {
+    e.stopPropagation()
+    setChatStickTopic(stickTopic || "Untitled Stick")
+    setChatModalOpen(true)
+  }
+
+  const handleVideoClick = (e: React.MouseEvent) => {
+    e.stopPropagation()
+    router.push("/video")
   }
 
   const handleUpdateStick = (updatedStick: Stick) => {
@@ -187,7 +202,27 @@ export function MySticksClient({ initialSticks }: MySticksClientProps) {
                   <CardHeader>
                     <CardTitle className="flex items-center justify-between gap-2">
                       <span className="flex-1 truncate text-base">{stick.topic || "Untitled Stick"}</span>
-                      <Badge className={getRoleBadgeColor(stick.userRole)}>{stick.userRole}</Badge>
+                      <div className="flex items-center gap-1">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-7 w-7 p-0"
+                          onClick={(e) => handleChatClick(e, stick.topic)}
+                          title="New chat"
+                        >
+                          <MessagesSquare className="h-4 w-4 text-purple-500 hover:text-purple-600" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-7 w-7 p-0"
+                          onClick={handleVideoClick}
+                          title="Start video call"
+                        >
+                          <Video className="h-4 w-4 text-blue-500 hover:text-blue-600" />
+                        </Button>
+                        <Badge className={getRoleBadgeColor(stick.userRole)}>{stick.userRole}</Badge>
+                      </div>
                     </CardTitle>
                     <CardDescription className="line-clamp-3">{stick.content || "No content"}</CardDescription>
                   </CardHeader>
@@ -226,6 +261,14 @@ export function MySticksClient({ initialSticks }: MySticksClientProps) {
           onDelete={handleDeleteStick}
         />
       )}
+
+      {/* Chat Modal */}
+      <CreateChatModal
+        open={chatModalOpen}
+        onOpenChange={setChatModalOpen}
+        defaultName={chatStickTopic}
+        autoSubmit
+      />
     </div>
   )
 }

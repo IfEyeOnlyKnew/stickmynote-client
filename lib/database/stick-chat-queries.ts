@@ -227,6 +227,35 @@ export async function findChatForStick(
 }
 
 /**
+ * Find an existing chat by name for a user
+ * Used to prevent duplicate chats with the same name
+ */
+export async function findChatByName(
+  name: string,
+  userId: string,
+  orgId: string | null
+): Promise<StickChat | null> {
+  const params: (string | null)[] = [name.toLowerCase(), userId]
+  let orgCondition = ""
+
+  if (orgId) {
+    orgCondition = "AND sc.org_id = $3"
+    params.push(orgId)
+  }
+
+  return queryOne<StickChatRow>(
+    `SELECT sc.* FROM stick_chats sc
+     LEFT JOIN stick_chat_members scm ON sc.id = scm.chat_id
+     WHERE LOWER(sc.name) = $1
+     AND (sc.owner_id = $2 OR scm.user_id = $2)
+     ${orgCondition}
+     AND sc.expires_at > NOW()
+     LIMIT 1`,
+    params
+  )
+}
+
+/**
  * Create a new chat
  */
 export async function createChat(data: {

@@ -199,11 +199,7 @@ export const NotePreviewCard: React.FC<NotePreviewCardProps> = ({
           <div className="flex items-center gap-2">
             {/* Chat icon */}
             {showChatIcon && (
-              <ChatIconButton
-                stickId={note.id}
-                stickType="personal"
-                className="p-0.5"
-              />
+              <ChatIconButton className="p-0.5" />
             )}
 
             {/* Shared indicator */}
