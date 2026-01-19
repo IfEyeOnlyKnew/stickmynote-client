@@ -10,9 +10,12 @@ import { NoteFullscreenHeader } from "./note-fullscreen/NoteFullscreenHeader"
 import { NoteFullscreenContent } from "./note-fullscreen/NoteFullscreenContent"
 import { NoteFullscreenReplies } from "./note-fullscreen/NoteFullscreenReplies"
 import { SummarizeLinksButton } from "./ui/summarize-links-button"
-import { Trash2, Share2, Lock } from "lucide-react"
+import { Trash2, Share2, Lock, MessagesSquare, Video } from "lucide-react"
+import { useState } from "react"
+import { CreateChatModal } from "@/components/stick-chats/CreateChatModal"
 
 export const UnifiedNoteFullscreen: React.FC = () => {
+  const [chatModalOpen, setChatModalOpen] = useState(false)
   const context = useNoteContext()
   const {
     note,
@@ -251,6 +254,32 @@ export const UnifiedNoteFullscreen: React.FC = () => {
               <NoteFullscreenHeader onClose={onClose} />
             </div>
             <div className="flex items-center gap-1 md:gap-2">
+              {/* Chat Icon */}
+              {!isNewNote && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setChatModalOpen(true)}
+                  className="h-7 w-7 p-0"
+                  title="Start chat"
+                >
+                  <MessagesSquare className="h-4 w-4 text-purple-500" />
+                </Button>
+              )}
+
+              {/* Video Icon */}
+              {!isNewNote && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => window.open("/video", "_blank")}
+                  className="h-7 w-7 p-0"
+                  title="Start video call"
+                >
+                  <Video className="h-4 w-4 text-blue-500" />
+                </Button>
+              )}
+
               {!isNewNote && isOwner && (
                 <Button
                   variant="outline"
@@ -342,6 +371,14 @@ export const UnifiedNoteFullscreen: React.FC = () => {
           />
         </div>
       </div>
+
+      {/* Chat Modal */}
+      <CreateChatModal
+        open={chatModalOpen}
+        onOpenChange={setChatModalOpen}
+        defaultName={note.topic || note.title || "Untitled Note"}
+        autoSubmit
+      />
     </div>
   )
 }

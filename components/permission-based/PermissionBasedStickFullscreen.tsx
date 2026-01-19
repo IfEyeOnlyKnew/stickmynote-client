@@ -16,9 +16,10 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
-import { X, Trash2, Zap, MessageSquare, Video } from "lucide-react"
+import { X, Trash2, Zap, MessagesSquare, Video } from "lucide-react"
 import { GenericStickTabs } from "@/components/GenericStickTabs"
 import { ThreadedReplies } from "@/components/replies/ThreadedReplies"
+import { CreateChatModal } from "@/components/stick-chats/CreateChatModal"
 import type { Stick } from "@/types/pad"
 import type { StickTabsConfig } from "@/types/stick-tabs-config"
 import { getStickTabs, saveStickTab, deleteStickTabItem } from "@/lib/stick-tabs"
@@ -84,6 +85,7 @@ export function PermissionBasedStickFullscreen({
   const [refreshTrigger, setRefreshTrigger] = useState(0)
 
   const [currentUserId, setCurrentUserId] = useState<string | null>(null)
+  const [chatModalOpen, setChatModalOpen] = useState(false)
 
   // Real-time polling for replies
   const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null)
@@ -663,9 +665,9 @@ export function PermissionBasedStickFullscreen({
                     size="sm"
                     className="h-7 w-7 p-0 ml-1"
                     title="Start chat for this stick"
-                    onClick={() => window.open(`/chats?stick_id=${stick.id}&stick_type=pad`, "_blank")}
+                    onClick={() => setChatModalOpen(true)}
                   >
-                    <MessageSquare className="h-4 w-4 text-teal-600" />
+                    <MessagesSquare className="h-4 w-4 text-purple-500" />
                   </Button>
                   <Button
                     variant="ghost"
@@ -774,6 +776,14 @@ export function PermissionBasedStickFullscreen({
           </div>
         )}
       </div>
+
+      {/* Chat Modal */}
+      <CreateChatModal
+        open={chatModalOpen}
+        onOpenChange={setChatModalOpen}
+        defaultName={editedStick.topic || "Untitled Stick"}
+        autoSubmit
+      />
     </div>
   )
 }

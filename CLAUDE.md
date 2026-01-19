@@ -46,7 +46,6 @@ git push origin main
 
 ### Step 2: Update Production (Selective Checkout - RECOMMENDED)
 
-```bash
 # Navigate to production
 cd C:\stick-my-note-prod\stickmynote-client
 
@@ -78,17 +77,17 @@ git checkout origin/main -- pnpm-lock.yaml
 git checkout origin/main -- next.config.mjs
 git checkout origin/main -- tailwind.config.ts
 git checkout origin/main -- tsconfig.json
-```
+
 
 ### Step 3: Install Dependencies (if package.json changed)
 
-```bash
+
 pnpm install
-```
+
 
 ### Step 4: Build Production
 
-```bash
+
 # Use build-only env for build phase
 cp .env.local.build-only .env.local
 
@@ -97,16 +96,15 @@ pnpm run build
 
 # CRITICAL: Remove build-only env after build (prevents empty POSTGRES_PASSWORD)
 rm .env.local
-```
+
 
 > **WARNING:** You MUST delete `.env.local` after the build completes. Production does NOT need `.env.local` - it uses `.env` and `.env.production` which have the correct database credentials. If `.env.local` remains, sign-in will fail with "SASL: client password must be a string" because the build-time config has an empty `POSTGRES_PASSWORD`.
 
 ### Step 5: Start Service
 
-```bash
 # Requires admin privileges
 net start StickyMyNote
-```
+
 
 ### Step 6: Verify Production
 

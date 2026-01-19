@@ -8,14 +8,12 @@ import { MessageCircle, Expand, Clock, Share2, Palette } from "lucide-react"
 import type { Note } from "@/types/note"
 import { formatDistanceToNow } from "date-fns"
 import { COLORS } from "@/utils/noteUtils"
-import { ChatIconButton } from "@/components/stick-chats/ChatIconButton"
 
 interface NotePreviewCardProps {
   note: Note
   onClick: () => void
   onUpdateColor?: (noteId: string, color: string) => void
   isLoading?: boolean
-  showChatIcon?: boolean
 }
 
 export const NotePreviewCard: React.FC<NotePreviewCardProps> = ({
@@ -23,7 +21,6 @@ export const NotePreviewCard: React.FC<NotePreviewCardProps> = ({
   onClick,
   onUpdateColor,
   isLoading = false,
-  showChatIcon = true,
 }) => {
   const [colorPickerOpen, setColorPickerOpen] = useState(false)
 
@@ -195,13 +192,8 @@ export const NotePreviewCard: React.FC<NotePreviewCardProps> = ({
             )}
           </div>
 
-          {/* Right side: Chat icon and shared indicator */}
+          {/* Right side: Shared indicator */}
           <div className="flex items-center gap-2">
-            {/* Chat icon */}
-            {showChatIcon && (
-              <ChatIconButton className="p-0.5" />
-            )}
-
             {/* Shared indicator */}
             {note.is_shared && (
               <span className="flex items-center gap-1">
