@@ -34,6 +34,12 @@ export default function VideoPage() {
   const [isCreating, setIsCreating] = useState(false)
   const [activeRoomUrl, setActiveRoomUrl] = useState<string | null>(null)
 
+  // Memoized callback to prevent infinite re-renders in VideoInviteUserSearch
+  // MUST be defined before any conditional returns (Rules of Hooks)
+  const handleEmailsChange = useCallback((emails: string[]) => {
+    setInviteEmails(emails)
+  }, [])
+
   /* eslint-disable react-hooks/exhaustive-deps */
   useEffect(() => {
     if (!guardLoading && isAuthorized) {
@@ -200,11 +206,6 @@ export default function VideoPage() {
       })
     }
   }
-
-  // Memoized callback to prevent infinite re-renders in VideoInviteUserSearch
-  const handleEmailsChange = useCallback((emails: string[]) => {
-    setInviteEmails(emails)
-  }, [])
 
   return (
     <div className="container mx-auto px-4 py-8 max-w-6xl">
