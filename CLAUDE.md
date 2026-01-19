@@ -37,10 +37,10 @@ git status
 
 # Stage and commit changes
 git add .
-git commit -m "Your commit message"
+git commit -m "Updated Chat Icon"
 
 # Push to GitHub
-git push origin master
+git push origin main
 
 ```
 
@@ -63,7 +63,7 @@ cp .env .env.backup
 cp .env.production .env.production.backup
 
 # Fetch latest without merging
-git fetch origin master
+git fetch origin main
 
 # Selectively update directories (NEVER include server.js or .env files)
 git checkout origin/main -- app/
@@ -121,13 +121,13 @@ net start StickyMyNote
 ### Development (commit and push)
 ```bash
 cd C:\stick-my-note-dev\stickmynote-client-install
-git add . && git commit -m "message" && git push origin master
+git add . && git commit -m "message" && git push origin main
 ```
 
 ### Production (safe update)
 ```bash
 cd C:\stick-my-note-prod\stickmynote-client
-git fetch origin master
+git fetch origin main
 git checkout origin/main -- app/ components/ lib/ hooks/ types/ public/
 pnpm run build
 net stop StickyMyNote && net start StickyMyNote
