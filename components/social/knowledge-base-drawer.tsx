@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useMemo } from "react"
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -13,18 +13,19 @@ import { formatDistanceToNow } from "date-fns"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Separator } from "@/components/ui/separator"
 
-const KB_CATEGORIES = [
-  { value: "general", label: "General", icon: FileText },
-  { value: "sop", label: "SOP", icon: BookOpen },
-  { value: "pattern", label: "Pattern", icon: BookOpen },
-  { value: "best-practice", label: "Best Practice", icon: BookOpen },
-  { value: "troubleshooting", label: "Troubleshooting", icon: BookOpen },
-  { value: "reference", label: "Reference", icon: BookOpen },
-  { value: "faq", label: "FAQ", icon: BookOpen },
-  { value: "guideline", label: "Guideline", icon: BookOpen },
-  { value: "template", label: "Template", icon: BookOpen },
-  { value: "tribal-knowledge", label: "Tribal Knowledge", icon: BookOpen },
-] as const
+// Default categories - will be extended with custom categories from articles
+const DEFAULT_KB_CATEGORIES = [
+  { value: "general", label: "General" },
+  { value: "sop", label: "SOP" },
+  { value: "pattern", label: "Pattern" },
+  { value: "best-practice", label: "Best Practice" },
+  { value: "troubleshooting", label: "Troubleshooting" },
+  { value: "reference", label: "Reference" },
+  { value: "faq", label: "FAQ" },
+  { value: "guideline", label: "Guideline" },
+  { value: "template", label: "Template" },
+  { value: "tribal-knowledge", label: "Tribal Knowledge" },
+]
 
 interface KBArticle {
   id: string
@@ -204,6 +205,26 @@ export function KnowledgeBaseDrawer({ open, onOpenChange, padId, onSelectArticle
     setFormTags("")
   }
 
+  // Build dynamic category list from articles + defaults
+  const allCategories = useMemo(() => {
+    const categorySet = new Set<string>()
+    // Add default categories
+    DEFAULT_KB_CATEGORIES.forEach((cat) => categorySet.add(cat.value))
+    // Add custom categories from articles
+    articles.forEach((article) => {
+      if (article.category) {
+        categorySet.add(article.category)
+      }
+    })
+    // Convert to sorted array with labels
+    return Array.from(categorySet)
+      .sort((a, b) => a.localeCompare(b))
+      .map((value) => {
+        const defaultCat = DEFAULT_KB_CATEGORIES.find((c) => c.value === value)
+        return { value, label: defaultCat?.label || value }
+      })
+  }, [articles])
+
   const filteredArticles = articles.filter((article) => {
     const matchesSearch =
       searchQuery === "" ||
@@ -251,7 +272,7 @@ export function KnowledgeBaseDrawer({ open, onOpenChange, padId, onSelectArticle
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Categories</SelectItem>
-                  {KB_CATEGORIES.map((cat) => (
+                  {allCategories.map((cat) => (
                     <SelectItem key={cat.value} value={cat.value}>
                       {cat.label}
                     </SelectItem>
@@ -283,18 +304,13 @@ export function KnowledgeBaseDrawer({ open, onOpenChange, padId, onSelectArticle
 
                     <div>
                       <span className="text-sm font-medium mb-2 block">Category</span>
-                      <Select value={formCategory} onValueChange={setFormCategory}>
-                        <SelectTrigger>
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {KB_CATEGORIES.map((cat) => (
-                            <SelectItem key={cat.value} value={cat.value}>
-                              {cat.label}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                      <Input
+                        placeholder="Enter category (e.g., SOP, FAQ, Troubleshooting...)"
+                        value={formCategory}
+                        onChange={(e) => setFormCategory(e.target.value)}
+                        maxLength={50}
+                      />
+                      <p className="text-xs text-gray-500 mt-1">Type any category name. Custom categories will appear in the filter dropdown.</p>
                     </div>
 
                     <div>
@@ -304,9 +320,9 @@ export function KnowledgeBaseDrawer({ open, onOpenChange, padId, onSelectArticle
                         value={formContent}
                         onChange={(e) => setFormContent(e.target.value)}
                         rows={6}
-                        maxLength={5000}
+                        maxLength={50000}
                       />
-                      <p className="text-xs text-gray-500 mt-1">{formContent.length}/5000</p>
+                      <p className="text-xs text-gray-500 mt-1">{formContent.length.toLocaleString()}/50,000</p>
                     </div>
 
                     <div>
@@ -364,7 +380,7 @@ export function KnowledgeBaseDrawer({ open, onOpenChange, padId, onSelectArticle
                           <div className="flex items-center gap-2 mb-2">
                             {article.is_pinned && <Pin className="h-4 w-4 text-purple-600" />}
                             <Badge variant="secondary" className="text-xs">
-                              {KB_CATEGORIES.find((c) => c.value === article.category)?.label || article.category}
+                              {DEFAULT_KB_CATEGORIES.find((c) => c.value === article.category)?.label || article.category}
                             </Badge>
                           </div>
                           <CardTitle className="text-lg mb-1">{article.title}</CardTitle>
