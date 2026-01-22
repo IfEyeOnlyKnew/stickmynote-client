@@ -26,6 +26,13 @@ export interface CalStick {
   archived_at?: string | null
   archived_by?: string | null
   social_stick_id?: string | null
+  // Sprint/Agile fields
+  sprint_id?: string | null
+  story_points?: number | null
+  // Gantt baseline fields
+  baseline_start_date?: string | null
+  baseline_end_date?: string | null
+  baseline_set_at?: string | null
   user?: {
     id: string
     username: string | null

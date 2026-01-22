@@ -98,7 +98,8 @@ function buildBaseQuery(db: any, orgId: string, offset: number, limit: number) {
       calstick_date, calstick_completed, calstick_completed_at,
       calstick_progress, calstick_status, calstick_priority,
       calstick_assignee_id, calstick_estimated_hours, calstick_actual_hours,
-      calstick_start_date, social_stick_id, created_at, updated_at
+      calstick_start_date, social_stick_id, sprint_id, story_points,
+      created_at, updated_at
     `,
       { count: "exact" },
     )

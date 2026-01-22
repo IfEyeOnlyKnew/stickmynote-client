@@ -151,6 +151,7 @@ export function AgendaView({ calsticks, onToggleComplete, onStickClick }: Readon
                         onToggleComplete(task.id, task.calstick_completed)
                       }}
                       className="mt-0.5 touch-manipulation"
+                      aria-label="Mark task as complete"
                     >
                       <Circle className="h-5 w-5 text-gray-400" />
                     </button>
@@ -210,6 +211,7 @@ export function AgendaView({ calsticks, onToggleComplete, onStickClick }: Readon
                       onToggleComplete(task.id, task.calstick_completed)
                     }}
                     className="mt-0.5 touch-manipulation"
+                    aria-label="Mark task as incomplete"
                   >
                     <CheckCircle2 className="h-5 w-5 text-green-600" />
                   </button>

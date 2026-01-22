@@ -17,6 +17,7 @@ import {
   Sparkles,
   Map,
   Download,
+  Rocket,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -50,8 +51,12 @@ import { TaskSettings } from "@/components/calsticks/TaskSettings"
 
 const GanttChart = dynamic(() => import("@/components/calsticks/GanttChart"), { ssr: false })
 const StoryMapView = dynamic(() => import("@/components/calsticks/StoryMap"), { ssr: false })
+const SprintBoard = dynamic(() => import("@/components/calsticks/SprintBoard").then(mod => mod.SprintBoard), { ssr: false })
+const BurndownChart = dynamic(() => import("@/components/calsticks/BurndownChart").then(mod => mod.BurndownChart), { ssr: false })
+const VelocityChart = dynamic(() => import("@/components/calsticks/VelocityChart").then(mod => mod.VelocityChart), { ssr: false })
+import { SprintSelector } from "@/components/calsticks/SprintSelector"
 
-type ViewMode = "list" | "kanban" | "calendar" | "gantt" | "agenda" | "storymap"
+type ViewMode = "list" | "kanban" | "calendar" | "gantt" | "agenda" | "storymap" | "sprint"
 type FilterType = "all" | "completed" | "not-completed" | "promoted"
 
 interface Pad {
@@ -87,6 +92,8 @@ export default function CalSticksPageClient() {
   const [showAutoSchedule, setShowAutoSchedule] = useState(false)
 
   const [autoArchiveDays, setAutoArchiveDays] = useState(14)
+  const [selectedSprintId, setSelectedSprintId] = useState<string | null>(null)
+  const [sprintRefreshTrigger, setSprintRefreshTrigger] = useState(0)
 
   const isMobile = useIsMobile()
 
@@ -466,6 +473,30 @@ export default function CalSticksPageClient() {
         return <GanttChart calsticks={calsticks} dependencies={dependencies} onTaskChange={handleTaskDateChange} />
       case "storymap":
         return <StoryMapView calsticks={calsticks} onTaskClick={handleStickClick} />
+      case "sprint":
+        return (
+          <div className="space-y-6">
+            <div className="flex items-center justify-between">
+              <h2 className="text-lg font-semibold">Sprint Planning</h2>
+              <SprintSelector
+                selectedSprintId={selectedSprintId}
+                onSprintChange={(id) => setSelectedSprintId(id)}
+                showAllOption={false}
+                showBacklogOption={false}
+              />
+            </div>
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              {selectedSprintId && selectedSprintId !== "backlog" && (
+                <BurndownChart sprintId={selectedSprintId} />
+              )}
+              <VelocityChart />
+            </div>
+            <SprintBoard
+              onTaskClick={handleStickClick}
+              refreshTrigger={sprintRefreshTrigger}
+            />
+          </div>
+        )
       case "list":
       default:
         return (
@@ -582,8 +613,7 @@ export default function CalSticksPageClient() {
               <BreadcrumbNav
                 items={[
                   { label: "Dashboard", href: "/dashboard" },
-                  { label: "Paks-Hub", href: "/paks" },
-                  { label: "CalSticks", href: "/calsticks" },
+                  { label: "CalSticks", current: true },
                 ]}
               />
             </div>
@@ -634,7 +664,7 @@ export default function CalSticksPageClient() {
             <div className="flex items-center gap-2 flex-wrap">
               {!isMobile && (
                 <Tabs value={viewMode} onValueChange={(v) => setViewMode(v as ViewMode)} className="w-auto">
-                  <TabsList className="grid w-full grid-cols-6">
+                  <TabsList className="grid w-full grid-cols-7">
                     <TabsTrigger value="kanban" className="text-xs">
                       <LayoutGrid className="h-3 w-3 md:mr-1" />
                       <span className="hidden md:inline">Board</span>
@@ -650,6 +680,10 @@ export default function CalSticksPageClient() {
                     <TabsTrigger value="gantt" className="text-xs">
                       <GanttChartIcon className="h-3 w-3 md:mr-1" />
                       <span className="hidden md:inline">Gantt</span>
+                    </TabsTrigger>
+                    <TabsTrigger value="sprint" className="text-xs">
+                      <Rocket className="h-3 w-3 md:mr-1" />
+                      <span className="hidden md:inline">Sprint</span>
                     </TabsTrigger>
                     <TabsTrigger value="agenda" className="text-xs">
                       <FileText className="h-3 w-3 md:mr-1" />

@@ -3,7 +3,8 @@
 import { useMemo, useState, useCallback, useRef, useEffect } from "react"
 import { Gantt, type Task, ViewMode } from "gantt-task-react"
 import "gantt-task-react/dist/index.css"
-import { parseISO, addDays, format } from "date-fns"
+import { parseISO, addDays, format, differenceInDays, isSameDay, eachDayOfInterval } from "date-fns"
+import { useToast } from "@/hooks/use-toast"
 import { Button } from "@/components/ui/button"
 import {
   ZoomIn,
@@ -16,6 +17,10 @@ import {
   ChevronRight,
   Diamond,
   Table,
+  Bookmark,
+  Users,
+  FileDown,
+  AlertTriangle,
 } from "lucide-react"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { Switch } from "@/components/ui/switch"
@@ -250,24 +255,138 @@ function generateStoryline(tasks: Task[], dependencies: Dependency[]): Storyline
   return phases
 }
 
+// Resource workload calculation
+interface ResourceWorkload {
+  userId: string
+  userName: string
+  workloadByDay: Map<string, number> // date string -> hours
+  totalHours: number
+  overloadedDays: string[]
+}
+
+function calculateResourceWorkload(calsticks: CalStick[]): ResourceWorkload[] {
+  const workloadMap = new Map<string, ResourceWorkload>()
+
+  for (const cs of calsticks) {
+    if (!cs.calstick_assignee_id || cs.calstick_completed) continue
+
+    const startDate = cs.calstick_start_date ? parseISO(cs.calstick_start_date) : cs.calstick_date ? parseISO(cs.calstick_date) : null
+    if (!startDate) continue
+
+    const estimatedHours = cs.calstick_estimated_hours || 8
+    const days = Math.max(1, Math.ceil(estimatedHours / 8))
+    const hoursPerDay = estimatedHours / days
+    const endDate = addDays(startDate, days - 1)
+
+    if (!workloadMap.has(cs.calstick_assignee_id)) {
+      workloadMap.set(cs.calstick_assignee_id, {
+        userId: cs.calstick_assignee_id,
+        userName: cs.assignee?.full_name || cs.assignee?.username || cs.assignee?.email || "Unknown",
+        workloadByDay: new Map(),
+        totalHours: 0,
+        overloadedDays: [],
+      })
+    }
+
+    const workload = workloadMap.get(cs.calstick_assignee_id)!
+
+    try {
+      const daysInRange = eachDayOfInterval({ start: startDate, end: endDate })
+      for (const day of daysInRange) {
+        const dateKey = format(day, "yyyy-MM-dd")
+        const currentHours = workload.workloadByDay.get(dateKey) || 0
+        workload.workloadByDay.set(dateKey, currentHours + hoursPerDay)
+        workload.totalHours += hoursPerDay
+      }
+    } catch {
+      // Invalid date range, skip
+    }
+  }
+
+  // Find overloaded days (more than 8 hours)
+  for (const workload of workloadMap.values()) {
+    for (const [date, hours] of workload.workloadByDay) {
+      if (hours > 8) {
+        workload.overloadedDays.push(date)
+      }
+    }
+  }
+
+  return Array.from(workloadMap.values()).sort((a, b) => b.totalHours - a.totalHours)
+}
+
+// Baseline variance calculation
+interface BaselineVariance {
+  taskId: string
+  taskName: string
+  plannedStart: Date
+  plannedEnd: Date
+  actualStart: Date
+  actualEnd: Date
+  startVarianceDays: number
+  endVarianceDays: number
+  isDelayed: boolean
+  isAhead: boolean
+}
+
+function calculateBaselineVariance(calsticks: CalStick[]): BaselineVariance[] {
+  const variances: BaselineVariance[] = []
+
+  for (const cs of calsticks) {
+    if (!cs.baseline_start_date || !cs.baseline_end_date) continue
+
+    const plannedStart = parseISO(cs.baseline_start_date)
+    const plannedEnd = parseISO(cs.baseline_end_date)
+    const actualStart = cs.calstick_start_date ? parseISO(cs.calstick_start_date) : cs.calstick_date ? parseISO(cs.calstick_date) : null
+
+    if (!actualStart) continue
+
+    const estimatedDays = cs.calstick_estimated_hours ? Math.max(1, Math.ceil(cs.calstick_estimated_hours / 8)) : 1
+    const actualEnd = addDays(actualStart, estimatedDays)
+
+    const startVariance = differenceInDays(actualStart, plannedStart)
+    const endVariance = differenceInDays(actualEnd, plannedEnd)
+
+    variances.push({
+      taskId: cs.id,
+      taskName: cs.content,
+      plannedStart,
+      plannedEnd,
+      actualStart,
+      actualEnd,
+      startVarianceDays: startVariance,
+      endVarianceDays: endVariance,
+      isDelayed: endVariance > 0,
+      isAhead: endVariance < 0,
+    })
+  }
+
+  return variances
+}
+
 interface GanttChartProps {
   readonly calsticks: CalStick[]
   readonly dependencies?: Dependency[]
   readonly onTaskChange?: (taskId: string, startDate: Date, endDate: Date) => Promise<void>
   readonly onDependencyAdd?: (taskId: string, dependsOnId: string) => Promise<void>
+  readonly onRefresh?: () => void
 }
 
-export default function GanttChart({ calsticks, dependencies = [], onTaskChange, onDependencyAdd: _onDependencyAdd }: GanttChartProps) {
+export default function GanttChart({ calsticks, dependencies = [], onTaskChange, onDependencyAdd: _onDependencyAdd, onRefresh }: GanttChartProps) {
   const [viewMode, setViewMode] = useState<ViewMode>(ViewMode.Day)
   const [isUpdating, setIsUpdating] = useState(false)
   const [showCriticalPath, setShowCriticalPath] = useState(false)
   const [showStoryline, setShowStoryline] = useState(false)
   const [accessibilityMode, setAccessibilityMode] = useState(false)
   const [showTableView, setShowTableView] = useState(false)
+  const [showBaseline, setShowBaseline] = useState(false)
+  const [showResourceView, setShowResourceView] = useState(false)
+  const [settingBaseline, setSettingBaseline] = useState(false)
   const [pendingUpdates, setPendingUpdates] = useState<Map<string, { start: Date; end: Date }>>(new Map())
   const [visibleRange, setVisibleRange] = useState({ start: 0, end: 50 })
   const updateTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   const containerRef = useRef<HTMLDivElement>(null)
+  const { toast } = useToast()
 
   const VIRTUAL_PAGE_SIZE = 50
 
@@ -333,6 +452,155 @@ export default function GanttChart({ calsticks, dependencies = [], onTaskChange,
     if (!showStoryline || tasks.length === 0) return []
     return generateStoryline(tasks, dependencies)
   }, [tasks, dependencies, showStoryline])
+
+  const baselineVariances = useMemo(() => {
+    if (!showBaseline) return []
+    return calculateBaselineVariance(calsticks)
+  }, [calsticks, showBaseline])
+
+  const resourceWorkloads = useMemo(() => {
+    if (!showResourceView) return []
+    return calculateResourceWorkload(calsticks)
+  }, [calsticks, showResourceView])
+
+  const hasBaseline = useMemo(() => {
+    return calsticks.some(cs => cs.baseline_set_at)
+  }, [calsticks])
+
+  const handleSetBaseline = async () => {
+    try {
+      setSettingBaseline(true)
+      const response = await fetch("/api/calsticks/baseline", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ setAll: true }),
+      })
+
+      if (!response.ok) {
+        throw new Error("Failed to set baseline")
+      }
+
+      const data = await response.json()
+      toast({
+        title: "Baseline Set",
+        description: data.message,
+      })
+      onRefresh?.()
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to set baseline",
+        variant: "destructive",
+      })
+    } finally {
+      setSettingBaseline(false)
+    }
+  }
+
+  const handleClearBaseline = async () => {
+    try {
+      setSettingBaseline(true)
+      const response = await fetch("/api/calsticks/baseline", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ clearAll: true }),
+      })
+
+      if (!response.ok) {
+        throw new Error("Failed to clear baseline")
+      }
+
+      toast({
+        title: "Baseline Cleared",
+        description: "All baselines have been removed",
+      })
+      setShowBaseline(false)
+      onRefresh?.()
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to clear baseline",
+        variant: "destructive",
+      })
+    } finally {
+      setSettingBaseline(false)
+    }
+  }
+
+  const handleExportPDF = async () => {
+    try {
+      // Dynamic imports with error handling for missing packages
+      let html2canvas: any
+      let jsPDF: any
+
+      try {
+        const html2canvasModule = await import("html2canvas" as any)
+        html2canvas = html2canvasModule.default
+      } catch {
+        toast({
+          title: "Package Missing",
+          description: "Install html2canvas: pnpm add html2canvas",
+          variant: "destructive",
+        })
+        return
+      }
+
+      try {
+        const jspdfModule = await import("jspdf" as any)
+        jsPDF = jspdfModule.jsPDF
+      } catch {
+        toast({
+          title: "Package Missing",
+          description: "Install jspdf: pnpm add jspdf",
+          variant: "destructive",
+        })
+        return
+      }
+
+      const element = containerRef.current
+      if (!element) {
+        toast({
+          title: "Error",
+          description: "Could not find chart to export",
+          variant: "destructive",
+        })
+        return
+      }
+
+      toast({
+        title: "Exporting...",
+        description: "Generating PDF, please wait",
+      })
+
+      const canvas = await html2canvas(element, {
+        scale: 2,
+        useCORS: true,
+        backgroundColor: "#ffffff",
+      })
+
+      const imgData = canvas.toDataURL("image/png")
+      const pdf = new jsPDF({
+        orientation: "landscape",
+        unit: "px",
+        format: [canvas.width, canvas.height],
+      })
+
+      pdf.addImage(imgData, "PNG", 0, 0, canvas.width, canvas.height)
+      pdf.save(`gantt-chart-${format(new Date(), "yyyy-MM-dd")}.pdf`)
+
+      toast({
+        title: "Export Complete",
+        description: "Gantt chart has been exported to PDF",
+      })
+    } catch (error) {
+      console.error("PDF export error:", error)
+      toast({
+        title: "Export Failed",
+        description: "Could not export PDF. Check console for details.",
+        variant: "destructive",
+      })
+    }
+  }
 
   const styledTasks = useMemo(() => {
     const tasksToStyle = tasks.length > VIRTUAL_PAGE_SIZE ? visibleTasks : tasks
@@ -513,6 +781,37 @@ export default function GanttChart({ calsticks, dependencies = [], onTaskChange,
                 Showing {visibleRange.end - visibleRange.start} of {tasks.length} tasks
               </Badge>
             )}
+
+            {/* Baseline buttons */}
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleSetBaseline}
+                  disabled={settingBaseline}
+                  aria-label="Set baseline"
+                >
+                  {settingBaseline ? <Loader2 className="h-4 w-4 animate-spin" /> : <Bookmark className="h-4 w-4" />}
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Set Baseline (snapshot current dates)</TooltipContent>
+            </Tooltip>
+
+            {/* PDF Export */}
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleExportPDF}
+                  aria-label="Export to PDF"
+                >
+                  <FileDown className="h-4 w-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Export to PDF</TooltipContent>
+            </Tooltip>
           </div>
 
           <div className="flex items-center gap-4">
@@ -539,6 +838,33 @@ export default function GanttChart({ calsticks, dependencies = [], onTaskChange,
               <Label htmlFor="storyline" className="flex items-center gap-1 text-sm cursor-pointer">
                 <Flag className="h-4 w-4" />
                 <span className="hidden sm:inline">Storyline</span>
+              </Label>
+            </div>
+
+            <div className="flex items-center space-x-2">
+              <Switch
+                id="baseline"
+                checked={showBaseline}
+                onCheckedChange={setShowBaseline}
+                disabled={!hasBaseline}
+                aria-label="Show baseline comparison"
+              />
+              <Label htmlFor="baseline" className="flex items-center gap-1 text-sm cursor-pointer">
+                <Bookmark className="h-4 w-4" />
+                <span className="hidden sm:inline">Baseline</span>
+              </Label>
+            </div>
+
+            <div className="flex items-center space-x-2">
+              <Switch
+                id="resource-view"
+                checked={showResourceView}
+                onCheckedChange={setShowResourceView}
+                aria-label="Show resource workload"
+              />
+              <Label htmlFor="resource-view" className="flex items-center gap-1 text-sm cursor-pointer">
+                <Users className="h-4 w-4" />
+                <span className="hidden sm:inline">Resources</span>
               </Label>
             </div>
 
@@ -613,6 +939,137 @@ export default function GanttChart({ calsticks, dependencies = [], onTaskChange,
                     {index < storyline.length - 1 && <ChevronRight className="h-5 w-5 mx-1 text-muted-foreground" />}
                   </div>
                 ))}
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Baseline Variance Panel */}
+        {showBaseline && baselineVariances.length > 0 && (
+          <Card>
+            <CardHeader className="py-3">
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-sm font-medium flex items-center gap-2">
+                  <Bookmark className="h-4 w-4" />
+                  Baseline Comparison
+                  <Badge variant="outline">{baselineVariances.length} tasks</Badge>
+                </CardTitle>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={handleClearBaseline}
+                  disabled={settingBaseline}
+                  className="text-xs text-muted-foreground hover:text-destructive"
+                >
+                  Clear Baseline
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent className="py-2">
+              <div className="space-y-2 max-h-48 overflow-y-auto">
+                {baselineVariances.filter(v => v.isDelayed || v.isAhead).slice(0, 10).map((variance) => (
+                  <div
+                    key={variance.taskId}
+                    className={`flex items-center justify-between p-2 rounded text-sm ${
+                      variance.isDelayed ? "bg-red-50 dark:bg-red-950/20" : "bg-green-50 dark:bg-green-950/20"
+                    }`}
+                  >
+                    <span className="truncate max-w-[200px]">{truncateText(variance.taskName, 30)}</span>
+                    <div className="flex items-center gap-2">
+                      {variance.isDelayed && (
+                        <Badge variant="destructive" className="text-xs">
+                          <AlertTriangle className="h-3 w-3 mr-1" />
+                          +{variance.endVarianceDays}d late
+                        </Badge>
+                      )}
+                      {variance.isAhead && (
+                        <Badge variant="default" className="text-xs bg-green-600">
+                          {variance.endVarianceDays}d ahead
+                        </Badge>
+                      )}
+                    </div>
+                  </div>
+                ))}
+                {baselineVariances.filter(v => !v.isDelayed && !v.isAhead).length > 0 && (
+                  <div className="text-xs text-muted-foreground text-center py-1">
+                    {baselineVariances.filter(v => !v.isDelayed && !v.isAhead).length} tasks on schedule
+                  </div>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Resource Workload Panel */}
+        {showResourceView && resourceWorkloads.length > 0 && (
+          <Card>
+            <CardHeader className="py-3">
+              <CardTitle className="text-sm font-medium flex items-center gap-2">
+                <Users className="h-4 w-4" />
+                Resource Workload
+                <Badge variant="outline">{resourceWorkloads.length} resources</Badge>
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="py-2">
+              <div className="space-y-3">
+                {resourceWorkloads.map((workload) => {
+                  const hasOverload = workload.overloadedDays.length > 0
+                  return (
+                    <div key={workload.userId} className="space-y-1">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <Avatar className="h-6 w-6">
+                            <AvatarFallback className="text-xs">
+                              {workload.userName.split(" ").map(n => n[0]).join("").toUpperCase().slice(0, 2)}
+                            </AvatarFallback>
+                          </Avatar>
+                          <span className="text-sm font-medium">{workload.userName}</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs text-muted-foreground">
+                            {Math.round(workload.totalHours)}h total
+                          </span>
+                          {hasOverload && (
+                            <Badge variant="destructive" className="text-xs">
+                              <AlertTriangle className="h-3 w-3 mr-1" />
+                              {workload.overloadedDays.length} overloaded days
+                            </Badge>
+                          )}
+                        </div>
+                      </div>
+                      <div className="flex gap-0.5">
+                        {Array.from(workload.workloadByDay.entries()).slice(0, 14).map(([date, hours]) => (
+                          <Tooltip key={date}>
+                            <TooltipTrigger asChild>
+                              <div
+                                className={`h-4 w-4 rounded-sm ${
+                                  hours > 8 ? "bg-red-500" : hours > 6 ? "bg-orange-400" : hours > 4 ? "bg-yellow-400" : "bg-green-400"
+                                }`}
+                              />
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              {format(parseISO(date), "MMM d")}: {Math.round(hours)}h
+                            </TooltipContent>
+                          </Tooltip>
+                        ))}
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+              <div className="flex items-center gap-4 mt-3 pt-2 border-t text-xs text-muted-foreground">
+                <div className="flex items-center gap-1">
+                  <div className="w-3 h-3 rounded-sm bg-green-400" /> &lt;4h
+                </div>
+                <div className="flex items-center gap-1">
+                  <div className="w-3 h-3 rounded-sm bg-yellow-400" /> 4-6h
+                </div>
+                <div className="flex items-center gap-1">
+                  <div className="w-3 h-3 rounded-sm bg-orange-400" /> 6-8h
+                </div>
+                <div className="flex items-center gap-1">
+                  <div className="w-3 h-3 rounded-sm bg-red-500" /> &gt;8h (overload)
+                </div>
               </div>
             </CardContent>
           </Card>

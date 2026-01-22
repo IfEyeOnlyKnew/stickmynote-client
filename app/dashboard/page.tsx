@@ -5,7 +5,7 @@ import { useState, useEffect } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { StickyNote, Users, FileText, ArrowRight, Share2, AlertCircle, MessagesSquare, Video } from "lucide-react"
+import { StickyNote, Users, FileText, ArrowRight, Share2, MessagesSquare, Video, CalendarCheck } from "lucide-react"
 import { UserMenu } from "@/components/user-menu"
 import { useUser } from "@/contexts/user-context"
 import { useOrganization } from "@/contexts/organization-context"
@@ -180,17 +180,6 @@ export default function DashboardPage() {
                 Go to Paks Hub
                 <ArrowRight className="h-5 w-5 ml-2" />
               </Button>
-              {openCalSticksCount >= 1 && (
-                <div className="mt-3 text-center">
-                  <button
-                    onClick={() => router.push("/calsticks")}
-                    className="text-red-600 hover:text-red-700 font-bold text-lg flex items-center justify-center w-full transition-colors animate-pulse"
-                  >
-                    <AlertCircle className="h-5 w-5 mr-2" />
-                    CalSticks Open
-                  </button>
-                </div>
-              )}
             </CardContent>
           </Card>
 
@@ -321,6 +310,52 @@ export default function DashboardPage() {
               </Button>
             </CardContent>
           </Card>
+
+          {/* CalSticks Hub Section */}
+          <Card className="hover:shadow-xl transition-all duration-300 hover:scale-105 border-2 hover:border-orange-300">
+            <CardHeader className="text-center pb-4">
+              <div className="mx-auto w-16 h-16 bg-orange-100 rounded-full flex items-center justify-center mb-4 relative">
+                <CalendarCheck className="h-8 w-8 text-orange-600" />
+                {openCalSticksCount > 0 && (
+                  <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs font-bold rounded-full min-w-[20px] h-5 flex items-center justify-center px-1">
+                    {openCalSticksCount > 99 ? "99+" : openCalSticksCount}
+                  </span>
+                )}
+              </div>
+              <CardTitle className="text-2xl text-gray-900">CalSticks</CardTitle>
+              <CardDescription className="text-base">
+                Task management with Kanban boards, calendars, and Gantt charts
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-3">
+                <div className="flex items-center text-sm text-gray-600">
+                  <div className="w-2 h-2 bg-orange-500 rounded-full mr-2"></div>
+                  Kanban board with drag-drop
+                </div>
+                <div className="flex items-center text-sm text-gray-600">
+                  <div className="w-2 h-2 bg-orange-500 rounded-full mr-2"></div>
+                  Calendar and Gantt views
+                </div>
+                <div className="flex items-center text-sm text-gray-600">
+                  <div className="w-2 h-2 bg-orange-500 rounded-full mr-2"></div>
+                  WIP limits and swimlanes
+                </div>
+                <div className="flex items-center text-sm text-gray-600">
+                  <div className="w-2 h-2 bg-orange-500 rounded-full mr-2"></div>
+                  Smart capture and auto-schedule
+                </div>
+              </div>
+              <Button
+                onClick={() => router.push("/calsticks")}
+                className="w-full bg-orange-600 hover:bg-orange-700 text-white font-semibold py-3 text-lg"
+                size="lg"
+              >
+                Go to CalSticks
+                <ArrowRight className="h-5 w-5 ml-2" />
+              </Button>
+            </CardContent>
+          </Card>
         </div>
 
         {/* Quick Info Section */}
@@ -346,9 +381,13 @@ export default function DashboardPage() {
               <Video className="h-4 w-4 mr-2" />
               Video: Face-to-Face Meetings
             </Badge>
+            <Badge variant="secondary" className="px-4 py-2">
+              <CalendarCheck className="h-4 w-4 mr-2" />
+              CalSticks: Task Management
+            </Badge>
           </div>
           <p className="text-gray-500 text-sm max-w-3xl mx-auto">
-            You can switch between Notes, Paks, and Social Hub anytime. Each section offers powerful features for
+            You can switch between Notes, Paks, Social Hub, and CalSticks anytime. Each section offers powerful features for
             organizing, collaborating, and engaging with your content and teams.
           </p>
         </div>

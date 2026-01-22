@@ -198,6 +198,7 @@ export function AttachmentPanel({ calstickId }: Readonly<AttachmentPanelProps>) 
         accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.csv,.zip"
         onChange={(e) => e.target.files?.[0] && handleFileUpload(e.target.files[0])}
         className="hidden"
+        aria-label="Upload attachment file"
       />
 
       {/* Attachments List */}

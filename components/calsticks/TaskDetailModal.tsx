@@ -20,6 +20,8 @@ import {
   Repeat,
   Bell,
   User,
+  Target,
+  Hash,
 } from "lucide-react"
 
 // Dynamically import TiptapEditor with SSR disabled
@@ -38,6 +40,7 @@ import { AttachmentPanel } from "@/components/calsticks/AttachmentPanel"
 import { RecurringTaskModal } from "./RecurringTaskModal"
 import { ReminderModal } from "./ReminderModal"
 import type { ChecklistData, TaskProgress } from "@/types/checklist"
+import type { Sprint } from "@/types/sprint"
 
 interface TaskDetailModalProps {
   task: CalStick | null
@@ -80,6 +83,9 @@ export function TaskDetailModal({ task, isOpen, onClose, onSave }: TaskDetailMod
   const [assigneeId, setAssigneeId] = useState<string | null>(null)
   const [members, setMembers] = useState<any[]>([])
   const [editorContent, setEditorContent] = useState("")
+  const [sprintId, setSprintId] = useState<string | null>(null)
+  const [storyPoints, setStoryPoints] = useState<string>("")
+  const [sprints, setSprints] = useState<Sprint[]>([])
 
   useEffect(() => {
     if (!task) return
@@ -103,11 +109,27 @@ export function TaskDetailModal({ task, isOpen, onClose, onSave }: TaskDetailMod
       setTaskProgress(null)
     }
 
+    setSprintId(task.sprint_id || null)
+    setStoryPoints(task.story_points?.toString() || "")
+
     if (task.stick?.pad_id) {
       fetchMembers(task.stick.pad_id)
     }
+    fetchSprints()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [task])
+
+  const fetchSprints = async () => {
+    try {
+      const response = await fetch("/api/calsticks/sprints?includeStats=false")
+      if (response.ok) {
+        const data = await response.json()
+        setSprints(data.sprints || [])
+      }
+    } catch (error) {
+      console.error("Error fetching sprints:", error)
+    }
+  }
 
   const fetchProgress = async () => {
     if (!task || task.id === "new") return
@@ -154,6 +176,8 @@ export function TaskDetailModal({ task, isOpen, onClose, onSave }: TaskDetailMod
             calstick_labels: labels,
             calstick_description: editorContent,
             calstick_assignee_id: assigneeId,
+            sprint_id: sprintId,
+            story_points: storyPoints ? parseInt(storyPoints) : null,
           }),
         })
 
@@ -173,6 +197,8 @@ export function TaskDetailModal({ task, isOpen, onClose, onSave }: TaskDetailMod
           calstick_labels: labels,
           calstick_description: editorContent,
           calstick_assignee_id: assigneeId,
+          sprint_id: sprintId,
+          story_points: storyPoints ? parseInt(storyPoints) : null,
         } as Partial<CalStick>)
       }
       onClose()
@@ -346,16 +372,58 @@ export function TaskDetailModal({ task, isOpen, onClose, onSave }: TaskDetailMod
                 </div>
               </div>
 
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="estimated">Estimated Hours</Label>
+                  <Input
+                    id="estimated"
+                    type="number"
+                    step="0.5"
+                    value={estimatedHours}
+                    onChange={(e) => setEstimatedHours(e.target.value)}
+                    placeholder="0"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="story-points">Story Points</Label>
+                  <Input
+                    id="story-points"
+                    type="number"
+                    min={0}
+                    max={100}
+                    value={storyPoints}
+                    onChange={(e) => setStoryPoints(e.target.value)}
+                    placeholder="e.g., 1, 2, 3, 5, 8, 13"
+                  />
+                </div>
+              </div>
+
               <div className="space-y-2">
-                <Label htmlFor="estimated">Estimated Hours</Label>
-                <Input
-                  id="estimated"
-                  type="number"
-                  step="0.5"
-                  value={estimatedHours}
-                  onChange={(e) => setEstimatedHours(e.target.value)}
-                  placeholder="0"
-                />
+                <Label htmlFor="sprint">Sprint</Label>
+                <Select
+                  value={sprintId || "backlog"}
+                  onValueChange={(val) => setSprintId(val === "backlog" ? null : val)}
+                >
+                  <SelectTrigger id="sprint">
+                    <div className="flex items-center gap-2">
+                      <Target className="h-4 w-4 text-muted-foreground" />
+                      <SelectValue placeholder="Select sprint" />
+                    </div>
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="backlog">Backlog (No Sprint)</SelectItem>
+                    {sprints.map((sprint) => (
+                      <SelectItem key={sprint.id} value={sprint.id}>
+                        <div className="flex items-center gap-2">
+                          {sprint.name}
+                          <Badge variant={sprint.status === "active" ? "default" : "secondary"} className="text-xs">
+                            {sprint.status}
+                          </Badge>
+                        </div>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
 
               <div className="space-y-2">

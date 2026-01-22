@@ -193,6 +193,7 @@ export function CalendarView({
                         className="text-xs p-1 rounded cursor-pointer hover:shadow-sm transition-shadow truncate w-full text-left"
                         style={{ backgroundColor: cs.color + "20", borderLeft: `3px solid ${cs.color}` }}
                         onClick={() => onStickClick(cs)}
+                        aria-label={`Open task: ${cs.content || cs.stick?.topic || "Untitled"}`}
                       >
                         <div className="flex items-center gap-1">
                           <button
@@ -201,6 +202,7 @@ export function CalendarView({
                               e.stopPropagation()
                               onToggleComplete(cs.id, cs.calstick_completed)
                             }}
+                            aria-label={cs.calstick_completed ? "Mark task as incomplete" : "Mark task as complete"}
                           >
                             {cs.calstick_completed ? (
                               <CheckCircle2 className="h-3 w-3 text-green-600 flex-shrink-0" />
