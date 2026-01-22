@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useCallback, useRef } from "react"
 import { Button } from "@/components/ui/button"
 import {
   Dialog,
@@ -16,9 +16,28 @@ import { Badge } from "@/components/ui/badge"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { UserPlus, Trash2, Shield, FileText, Mail, Clock } from "lucide-react"
+import { UserPlus, Trash2, Shield, FileText, Mail, Clock, Search, Users, Loader2, Building2 } from "lucide-react"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { CsvEmailUpload } from "@/components/csv-email-upload"
+import { ScrollArea } from "@/components/ui/scroll-area"
+
+// LDAP search result type
+interface LDAPUser {
+  id: string | null
+  username: string | null
+  email: string | null
+  full_name: string | null
+  source: "ldap" | "database"
+  dn?: string
+}
+
+// AD Group type
+interface ADGroup {
+  dn: string
+  name: string
+  description: string
+  memberCount: number
+}
 
 interface Member {
   id: string
@@ -61,6 +80,22 @@ export function ManageMembersDialog({ open, onOpenChange, padId, padName }: Mana
   const [bulkEmails, setBulkEmails] = useState("")
   const [feedbackMessage, setFeedbackMessage] = useState<{ type: "success" | "error"; text: string } | null>(null)
 
+  // LDAP Search state
+  const [ldapSearchResults, setLdapSearchResults] = useState<LDAPUser[]>([])
+  const [ldapSearching, setLdapSearching] = useState(false)
+  const [showLdapDropdown, setShowLdapDropdown] = useState(false)
+  const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+  const searchContainerRef = useRef<HTMLDivElement>(null)
+
+  // AD Group Search state
+  const [groupSearchQuery, setGroupSearchQuery] = useState("")
+  const [adGroups, setAdGroups] = useState<ADGroup[]>([])
+  const [groupSearching, setGroupSearching] = useState(false)
+  const [showGroupDropdown, setShowGroupDropdown] = useState(false)
+  const [invitingGroup, setInvitingGroup] = useState(false)
+  const groupSearchTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+  const groupSearchContainerRef = useRef<HTMLDivElement>(null)
+
   useEffect(() => {
     if (open && padId) {
       fetchMembers()
@@ -68,6 +103,138 @@ export function ManageMembersDialog({ open, onOpenChange, padId, padName }: Mana
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, padId])
+
+  // Close dropdowns when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (searchContainerRef.current && !searchContainerRef.current.contains(event.target as Node)) {
+        setShowLdapDropdown(false)
+      }
+      if (groupSearchContainerRef.current && !groupSearchContainerRef.current.contains(event.target as Node)) {
+        setShowGroupDropdown(false)
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside)
+    return () => document.removeEventListener("mousedown", handleClickOutside)
+  }, [])
+
+  // LDAP User Search
+  const searchLdapUsers = useCallback(async (query: string) => {
+    if (query.length < 2) {
+      setLdapSearchResults([])
+      setShowLdapDropdown(false)
+      return
+    }
+
+    setLdapSearching(true)
+    try {
+      const response = await fetch(`/api/user-search?query=${encodeURIComponent(query)}&limit=10&source=both`)
+      if (response.ok) {
+        const results = await response.json()
+        setLdapSearchResults(results)
+        setShowLdapDropdown(results.length > 0)
+      }
+    } catch (error) {
+      console.error("LDAP search error:", error)
+    } finally {
+      setLdapSearching(false)
+    }
+  }, [])
+
+  // Debounced search handler
+  const handleEmailInputChange = useCallback((value: string) => {
+    setInviteEmail(value)
+
+    if (searchTimeoutRef.current) {
+      clearTimeout(searchTimeoutRef.current)
+    }
+
+    searchTimeoutRef.current = setTimeout(() => {
+      searchLdapUsers(value)
+    }, 300)
+  }, [searchLdapUsers])
+
+  // Select user from LDAP search
+  const handleSelectLdapUser = useCallback((user: LDAPUser) => {
+    if (user.email) {
+      setInviteEmail(user.email)
+    }
+    setShowLdapDropdown(false)
+    setLdapSearchResults([])
+  }, [])
+
+  // AD Group Search
+  const searchAdGroups = useCallback(async (query: string) => {
+    if (query.length < 2) {
+      setAdGroups([])
+      setShowGroupDropdown(false)
+      return
+    }
+
+    setGroupSearching(true)
+    try {
+      const response = await fetch(`/api/ad-groups/search?query=${encodeURIComponent(query)}&limit=10`)
+      if (response.ok) {
+        const data = await response.json()
+        setAdGroups(data.groups || [])
+        setShowGroupDropdown(data.groups?.length > 0)
+      }
+    } catch (error) {
+      console.error("AD group search error:", error)
+    } finally {
+      setGroupSearching(false)
+    }
+  }, [])
+
+  // Debounced group search
+  const handleGroupSearchChange = useCallback((value: string) => {
+    setGroupSearchQuery(value)
+
+    if (groupSearchTimeoutRef.current) {
+      clearTimeout(groupSearchTimeoutRef.current)
+    }
+
+    groupSearchTimeoutRef.current = setTimeout(() => {
+      searchAdGroups(value)
+    }, 300)
+  }, [searchAdGroups])
+
+  // Invite all members of an AD group
+  const handleInviteGroup = useCallback(async (group: ADGroup) => {
+    setInvitingGroup(true)
+    setShowGroupDropdown(false)
+    setFeedbackMessage(null)
+
+    try {
+      const response = await fetch(`/api/social-pads/${padId}/members/ad-group`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          groupDn: group.dn,
+          role: inviteRole,
+        }),
+      })
+
+      const data = await response.json()
+
+      if (response.ok) {
+        setGroupSearchQuery("")
+        setFeedbackMessage({
+          type: "success",
+          text: data.message || `Successfully invited ${data.added || 0} members from group "${group.name}"`,
+        })
+        fetchMembers()
+        fetchPendingInvites()
+      } else {
+        setFeedbackMessage({ type: "error", text: data.error || "Failed to invite group members" })
+      }
+    } catch (error) {
+      console.error("Error inviting group:", error)
+      setFeedbackMessage({ type: "error", text: "Failed to invite group members" })
+    } finally {
+      setInvitingGroup(false)
+    }
+  }, [padId, inviteRole])
 
   const fetchMembers = async () => {
     try {
@@ -350,8 +517,9 @@ export function ManageMembersDialog({ open, onOpenChange, padId, padName }: Mana
         )}
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="grid w-full grid-cols-2">
+          <TabsList className="grid w-full grid-cols-3">
             <TabsTrigger value="invite">Invite Members</TabsTrigger>
+            <TabsTrigger value="groups">AD Groups</TabsTrigger>
             <TabsTrigger value="bulk">Bulk Upload</TabsTrigger>
           </TabsList>
 
@@ -361,19 +529,61 @@ export function ManageMembersDialog({ open, onOpenChange, padId, padName }: Mana
                 <h3 className="font-semibold flex items-center gap-2">
                   <UserPlus className="h-4 w-4" />
                   Invite Member by Email
+                  <Badge variant="outline" className="text-xs">LDAP Search</Badge>
                 </h3>
                 <div className="flex gap-2">
-                  <Input
-                    placeholder="Enter email address"
-                    value={inviteEmail}
-                    onChange={(e) => setInviteEmail(e.target.value)}
-                    type="email"
-                    onKeyPress={(e) => {
-                      if (e.key === "Enter") {
-                        handleInviteMember()
-                      }
-                    }}
-                  />
+                  <div className="relative flex-1" ref={searchContainerRef}>
+                    <div className="relative">
+                      <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                      <Input
+                        placeholder="Search by name or enter email..."
+                        value={inviteEmail}
+                        onChange={(e) => handleEmailInputChange(e.target.value)}
+                        onFocus={() => ldapSearchResults.length > 0 && setShowLdapDropdown(true)}
+                        onKeyPress={(e) => {
+                          if (e.key === "Enter") {
+                            setShowLdapDropdown(false)
+                            handleInviteMember()
+                          }
+                        }}
+                        className="pl-9"
+                      />
+                      {ldapSearching && (
+                        <Loader2 className="absolute right-3 top-1/2 transform -translate-y-1/2 h-4 w-4 animate-spin text-gray-400" />
+                      )}
+                    </div>
+
+                    {/* LDAP Search Results Dropdown */}
+                    {showLdapDropdown && ldapSearchResults.length > 0 && (
+                      <div className="absolute z-50 w-full mt-1 bg-white border rounded-md shadow-lg max-h-64 overflow-hidden">
+                        <ScrollArea className="max-h-64">
+                          {ldapSearchResults.map((user, idx) => (
+                            <button
+                              key={user.email || idx}
+                              type="button"
+                              className="w-full px-3 py-2 text-left hover:bg-gray-100 flex items-center gap-3 border-b last:border-b-0"
+                              onClick={() => handleSelectLdapUser(user)}
+                            >
+                              <Avatar className="h-8 w-8">
+                                <AvatarFallback className="text-xs">
+                                  {(user.full_name || user.username || user.email || "??").substring(0, 2).toUpperCase()}
+                                </AvatarFallback>
+                              </Avatar>
+                              <div className="flex-1 min-w-0">
+                                <p className="font-medium text-sm truncate">
+                                  {user.full_name || user.username || "Unknown"}
+                                </p>
+                                <p className="text-xs text-gray-500 truncate">{user.email}</p>
+                              </div>
+                              <Badge variant="outline" className="text-xs shrink-0">
+                                {user.source === "ldap" ? "AD" : "DB"}
+                              </Badge>
+                            </button>
+                          ))}
+                        </ScrollArea>
+                      </div>
+                    )}
+                  </div>
                   <Select
                     value={inviteRole}
                     onValueChange={(value) => setInviteRole(value as "admin" | "editor" | "viewer")}
@@ -402,7 +612,7 @@ export function ManageMembersDialog({ open, onOpenChange, padId, padName }: Mana
                     <strong>Viewer:</strong> Can only reply to sticks (read-only for pad/stick content)
                   </p>
                   <p className="text-xs text-purple-600 mt-2">
-                    💡 If the user doesn&apos;t have an account, they&apos;ll receive an email invitation to sign up.
+                    💡 Start typing a name to search Active Directory, or enter an email directly.
                   </p>
                 </div>
               </div>
@@ -514,6 +724,95 @@ export function ManageMembersDialog({ open, onOpenChange, padId, padName }: Mana
                 </div>
               )}
             </div>
+          </TabsContent>
+
+          <TabsContent value="groups" className="space-y-4">
+            {isOwner ? (
+              <div className="space-y-4">
+                <div className="space-y-4 border-b pb-4">
+                  <h3 className="font-semibold flex items-center gap-2">
+                    <Building2 className="h-4 w-4" />
+                    Invite AD Group Members
+                    <Badge variant="outline" className="text-xs">Active Directory</Badge>
+                  </h3>
+
+                  <div className="space-y-2">
+                    <Label>Select Role for Group Members</Label>
+                    <Select
+                      value={inviteRole}
+                      onValueChange={(value) => setInviteRole(value as "admin" | "editor" | "viewer")}
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="viewer">Viewer</SelectItem>
+                        <SelectItem value="editor">Editor</SelectItem>
+                        <SelectItem value="admin">Admin</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="relative" ref={groupSearchContainerRef}>
+                    <div className="relative">
+                      <Users className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                      <Input
+                        placeholder="Search AD groups by name..."
+                        value={groupSearchQuery}
+                        onChange={(e) => handleGroupSearchChange(e.target.value)}
+                        onFocus={() => adGroups.length > 0 && setShowGroupDropdown(true)}
+                        className="pl-9"
+                        disabled={invitingGroup}
+                      />
+                      {(groupSearching || invitingGroup) && (
+                        <Loader2 className="absolute right-3 top-1/2 transform -translate-y-1/2 h-4 w-4 animate-spin text-gray-400" />
+                      )}
+                    </div>
+
+                    {/* AD Group Search Results Dropdown */}
+                    {showGroupDropdown && adGroups.length > 0 && (
+                      <div className="absolute z-50 w-full mt-1 bg-white border rounded-md shadow-lg max-h-64 overflow-hidden">
+                        <ScrollArea className="max-h-64">
+                          {adGroups.map((group) => (
+                            <button
+                              key={group.dn}
+                              type="button"
+                              className="w-full px-3 py-3 text-left hover:bg-gray-100 border-b last:border-b-0"
+                              onClick={() => handleInviteGroup(group)}
+                              disabled={invitingGroup}
+                            >
+                              <div className="flex items-center gap-3">
+                                <div className="h-10 w-10 rounded-full bg-blue-100 flex items-center justify-center">
+                                  <Users className="h-5 w-5 text-blue-600" />
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                  <p className="font-medium text-sm">{group.name}</p>
+                                  {group.description && (
+                                    <p className="text-xs text-gray-500 truncate">{group.description}</p>
+                                  )}
+                                </div>
+                                <Badge variant="secondary" className="shrink-0">
+                                  {group.memberCount} members
+                                </Badge>
+                              </div>
+                            </button>
+                          ))}
+                        </ScrollArea>
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="text-sm text-gray-600 space-y-1">
+                    <p>Search for an Active Directory group to invite all its members at once.</p>
+                    <p className="text-xs text-purple-600 mt-2">
+                      💡 All group members will be invited with the selected role. Existing members will be skipped.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="text-center py-8 text-gray-500">Only the pad owner can invite members</div>
+            )}
           </TabsContent>
 
           <TabsContent value="bulk" className="space-y-4">

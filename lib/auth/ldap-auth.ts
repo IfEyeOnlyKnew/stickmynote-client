@@ -759,3 +759,263 @@ async function searchAllLDAPUsers(
     })
   })
 }
+
+// ============================================================================
+// AD Group Search
+// ============================================================================
+
+export interface ADGroup {
+  dn: string
+  name: string
+  description: string
+  memberCount: number
+}
+
+interface ADGroupSearchEntry {
+  pojo: {
+    objectName: string
+    attributes: Array<{ type: string; values: string[] }>
+  }
+}
+
+/**
+ * Search Active Directory for groups matching a query string.
+ * Searches by group name (cn) and description.
+ */
+export async function searchADGroups(
+  query: string,
+  limit: number = 10
+): Promise<{ success: boolean; groups?: ADGroup[]; error?: string }> {
+  if (isBuildTime) {
+    return { success: false, error: "LDAP not available during build" }
+  }
+
+  if (!query || query.length < 2) {
+    return { success: true, groups: [] }
+  }
+
+  const config = getLDAPConfig()
+  const client = await createLDAPClient(config.url)
+
+  try {
+    // Bind with service account
+    await bindLDAP(client, config.bindDN, config.bindPassword)
+
+    // Build search filter for groups
+    // Search by cn (common name) and description
+    const escapedQuery = query.replace(/[\\*()]/g, (char) => `\\${char}`)
+    const searchFilter = `(&(objectClass=group)(|(cn=*${escapedQuery}*)(description=*${escapedQuery}*)))`
+
+    const groups = await searchADGroupsInternal(client, config, searchFilter, limit)
+
+    safeUnbind(client)
+    return { success: true, groups }
+  } catch (error) {
+    console.error("[LDAP] Group search error:", error)
+    safeUnbind(client)
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Search failed",
+    }
+  }
+}
+
+async function searchADGroupsInternal(
+  client: any,
+  config: LDAPConfig,
+  searchFilter: string,
+  limit: number
+): Promise<ADGroup[]> {
+  return new Promise((resolve, reject) => {
+    const opts = {
+      filter: searchFilter,
+      scope: "sub" as const,
+      attributes: ["dn", "cn", "description", "member"],
+      sizeLimit: limit,
+    }
+
+    console.log(`[LDAP] Searching groups with filter: ${searchFilter}`)
+
+    client.search(config.baseDN, opts, (err: Error | null, res: any) => {
+      if (err) {
+        console.error("[LDAP] Group search error:", err.message)
+        reject(err)
+        return
+      }
+
+      const groups: ADGroup[] = []
+
+      res.on("searchEntry", (entry: ADGroupSearchEntry) => {
+        try {
+          const { objectName, attributes } = entry.pojo
+          const cn = attributes.find((a) => a.type === "cn")?.values[0] || ""
+          const description = attributes.find((a) => a.type === "description")?.values[0] || ""
+          const members = attributes.find((a) => a.type === "member")?.values || []
+
+          groups.push({
+            dn: objectName || "",
+            name: cn,
+            description,
+            memberCount: members.length,
+          })
+        } catch (parseErr) {
+          console.warn("[LDAP] Error parsing group entry:", parseErr)
+        }
+      })
+
+      res.on("error", (searchErr: Error) => {
+        // Size limit exceeded is not a fatal error - we still have results
+        if (searchErr.message?.includes("Size Limit Exceeded")) {
+          console.log("[LDAP] Group search size limit reached, returning partial results")
+          resolve(groups)
+        } else {
+          reject(searchErr)
+        }
+      })
+
+      res.on("end", () => {
+        console.log(`[LDAP] Group search complete, found ${groups.length} groups`)
+        resolve(groups)
+      })
+    })
+  })
+}
+
+/**
+ * Get all members of an AD group by group DN.
+ * Returns user objects with email addresses.
+ */
+export async function getADGroupMembers(
+  groupDn: string
+): Promise<{ success: boolean; members?: LDAPSearchResult[]; error?: string }> {
+  if (isBuildTime) {
+    return { success: false, error: "LDAP not available during build" }
+  }
+
+  if (!groupDn) {
+    return { success: false, error: "Group DN is required" }
+  }
+
+  const config = getLDAPConfig()
+  const client = await createLDAPClient(config.url)
+
+  try {
+    // Bind with service account
+    await bindLDAP(client, config.bindDN, config.bindPassword)
+
+    // First, get the group's member attribute
+    const groupMembers = await getGroupMemberDNs(client, groupDn)
+
+    if (groupMembers.length === 0) {
+      safeUnbind(client)
+      return { success: true, members: [] }
+    }
+
+    // For each member DN, look up the user details
+    const members: LDAPSearchResult[] = []
+
+    for (const memberDn of groupMembers) {
+      try {
+        const user = await getUserByDn(client, config, memberDn)
+        if (user && user.email) {
+          members.push(user)
+        }
+      } catch (err) {
+        console.warn(`[LDAP] Could not fetch user ${memberDn}:`, err)
+      }
+    }
+
+    safeUnbind(client)
+    return { success: true, members }
+  } catch (error) {
+    console.error("[LDAP] Get group members error:", error)
+    safeUnbind(client)
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Failed to get group members",
+    }
+  }
+}
+
+async function getGroupMemberDNs(client: any, groupDn: string): Promise<string[]> {
+  return new Promise((resolve, reject) => {
+    const opts = {
+      filter: "(objectClass=*)",
+      scope: "base" as const,
+      attributes: ["member"],
+    }
+
+    client.search(groupDn, opts, (err: Error | null, res: any) => {
+      if (err) {
+        reject(err)
+        return
+      }
+
+      let memberDns: string[] = []
+
+      res.on("searchEntry", (entry: ADGroupSearchEntry) => {
+        const members = entry.pojo.attributes.find((a) => a.type === "member")?.values || []
+        memberDns = members
+      })
+
+      res.on("error", (searchErr: Error) => {
+        reject(searchErr)
+      })
+
+      res.on("end", () => {
+        console.log(`[LDAP] Found ${memberDns.length} members in group`)
+        resolve(memberDns)
+      })
+    })
+  })
+}
+
+async function getUserByDn(
+  client: any,
+  config: LDAPConfig,
+  userDn: string
+): Promise<LDAPSearchResult | null> {
+  return new Promise((resolve, reject) => {
+    const opts = {
+      filter: "(objectClass=user)",
+      scope: "base" as const,
+      attributes: [...LDAP_SEARCH_ATTRIBUTES],
+    }
+
+    client.search(userDn, opts, (err: Error | null, res: any) => {
+      if (err) {
+        reject(err)
+        return
+      }
+
+      let user: LDAPSearchResult | null = null
+
+      res.on("searchEntry", (entry: LDAPSearchEntry) => {
+        try {
+          const ldapUser = parseSearchEntry(entry)
+          if (ldapUser.mail || ldapUser.userPrincipalName) {
+            user = {
+              dn: ldapUser.dn,
+              sAMAccountName: ldapUser.sAMAccountName,
+              email: ldapUser.mail || ldapUser.userPrincipalName,
+              displayName: ldapUser.displayName,
+              givenName: ldapUser.givenName,
+              surname: ldapUser.sn,
+            }
+          }
+        } catch (parseErr) {
+          console.warn("[LDAP] Error parsing user entry:", parseErr)
+        }
+      })
+
+      res.on("error", () => {
+        // Ignore errors for individual user lookups
+        resolve(null)
+      })
+
+      res.on("end", () => {
+        resolve(user)
+      })
+    })
+  })
+}
