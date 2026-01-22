@@ -19,6 +19,7 @@ import {
   Calendar,
   ChevronDown,
   ChevronRight,
+  ChevronLeft,
   User,
   Plus,
   Eye,
@@ -33,7 +34,11 @@ import {
   ArrowRight,
   ExternalLink,
   Shield,
+  LayoutList,
+  Clock,
+  CheckCircle2,
 } from "lucide-react"
+import { REPLY_CATEGORIES } from "@/components/social/reply-modal"
 import { BreadcrumbNav } from "@/components/breadcrumb-nav"
 import { UserMenu } from "@/components/user-menu"
 import { formatDistanceToNow } from "date-fns"
@@ -184,6 +189,7 @@ interface Reply {
   id: string
   content: string
   color: string
+  category?: string
   created_at: string
   calstick_id?: string | null
   promoted_at?: string | null
@@ -238,6 +244,63 @@ const StickTableRow = React.memo(function StickTableRow({
 }: StickTableRowProps) {
   const router = useRouter()
   const [chatModalOpen, setChatModalOpen] = useState(false)
+  const [viewMode, setViewMode] = useState<'grouped' | 'timeline'>('grouped')
+  const [selectedCategory, setSelectedCategory] = useState<string | null>(null)
+  const categoryTabsRef = useRef<HTMLDivElement>(null)
+
+  // Calculate category counts
+  const categoryCounts = React.useMemo(() => {
+    const counts = new Map<string, number>()
+    if (replies) {
+      for (const reply of replies) {
+        const cat = reply.category || "Default"
+        counts.set(cat, (counts.get(cat) || 0) + 1)
+      }
+    }
+    return counts
+  }, [replies])
+
+  // Filter replies by selected category
+  const filteredReplies = React.useMemo(() => {
+    if (!replies) return []
+    if (!selectedCategory) return replies
+    return replies.filter(r => (r.category || "Default") === selectedCategory)
+  }, [replies, selectedCategory])
+
+  // Group replies by category
+  const groupedReplies = React.useMemo(() => {
+    const grouped = new Map<string, Reply[]>()
+    for (const reply of filteredReplies) {
+      const cat = reply.category || "Default"
+      if (!grouped.has(cat)) grouped.set(cat, [])
+      grouped.get(cat)!.push(reply)
+    }
+    return grouped
+  }, [filteredReplies])
+
+  // Sort replies chronologically for timeline
+  const timelineSortedReplies = React.useMemo(() => {
+    return [...filteredReplies].sort((a, b) =>
+      new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+    )
+  }, [filteredReplies])
+
+  // Detect milestones for timeline
+  const getMilestone = useCallback((reply: Reply, index: number): { type: string; label: string } | null => {
+    if (index === 0) return { type: 'first', label: 'First Reply' }
+    if (reply.category === 'Answer') return { type: 'answer', label: 'Answer Posted' }
+    if (reply.category === 'Status Update') return { type: 'status', label: 'Status Update' }
+    return null
+  }, [])
+
+  const scrollCategoryTabs = useCallback((direction: 'left' | 'right') => {
+    if (categoryTabsRef.current) {
+      categoryTabsRef.current.scrollBy({
+        left: direction === 'left' ? -150 : 150,
+        behavior: 'smooth'
+      })
+    }
+  }, [])
 
   const handleRowClick = useCallback(() => {
     onToggle(stick.id)
@@ -334,58 +397,236 @@ const StickTableRow = React.memo(function StickTableRow({
         <TableRow>
           <TableCell colSpan={9} className="bg-gray-50">
             <div className="py-4 px-6">
-              <h4 className="font-semibold mb-3 flex items-center gap-2">
-                <MessageSquare className="h-4 w-4" />
-                Replies ({replies?.length || 0})
-              </h4>
-              {replies && replies.length > 0 ? (
-                <div className="space-y-3">
-                  {replies.map((reply) => (
-                    <Card
-                      key={reply.id}
-                      className="p-4"
-                      style={{ borderLeftWidth: "3px", borderLeftColor: reply.color }}
+              {/* Header with view toggle */}
+              <div className="flex items-center justify-between mb-3">
+                <h4 className="font-semibold flex items-center gap-2">
+                  <MessageSquare className="h-4 w-4" />
+                  Replies ({replies?.length || 0})
+                </h4>
+                {replies && replies.length > 0 && (
+                  <div className="flex items-center bg-gray-100 rounded-lg p-0.5">
+                    <button
+                      type="button"
+                      onClick={() => setViewMode('grouped')}
+                      className={`px-2 py-1 text-xs font-medium rounded transition-all flex items-center gap-1 ${
+                        viewMode === 'grouped'
+                          ? 'bg-white text-gray-900 shadow-sm'
+                          : 'text-gray-600 hover:text-gray-900'
+                      }`}
                     >
-                      <div className="flex items-start justify-between gap-4">
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm mb-2">{reply.content}</p>
-                          <div className="flex items-center gap-3 text-xs text-gray-500">
-                            <div className="flex items-center gap-1">
-                              <User className="h-3 w-3" />
-                              {reply.users?.full_name || reply.users?.email || "Unknown"}
+                      <LayoutList className="h-3 w-3" />
+                      Grouped
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setViewMode('timeline')}
+                      className={`px-2 py-1 text-xs font-medium rounded transition-all flex items-center gap-1 ${
+                        viewMode === 'timeline'
+                          ? 'bg-white text-gray-900 shadow-sm'
+                          : 'text-gray-600 hover:text-gray-900'
+                      }`}
+                    >
+                      <Clock className="h-3 w-3" />
+                      Timeline
+                    </button>
+                  </div>
+                )}
+              </div>
+
+              {/* Category Tabs */}
+              {replies && replies.length > 0 && categoryCounts.size > 0 && (
+                <div className="relative mb-4">
+                  <button
+                    type="button"
+                    onClick={() => scrollCategoryTabs('left')}
+                    className="absolute left-0 top-1/2 -translate-y-1/2 z-10 bg-white/90 shadow rounded-full p-0.5 hover:bg-gray-100"
+                    title="Scroll left"
+                    aria-label="Scroll left"
+                  >
+                    <ChevronLeft className="h-3 w-3" />
+                  </button>
+                  <div
+                    ref={categoryTabsRef}
+                    className="flex items-center gap-1.5 overflow-x-auto px-6 py-1"
+                    style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
+                  >
+                    <button
+                      type="button"
+                      onClick={() => setSelectedCategory(null)}
+                      className={`px-3 py-1 rounded text-xs font-medium whitespace-nowrap transition-all border ${
+                        selectedCategory === null
+                          ? 'bg-purple-600 text-white border-purple-600'
+                          : 'bg-white text-gray-700 border-gray-200 hover:border-purple-300'
+                      }`}
+                    >
+                      All ({replies.length})
+                    </button>
+                    {Array.from(categoryCounts.entries()).map(([category, count]) => (
+                      <button
+                        type="button"
+                        key={category}
+                        onClick={() => setSelectedCategory(category)}
+                        className={`px-3 py-1 rounded text-xs font-medium whitespace-nowrap transition-all border ${
+                          selectedCategory === category
+                            ? 'bg-purple-600 text-white border-purple-600'
+                            : 'bg-white text-gray-700 border-gray-200 hover:border-purple-300'
+                        }`}
+                      >
+                        {category} ({count})
+                      </button>
+                    ))}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => scrollCategoryTabs('right')}
+                    className="absolute right-0 top-1/2 -translate-y-1/2 z-10 bg-white/90 shadow rounded-full p-0.5 hover:bg-gray-100"
+                    title="Scroll right"
+                    aria-label="Scroll right"
+                  >
+                    <ChevronRight className="h-3 w-3" />
+                  </button>
+                </div>
+              )}
+
+              {/* Grouped View */}
+              {replies && replies.length > 0 && viewMode === 'grouped' ? (
+                <div className="space-y-4">
+                  {Array.from(groupedReplies.entries()).map(([category, categoryReplies]) => (
+                    <div key={category}>
+                      <h5 className="text-sm font-medium text-gray-700 mb-2 flex items-center gap-2">
+                        {category}
+                        <Badge variant="outline" className="text-xs">{categoryReplies.length}</Badge>
+                      </h5>
+                      <div className="space-y-2">
+                        {categoryReplies.map((reply) => (
+                          <Card
+                            key={reply.id}
+                            className="p-3"
+                            style={{ borderLeftWidth: "3px", borderLeftColor: reply.color }}
+                          >
+                            <div className="flex items-start justify-between gap-4">
+                              <div className="flex-1 min-w-0">
+                                <p className="text-sm mb-2">{reply.content}</p>
+                                <div className="flex items-center gap-3 text-xs text-gray-500">
+                                  <div className="flex items-center gap-1">
+                                    <User className="h-3 w-3" />
+                                    {reply.users?.full_name || reply.users?.email || "Unknown"}
+                                  </div>
+                                  <div className="flex items-center gap-1">
+                                    <Calendar className="h-3 w-3" />
+                                    {formatDistanceToNow(new Date(reply.created_at), { addSuffix: true })}
+                                  </div>
+                                  {reply.category && (
+                                    <Badge variant="secondary" className="text-xs">{reply.category}</Badge>
+                                  )}
+                                </div>
+                              </div>
+                              <div className="flex-shrink-0">
+                                {reply.calstick_id ? (
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => onNavigateToCalstick(reply.calstick_id!)}
+                                    title="View in CalSticks"
+                                    className="text-green-600 hover:text-green-700 hover:bg-green-50"
+                                  >
+                                    <ExternalLink className="h-4 w-4" />
+                                  </Button>
+                                ) : (
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => onPromoteReply(stick.id, stick.topic, stick.content || '', reply.id, reply.content)}
+                                    title="Promote this reply to CalStick"
+                                    className="text-purple-600 hover:text-purple-700 hover:bg-purple-50"
+                                  >
+                                    <ArrowRight className="h-4 w-4" />
+                                  </Button>
+                                )}
+                              </div>
                             </div>
-                            <div className="flex items-center gap-1">
-                              <Calendar className="h-3 w-3" />
-                              {formatDistanceToNow(new Date(reply.created_at), { addSuffix: true })}
+                          </Card>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : replies && replies.length > 0 && viewMode === 'timeline' ? (
+                /* Timeline View */
+                <div className="relative">
+                  <div className="absolute left-3 top-0 bottom-0 w-0.5 bg-gray-200" />
+                  <div className="space-y-3">
+                    {timelineSortedReplies.map((reply, index) => {
+                      const milestone = getMilestone(reply, index)
+                      const replyDate = new Date(reply.created_at)
+                      const prevDate = index > 0 ? new Date(timelineSortedReplies[index - 1].created_at) : null
+                      const showDateHeader = !prevDate || replyDate.toDateString() !== prevDate.toDateString()
+
+                      return (
+                        <div key={reply.id}>
+                          {showDateHeader && (
+                            <div className="flex items-center gap-2 mb-2 ml-6">
+                              <span className="text-xs font-medium text-gray-500 bg-gray-100 px-2 py-0.5 rounded">
+                                {replyDate.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}
+                              </span>
+                            </div>
+                          )}
+                          <div className="relative flex items-start gap-3">
+                            <div className={`relative z-10 w-6 h-6 rounded-full flex items-center justify-center ${
+                              milestone ? 'bg-purple-100 border-2 border-purple-400' : 'bg-white border-2 border-gray-300'
+                            }`}>
+                              {milestone?.type === 'first' && <MessageSquare className="h-3 w-3 text-purple-600" />}
+                              {milestone?.type === 'answer' && <CheckCircle2 className="h-3 w-3 text-green-600" />}
+                              {milestone?.type === 'status' && <Clock className="h-3 w-3 text-blue-600" />}
+                              {!milestone && <div className="w-1.5 h-1.5 rounded-full bg-gray-400" />}
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              {milestone && (
+                                <Badge variant="secondary" className="text-xs bg-purple-100 text-purple-700 mb-1">
+                                  {milestone.label}
+                                </Badge>
+                              )}
+                              <Card className="p-3" style={{ borderLeftWidth: "3px", borderLeftColor: reply.color }}>
+                                <div className="flex items-start justify-between gap-4">
+                                  <div className="flex-1 min-w-0">
+                                    <p className="text-sm mb-2">{reply.content}</p>
+                                    <div className="flex items-center gap-3 text-xs text-gray-500">
+                                      <span>{reply.users?.full_name || reply.users?.email || "Unknown"}</span>
+                                      <span>{replyDate.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}</span>
+                                      {reply.category && <Badge variant="outline" className="text-xs">{reply.category}</Badge>}
+                                    </div>
+                                  </div>
+                                  <div className="flex-shrink-0">
+                                    {reply.calstick_id ? (
+                                      <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        onClick={() => onNavigateToCalstick(reply.calstick_id!)}
+                                        title="View in CalSticks"
+                                        className="text-green-600 hover:text-green-700 hover:bg-green-50"
+                                      >
+                                        <ExternalLink className="h-4 w-4" />
+                                      </Button>
+                                    ) : (
+                                      <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        onClick={() => onPromoteReply(stick.id, stick.topic, stick.content || '', reply.id, reply.content)}
+                                        title="Promote this reply to CalStick"
+                                        className="text-purple-600 hover:text-purple-700 hover:bg-purple-50"
+                                      >
+                                        <ArrowRight className="h-4 w-4" />
+                                      </Button>
+                                    )}
+                                  </div>
+                                </div>
+                              </Card>
                             </div>
                           </div>
                         </div>
-                        <div className="flex-shrink-0">
-                          {reply.calstick_id ? (
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => onNavigateToCalstick(reply.calstick_id!)}
-                              title="View in CalSticks"
-                              className="text-green-600 hover:text-green-700 hover:bg-green-50"
-                            >
-                              <ExternalLink className="h-4 w-4" />
-                            </Button>
-                          ) : (
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => onPromoteReply(stick.id, stick.topic, stick.content || '', reply.id, reply.content)}
-                              title="Promote this reply to CalStick"
-                              className="text-purple-600 hover:text-purple-700 hover:bg-purple-50"
-                            >
-                              <ArrowRight className="h-4 w-4" />
-                            </Button>
-                          )}
-                        </div>
-                      </div>
-                    </Card>
-                  ))}
+                      )
+                    })}
+                  </div>
                 </div>
               ) : (
                 <p className="text-sm text-gray-500 italic">No replies yet</p>
