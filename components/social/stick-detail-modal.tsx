@@ -1031,38 +1031,6 @@ export function StickDetailModal({ open, onOpenChange, stickId, onUpdate }: Stic
                       </Card>
                     )}
 
-                    {/* Category Summary Bar */}
-                    {categoryCounts.size > 0 && (
-                      <Card className="bg-white border shadow-sm">
-                        <CardContent className="py-3">
-                          <div className="flex items-center gap-2 flex-wrap">
-                            <span className="text-sm font-medium text-gray-600 mr-2">Categories:</span>
-                            {Array.from(categoryCounts.entries()).map(([category, count]) => (
-                              <button
-                                key={category}
-                                onClick={() => selectOnlyCategory(category)}
-                                className={`px-3 py-1 rounded-full text-sm font-medium transition-all ${
-                                  selectedCategories.length === 1 && selectedCategories[0] === category
-                                    ? 'bg-purple-600 text-white'
-                                    : 'bg-gray-100 text-gray-700 hover:bg-purple-100 hover:text-purple-700'
-                                }`}
-                              >
-                                {category} <span className="ml-1 text-xs opacity-75">({count})</span>
-                              </button>
-                            ))}
-                            {selectedCategories.length === 1 && (
-                              <button
-                                onClick={resetCategories}
-                                className="px-2 py-1 text-xs text-gray-500 hover:text-gray-700"
-                              >
-                                Clear filter
-                              </button>
-                            )}
-                          </div>
-                        </CardContent>
-                      </Card>
-                    )}
-
                     <div className="space-y-4">
                       {/* Header with View Toggle */}
                       <div className="flex items-center justify-between">
