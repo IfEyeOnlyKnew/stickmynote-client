@@ -1,11 +1,11 @@
 "use client"
 
-import { useState, useEffect, useCallback, useMemo } from "react"
+import { useState, useEffect, useCallback, useMemo, useRef } from "react"
 import { useUser } from "@/contexts/user-context"
 import { Dialog, DialogContent, DialogTitle, DialogDescription } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { User, Calendar, Filter, MessageSquare, BookOpen, LinkIcon, Trash2 } from "lucide-react"
+import { User, Calendar, Filter, MessageSquare, BookOpen, LinkIcon, Trash2, LayoutList, Clock, ChevronLeft, ChevronRight, Lightbulb, Play, CheckCircle2 } from "lucide-react"
 import { formatDistanceToNow } from "date-fns"
 import { ReplyModal, REPLY_CATEGORIES } from "@/components/social/reply-modal"
 import { Badge } from "@/components/ui/badge"
@@ -26,6 +26,9 @@ import { StickSummaryCard } from "@/components/social/stick-summary-card"
 import { RelatedKBArticles } from "@/components/social/related-kb-articles"
 import { FollowButton } from "@/components/social/follow-button"
 import { toast } from "sonner"
+import { WORKFLOW_STATUSES, WORKFLOW_ORDER, type WorkflowStatus } from "@/types/social-workflow"
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 
 interface Reply {
   id: string
@@ -68,6 +71,16 @@ interface SocialStick {
   last_summarized_at?: string
   summary_reply_count?: number
   ai_generated_tags?: string[]
+  // Workflow fields
+  workflow_status?: WorkflowStatus
+  workflow_owner_id?: string | null
+  workflow_due_date?: string | null
+  workflow_owner?: {
+    id: string
+    full_name: string | null
+    email: string
+    avatar_url: string | null
+  } | null
 }
 
 interface StickDetailModalProps {
@@ -100,6 +113,10 @@ export function StickDetailModal({ open, onOpenChange, stickId, onUpdate }: Stic
 
   const [isSummarizing, setIsSummarizing] = useState(false)
   const [currentUserId, setCurrentUserId] = useState<string | null>(null)
+  const [viewMode, setViewMode] = useState<'grouped' | 'timeline'>('grouped')
+
+  // Category tabs scroll ref
+  const categoryTabsRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     if (user?.id) {
@@ -721,6 +738,48 @@ export function StickDetailModal({ open, onOpenChange, stickId, onUpdate }: Stic
     return categories
   }, [stick?.replies])
 
+  // Category counts for summary bar
+  const categoryCounts = useMemo(() => {
+    const counts = new Map<string, number>()
+    if (stick?.replies) {
+      for (const reply of stick.replies) {
+        if (!reply.parent_reply_id) {
+          const cat = reply.category || "Default"
+          counts.set(cat, (counts.get(cat) || 0) + 1)
+        }
+      }
+    }
+    return counts
+  }, [stick?.replies])
+
+  // Sorted replies for timeline view (chronological order)
+  const timelineSortedReplies = useMemo(() => {
+    if (!stick?.replies) return []
+    return [...stick.replies]
+      .filter(r => !r.parent_reply_id) // Only root replies for timeline
+      .sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime())
+  }, [stick?.replies])
+
+  // Detect milestones for timeline view
+  const getMilestone = useCallback((reply: Reply, index: number): { type: string; label: string } | null => {
+    if (index === 0) return { type: 'first', label: 'First Reply' }
+    if (reply.category === 'Answer') return { type: 'answer', label: 'Answer Posted' }
+    if (reply.category === 'Status Update') return { type: 'status', label: 'Status Update' }
+    if (reply.category === 'Correction') return { type: 'correction', label: 'Correction Made' }
+    return null
+  }, [])
+
+  // Scroll category tabs
+  const scrollCategoryTabs = useCallback((direction: 'left' | 'right') => {
+    if (categoryTabsRef.current) {
+      const scrollAmount = 200
+      categoryTabsRef.current.scrollBy({
+        left: direction === 'left' ? -scrollAmount : scrollAmount,
+        behavior: 'smooth'
+      })
+    }
+  }, [])
+
   const isOwner = stick?.user_id === user?.id
 
   if (!stick && !loading) return null
@@ -900,102 +959,299 @@ export function StickDetailModal({ open, onOpenChange, stickId, onUpdate }: Stic
                       showGenerateButton={showGenerateButton}
                     />
 
+                    {/* Progress/Resolution Tracker */}
+                    {stick.workflow_status && (
+                      <Card className="bg-white border shadow-sm">
+                        <CardContent className="py-4">
+                          <div className="flex items-center justify-between mb-3">
+                            <h4 className="text-sm font-semibold text-gray-700">Workflow Progress</h4>
+                            {stick.workflow_owner && (
+                              <div className="flex items-center gap-2 text-sm text-gray-600">
+                                <Avatar className="h-5 w-5">
+                                  {stick.workflow_owner.avatar_url && (
+                                    <AvatarImage src={stick.workflow_owner.avatar_url} />
+                                  )}
+                                  <AvatarFallback className="text-[10px]">
+                                    {(stick.workflow_owner.full_name || stick.workflow_owner.email).substring(0, 2).toUpperCase()}
+                                  </AvatarFallback>
+                                </Avatar>
+                                <span>{stick.workflow_owner.full_name || stick.workflow_owner.email}</span>
+                              </div>
+                            )}
+                          </div>
+                          <div className="flex items-center justify-between">
+                            {WORKFLOW_ORDER.map((status, index) => {
+                              const config = WORKFLOW_STATUSES[status]
+                              const isCurrent = stick.workflow_status === status
+                              const isPast = WORKFLOW_ORDER.indexOf(stick.workflow_status!) > index
+                              const isCompleted = isPast || isCurrent
+
+                              return (
+                                <div key={status} className="flex items-center flex-1">
+                                  <TooltipProvider>
+                                    <Tooltip>
+                                      <TooltipTrigger asChild>
+                                        <div className={`flex flex-col items-center ${isCurrent ? 'scale-110' : ''}`}>
+                                          <div className={`w-8 h-8 rounded-full flex items-center justify-center border-2 transition-all ${
+                                            isCurrent
+                                              ? `${config.bgColor} ${config.borderColor} ${config.color}`
+                                              : isPast
+                                                ? 'bg-green-100 border-green-400 text-green-600'
+                                                : 'bg-gray-100 border-gray-300 text-gray-400'
+                                          }`}>
+                                            {status === 'idea' && <Lightbulb className="h-4 w-4" />}
+                                            {status === 'triage' && <Filter className="h-4 w-4" />}
+                                            {status === 'in_progress' && <Play className="h-4 w-4" />}
+                                            {status === 'resolved' && <CheckCircle2 className="h-4 w-4" />}
+                                          </div>
+                                          <span className={`text-xs mt-1 font-medium ${isCurrent ? config.color : isPast ? 'text-green-600' : 'text-gray-400'}`}>
+                                            {config.label}
+                                          </span>
+                                        </div>
+                                      </TooltipTrigger>
+                                      <TooltipContent>
+                                        <p>{config.description}</p>
+                                      </TooltipContent>
+                                    </Tooltip>
+                                  </TooltipProvider>
+                                  {index < WORKFLOW_ORDER.length - 1 && (
+                                    <div className={`flex-1 h-0.5 mx-2 ${isPast ? 'bg-green-400' : 'bg-gray-200'}`} />
+                                  )}
+                                </div>
+                              )
+                            })}
+                          </div>
+                          {stick.workflow_due_date && (
+                            <div className="mt-3 text-xs text-gray-500 flex items-center gap-1">
+                              <Calendar className="h-3 w-3" />
+                              Due: {new Date(stick.workflow_due_date).toLocaleDateString()}
+                            </div>
+                          )}
+                        </CardContent>
+                      </Card>
+                    )}
+
+                    {/* Category Summary Bar */}
+                    {categoryCounts.size > 0 && (
+                      <Card className="bg-white border shadow-sm">
+                        <CardContent className="py-3">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="text-sm font-medium text-gray-600 mr-2">Categories:</span>
+                            {Array.from(categoryCounts.entries()).map(([category, count]) => (
+                              <button
+                                key={category}
+                                onClick={() => selectOnlyCategory(category)}
+                                className={`px-3 py-1 rounded-full text-sm font-medium transition-all ${
+                                  selectedCategories.length === 1 && selectedCategories[0] === category
+                                    ? 'bg-purple-600 text-white'
+                                    : 'bg-gray-100 text-gray-700 hover:bg-purple-100 hover:text-purple-700'
+                                }`}
+                              >
+                                {category} <span className="ml-1 text-xs opacity-75">({count})</span>
+                              </button>
+                            ))}
+                            {selectedCategories.length === 1 && (
+                              <button
+                                onClick={resetCategories}
+                                className="px-2 py-1 text-xs text-gray-500 hover:text-gray-700"
+                              >
+                                Clear filter
+                              </button>
+                            )}
+                          </div>
+                        </CardContent>
+                      </Card>
+                    )}
+
                     <div className="space-y-4">
+                      {/* Header with View Toggle */}
                       <div className="flex items-center justify-between">
                         <h3 className="text-xl font-bold text-gray-900">Replies ({replyCount})</h3>
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button variant="outline" size="sm">
-                              <Filter className="h-4 w-4 mr-2" />
-                              Filter by Category
-                              {selectedCategories.length < REPLY_CATEGORIES.length && (
-                                <Badge variant="secondary" className="ml-2">
-                                  {selectedCategories.length}/{REPLY_CATEGORIES.length}
-                                </Badge>
-                              )}
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end" className="w-72">
-                            <DropdownMenuLabel className="flex items-center justify-between">
-                              <span>Filter Categories</span>
-                              <div className="flex gap-1">
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  className="h-6 px-2 text-xs"
-                                  onClick={(e) => {
-                                    e.preventDefault()
-                                    resetCategories()
-                                  }}
-                                >
-                                  Show All
-                                </Button>
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  className="h-6 px-2 text-xs text-muted-foreground"
-                                  onClick={(e) => {
-                                    e.preventDefault()
-                                    clearCategories()
-                                  }}
-                                >
-                                  Clear
-                                </Button>
-                              </div>
-                            </DropdownMenuLabel>
-                            <DropdownMenuSeparator />
-                            <ScrollArea className="h-64">
-                              {REPLY_CATEGORIES.map((category) => {
-                                const hasReplies = categoriesWithReplies.has(category.value)
-                                return (
-                                  <DropdownMenuCheckboxItem
-                                    key={category.value}
-                                    checked={selectedCategories.includes(category.value)}
-                                    onCheckedChange={() => toggleCategory(category.value)}
-                                    onSelect={(e) => e.preventDefault()}
-                                    className={hasReplies ? "bg-green-50 dark:bg-green-950/20" : ""}
-                                  >
-                                    <div
-                                      className="flex flex-col flex-1 cursor-pointer"
-                                      onClick={(e) => {
-                                        e.stopPropagation()
-                                        selectOnlyCategory(category.value)
-                                      }}
-                                    >
-                                      <span className={`font-medium ${hasReplies ? "text-green-700 dark:text-green-400" : ""}`}>
-                                        {category.label}
-                                        {hasReplies && <span className="ml-1 text-xs">(has replies)</span>}
-                                      </span>
-                                      <span className="text-xs text-gray-500">{category.description}</span>
-                                    </div>
-                                  </DropdownMenuCheckboxItem>
-                                )
-                              })}
-                            </ScrollArea>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
+                        <div className="flex items-center gap-2">
+                          {/* View Mode Toggle */}
+                          <div className="flex items-center bg-gray-100 rounded-lg p-0.5">
+                            <button
+                              onClick={() => setViewMode('grouped')}
+                              className={`px-3 py-1.5 text-sm font-medium rounded-md transition-all flex items-center gap-1.5 ${
+                                viewMode === 'grouped'
+                                  ? 'bg-white text-gray-900 shadow-sm'
+                                  : 'text-gray-600 hover:text-gray-900'
+                              }`}
+                            >
+                              <LayoutList className="h-4 w-4" />
+                              Grouped
+                            </button>
+                            <button
+                              onClick={() => setViewMode('timeline')}
+                              className={`px-3 py-1.5 text-sm font-medium rounded-md transition-all flex items-center gap-1.5 ${
+                                viewMode === 'timeline'
+                                  ? 'bg-white text-gray-900 shadow-sm'
+                                  : 'text-gray-600 hover:text-gray-900'
+                              }`}
+                            >
+                              <Clock className="h-4 w-4" />
+                              Timeline
+                            </button>
+                          </div>
+                        </div>
                       </div>
 
-                      {filteredReplies.length > 0 ? (
-                        <div className="space-y-6">
-                          {Array.from(groupedReplies.entries()).map(([category, replies]) => (
-                            <div key={category} className="space-y-3">
-                              <h4 className="text-lg font-semibold text-gray-800 flex items-center gap-2">
-                                {category}
-                                <Badge variant="outline">{replies.length}</Badge>
-                              </h4>
-                              <ul className="space-y-2">{replies.map((reply) => renderReply(reply))}</ul>
-                            </div>
-                          ))}
+                      {/* Category Tabs (Horizontal) */}
+                      <div className="relative">
+                        <button
+                          onClick={() => scrollCategoryTabs('left')}
+                          className="absolute left-0 top-1/2 -translate-y-1/2 z-10 bg-white/90 shadow-md rounded-full p-1 hover:bg-gray-100"
+                          aria-label="Scroll left"
+                        >
+                          <ChevronLeft className="h-4 w-4" />
+                        </button>
+                        <div
+                          ref={categoryTabsRef}
+                          className="flex items-center gap-2 overflow-x-auto scrollbar-hide px-8 py-2"
+                          style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
+                        >
+                          <button
+                            onClick={resetCategories}
+                            className={`px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap transition-all border ${
+                              selectedCategories.length === REPLY_CATEGORIES.length
+                                ? 'bg-purple-600 text-white border-purple-600'
+                                : 'bg-white text-gray-700 border-gray-200 hover:border-purple-300 hover:bg-purple-50'
+                            }`}
+                          >
+                            All ({replyCount})
+                          </button>
+                          {REPLY_CATEGORIES.filter(cat => categoriesWithReplies.has(cat.value)).map((category) => {
+                            const count = categoryCounts.get(category.value) || 0
+                            const isSelected = selectedCategories.length === 1 && selectedCategories[0] === category.value
+                            return (
+                              <button
+                                key={category.value}
+                                onClick={() => selectOnlyCategory(category.value)}
+                                className={`px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap transition-all border ${
+                                  isSelected
+                                    ? 'bg-purple-600 text-white border-purple-600'
+                                    : 'bg-white text-gray-700 border-gray-200 hover:border-purple-300 hover:bg-purple-50'
+                                }`}
+                              >
+                                {category.label} ({count})
+                              </button>
+                            )
+                          })}
                         </div>
-                      ) : (
-                        <Card>
-                          <CardContent className="py-12 text-center text-gray-500">
-                            {selectedCategories.length === 0
-                              ? "Please select at least one category to view replies."
-                              : "No replies yet. Be the first to reply!"}
-                          </CardContent>
-                        </Card>
+                        <button
+                          onClick={() => scrollCategoryTabs('right')}
+                          className="absolute right-0 top-1/2 -translate-y-1/2 z-10 bg-white/90 shadow-md rounded-full p-1 hover:bg-gray-100"
+                          aria-label="Scroll right"
+                        >
+                          <ChevronRight className="h-4 w-4" />
+                        </button>
+                      </div>
+
+                      {/* Grouped View */}
+                      {viewMode === 'grouped' && (
+                        <>
+                          {filteredReplies.length > 0 ? (
+                            <div className="space-y-6">
+                              {Array.from(groupedReplies.entries()).map(([category, replies]) => (
+                                <div key={category} className="space-y-3">
+                                  <h4 className="text-lg font-semibold text-gray-800 flex items-center gap-2">
+                                    {category}
+                                    <Badge variant="outline">{replies.length}</Badge>
+                                  </h4>
+                                  <ul className="space-y-2">{replies.map((reply) => renderReply(reply))}</ul>
+                                </div>
+                              ))}
+                            </div>
+                          ) : (
+                            <Card>
+                              <CardContent className="py-12 text-center text-gray-500">
+                                {selectedCategories.length === 0
+                                  ? "Please select at least one category to view replies."
+                                  : "No replies yet. Be the first to reply!"}
+                              </CardContent>
+                            </Card>
+                          )}
+                        </>
+                      )}
+
+                      {/* Timeline View */}
+                      {viewMode === 'timeline' && (
+                        <>
+                          {timelineSortedReplies.length > 0 ? (
+                            <div className="relative">
+                              {/* Vertical timeline line */}
+                              <div className="absolute left-4 top-0 bottom-0 w-0.5 bg-gray-200" />
+
+                              <div className="space-y-4">
+                                {timelineSortedReplies.map((reply, index) => {
+                                  const milestone = getMilestone(reply, index)
+                                  const replyDate = new Date(reply.created_at)
+                                  const prevDate = index > 0 ? new Date(timelineSortedReplies[index - 1].created_at) : null
+                                  const showDateHeader = !prevDate || replyDate.toDateString() !== prevDate.toDateString()
+
+                                  return (
+                                    <div key={reply.id}>
+                                      {/* Date Header */}
+                                      {showDateHeader && (
+                                        <div className="flex items-center gap-3 mb-3 ml-8">
+                                          <div className="text-sm font-semibold text-gray-600 bg-gray-100 px-3 py-1 rounded-full">
+                                            {replyDate.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}
+                                          </div>
+                                        </div>
+                                      )}
+
+                                      <div className="relative flex items-start gap-4">
+                                        {/* Timeline dot */}
+                                        <div className={`relative z-10 w-8 h-8 rounded-full flex items-center justify-center ${
+                                          milestone
+                                            ? 'bg-purple-100 border-2 border-purple-400'
+                                            : 'bg-white border-2 border-gray-300'
+                                        }`}>
+                                          {milestone?.type === 'first' && <MessageSquare className="h-4 w-4 text-purple-600" />}
+                                          {milestone?.type === 'answer' && <CheckCircle2 className="h-4 w-4 text-green-600" />}
+                                          {milestone?.type === 'status' && <Clock className="h-4 w-4 text-blue-600" />}
+                                          {milestone?.type === 'correction' && <Filter className="h-4 w-4 text-amber-600" />}
+                                          {!milestone && <div className="w-2 h-2 rounded-full bg-gray-400" />}
+                                        </div>
+
+                                        {/* Reply content */}
+                                        <div className="flex-1 min-w-0">
+                                          {milestone && (
+                                            <div className="mb-2">
+                                              <Badge variant="secondary" className="text-xs bg-purple-100 text-purple-700">
+                                                {milestone.label}
+                                              </Badge>
+                                            </div>
+                                          )}
+                                          <div className="bg-white rounded-lg border shadow-sm p-3">
+                                            <div className="flex items-center gap-2 mb-2">
+                                              <span className="text-sm font-medium text-gray-900">
+                                                {reply.users?.full_name || reply.users?.email || 'Unknown'}
+                                              </span>
+                                              <Badge variant="outline" className="text-xs">
+                                                {reply.category || 'Default'}
+                                              </Badge>
+                                              <span className="text-xs text-gray-500">
+                                                {replyDate.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}
+                                              </span>
+                                            </div>
+                                            <p className="text-sm text-gray-700 whitespace-pre-wrap">{reply.content}</p>
+                                          </div>
+                                        </div>
+                                      </div>
+                                    </div>
+                                  )
+                                })}
+                              </div>
+                            </div>
+                          ) : (
+                            <Card>
+                              <CardContent className="py-12 text-center text-gray-500">
+                                No replies yet. Be the first to reply!
+                              </CardContent>
+                            </Card>
+                          )}
+                        </>
                       )}
                     </div>
                   </div>
