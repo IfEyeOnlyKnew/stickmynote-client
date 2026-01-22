@@ -15,7 +15,10 @@ import {
   DropdownMenuContent,
   DropdownMenuCheckboxItem,
   DropdownMenuTrigger,
+  DropdownMenuSeparator,
+  DropdownMenuLabel,
 } from "@/components/ui/dropdown-menu"
+import { ScrollArea } from "@/components/ui/scroll-area"
 import { SocialStickTabs } from "@/components/social/social-stick-tabs"
 import { KnowledgeBaseDrawer } from "@/components/social/knowledge-base-drawer"
 import { AddCitationModal } from "@/components/social/add-citation-modal"
@@ -108,6 +111,18 @@ export function StickDetailModal({ open, onOpenChange, stickId, onUpdate }: Stic
     setSelectedCategories((prevCategories) =>
       prevCategories.includes(category) ? prevCategories.filter((c) => c !== category) : [...prevCategories, category],
     )
+  }
+
+  const selectOnlyCategory = (category: string) => {
+    setSelectedCategories([category])
+  }
+
+  const resetCategories = () => {
+    setSelectedCategories(REPLY_CATEGORIES.map((c) => c.value))
+  }
+
+  const clearCategories = () => {
+    setSelectedCategories([])
   }
 
   const fetchWithRetry = async (url: string, options?: RequestInit, maxRetries = 3): Promise<Response> => {
@@ -479,27 +494,32 @@ export function StickDetailModal({ open, onOpenChange, stickId, onUpdate }: Stic
     return rootReplies
   }
 
-  const filterRepliesByCategory = (replies: Reply[]): Reply[] => {
-    return replies
-      .filter((reply) => selectedCategories.includes(reply.category))
-      .map((reply) => {
-        // Create a copy of the reply with filtered nested replies
-        const filteredReply = { ...reply }
-        if (reply.replies && reply.replies.length > 0) {
-          filteredReply.replies = filterRepliesByCategory(reply.replies)
-        }
-        return filteredReply
-      })
-  }
+  // Optimized: Only filter parent/root replies by category
+  // Child replies are always shown if their parent matches
+  const filterRepliesByCategory = useCallback((replies: Reply[]): Reply[] => {
+    if (selectedCategories.length === REPLY_CATEGORIES.length) {
+      // Fast path: all categories selected, no filtering needed
+      return replies
+    }
+
+    // Create a Set for O(1) lookup instead of O(n) array.includes
+    const categorySet = new Set(selectedCategories)
+
+    return replies.filter((reply) => {
+      const replyCategory = reply.category || "Default"
+      return categorySet.has(replyCategory)
+    })
+  }, [selectedCategories])
 
   const groupRepliesByCategory = (replies: Reply[]) => {
     const grouped = new Map<string, Reply[]>()
 
     replies.forEach((reply) => {
-      if (!grouped.has(reply.category)) {
-        grouped.set(reply.category, [])
+      const category = reply.category || "Default"
+      if (!grouped.has(category)) {
+        grouped.set(category, [])
       }
-      grouped.get(reply.category)!.push(reply)
+      grouped.get(category)!.push(reply)
     })
 
     return grouped
@@ -679,12 +699,28 @@ export function StickDetailModal({ open, onOpenChange, stickId, onUpdate }: Stic
   )
   const filteredReplies = useMemo(
     () => filterRepliesByCategory(organizedReplies),
-    [organizedReplies, selectedCategories]
+    [filterRepliesByCategory, organizedReplies]
   )
   const groupedReplies = useMemo(
     () => groupRepliesByCategory(filteredReplies),
     [filteredReplies]
   )
+
+  // Get categories that have parent/root replies only (for highlighting in dropdown)
+  // This matches the filtering behavior which only filters parent replies
+  const categoriesWithReplies = useMemo(() => {
+    const categories = new Set<string>()
+    // Only check root-level replies (those without parent_reply_id)
+    if (stick?.replies) {
+      for (const reply of stick.replies) {
+        if (!reply.parent_reply_id) {
+          categories.add(reply.category || "Default")
+        }
+      }
+    }
+    return categories
+  }, [stick?.replies])
+
   const isOwner = stick?.user_id === user?.id
 
   if (!stick && !loading) return null
@@ -874,24 +910,68 @@ export function StickDetailModal({ open, onOpenChange, stickId, onUpdate }: Stic
                               Filter by Category
                               {selectedCategories.length < REPLY_CATEGORIES.length && (
                                 <Badge variant="secondary" className="ml-2">
-                                  {selectedCategories.length}
+                                  {selectedCategories.length}/{REPLY_CATEGORIES.length}
                                 </Badge>
                               )}
                             </Button>
                           </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end" className="w-64">
-                            {REPLY_CATEGORIES.map((category) => (
-                              <DropdownMenuCheckboxItem
-                                key={category.value}
-                                checked={selectedCategories.includes(category.value)}
-                                onCheckedChange={() => toggleCategory(category.value)}
-                              >
-                                <div className="flex flex-col">
-                                  <span className="font-medium">{category.label}</span>
-                                  <span className="text-xs text-gray-500">{category.description}</span>
-                                </div>
-                              </DropdownMenuCheckboxItem>
-                            ))}
+                          <DropdownMenuContent align="end" className="w-72">
+                            <DropdownMenuLabel className="flex items-center justify-between">
+                              <span>Filter Categories</span>
+                              <div className="flex gap-1">
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="h-6 px-2 text-xs"
+                                  onClick={(e) => {
+                                    e.preventDefault()
+                                    resetCategories()
+                                  }}
+                                >
+                                  Show All
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="h-6 px-2 text-xs text-muted-foreground"
+                                  onClick={(e) => {
+                                    e.preventDefault()
+                                    clearCategories()
+                                  }}
+                                >
+                                  Clear
+                                </Button>
+                              </div>
+                            </DropdownMenuLabel>
+                            <DropdownMenuSeparator />
+                            <ScrollArea className="h-64">
+                              {REPLY_CATEGORIES.map((category) => {
+                                const hasReplies = categoriesWithReplies.has(category.value)
+                                return (
+                                  <DropdownMenuCheckboxItem
+                                    key={category.value}
+                                    checked={selectedCategories.includes(category.value)}
+                                    onCheckedChange={() => toggleCategory(category.value)}
+                                    onSelect={(e) => e.preventDefault()}
+                                    className={hasReplies ? "bg-green-50 dark:bg-green-950/20" : ""}
+                                  >
+                                    <div
+                                      className="flex flex-col flex-1 cursor-pointer"
+                                      onClick={(e) => {
+                                        e.stopPropagation()
+                                        selectOnlyCategory(category.value)
+                                      }}
+                                    >
+                                      <span className={`font-medium ${hasReplies ? "text-green-700 dark:text-green-400" : ""}`}>
+                                        {category.label}
+                                        {hasReplies && <span className="ml-1 text-xs">(has replies)</span>}
+                                      </span>
+                                      <span className="text-xs text-gray-500">{category.description}</span>
+                                    </div>
+                                  </DropdownMenuCheckboxItem>
+                                )
+                              })}
+                            </ScrollArea>
                           </DropdownMenuContent>
                         </DropdownMenu>
                       </div>

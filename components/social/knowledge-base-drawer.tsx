@@ -12,7 +12,6 @@ import { BookOpen, Plus, Search, ThumbsUp, Eye, Pin, ExternalLink, Trash2, Edit,
 import { formatDistanceToNow } from "date-fns"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Separator } from "@/components/ui/separator"
-import { SheetOverlay } from "@/components/ui/sheet"
 
 const KB_CATEGORIES = [
   { value: "general", label: "General", icon: FileText },
@@ -219,8 +218,7 @@ export function KnowledgeBaseDrawer({ open, onOpenChange, padId, onSelectArticle
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetOverlay className="z-[110]" />
-      <SheetContent side="right" className="w-full sm:max-w-2xl p-0 z-[120]">
+      <SheetContent side="right" className="w-full sm:max-w-2xl p-0">
         <SheetHeader className="p-6 border-b">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
