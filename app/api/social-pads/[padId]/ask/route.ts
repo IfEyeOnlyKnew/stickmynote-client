@@ -35,25 +35,18 @@ export async function POST(req: Request, { params }: { params: Promise<{ padId: 
     }
 
     // Fetch all sticks in the pad
+    console.log(`[Ask Pad] Fetching sticks for pad ${padId}, org ${orgContext.orgId}`)
     const { data: sticks, error: sticksError } = await db
       .from("social_sticks")
-      .select(
-        `
-        id,
-        topic,
-        content,
-        live_summary,
-        reply_count
-      `,
-      )
+      .select("id, topic, content, ai_live_summary")
       .eq("social_pad_id", padId)
       .eq("org_id", orgContext.orgId)
       .order("created_at", { ascending: false })
       .limit(20)
 
     if (sticksError) {
-      console.error("Error fetching sticks:", sticksError)
-      return new NextResponse("Error fetching sticks", { status: 500 })
+      console.error("[Ask Pad] Error fetching sticks:", JSON.stringify(sticksError))
+      return NextResponse.json({ error: "Error fetching sticks", details: sticksError.message }, { status: 500 })
     }
 
     if (!sticks || sticks.length === 0) {
@@ -63,16 +56,71 @@ export async function POST(req: Request, { params }: { params: Promise<{ padId: 
       })
     }
 
+    // Fetch replies for each stick (including CalStick status and author name)
+    const stickIds = sticks.map((s) => s.id)
+    const { data: allReplies, error: repliesError } = await db
+      .from("social_stick_replies")
+      .select("id, social_stick_id, content, category, calstick_id, user:users!user_id(full_name)")
+      .in("social_stick_id", stickIds)
+      .eq("org_id", orgContext.orgId)
+      .order("created_at", { ascending: true })
+      .limit(100)
+
+    if (repliesError) {
+      console.error("[Ask Pad] Error fetching replies:", JSON.stringify(repliesError))
+      // Continue without replies rather than failing
+    }
+
+    // Fetch CalStick details for replies that have calstick_id
+    const calstickIds = (allReplies || [])
+      .filter((r) => r.calstick_id)
+      .map((r) => r.calstick_id)
+
+    let calstickMap: Record<string, { status?: string; completed?: boolean }> = {}
+    if (calstickIds.length > 0) {
+      const { data: calsticks } = await db
+        .from("calsticks")
+        .select("id, status, completed")
+        .in("id", calstickIds)
+
+      if (calsticks) {
+        calstickMap = Object.fromEntries(
+          calsticks.map((c) => [c.id, { status: c.status, completed: c.completed }])
+        )
+      }
+    }
+
+    // Group replies by stick
+    const repliesByStick = (allReplies || []).reduce(
+      (acc, reply) => {
+        if (!acc[reply.social_stick_id]) {
+          acc[reply.social_stick_id] = []
+        }
+        acc[reply.social_stick_id].push(reply)
+        return acc
+      },
+      {} as Record<string, typeof allReplies>
+    )
+
     // Use AI to answer the question
+    console.log(`[Ask Pad] Processing question for pad ${padId} with ${sticks.length} sticks and ${allReplies?.length || 0} replies`)
     const result = await AIService.answerPadQuestion({
       question,
       sticks: sticks.map((s) => ({
         topic: s.topic || "Untitled",
         content: s.content,
-        summary: s.live_summary || undefined,
-        replies_count: s.reply_count || 0,
+        summary: s.ai_live_summary || undefined,
+        replies: (repliesByStick[s.id] || []).map((r: any) => ({
+          content: r.content,
+          category: r.category || undefined,
+          is_calstick: !!r.calstick_id,
+          calstick_status: r.calstick_id ? calstickMap[r.calstick_id]?.status : undefined,
+          calstick_completed: r.calstick_id ? calstickMap[r.calstick_id]?.completed : undefined,
+          user_name: r.user?.full_name || "Unknown",
+        })),
       })),
     })
+    console.log(`[Ask Pad] AI response received: answer="${result.answer?.substring(0, 100)}...", citations=${result.citations?.length}`)
 
     const { data: qaRecord, error: qaError } = await db
       .from("social_qa_history")

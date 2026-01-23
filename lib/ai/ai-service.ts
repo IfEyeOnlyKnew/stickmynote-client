@@ -349,25 +349,74 @@ Return ONLY 3 questions, one per line, nothing else.`
    */
   static async answerPadQuestion(params: {
     question: string
-    sticks: Array<{ topic: string; content: string; summary?: string; replies_count: number }>
+    sticks: Array<{
+      topic: string
+      content: string
+      summary?: string
+      replies?: Array<{
+        content: string
+        category?: string
+        is_calstick?: boolean
+        calstick_status?: string
+        calstick_completed?: boolean
+        user_name?: string
+      }>
+    }>
   }): Promise<{ answer: string; citations: Array<{ topic: string; relevance: string }> }> {
     try {
       const context = params.sticks
-        .map(
-          (s, idx) =>
-            `[${idx + 1}] Topic: ${s.topic}\nContent: ${s.content}\nSummary: ${s.summary || "N/A"}\nReplies: ${s.replies_count}`,
-        )
+        .map((s, idx) => {
+          let stickContext = `[${idx + 1}] Topic: ${s.topic}\nContent: ${s.content}`
+          if (s.summary) {
+            stickContext += `\nSummary: ${s.summary}`
+          }
+          if (s.replies && s.replies.length > 0) {
+            // Count reply types for clarity
+            const calstickCount = s.replies.filter(r => r.is_calstick).length
+            const regularCount = s.replies.length - calstickCount
+            stickContext += `\nReplies (${s.replies.length} total: ${regularCount} discussion replies, ${calstickCount} task items):`
+
+            s.replies.forEach((r) => {
+              const author = r.user_name || "Someone"
+              const contentPreview = r.content.substring(0, 200) + (r.content.length > 200 ? "..." : "")
+
+              if (r.is_calstick) {
+                // This is a task/CalStick
+                const status = r.calstick_completed ? "COMPLETED" : (r.calstick_status || "Pending")
+                stickContext += `\n  - [TASK] ${author}: "${contentPreview}" (Status: ${status})`
+              } else {
+                // This is a regular discussion reply
+                const categoryInfo = r.category && r.category !== "Default" ? ` [${r.category}]` : ""
+                stickContext += `\n  - [REPLY] ${author}: "${contentPreview}"${categoryInfo}`
+              }
+            })
+          } else {
+            stickContext += `\nReplies: None yet`
+          }
+          return stickContext
+        })
         .join("\n\n")
 
-      const prompt = `Answer this question about the project based on the stick discussions below.
+      const prompt = `Answer this question about the project based on the discussion threads below.
 
 Question: ${params.question}
 
-Context from sticks:
+Understanding the data:
+- Each numbered item [1], [2], etc. is a "Stick" (a discussion topic/thread)
+- [REPLY] entries are discussion comments from team members
+- [TASK] entries are action items/tasks with completion status
+
+Discussion Threads:
 ${context}
 
+Instructions:
+- Focus on what team members actually said in their replies
+- Pay attention to who said what
+- Distinguish between completed tasks vs pending tasks vs discussion comments
+- Do NOT assume all replies are tasks - most are regular discussion comments
+
 Provide:
-1. A clear answer (2-3 sentences)
+1. A clear, specific answer (2-3 sentences) based on the actual discussion content
 2. Citations: List which stick numbers [1], [2], etc. are most relevant
 
 Format:
