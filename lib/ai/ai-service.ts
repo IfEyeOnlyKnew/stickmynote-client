@@ -397,31 +397,24 @@ Return ONLY 3 questions, one per line, nothing else.`
         })
         .join("\n\n")
 
-      const prompt = `Answer this question about the project based on the discussion threads below.
+      const prompt = `Answer the question based ONLY on the discussion data below. Do not make assumptions.
 
 Question: ${params.question}
 
-Understanding the data:
-- Each numbered item [1], [2], etc. is a "Stick" (a discussion topic/thread)
-- [REPLY] entries are discussion comments from team members
-- [TASK] entries are action items/tasks with completion status
-
-Discussion Threads:
+Discussion Data:
 ${context}
 
-Instructions:
-- Focus on what team members actually said in their replies
-- Pay attention to who said what
-- Distinguish between completed tasks vs pending tasks vs discussion comments
-- Do NOT assume all replies are tasks - most are regular discussion comments
+Rules:
+- ONLY mention tasks if you see [TASK] in the data
+- [REPLY] means a regular comment, NOT a task
+- Report exactly what the data shows
+- If a task says "COMPLETED" it is done, not pending
 
-Provide:
-1. A clear, specific answer (2-3 sentences) based on the actual discussion content
-2. Citations: List which stick numbers [1], [2], etc. are most relevant
+Answer in 2-3 sentences, then list which discussion numbers [1], [2] etc. you referenced.
 
 Format:
-ANSWER: [your answer]
-CITATIONS: [1], [3] - [brief relevance note]`
+ANSWER: [your answer based only on the data above]
+CITATIONS: [1], [2] - [why relevant]`
 
       const { text } = await generateText({
         prompt,

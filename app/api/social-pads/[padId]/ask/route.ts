@@ -114,6 +114,20 @@ export async function POST(req: Request, { params }: { params: Promise<{ padId: 
 
     // Use AI to answer the question
     console.log(`[Ask Pad] Processing question for pad ${padId} with ${sticks.length} sticks and ${allReplies?.length || 0} replies`)
+
+    // Debug: Log the actual context being sent to AI
+    const debugContext = sticks.map((s: any) => ({
+      topic: s.topic,
+      replyCount: (repliesByStick[s.id] || []).length,
+      replies: (repliesByStick[s.id] || []).map((r: any) => ({
+        content: r.content?.substring(0, 50),
+        is_calstick: !!r.calstick_id,
+        calstick_status: r.calstick_id ? calstickMap[r.calstick_id]?.status : null,
+        calstick_completed: r.calstick_id ? calstickMap[r.calstick_id]?.completed : null,
+        user_name: userMap.get(r.user_id),
+      })),
+    }))
+    console.log(`[Ask Pad] Context being sent to AI:`, JSON.stringify(debugContext, null, 2))
     const result = await AIService.answerPadQuestion({
       question,
       sticks: sticks.map((s: any) => ({
