@@ -1,4 +1,4 @@
-import { createDatabaseClient } from "@/lib/database/database-adapter"
+import { createDatabaseClient, createServiceDatabaseClient } from "@/lib/database/database-adapter"
 import { NextResponse } from "next/server"
 import { AIService } from "@/lib/ai/ai-service"
 import { getOrgContext } from "@/lib/auth/get-org-context"
@@ -56,11 +56,11 @@ export async function POST(req: Request, { params }: { params: Promise<{ padId: 
       })
     }
 
-    // Fetch replies for each stick (including CalStick status and author name)
+    // Fetch replies for each stick
     const stickIds = sticks.map((s) => s.id)
     const { data: allReplies, error: repliesError } = await db
       .from("social_stick_replies")
-      .select("id, social_stick_id, content, category, calstick_id, user:users!user_id(full_name)")
+      .select("id, social_stick_id, content, category, calstick_id, user_id")
       .in("social_stick_id", stickIds)
       .eq("org_id", orgContext.orgId)
       .order("created_at", { ascending: true })
@@ -71,10 +71,20 @@ export async function POST(req: Request, { params }: { params: Promise<{ padId: 
       // Continue without replies rather than failing
     }
 
+    // Fetch user names for reply authors
+    const userIds = allReplies?.length
+      ? [...new Set(allReplies.map((r: any) => r.user_id))] as string[]
+      : []
+    const serviceDb = await createServiceDatabaseClient()
+    const { data: users } = userIds.length > 0
+      ? await serviceDb.from("users").select("id, full_name").in("id", userIds)
+      : { data: [] }
+    const userMap = new Map((users || []).map((u: any) => [u.id, u.full_name || "Unknown"]))
+
     // Fetch CalStick details for replies that have calstick_id
     const calstickIds = (allReplies || [])
-      .filter((r) => r.calstick_id)
-      .map((r) => r.calstick_id)
+      .filter((r: any) => r.calstick_id)
+      .map((r: any) => r.calstick_id)
 
     let calstickMap: Record<string, { status?: string; completed?: boolean }> = {}
     if (calstickIds.length > 0) {
@@ -85,28 +95,28 @@ export async function POST(req: Request, { params }: { params: Promise<{ padId: 
 
       if (calsticks) {
         calstickMap = Object.fromEntries(
-          calsticks.map((c) => [c.id, { status: c.status, completed: c.completed }])
+          calsticks.map((c: any) => [c.id, { status: c.status, completed: c.completed }])
         )
       }
     }
 
     // Group replies by stick
     const repliesByStick = (allReplies || []).reduce(
-      (acc, reply) => {
+      (acc: any, reply: any) => {
         if (!acc[reply.social_stick_id]) {
           acc[reply.social_stick_id] = []
         }
         acc[reply.social_stick_id].push(reply)
         return acc
       },
-      {} as Record<string, typeof allReplies>
+      {} as Record<string, any[]>
     )
 
     // Use AI to answer the question
     console.log(`[Ask Pad] Processing question for pad ${padId} with ${sticks.length} sticks and ${allReplies?.length || 0} replies`)
     const result = await AIService.answerPadQuestion({
       question,
-      sticks: sticks.map((s) => ({
+      sticks: sticks.map((s: any) => ({
         topic: s.topic || "Untitled",
         content: s.content,
         summary: s.ai_live_summary || undefined,
@@ -116,7 +126,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ padId: 
           is_calstick: !!r.calstick_id,
           calstick_status: r.calstick_id ? calstickMap[r.calstick_id]?.status : undefined,
           calstick_completed: r.calstick_id ? calstickMap[r.calstick_id]?.completed : undefined,
-          user_name: r.user?.full_name || "Unknown",
+          user_name: userMap.get(r.user_id) || "Unknown",
         })),
       })),
     })
