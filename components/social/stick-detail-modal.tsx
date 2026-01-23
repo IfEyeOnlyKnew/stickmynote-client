@@ -10,6 +10,10 @@ import { formatDistanceToNow } from "date-fns"
 import { ReplyModal, REPLY_CATEGORIES } from "@/components/social/reply-modal"
 import { Badge } from "@/components/ui/badge"
 import { ReplyCard } from "@/components/social/reply-card"
+import { DiscussionTemplatePicker } from "@/components/social/discussion-template-picker"
+import { DiscussionTemplateProgress } from "@/components/social/discussion-template-progress"
+import { GuidedPromptsPanel } from "@/components/social/guided-prompts-panel"
+import type { DiscussionTemplate, TemplateProgress, StickDiscussionTemplate } from "@/types/discussion-templates"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -114,6 +118,12 @@ export function StickDetailModal({ open, onOpenChange, stickId, onUpdate }: Stic
   const [isSummarizing, setIsSummarizing] = useState(false)
   const [currentUserId, setCurrentUserId] = useState<string | null>(null)
   const [viewMode, setViewMode] = useState<'grouped' | 'timeline'>('grouped')
+
+  // Discussion template state
+  const [showTemplatePicker, setShowTemplatePicker] = useState(false)
+  const [templateAssignment, setTemplateAssignment] = useState<StickDiscussionTemplate | null>(null)
+  const [templateProgress, setTemplateProgress] = useState<TemplateProgress | null>(null)
+  const [suggestedCategory, setSuggestedCategory] = useState<string | null>(null)
 
   // Category tabs scroll ref
   const categoryTabsRef = useRef<HTMLDivElement>(null)
@@ -245,6 +255,7 @@ export function StickDetailModal({ open, onOpenChange, stickId, onUpdate }: Stic
     if (stick?.social_pad_id) {
       setPadId(stick.social_pad_id)
       fetchCitations()
+      fetchDiscussionTemplate()
     }
   }, [stick])
   /* eslint-enable react-hooks/exhaustive-deps */
@@ -260,6 +271,62 @@ export function StickDetailModal({ open, onOpenChange, stickId, onUpdate }: Stic
     } catch (error) {
       console.error("[v0] Error fetching citations:", error)
     }
+  }
+
+  const fetchDiscussionTemplate = useCallback(async () => {
+    if (!stickId) return
+    try {
+      const response = await fetch(`/api/v2/social-sticks/${stickId}/discussion-template`)
+      if (response.ok) {
+        const data = await response.json()
+        setTemplateAssignment(data.assignment)
+        setTemplateProgress(data.progress)
+      }
+    } catch (error) {
+      console.error("[v0] Error fetching discussion template:", error)
+    }
+  }, [stickId])
+
+  const handleAssignTemplate = async (template: DiscussionTemplate) => {
+    if (!stickId) return
+    try {
+      const response = await fetch(`/api/v2/social-sticks/${stickId}/discussion-template`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ templateId: template.id }),
+      })
+      if (response.ok) {
+        await fetchDiscussionTemplate()
+        toast.success(`Applied "${template.name}" template`)
+      }
+    } catch (error) {
+      console.error("[v0] Error assigning template:", error)
+      toast.error("Failed to apply template")
+    }
+  }
+
+  const handleRemoveTemplate = async () => {
+    if (!stickId) return
+    if (!confirm("Remove the discussion template from this stick?")) return
+    try {
+      const response = await fetch(`/api/v2/social-sticks/${stickId}/discussion-template`, {
+        method: "DELETE",
+      })
+      if (response.ok) {
+        setTemplateAssignment(null)
+        setTemplateProgress(null)
+        toast.success("Template removed")
+      }
+    } catch (error) {
+      console.error("[v0] Error removing template:", error)
+      toast.error("Failed to remove template")
+    }
+  }
+
+  const handleGuidedPromptSelect = (category: string) => {
+    setSuggestedCategory(category)
+    setParentReply(null)
+    setReplyModalOpen(true)
   }
 
   const handleDeleteCitation = async (citationId: string) => {
@@ -316,6 +383,12 @@ export function StickDetailModal({ open, onOpenChange, stickId, onUpdate }: Stic
 
         setReplyModalOpen(false)
         setParentReply(null)
+        setSuggestedCategory(null)
+
+        // Refresh template progress after adding a reply
+        if (templateAssignment) {
+          fetchDiscussionTemplate()
+        }
 
         if (stick.last_summarized_at) {
           handleRegenerateSummary()
@@ -1031,6 +1104,40 @@ export function StickDetailModal({ open, onOpenChange, stickId, onUpdate }: Stic
                       </Card>
                     )}
 
+                    {/* Discussion Template Section */}
+                    {templateProgress ? (
+                      <DiscussionTemplateProgress
+                        progress={templateProgress}
+                        templateCategory={templateAssignment?.template?.category}
+                        onRemoveTemplate={handleRemoveTemplate}
+                      />
+                    ) : (
+                      <Card className="bg-white border border-dashed border-gray-300 shadow-sm">
+                        <CardContent className="py-6 text-center">
+                          <div className="text-gray-500 mb-3">
+                            <MessageSquare className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                            <p className="text-sm">No discussion template applied</p>
+                            <p className="text-xs text-gray-400">Templates help guide the conversation flow</p>
+                          </div>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setShowTemplatePicker(true)}
+                          >
+                            Apply Template
+                          </Button>
+                        </CardContent>
+                      </Card>
+                    )}
+
+                    {/* Guided Prompts */}
+                    {templateProgress && templateProgress.suggestedPrompts.length > 0 && (
+                      <GuidedPromptsPanel
+                        prompts={templateProgress.suggestedPrompts}
+                        onSelectPrompt={handleGuidedPromptSelect}
+                      />
+                    )}
+
                     <div className="space-y-4">
                       {/* Header with View Toggle */}
                       <div className="flex items-center justify-between">
@@ -1235,11 +1342,21 @@ export function StickDetailModal({ open, onOpenChange, stickId, onUpdate }: Stic
           setReplyModalOpen(open)
           if (!open) {
             setParentReply(null)
+            setSuggestedCategory(null)
           }
         }}
         onSubmit={handleSubmitReply}
         parentReplyContent={parentReply?.content}
         title={parentReply ? "Reply to Comment" : "Reply to Stick"}
+        suggestedCategory={suggestedCategory || undefined}
+        guidedPrompts={templateProgress?.suggestedPrompts}
+      />
+
+      <DiscussionTemplatePicker
+        open={showTemplatePicker}
+        onOpenChange={setShowTemplatePicker}
+        onSelect={handleAssignTemplate}
+        currentTemplateId={templateAssignment?.discussion_template_id}
       />
 
       {padId && (

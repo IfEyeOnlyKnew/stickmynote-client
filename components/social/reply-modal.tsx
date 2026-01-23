@@ -1,11 +1,13 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Send } from "lucide-react"
+import { Badge } from "@/components/ui/badge"
+import { Send, Lightbulb, Star } from "lucide-react"
+import type { GuidedPrompt } from "@/types/discussion-templates"
 
 export const REPLY_CATEGORIES = [
   { value: "Default", label: "Default", description: "General reply without specific category" },
@@ -30,12 +32,32 @@ interface ReplyModalProps {
   onSubmit: (content: string, category: string) => Promise<void>
   parentReplyContent?: string
   title?: string
+  suggestedCategory?: string
+  guidedPrompts?: GuidedPrompt[]
 }
 
-export function ReplyModal({ open, onOpenChange, onSubmit, parentReplyContent, title = "Add Reply" }: ReplyModalProps) {
+export function ReplyModal({
+  open,
+  onOpenChange,
+  onSubmit,
+  parentReplyContent,
+  title = "Add Reply",
+  suggestedCategory,
+  guidedPrompts,
+}: ReplyModalProps) {
   const [content, setContent] = useState("")
   const [category, setCategory] = useState("Default")
   const [submitting, setSubmitting] = useState(false)
+
+  // Set suggested category when modal opens
+  useEffect(() => {
+    if (open && suggestedCategory) {
+      setCategory(suggestedCategory)
+    }
+  }, [open, suggestedCategory])
+
+  // Get set of suggested categories for highlighting
+  const suggestedCategorySet = new Set(guidedPrompts?.map((p) => p.category) || [])
 
   const handleSubmit = async () => {
     if (!content.trim()) return
@@ -71,20 +93,42 @@ export function ReplyModal({ open, onOpenChange, onSubmit, parentReplyContent, t
           )}
 
           <div className="space-y-2">
-            <span className="text-sm font-medium text-gray-700">Category</span>
+            <div className="flex items-center justify-between">
+              <span className="text-sm font-medium text-gray-700">Category</span>
+              {suggestedCategorySet.size > 0 && (
+                <span className="text-xs text-blue-600 flex items-center gap-1">
+                  <Lightbulb className="h-3 w-3" />
+                  Suggested categories highlighted
+                </span>
+              )}
+            </div>
             <Select value={category} onValueChange={setCategory}>
               <SelectTrigger>
                 <SelectValue placeholder="Select a category" />
               </SelectTrigger>
               <SelectContent>
-                {REPLY_CATEGORIES.map((cat) => (
-                  <SelectItem key={cat.value} value={cat.value}>
-                    <div className="flex flex-col">
-                      <span className="font-medium">{cat.label}</span>
-                      <span className="text-xs text-gray-500">{cat.description}</span>
-                    </div>
-                  </SelectItem>
-                ))}
+                {REPLY_CATEGORIES.map((cat) => {
+                  const isSuggested = suggestedCategorySet.has(cat.value)
+                  const prompt = guidedPrompts?.find((p) => p.category === cat.value)
+                  return (
+                    <SelectItem key={cat.value} value={cat.value}>
+                      <div className="flex flex-col">
+                        <div className="flex items-center gap-2">
+                          <span className="font-medium">{cat.label}</span>
+                          {isSuggested && (
+                            <Badge variant="secondary" className="text-[10px] px-1 py-0 bg-amber-100 text-amber-700 border-amber-200">
+                              <Star className="h-2.5 w-2.5 mr-0.5" />
+                              Suggested
+                            </Badge>
+                          )}
+                        </div>
+                        <span className="text-xs text-gray-500">
+                          {prompt ? prompt.prompt : cat.description}
+                        </span>
+                      </div>
+                    </SelectItem>
+                  )
+                })}
               </SelectContent>
             </Select>
           </div>
