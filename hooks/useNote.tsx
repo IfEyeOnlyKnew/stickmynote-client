@@ -91,8 +91,7 @@ export const useNote = (note: Note, options: UseNoteOptions = {}) => {
       setOriginalTopic(newTopic)
       setOriginalContent(newContent)
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [note.id, isEditing])
+  }, [note.id, note.topic, note.title, note.content, isEditing])
 
   // Action handlers (only available when callbacks are provided)
   const handleStartEditing = useCallback(() => {

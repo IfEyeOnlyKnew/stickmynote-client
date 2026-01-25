@@ -318,8 +318,8 @@ export const UnifiedNoteFullscreen: React.FC = () => {
           <div className="p-3 md:p-4 lg:p-6 bg-transparent text-gray-900 flex-1 overflow-y-auto">
             <NoteFullscreenContent
               noteId={note.id}
-              topic={note.topic || note.title || ""}
-              content={note.content || ""}
+              topic={editedTopic}
+              content={editedContent}
               onTopicChange={handleTopicChangeInternal}
               onContentChange={handleContentChangeInternal}
               onDetailsChange={handleDetailsChangeInternal}
