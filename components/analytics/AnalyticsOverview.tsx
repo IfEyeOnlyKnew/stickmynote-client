@@ -3,7 +3,7 @@ import { FileText, Users, Activity, Calendar } from "lucide-react"
 import type { AnalyticsData } from "@/hooks/use-analytics"
 
 interface AnalyticsOverviewProps {
-  analytics: AnalyticsData
+  readonly analytics: AnalyticsData
 }
 
 export function AnalyticsOverview({ analytics }: AnalyticsOverviewProps) {

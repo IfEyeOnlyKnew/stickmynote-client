@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button"
 import { Loader2, ActivityIcon } from "lucide-react"
 
 interface ActivityFeedListProps {
-  userId: string | null
+  readonly userId: string | null
 }
 
 export function ActivityFeedList({ userId }: ActivityFeedListProps) {

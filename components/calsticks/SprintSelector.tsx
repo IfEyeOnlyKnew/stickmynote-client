@@ -22,18 +22,25 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Badge } from "@/components/ui/badge"
-import { Plus, Loader2, Target, Calendar } from "lucide-react"
+import { Plus, Loader2, Target } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import type { Sprint } from "@/types/sprint"
 import { format, addDays } from "date-fns"
 
 interface SprintSelectorProps {
-  selectedSprintId: string | null
-  onSprintChange: (sprintId: string | null) => void
-  showAllOption?: boolean
-  showBacklogOption?: boolean
-  showCreateButton?: boolean
-  className?: string
+  readonly selectedSprintId: string | null
+  readonly onSprintChange: (sprintId: string | null) => void
+  readonly showAllOption?: boolean
+  readonly showBacklogOption?: boolean
+  readonly showCreateButton?: boolean
+  readonly className?: string
+}
+
+// Helper to convert select value to sprint ID
+function getSprintIdFromValue(value: string): string | null {
+  if (value === "all") return null
+  if (value === "backlog") return "backlog"
+  return value
 }
 
 export function SprintSelector({
@@ -154,7 +161,7 @@ export function SprintSelector({
     <div className={`flex items-center gap-2 ${className}`}>
       <Select
         value={selectedSprintId || "all"}
-        onValueChange={(value) => onSprintChange(value === "all" ? null : value === "backlog" ? "backlog" : value)}
+        onValueChange={(value) => onSprintChange(getSprintIdFromValue(value))}
       >
         <SelectTrigger className="w-[200px]">
           <Target className="h-4 w-4 mr-2" />
@@ -248,11 +255,11 @@ export function SprintSelector({
                   placeholder="e.g., 21"
                   value={newSprint.velocity_planned || ""}
                   onChange={(e) =>
-                    setNewSprint((prev) => ({ ...prev, velocity_planned: parseInt(e.target.value) || 0 }))
+                    setNewSprint((prev) => ({ ...prev, velocity_planned: Number.parseInt(e.target.value) || 0 }))
                   }
                 />
                 <p className="text-xs text-muted-foreground">
-                  Based on your team's average velocity from past sprints
+                  Based on your team&apos;s average velocity from past sprints
                 </p>
               </div>
             </div>

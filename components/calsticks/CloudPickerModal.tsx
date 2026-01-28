@@ -8,9 +8,9 @@ import { Cloud, HardDrive, FolderOpen } from "lucide-react"
 import { toast } from "sonner"
 
 interface CloudPickerModalProps {
-  open: boolean
-  onClose: () => void
-  onFileSelect: (file: {
+  readonly open: boolean
+  readonly onClose: () => void
+  readonly onFileSelect: (file: {
     name: string
     url: string
     size: number

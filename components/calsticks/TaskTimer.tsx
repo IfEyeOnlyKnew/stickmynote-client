@@ -7,9 +7,9 @@ import { toast } from "@/hooks/use-toast"
 import { formatDuration } from "@/lib/utils"
 
 interface TaskTimerProps {
-  taskId: string
-  initialDuration?: number
-  onTimerStop?: (duration: number) => void
+  readonly taskId: string
+  readonly initialDuration?: number
+  readonly onTimerStop?: (duration: number) => void
 }
 
 export function TaskTimer({ taskId, initialDuration = 0, onTimerStop }: TaskTimerProps) {
@@ -36,7 +36,7 @@ export function TaskTimer({ taskId, initialDuration = 0, onTimerStop }: TaskTime
             setEntryId(data.activeEntry.id)
             setIsRunning(true)
             const startTime = new Date(data.activeEntry.started_at).getTime()
-            const now = new Date().getTime()
+            const now = Date.now()
             setElapsed(Math.floor((now - startTime) / 1000))
           }
         }

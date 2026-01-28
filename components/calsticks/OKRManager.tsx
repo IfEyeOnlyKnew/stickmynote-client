@@ -32,8 +32,8 @@ interface Objective {
 }
 
 interface OKRManagerProps {
-  open: boolean
-  onClose: () => void
+  readonly open: boolean
+  readonly onClose: () => void
 }
 
 export function OKRManager({ open, onClose }: OKRManagerProps) {
@@ -80,7 +80,7 @@ export function OKRManager({ open, onClose }: OKRManagerProps) {
         setShowForm(false)
         setEditingObjective(null)
       }
-    } catch (error) {
+    } catch {
       toast({
         title: "Error",
         description: "Failed to save objective",
@@ -104,7 +104,7 @@ export function OKRManager({ open, onClose }: OKRManagerProps) {
         })
         fetchObjectives()
       }
-    } catch (error) {
+    } catch {
       toast({
         title: "Error",
         description: "Failed to delete objective",
@@ -121,7 +121,16 @@ export function OKRManager({ open, onClose }: OKRManagerProps) {
           <DialogDescription>Create and manage objectives and key results</DialogDescription>
         </DialogHeader>
 
-        {!showForm ? (
+        {showForm ? (
+          <ObjectiveForm
+            objective={editingObjective!}
+            onSave={handleSaveObjective}
+            onCancel={() => {
+              setShowForm(false)
+              setEditingObjective(null)
+            }}
+          />
+        ) : (
           <div className="space-y-4">
             <Button
               onClick={() => {
@@ -171,15 +180,6 @@ export function OKRManager({ open, onClose }: OKRManagerProps) {
               ))}
             </div>
           </div>
-        ) : (
-          <ObjectiveForm
-            objective={editingObjective!}
-            onSave={handleSaveObjective}
-            onCancel={() => {
-              setShowForm(false)
-              setEditingObjective(null)
-            }}
-          />
         )}
       </DialogContent>
     </Dialog>
@@ -191,9 +191,9 @@ function ObjectiveForm({
   onSave,
   onCancel,
 }: {
-  objective: Objective
-  onSave: (obj: Objective) => void
-  onCancel: () => void
+  readonly objective: Objective
+  readonly onSave: (obj: Objective) => void
+  readonly onCancel: () => void
 }) {
   const [formData, setFormData] = useState<Objective>(objective)
 
@@ -295,7 +295,7 @@ function ObjectiveForm({
         </div>
 
         {formData.key_results.map((kr, index) => (
-          <div key={index} className="border rounded-lg p-4 space-y-3">
+          <div key={kr.id ?? `kr-${index}`} className="border rounded-lg p-4 space-y-3">
             <div className="flex items-start justify-between">
               <Input
                 value={kr.title}

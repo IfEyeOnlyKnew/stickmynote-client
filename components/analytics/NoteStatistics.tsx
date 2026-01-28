@@ -4,7 +4,7 @@ import { Target, Award } from "lucide-react"
 import type { AnalyticsData } from "@/hooks/use-analytics"
 
 interface NoteStatisticsProps {
-  analytics: AnalyticsData
+  readonly analytics: AnalyticsData
 }
 
 export function NoteStatistics({ analytics }: NoteStatisticsProps) {

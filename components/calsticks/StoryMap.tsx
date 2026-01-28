@@ -66,11 +66,11 @@ interface Release {
 }
 
 interface StoryMapProps {
-  calsticks: CalStick[]
-  onTaskClick?: (task: CalStick) => void
-  onTaskMove?: (taskId: string, newEpicId: string, newReleaseId: string) => Promise<void>
-  onEpicCreate?: (name: string) => Promise<void>
-  onReleaseCreate?: (name: string, startDate: Date, endDate: Date) => Promise<void>
+  readonly calsticks: CalStick[]
+  readonly onTaskClick?: (task: CalStick) => void
+  readonly onTaskMove?: (taskId: string, newEpicId: string, newReleaseId: string) => Promise<void>
+  readonly onEpicCreate?: (name: string) => Promise<void>
+  readonly onReleaseCreate?: (name: string, startDate: Date, endDate: Date) => Promise<void>
 }
 
 // Generate releases based on date ranges
@@ -139,7 +139,7 @@ function generateEpics(calsticks: CalStick[]): Epic[] {
     const epicName = cs.calstick_labels?.[0] || cs.calstick_priority || "Backlog"
     if (!epicMap.has(epicName)) {
       epicMap.set(epicName, {
-        id: `epic-${epicName.toLowerCase().replace(/\s+/g, "-")}`,
+        id: `epic-${epicName.toLowerCase().replaceAll(/\s+/g, "-")}`,
         name: epicName,
         color: epicColors[epicMap.size % epicColors.length],
         order: epicMap.size,
@@ -160,14 +160,13 @@ function generateEpics(calsticks: CalStick[]): Epic[] {
   return Array.from(epicMap.values()).sort((a, b) => a.order - b.order)
 }
 
-// Sortable task card
-function SortableTaskCard({
-  task,
-  onClick,
-}: {
-  task: CalStick
-  onClick?: (task: CalStick) => void
-}) {
+// Sortable task card props
+interface SortableTaskCardProps {
+  readonly task: CalStick
+  readonly onClick?: (task: CalStick) => void
+}
+
+function SortableTaskCard({ task, onClick }: SortableTaskCardProps) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: task.id,
   })
@@ -186,23 +185,21 @@ function SortableTaskCard({
   }
 
   return (
-    <div
+    <button
+      type="button"
       ref={setNodeRef}
       style={style}
-      role="button"
-      tabIndex={0}
       className={cn(
-        "group bg-card border rounded-lg p-2 shadow-sm hover:shadow-md transition-all cursor-pointer",
+        "group bg-card border rounded-lg p-2 shadow-sm hover:shadow-md transition-all cursor-pointer text-left w-full",
         isDragging && "ring-2 ring-primary",
         task.calstick_completed && "opacity-60",
       )}
       onClick={() => onClick?.(task)}
-      onKeyDown={(e) => e.key === "Enter" && onClick?.(task)}
     >
       <div className="flex items-start gap-2">
-        <button {...attributes} {...listeners} className="mt-1 cursor-grab active:cursor-grabbing">
+        <span {...attributes} {...listeners} className="mt-1 cursor-grab active:cursor-grabbing">
           <GripVertical className="h-3 w-3 text-muted-foreground" />
-        </button>
+        </span>
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-1 mb-1">
             {getStatusIcon()}
@@ -215,26 +212,22 @@ function SortableTaskCard({
           )}
         </div>
       </div>
-    </div>
+    </button>
   )
 }
 
+// Epic row props
+interface EpicRowProps {
+  readonly epic: Epic
+  readonly releases: Release[]
+  readonly tasks: CalStick[]
+  readonly isExpanded: boolean
+  readonly onToggle: () => void
+  readonly onTaskClick?: (task: CalStick) => void
+}
+
 // Epic row component
-function EpicRow({
-  epic,
-  releases,
-  tasks,
-  isExpanded,
-  onToggle,
-  onTaskClick,
-}: {
-  epic: Epic
-  releases: Release[]
-  tasks: CalStick[]
-  isExpanded: boolean
-  onToggle: () => void
-  onTaskClick?: (task: CalStick) => void
-}) {
+function EpicRow({ epic, releases, tasks, isExpanded, onToggle, onTaskClick }: EpicRowProps) {
   // Group tasks by release
   const tasksByRelease = useMemo(() => {
     const grouped = new Map<string, CalStick[]>()
@@ -258,7 +251,7 @@ function EpicRow({
         grouped.get(matchingRelease.id)?.push(task)
       } else {
         // Put in last release if date is beyond
-        const lastRelease = releases[releases.length - 1]
+        const lastRelease = releases.at(-1)
         if (lastRelease) {
           grouped.get(lastRelease.id)?.push(task)
         }
@@ -274,12 +267,10 @@ function EpicRow({
   return (
     <div className="border-b last:border-b-0">
       {/* Epic Header */}
-      <div
-        role="button"
-        tabIndex={0}
-        className="flex items-center gap-2 px-3 py-2 bg-muted/50 cursor-pointer hover:bg-muted/80 transition-colors"
+      <button
+        type="button"
+        className="flex items-center gap-2 px-3 py-2 bg-muted/50 cursor-pointer hover:bg-muted/80 transition-colors w-full text-left"
         onClick={onToggle}
-        onKeyDown={(e) => e.key === "Enter" && onToggle()}
         style={{ borderLeft: `4px solid ${epic.color}` }}
       >
         {isExpanded ? (
@@ -292,7 +283,7 @@ function EpicRow({
         <Badge variant="outline" className="text-xs">
           {completedCount}/{totalCount}
         </Badge>
-      </div>
+      </button>
 
       {/* Task Grid */}
       {isExpanded && (
@@ -402,9 +393,8 @@ export default function StoryMap({ calsticks, onTaskClick, onTaskMove, onEpicCre
 
       if (!event.over || !onTaskMove) return
 
-      const taskId = event.active.id as string
       // Parse the drop target to determine new epic and release
-      // This is a simplified implementation
+      // This is a simplified implementation - taskId is event.active.id
     },
     [onTaskMove],
   )

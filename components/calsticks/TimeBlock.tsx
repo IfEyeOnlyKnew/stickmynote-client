@@ -7,12 +7,18 @@ import { CheckCircle2, Circle, GripVertical } from "lucide-react"
 import type { CalStick } from "@/types/calstick"
 
 interface TimeBlockProps {
-  date: Date
-  hour: number
-  tasks: CalStick[]
-  onToggleComplete: (id: string, completed: boolean) => void
-  onStickClick: (calstick: CalStick) => void
-  fullWidth?: boolean
+  readonly date: Date
+  readonly hour: number
+  readonly tasks: CalStick[]
+  readonly onToggleComplete: (id: string, completed: boolean) => void
+  readonly onStickClick: (calstick: CalStick) => void
+  readonly fullWidth?: boolean
+}
+
+interface DraggableTaskProps {
+  readonly task: CalStick
+  readonly onToggleComplete: (id: string, completed: boolean) => void
+  readonly onStickClick: (calstick: CalStick) => void
 }
 
 export function TimeBlock({ date, hour, tasks, onToggleComplete, onStickClick, fullWidth = false }: TimeBlockProps) {
@@ -44,15 +50,7 @@ export function TimeBlock({ date, hour, tasks, onToggleComplete, onStickClick, f
   )
 }
 
-function DraggableTask({
-  task,
-  onToggleComplete,
-  onStickClick,
-}: {
-  task: CalStick
-  onToggleComplete: (id: string, completed: boolean) => void
-  onStickClick: (calstick: CalStick) => void
-}) {
+function DraggableTask({ task, onToggleComplete, onStickClick }: DraggableTaskProps) {
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
     id: task.id,
     data: {
@@ -70,11 +68,7 @@ function DraggableTask({
     <div
       ref={setNodeRef}
       style={style}
-      role="button"
-      tabIndex={0}
-      className="group relative rounded p-1.5 cursor-pointer hover:shadow-md transition-all border-l-3"
-      onClick={() => onStickClick(task)}
-      onKeyDown={(e) => e.key === "Enter" && onStickClick(task)}
+      className="group relative rounded p-1.5 hover:shadow-md transition-all border-l-3"
     >
       <div
         className="absolute inset-0 rounded"
@@ -89,11 +83,10 @@ function DraggableTask({
           <GripVertical className="h-3 w-3 text-gray-400" />
         </div>
         <button
-          onClick={(e) => {
-            e.stopPropagation()
-            onToggleComplete(task.id, task.calstick_completed)
-          }}
+          type="button"
+          onClick={() => onToggleComplete(task.id, task.calstick_completed)}
           className="flex-shrink-0"
+          aria-label={task.calstick_completed ? "Mark as incomplete" : "Mark as complete"}
         >
           {task.calstick_completed ? (
             <CheckCircle2 className="h-3.5 w-3.5 text-green-600" />
@@ -101,7 +94,11 @@ function DraggableTask({
             <Circle className="h-3.5 w-3.5 text-gray-400 hover:text-gray-600" />
           )}
         </button>
-        <div className="flex-1 min-w-0">
+        <button
+          type="button"
+          className="flex-1 min-w-0 text-left cursor-pointer"
+          onClick={() => onStickClick(task)}
+        >
           <div
             className={`text-xs font-medium truncate ${task.calstick_completed ? "line-through text-gray-500" : ""}`}
           >
@@ -113,7 +110,7 @@ function DraggableTask({
               {format(parseISO(task.calstick_end_time), "h:mm a")}
             </div>
           )}
-        </div>
+        </button>
       </div>
     </div>
   )

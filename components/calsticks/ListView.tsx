@@ -15,16 +15,16 @@ import { NLQueryBar } from "@/components/ai/NLQueryBar"
 import { useVirtualizer } from "@tanstack/react-virtual"
 
 interface ListViewProps {
-  calsticks: CalStick[]
-  onToggleComplete: (id: string, completed: boolean) => void
-  onUpdateDate: (id: string, date: Date | undefined) => void
-  onStickClick: (calstick: CalStick) => void
-  editingId: string | null
-  setEditingId: (id: string | null) => void
-  editDate: Date | undefined
-  setEditDate: (date: Date | undefined) => void
-  openGanttChart: (stickId: string) => void
-  autoArchiveDays?: number
+  readonly calsticks: CalStick[]
+  readonly onToggleComplete: (id: string, completed: boolean) => void
+  readonly onUpdateDate: (id: string, date: Date | undefined) => void
+  readonly onStickClick: (calstick: CalStick) => void
+  readonly editingId: string | null
+  readonly setEditingId: (id: string | null) => void
+  readonly editDate: Date | undefined
+  readonly setEditDate: (date: Date | undefined) => void
+  readonly openGanttChart: (stickId: string) => void
+  readonly autoArchiveDays?: number
 }
 
 interface GroupedCalSticks {
@@ -265,7 +265,7 @@ export function ListView({
             </div>
             <div className="flex items-center gap-2 ml-2">
               {isEditing ? (
-                <div className="flex items-center gap-1" role="presentation" onClick={(e) => e.stopPropagation()} onKeyDown={(e) => e.stopPropagation()}>
+                <div className="flex items-center gap-1">
                   <Popover>
                     <PopoverTrigger asChild>
                       <Button variant="outline" size="sm">

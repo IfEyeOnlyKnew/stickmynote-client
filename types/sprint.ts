@@ -77,3 +77,67 @@ export interface UpdateSprintInput {
   velocity_planned?: number
   velocity_completed?: number
 }
+
+// Sprint Retrospective Types
+export type RetrospectiveStatus = "draft" | "in_progress" | "completed"
+
+export interface RetrospectiveItem {
+  id: string
+  text: string
+  votes: number
+  author_id?: string
+  author_name?: string
+  created_at?: string
+}
+
+export interface ActionItem {
+  id: string
+  text: string
+  assignee_id?: string
+  assignee_name?: string
+  due_date?: string
+  completed: boolean
+  completed_at?: string
+  created_at?: string
+}
+
+export interface SprintRetrospective {
+  id: string
+  sprint_id: string
+  org_id?: string
+  went_well: RetrospectiveItem[]
+  to_improve: RetrospectiveItem[]
+  action_items: ActionItem[]
+  facilitator_id?: string
+  facilitator_name?: string
+  meeting_date?: string
+  meeting_notes?: string
+  duration_minutes?: number
+  participants: string[]
+  team_mood_score?: number
+  status: RetrospectiveStatus
+  created_at: string
+  updated_at: string
+  completed_at?: string
+  created_by?: string
+  // Joined data
+  sprint?: Sprint
+}
+
+export interface CreateRetrospectiveInput {
+  sprint_id: string
+  meeting_date?: string
+  meeting_notes?: string
+  facilitator_id?: string
+}
+
+export interface UpdateRetrospectiveInput {
+  went_well?: RetrospectiveItem[]
+  to_improve?: RetrospectiveItem[]
+  action_items?: ActionItem[]
+  meeting_notes?: string
+  duration_minutes?: number
+  participants?: string[]
+  team_mood_score?: number
+  status?: RetrospectiveStatus
+}

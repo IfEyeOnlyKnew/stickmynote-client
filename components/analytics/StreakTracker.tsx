@@ -4,7 +4,7 @@ import { TrendingUp, Award } from "lucide-react"
 import type { AnalyticsData } from "@/hooks/use-analytics"
 
 interface StreakTrackerProps {
-  analytics: AnalyticsData
+  readonly analytics: AnalyticsData
 }
 
 export function StreakTracker({ analytics }: StreakTrackerProps) {

@@ -7,9 +7,9 @@ import { Bold, Italic, List, ListOrdered } from "lucide-react"
 import { Button } from "@/components/ui/button"
 
 interface TiptapEditorProps {
-  content: string
-  onChange?: (content: string) => void
-  editable?: boolean
+  readonly content: string
+  readonly onChange?: (content: string) => void
+  readonly editable?: boolean
 }
 
 export function TiptapEditor({ content, onChange, editable = true }: TiptapEditorProps) {

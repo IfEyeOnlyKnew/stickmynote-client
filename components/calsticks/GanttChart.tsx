@@ -3,7 +3,7 @@
 import { useMemo, useState, useCallback, useRef, useEffect } from "react"
 import { Gantt, type Task, ViewMode } from "gantt-task-react"
 import "gantt-task-react/dist/index.css"
-import { parseISO, addDays, format, differenceInDays, isSameDay, eachDayOfInterval } from "date-fns"
+import { parseISO, addDays, format, differenceInDays, eachDayOfInterval } from "date-fns"
 import { useToast } from "@/hooks/use-toast"
 import { Button } from "@/components/ui/button"
 import {
@@ -264,46 +264,59 @@ interface ResourceWorkload {
   overloadedDays: string[]
 }
 
-function calculateResourceWorkload(calsticks: CalStick[]): ResourceWorkload[] {
-  const workloadMap = new Map<string, ResourceWorkload>()
+// Helper to get workload color based on hours
+function getWorkloadColor(hours: number): string {
+  if (hours > 8) return "bg-red-500"
+  if (hours > 6) return "bg-orange-400"
+  if (hours > 4) return "bg-yellow-400"
+  return "bg-green-400"
+}
 
-  for (const cs of calsticks) {
-    if (!cs.calstick_assignee_id || cs.calstick_completed) continue
+// Helper to get assignee display name
+function getAssigneeDisplayName(cs: CalStick): string {
+  return cs.assignee?.full_name || cs.assignee?.username || cs.assignee?.email || "Unknown"
+}
 
-    const startDate = cs.calstick_start_date ? parseISO(cs.calstick_start_date) : cs.calstick_date ? parseISO(cs.calstick_date) : null
-    if (!startDate) continue
-
-    const estimatedHours = cs.calstick_estimated_hours || 8
-    const days = Math.max(1, Math.ceil(estimatedHours / 8))
-    const hoursPerDay = estimatedHours / days
-    const endDate = addDays(startDate, days - 1)
-
-    if (!workloadMap.has(cs.calstick_assignee_id)) {
-      workloadMap.set(cs.calstick_assignee_id, {
-        userId: cs.calstick_assignee_id,
-        userName: cs.assignee?.full_name || cs.assignee?.username || cs.assignee?.email || "Unknown",
-        workloadByDay: new Map(),
-        totalHours: 0,
-        overloadedDays: [],
-      })
-    }
-
-    const workload = workloadMap.get(cs.calstick_assignee_id)!
-
-    try {
-      const daysInRange = eachDayOfInterval({ start: startDate, end: endDate })
-      for (const day of daysInRange) {
-        const dateKey = format(day, "yyyy-MM-dd")
-        const currentHours = workload.workloadByDay.get(dateKey) || 0
-        workload.workloadByDay.set(dateKey, currentHours + hoursPerDay)
-        workload.totalHours += hoursPerDay
-      }
-    } catch {
-      // Invalid date range, skip
-    }
+// Helper to get or create workload entry
+function getOrCreateWorkload(
+  workloadMap: Map<string, ResourceWorkload>,
+  assigneeId: string,
+  displayName: string
+): ResourceWorkload {
+  if (!workloadMap.has(assigneeId)) {
+    workloadMap.set(assigneeId, {
+      userId: assigneeId,
+      userName: displayName,
+      workloadByDay: new Map(),
+      totalHours: 0,
+      overloadedDays: [],
+    })
   }
+  return workloadMap.get(assigneeId)!
+}
 
-  // Find overloaded days (more than 8 hours)
+// Helper to add workload hours for a date range
+function addWorkloadHours(
+  workload: ResourceWorkload,
+  startDate: Date,
+  endDate: Date,
+  hoursPerDay: number
+): void {
+  try {
+    const daysInRange = eachDayOfInterval({ start: startDate, end: endDate })
+    for (const day of daysInRange) {
+      const dateKey = format(day, "yyyy-MM-dd")
+      const currentHours = workload.workloadByDay.get(dateKey) || 0
+      workload.workloadByDay.set(dateKey, currentHours + hoursPerDay)
+      workload.totalHours += hoursPerDay
+    }
+  } catch {
+    // Invalid date range, skip
+  }
+}
+
+// Helper to find overloaded days in workloads
+function findOverloadedDays(workloadMap: Map<string, ResourceWorkload>): void {
   for (const workload of workloadMap.values()) {
     for (const [date, hours] of workload.workloadByDay) {
       if (hours > 8) {
@@ -311,6 +324,27 @@ function calculateResourceWorkload(calsticks: CalStick[]): ResourceWorkload[] {
       }
     }
   }
+}
+
+function calculateResourceWorkload(calsticks: CalStick[]): ResourceWorkload[] {
+  const workloadMap = new Map<string, ResourceWorkload>()
+
+  for (const cs of calsticks) {
+    if (!cs.calstick_assignee_id || cs.calstick_completed) continue
+
+    const startDate = getCalstickStartDateOrNull(cs)
+    if (!startDate) continue
+
+    const estimatedHours = cs.calstick_estimated_hours || 8
+    const days = Math.max(1, Math.ceil(estimatedHours / 8))
+    const hoursPerDay = estimatedHours / days
+    const endDate = addDays(startDate, days - 1)
+
+    const workload = getOrCreateWorkload(workloadMap, cs.calstick_assignee_id, getAssigneeDisplayName(cs))
+    addWorkloadHours(workload, startDate, endDate, hoursPerDay)
+  }
+
+  findOverloadedDays(workloadMap)
 
   return Array.from(workloadMap.values()).sort((a, b) => b.totalHours - a.totalHours)
 }
@@ -337,7 +371,7 @@ function calculateBaselineVariance(calsticks: CalStick[]): BaselineVariance[] {
 
     const plannedStart = parseISO(cs.baseline_start_date)
     const plannedEnd = parseISO(cs.baseline_end_date)
-    const actualStart = cs.calstick_start_date ? parseISO(cs.calstick_start_date) : cs.calstick_date ? parseISO(cs.calstick_date) : null
+    const actualStart = getCalstickStartDateOrNull(cs)
 
     if (!actualStart) continue
 
@@ -486,7 +520,7 @@ export default function GanttChart({ calsticks, dependencies = [], onTaskChange,
         description: data.message,
       })
       onRefresh?.()
-    } catch (error) {
+    } catch {
       toast({
         title: "Error",
         description: "Failed to set baseline",
@@ -516,7 +550,7 @@ export default function GanttChart({ calsticks, dependencies = [], onTaskChange,
       })
       setShowBaseline(false)
       onRefresh?.()
-    } catch (error) {
+    } catch {
       toast({
         title: "Error",
         description: "Failed to clear baseline",
@@ -990,7 +1024,7 @@ export default function GanttChart({ calsticks, dependencies = [], onTaskChange,
                     </div>
                   </div>
                 ))}
-                {baselineVariances.filter(v => !v.isDelayed && !v.isAhead).length > 0 && (
+                {baselineVariances.some(v => !v.isDelayed && !v.isAhead) && (
                   <div className="text-xs text-muted-foreground text-center py-1">
                     {baselineVariances.filter(v => !v.isDelayed && !v.isAhead).length} tasks on schedule
                   </div>
@@ -1042,9 +1076,7 @@ export default function GanttChart({ calsticks, dependencies = [], onTaskChange,
                           <Tooltip key={date}>
                             <TooltipTrigger asChild>
                               <div
-                                className={`h-4 w-4 rounded-sm ${
-                                  hours > 8 ? "bg-red-500" : hours > 6 ? "bg-orange-400" : hours > 4 ? "bg-yellow-400" : "bg-green-400"
-                                }`}
+                                className={`h-4 w-4 rounded-sm ${getWorkloadColor(hours)}`}
                               />
                             </TooltipTrigger>
                             <TooltipContent>

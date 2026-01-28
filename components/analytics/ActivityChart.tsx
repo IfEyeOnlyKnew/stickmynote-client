@@ -4,7 +4,7 @@ import { BarChart3 } from "lucide-react"
 import type { AnalyticsData } from "@/hooks/use-analytics"
 
 interface ActivityChartProps {
-  analytics: AnalyticsData
+  readonly analytics: AnalyticsData
 }
 
 export function ActivityChart({ analytics }: ActivityChartProps) {

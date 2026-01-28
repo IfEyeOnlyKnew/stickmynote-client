@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { Loader2, TrendingDown, Target, Calendar, CheckCircle } from "lucide-react"
+import { Loader2, TrendingDown, Target, Calendar } from "lucide-react"
 import {
   LineChart,
   Line,
@@ -19,8 +19,19 @@ import { format, parseISO, isBefore } from "date-fns"
 import type { SprintBurndownData } from "@/types/sprint"
 
 interface BurndownChartProps {
-  sprintId: string
-  className?: string
+  readonly sprintId: string
+  readonly className?: string
+}
+
+// Helper to get actual remaining points for a date
+function getActualRemainingPoints(
+  snapshot: { remaining_points: number } | undefined,
+  isPastOrToday: boolean,
+  fallbackPoints: number
+): number | null {
+  if (snapshot) return snapshot.remaining_points
+  if (isPastOrToday) return fallbackPoints
+  return null
 }
 
 export function BurndownChart({ sprintId, className }: BurndownChartProps) {
@@ -86,13 +97,13 @@ export function BurndownChart({ sprintId, className }: BurndownChartProps) {
       date: ideal.date,
       displayDate: format(parseISO(ideal.date), "MMM d"),
       ideal: Math.round(ideal.points * 10) / 10,
-      actual: snapshot ? snapshot.remaining_points : (isPast || isToday ? currentProgress.remainingPoints : null),
+      actual: getActualRemainingPoints(snapshot, isPast || isToday, currentProgress.remainingPoints),
       completed: snapshot?.completed_points || (isToday ? currentProgress.completedPoints : null),
     }
   })
 
   const getStatusColor = () => {
-    const { remainingPoints, totalPoints, percentComplete } = currentProgress
+    const { percentComplete } = currentProgress
     if (percentComplete >= 90) return "text-green-500"
     if (percentComplete >= 50) return "text-yellow-500"
     return "text-orange-500"

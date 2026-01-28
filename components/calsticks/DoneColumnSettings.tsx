@@ -23,8 +23,8 @@ import { Archive, Settings, Loader2 } from 'lucide-react'
 import { useToast } from "@/hooks/use-toast"
 
 interface DoneColumnSettingsProps {
-  onArchiveAll: () => Promise<void>
-  onViewArchived: () => void
+  readonly onArchiveAll: () => Promise<void>
+  readonly onViewArchived: () => void
 }
 
 export function DoneColumnSettings({ onArchiveAll, onViewArchived }: DoneColumnSettingsProps) {
@@ -71,7 +71,7 @@ export function DoneColumnSettings({ onArchiveAll, onViewArchived }: DoneColumnS
         })
         setOpen(false)
       }
-    } catch (error) {
+    } catch {
       toast({
         title: "Error",
         description: "Failed to save settings",
@@ -90,7 +90,7 @@ export function DoneColumnSettings({ onArchiveAll, onViewArchived }: DoneColumnS
         title: "Tasks archived",
         description: "Old completed tasks have been archived",
       })
-    } catch (error) {
+    } catch {
       toast({
         title: "Error",
         description: "Failed to archive tasks",
@@ -120,7 +120,7 @@ export function DoneColumnSettings({ onArchiveAll, onViewArchived }: DoneColumnS
             <Label htmlFor="auto-archive">Auto-hide completed tasks after</Label>
             <Select
               value={autoArchiveDays.toString()}
-              onValueChange={(value) => setAutoArchiveDays(parseInt(value))}
+              onValueChange={(value) => setAutoArchiveDays(Number.parseInt(value))}
               disabled={loading}
             >
               <SelectTrigger id="auto-archive">

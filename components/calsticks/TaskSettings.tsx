@@ -17,9 +17,9 @@ import { Archive, Settings, Loader2 } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 
 interface TaskSettingsProps {
-  autoArchiveDays: number
-  onSettingsChange: (days: number) => void
-  onViewArchived?: () => void
+  readonly autoArchiveDays: number
+  readonly onSettingsChange: (days: number) => void
+  readonly onViewArchived?: () => void
 }
 
 export function TaskSettings({ autoArchiveDays, onSettingsChange, onViewArchived }: TaskSettingsProps) {
@@ -53,7 +53,7 @@ export function TaskSettings({ autoArchiveDays, onSettingsChange, onViewArchived
         })
         setOpen(false)
       }
-    } catch (error) {
+    } catch {
       toast({
         title: "Error",
         description: "Failed to save settings",
@@ -81,8 +81,8 @@ export function TaskSettings({ autoArchiveDays, onSettingsChange, onViewArchived
         title: "Tasks archived",
         description: "Old completed tasks have been archived",
       })
-      window.location.reload()
-    } catch (error) {
+      globalThis.location.reload()
+    } catch {
       toast({
         title: "Error",
         description: "Failed to archive tasks",

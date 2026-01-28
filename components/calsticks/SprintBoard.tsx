@@ -33,8 +33,8 @@ import {
   Edit,
   Trash2,
   Loader2,
-  ArrowRight,
   GripVertical,
+  MessageSquare,
 } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import { format, parseISO, differenceInDays, isAfter, isBefore } from "date-fns"
@@ -43,16 +43,17 @@ import type { CalStick } from "@/types/calstick"
 import { DndContext, closestCenter, DragEndEvent, DragOverlay, DragStartEvent } from "@dnd-kit/core"
 import { SortableContext, verticalListSortingStrategy, useSortable } from "@dnd-kit/sortable"
 import { CSS } from "@dnd-kit/utilities"
+import { SprintRetrospective } from "./SprintRetrospective"
 
 interface SprintBoardProps {
-  onTaskClick?: (task: CalStick) => void
-  refreshTrigger?: number
+  readonly onTaskClick?: (task: CalStick) => void
+  readonly refreshTrigger?: number
 }
 
 interface TaskCardProps {
-  task: CalStick
-  isDragging?: boolean
-  onClick?: () => void
+  readonly task: CalStick
+  readonly isDragging?: boolean
+  readonly onClick?: () => void
 }
 
 function TaskCard({ task, isDragging, onClick }: TaskCardProps) {
@@ -78,10 +79,11 @@ function TaskCard({ task, isDragging, onClick }: TaskCardProps) {
   }
 
   return (
-    <div
+    <button
+      type="button"
       ref={setNodeRef}
       style={style}
-      className="bg-card border rounded-lg p-3 mb-2 cursor-pointer hover:shadow-md transition-shadow"
+      className="bg-card border rounded-lg p-3 mb-2 cursor-pointer hover:shadow-md transition-shadow w-full text-left"
       onClick={onClick}
     >
       <div className="flex items-start gap-2">
@@ -118,17 +120,17 @@ function TaskCard({ task, isDragging, onClick }: TaskCardProps) {
           </div>
         </div>
       </div>
-    </div>
+    </button>
   )
 }
 
 interface SprintColumnProps {
-  sprint: Sprint | null
-  tasks: CalStick[]
-  title: string
-  isBacklog?: boolean
-  onTaskClick?: (task: CalStick) => void
-  onSprintAction?: (action: string, sprint: Sprint) => void
+  readonly sprint: Sprint | null
+  readonly tasks: CalStick[]
+  readonly title: string
+  readonly isBacklog?: boolean
+  readonly onTaskClick?: (task: CalStick) => void
+  readonly onSprintAction?: (action: string, sprint: Sprint) => void
 }
 
 function SprintColumn({
@@ -209,6 +211,12 @@ function SprintColumn({
                     Complete Sprint
                   </DropdownMenuItem>
                 )}
+                {(sprint.status === "active" || sprint.status === "completed") && (
+                  <DropdownMenuItem onClick={() => onSprintAction("retrospective", sprint)}>
+                    <MessageSquare className="h-4 w-4 mr-2" />
+                    Retrospective
+                  </DropdownMenuItem>
+                )}
                 <DropdownMenuItem onClick={() => onSprintAction("edit", sprint)}>
                   <Edit className="h-4 w-4 mr-2" />
                   Edit Sprint
@@ -285,6 +293,7 @@ export function SprintBoard({ onTaskClick, refreshTrigger }: SprintBoardProps) {
   const [editingSprint, setEditingSprint] = useState<Sprint | null>(null)
   const [editFormData, setEditFormData] = useState({ name: "", goal: "" })
   const [saving, setSaving] = useState(false)
+  const [retrospectiveSprint, setRetrospectiveSprint] = useState<Sprint | null>(null)
   const { toast } = useToast()
 
   const fetchData = useCallback(async () => {
@@ -377,6 +386,11 @@ export function SprintBoard({ onTaskClick, refreshTrigger }: SprintBoardProps) {
       return
     }
 
+    if (action === "retrospective") {
+      setRetrospectiveSprint(sprint)
+      return
+    }
+
     if (action === "delete") {
       if (!confirm(`Are you sure you want to delete "${sprint.name}"? Tasks will be moved to backlog.`)) {
         return
@@ -397,7 +411,7 @@ export function SprintBoard({ onTaskClick, refreshTrigger }: SprintBoardProps) {
             description: `Sprint "${sprint.name}" has been deleted`,
           })
         }
-      } catch (error) {
+      } catch {
         toast({
           title: "Error",
           description: "Failed to delete sprint",
@@ -426,7 +440,7 @@ export function SprintBoard({ onTaskClick, refreshTrigger }: SprintBoardProps) {
           description: `Sprint "${sprint.name}" is now ${newStatus}`,
         })
       }
-    } catch (error) {
+    } catch {
       toast({
         title: "Error",
         description: `Failed to ${action} sprint`,
@@ -457,7 +471,7 @@ export function SprintBoard({ onTaskClick, refreshTrigger }: SprintBoardProps) {
           description: "Sprint details have been saved",
         })
       }
-    } catch (error) {
+    } catch {
       toast({
         title: "Error",
         description: "Failed to update sprint",
@@ -561,6 +575,20 @@ export function SprintBoard({ onTaskClick, refreshTrigger }: SprintBoardProps) {
               Save Changes
             </Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Sprint Retrospective Dialog */}
+      <Dialog open={!!retrospectiveSprint} onOpenChange={() => setRetrospectiveSprint(null)}>
+        <DialogContent className="max-w-3xl max-h-[90vh] overflow-hidden p-0">
+          {retrospectiveSprint && (
+            <SprintRetrospective
+              sprintId={retrospectiveSprint.id}
+              sprint={retrospectiveSprint}
+              onClose={() => setRetrospectiveSprint(null)}
+              className="h-[85vh]"
+            />
+          )}
         </DialogContent>
       </Dialog>
     </>

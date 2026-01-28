@@ -17,12 +17,12 @@ import {
 import { TimeBlock } from "./TimeBlock"
 
 interface WeekViewProps {
-  currentWeek: Date
-  calsticks: CalStick[]
-  onToggleComplete: (id: string, completed: boolean) => void
-  onStickClick: (calstick: CalStick) => void
-  onUpdateDate: (id: string, date: Date | undefined) => void
-  onUpdateTime?: (id: string, startTime: Date, endTime: Date) => void
+  readonly currentWeek: Date
+  readonly calsticks: CalStick[]
+  readonly onToggleComplete: (id: string, completed: boolean) => void
+  readonly onStickClick: (calstick: CalStick) => void
+  readonly onUpdateDate: (id: string, date: Date | undefined) => void
+  readonly onUpdateTime?: (id: string, startTime: Date, endTime: Date) => void
 }
 
 export function WeekView({

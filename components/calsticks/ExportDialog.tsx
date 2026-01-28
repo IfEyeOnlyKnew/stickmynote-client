@@ -9,10 +9,17 @@ import type { CalStick } from "@/types/calstick"
 import { format } from "date-fns"
 
 interface ExportDialogProps {
-  open: boolean
-  onClose: () => void
-  calsticks: CalStick[]
-  selectedPad: string
+  readonly open: boolean
+  readonly onClose: () => void
+  readonly calsticks: CalStick[]
+  readonly selectedPad: string
+}
+
+// Helper to format status for display
+function formatStatusLabel(status: string): string {
+  if (status === "in-progress") return "In Progress"
+  if (status === "in-review") return "In Review"
+  return status.charAt(0).toUpperCase() + status.slice(1)
 }
 
 export function ExportDialog({ open, onClose, calsticks, selectedPad }: ExportDialogProps) {
@@ -26,14 +33,14 @@ export function ExportDialog({ open, onClose, calsticks, selectedPad }: ExportDi
       if (!response.ok) throw new Error("Failed to export CSV")
 
       const blob = await response.blob()
-      const url = window.URL.createObjectURL(blob)
+      const url = globalThis.URL.createObjectURL(blob)
       const a = document.createElement("a")
       a.href = url
       a.download = `calsticks-export-${format(new Date(), "yyyy-MM-dd")}.csv`
       document.body.appendChild(a)
       a.click()
-      window.URL.revokeObjectURL(url)
-      document.body.removeChild(a)
+      globalThis.URL.revokeObjectURL(url)
+      a.remove()
 
       toast({
         title: "Success",
@@ -60,14 +67,14 @@ export function ExportDialog({ open, onClose, calsticks, selectedPad }: ExportDi
       if (!response.ok) throw new Error("Failed to export Excel")
 
       const blob = await response.blob()
-      const url = window.URL.createObjectURL(blob)
+      const url = globalThis.URL.createObjectURL(blob)
       const a = document.createElement("a")
       a.href = url
       a.download = `calsticks-export-${format(new Date(), "yyyy-MM-dd")}.xlsx`
       document.body.appendChild(a)
       a.click()
-      window.URL.revokeObjectURL(url)
-      document.body.removeChild(a)
+      globalThis.URL.revokeObjectURL(url)
+      a.remove()
 
       toast({
         title: "Success",
@@ -211,7 +218,7 @@ export function ExportDialog({ open, onClose, calsticks, selectedPad }: ExportDi
                 ([status, tasks]) => `
               <div class="column">
                 <div class="column-header">
-                  <span>${status === "in-progress" ? "In Progress" : status === "in-review" ? "In Review" : status.charAt(0).toUpperCase() + status.slice(1)}</span>
+                  <span>${formatStatusLabel(status)}</span>
                   <span class="task-count">${tasks.length}</span>
                 </div>
                 ${tasks
@@ -239,7 +246,8 @@ export function ExportDialog({ open, onClose, calsticks, selectedPad }: ExportDi
       </html>
     `
 
-    printWindow.document.write(html)
+    printWindow.document.open()
+    printWindow.document.write(html) // Using document.write for print window content - standard pattern for popup printing
     printWindow.document.close()
     setTimeout(() => {
       printWindow.print()

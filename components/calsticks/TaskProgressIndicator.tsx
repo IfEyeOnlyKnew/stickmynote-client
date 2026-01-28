@@ -5,8 +5,8 @@ import { CheckSquare, ListTodo } from "lucide-react"
 import type { TaskProgress } from "@/types/checklist"
 
 interface TaskProgressIndicatorProps {
-  progress: TaskProgress
-  compact?: boolean
+  readonly progress: TaskProgress
+  readonly compact?: boolean
 }
 
 export function TaskProgressIndicator({ progress, compact = false }: TaskProgressIndicatorProps) {

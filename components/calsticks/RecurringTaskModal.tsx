@@ -14,9 +14,16 @@ import { format } from "date-fns" // Added format import
 import { cn } from "@/lib/utils" // Added cn import
 
 interface RecurringTaskModalProps {
-  isOpen: boolean
-  onClose: () => void
-  taskId: string
+  readonly isOpen: boolean
+  readonly onClose: () => void
+  readonly taskId: string
+}
+
+// Helper to get interval label based on frequency
+function getIntervalLabel(frequency: "daily" | "weekly" | "monthly"): string {
+  if (frequency === "daily") return "Days"
+  if (frequency === "weekly") return "Weeks"
+  return "Months"
 }
 
 export function RecurringTaskModal({ isOpen, onClose, taskId }: RecurringTaskModalProps) {
@@ -56,7 +63,7 @@ export function RecurringTaskModal({ isOpen, onClose, taskId }: RecurringTaskMod
 
       toast({ title: "Success", description: "Task will repeat " + frequency })
       onClose()
-    } catch (error) {
+    } catch {
       toast({ title: "Error", description: "Failed to save settings", variant: "destructive" })
     } finally {
       setLoading(false) // Reset loading state
@@ -89,7 +96,7 @@ export function RecurringTaskModal({ isOpen, onClose, taskId }: RecurringTaskMod
               </Select>
             </div>
             <div className="space-y-2">
-              <Label>Every X {frequency === "daily" ? "Days" : frequency === "weekly" ? "Weeks" : "Months"}</Label>
+              <Label>Every X {getIntervalLabel(frequency)}</Label>
               <Input type="number" min={1} value={interval} onChange={(e) => setInterval(Number(e.target.value))} />
             </div>
           </div>
@@ -100,7 +107,7 @@ export function RecurringTaskModal({ isOpen, onClose, taskId }: RecurringTaskMod
               <div className="flex gap-2">
                 {dayNames.map((day, idx) => (
                   <Button
-                    key={idx}
+                    key={day}
                     variant={selectedDays.includes(idx) ? "default" : "outline"}
                     size="sm"
                     className="flex-1"
@@ -126,7 +133,7 @@ export function RecurringTaskModal({ isOpen, onClose, taskId }: RecurringTaskMod
                 </Button>
               </PopoverTrigger>
               <PopoverContent className="w-auto p-0" align="start">
-                <Calendar mode="single" selected={endDate} onSelect={setEndDate} initialFocus />
+                <Calendar mode="single" selected={endDate} onSelect={setEndDate} autoFocus />
               </PopoverContent>
             </Popover>
           </div>

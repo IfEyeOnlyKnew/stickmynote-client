@@ -15,9 +15,9 @@ import { format } from "date-fns"
 import { cn } from "@/lib/utils"
 
 interface ReminderModalProps {
-  isOpen: boolean
-  onClose: () => void
-  taskId: string
+  readonly isOpen: boolean
+  readonly onClose: () => void
+  readonly taskId: string
 }
 
 export function ReminderModal({ isOpen, onClose, taskId }: ReminderModalProps) {
@@ -59,7 +59,7 @@ export function ReminderModal({ isOpen, onClose, taskId }: ReminderModalProps) {
         description: `You'll be reminded on ${format(remindAt, "PPP 'at' p")}`,
       })
       onClose()
-    } catch (error) {
+    } catch {
       toast({
         title: "Error",
         description: "Could not create reminder",
@@ -98,7 +98,7 @@ export function ReminderModal({ isOpen, onClose, taskId }: ReminderModalProps) {
                   </Button>
                 </PopoverTrigger>
                 <PopoverContent className="w-auto p-0" align="start">
-                  <Calendar mode="single" selected={reminderDate} onSelect={setReminderDate} initialFocus />
+                  <Calendar mode="single" selected={reminderDate} onSelect={setReminderDate} autoFocus />
                 </PopoverContent>
               </Popover>
             </div>

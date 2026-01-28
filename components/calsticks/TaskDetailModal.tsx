@@ -21,7 +21,6 @@ import {
   Bell,
   User,
   Target,
-  Hash,
 } from "lucide-react"
 
 // Dynamically import TiptapEditor with SSR disabled
@@ -43,10 +42,17 @@ import type { ChecklistData, TaskProgress } from "@/types/checklist"
 import type { Sprint } from "@/types/sprint"
 
 interface TaskDetailModalProps {
-  task: CalStick | null
-  isOpen: boolean
-  onClose: () => void
-  onSave: (taskId: string, updates: Partial<CalStick>) => Promise<void>
+  readonly task: CalStick | null
+  readonly isOpen: boolean
+  readonly onClose: () => void
+  readonly onSave: (taskId: string, updates: Partial<CalStick>) => Promise<void>
+}
+
+// Helper to get the save button label
+function getSaveButtonLabel(isSaving: boolean, isNewTask: boolean): string {
+  if (isSaving) return "Saving..."
+  if (isNewTask) return "Create Task"
+  return "Save Changes"
 }
 
 const PRIORITY_OPTIONS = [
@@ -100,13 +106,13 @@ export function TaskDetailModal({ task, isOpen, onClose, onSave }: TaskDetailMod
     setAssigneeId(task.calstick_assignee_id || null)
     setEditorContent(task.calstick_description || "")
 
-    if (task.id !== "new") {
+    if (task.id === "new") {
+      setChecklist({ items: [] })
+      setTaskProgress(null)
+    } else {
       const checklistData = (task as any).calstick_checklist_items as ChecklistData | null
       setChecklist(checklistData || { items: [] })
       fetchProgress()
-    } else {
-      setChecklist({ items: [] })
-      setTaskProgress(null)
     }
 
     setSprintId(task.sprint_id || null)
@@ -177,14 +183,14 @@ export function TaskDetailModal({ task, isOpen, onClose, onSave }: TaskDetailMod
             calstick_description: editorContent,
             calstick_assignee_id: assigneeId,
             sprint_id: sprintId,
-            story_points: storyPoints ? parseInt(storyPoints) : null,
+            story_points: storyPoints ? Number.parseInt(storyPoints) : null,
           }),
         })
 
         if (!response.ok) throw new Error("Failed to create task")
 
         // Refresh the calsticks list
-        window.location.reload()
+        globalThis.location.reload()
       } else {
         // Update existing task
         await onSave(task.id, {
@@ -198,7 +204,7 @@ export function TaskDetailModal({ task, isOpen, onClose, onSave }: TaskDetailMod
           calstick_description: editorContent,
           calstick_assignee_id: assigneeId,
           sprint_id: sprintId,
-          story_points: storyPoints ? parseInt(storyPoints) : null,
+          story_points: storyPoints ? Number.parseInt(storyPoints) : null,
         } as Partial<CalStick>)
       }
       onClose()
@@ -533,7 +539,7 @@ export function TaskDetailModal({ task, isOpen, onClose, onSave }: TaskDetailMod
             </Button>
             <Button onClick={handleSave} disabled={isSaving}>
               <Save className="h-4 w-4 mr-2" />
-              {isSaving ? "Saving..." : task.id === "new" ? "Create Task" : "Save Changes"}
+              {getSaveButtonLabel(isSaving, task.id === "new")}
             </Button>
           </div>
         </DialogContent>

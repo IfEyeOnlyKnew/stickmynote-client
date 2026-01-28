@@ -12,13 +12,12 @@ import { toast } from "@/hooks/use-toast"
 import type { AutomationRule, TriggerEvent, ActionType } from "@/types/automation"
 
 interface AutomationRulesModalProps {
-  isOpen: boolean
-  onClose: () => void
+  readonly isOpen: boolean
+  readonly onClose: () => void
 }
 
 export function AutomationRulesModal({ isOpen, onClose }: AutomationRulesModalProps) {
   const [rules, setRules] = useState<AutomationRule[]>([])
-  const [loading, setLoading] = useState(true)
   const [isCreating, setIsCreating] = useState(false)
 
   // New Rule State
@@ -38,8 +37,6 @@ export function AutomationRulesModal({ isOpen, onClose }: AutomationRulesModalPr
       if (data.rules) setRules(data.rules)
     } catch (error) {
       console.error("Error fetching rules:", error)
-    } finally {
-      setLoading(false)
     }
   }
 
@@ -69,15 +66,30 @@ export function AutomationRulesModal({ isOpen, onClose }: AutomationRulesModalPr
       setIsCreating(false)
       setNewName("")
       toast({ title: "Rule Created", description: "Your automation rule is active." })
-    } catch (error) {
+    } catch {
       toast({ title: "Error", description: "Could not create rule", variant: "destructive" })
     }
   }
 
   const handleDeleteRule = async (id: string) => {
-    // TODO: Implement delete API
     // Optimistic update
+    const previousRules = rules
     setRules(rules.filter((r) => r.id !== id))
+
+    try {
+      const res = await fetch(`/api/automation/rules/${id}`, {
+        method: "DELETE",
+      })
+      if (!res.ok) {
+        // Revert on failure
+        setRules(previousRules)
+        toast({ title: "Error", description: "Could not delete rule", variant: "destructive" })
+      }
+    } catch {
+      // Revert on error
+      setRules(previousRules)
+      toast({ title: "Error", description: "Could not delete rule", variant: "destructive" })
+    }
   }
 
   return (
@@ -91,45 +103,7 @@ export function AutomationRulesModal({ isOpen, onClose }: AutomationRulesModalPr
         </DialogHeader>
 
         <div className="space-y-6">
-          {!isCreating ? (
-            <div className="space-y-4">
-              <div className="flex justify-between items-center">
-                <p className="text-sm text-muted-foreground">
-                  Automate your workflow with simple &quot;If this, then that&quot; rules.
-                </p>
-                <Button onClick={() => setIsCreating(true)} size="sm">
-                  <Plus className="h-4 w-4 mr-2" />
-                  New Rule
-                </Button>
-              </div>
-
-              <div className="space-y-2 max-h-[400px] overflow-y-auto">
-                {rules.length === 0 ? (
-                  <div className="text-center py-8 border rounded-lg bg-muted/20">
-                    <p className="text-muted-foreground">No rules yet.</p>
-                  </div>
-                ) : (
-                  rules.map((rule) => (
-                    <div key={rule.id} className="flex items-center justify-between p-3 border rounded-lg bg-card">
-                      <div>
-                        <h4 className="font-medium">{rule.name}</h4>
-                        <p className="text-xs text-muted-foreground">
-                          When <b>{rule.trigger_event.replace("_", " ")}</b> →{" "}
-                          <b>{rule.action_type.replace("_", " ")}</b>
-                        </p>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <Switch checked={rule.is_active} />
-                        <Button variant="ghost" size="icon" onClick={() => handleDeleteRule(rule.id)}>
-                          <Trash2 className="h-4 w-4 text-destructive" />
-                        </Button>
-                      </div>
-                    </div>
-                  ))
-                )}
-              </div>
-            </div>
-          ) : (
+          {isCreating ? (
             <div className="space-y-4 border p-4 rounded-lg">
               <div className="grid gap-2">
                 <Label>Rule Name</Label>
@@ -183,6 +157,44 @@ export function AutomationRulesModal({ isOpen, onClose }: AutomationRulesModalPr
                   Cancel
                 </Button>
                 <Button onClick={handleCreateRule}>Create Rule</Button>
+              </div>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              <div className="flex justify-between items-center">
+                <p className="text-sm text-muted-foreground">
+                  Automate your workflow with simple &quot;If this, then that&quot; rules.
+                </p>
+                <Button onClick={() => setIsCreating(true)} size="sm">
+                  <Plus className="h-4 w-4 mr-2" />
+                  New Rule
+                </Button>
+              </div>
+
+              <div className="space-y-2 max-h-[400px] overflow-y-auto">
+                {rules.length === 0 ? (
+                  <div className="text-center py-8 border rounded-lg bg-muted/20">
+                    <p className="text-muted-foreground">No rules yet.</p>
+                  </div>
+                ) : (
+                  rules.map((rule) => (
+                    <div key={rule.id} className="flex items-center justify-between p-3 border rounded-lg bg-card">
+                      <div>
+                        <h4 className="font-medium">{rule.name}</h4>
+                        <p className="text-xs text-muted-foreground">
+                          When <b>{rule.trigger_event.replace("_", " ")}</b> →{" "}
+                          <b>{rule.action_type.replace("_", " ")}</b>
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Switch checked={rule.is_active} />
+                        <Button variant="ghost" size="icon" onClick={() => handleDeleteRule(rule.id)}>
+                          <Trash2 className="h-4 w-4 text-destructive" />
+                        </Button>
+                      </div>
+                    </div>
+                  ))
+                )}
               </div>
             </div>
           )}

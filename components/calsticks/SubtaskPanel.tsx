@@ -18,9 +18,9 @@ function getPriorityBadgeColor(priority: string): string {
 }
 
 interface SubtaskPanelProps {
-  parentCalstick: CalStick
-  onSubtaskClick: (subtask: CalStick) => void
-  onRefresh: () => void
+  readonly parentCalstick: CalStick
+  readonly onSubtaskClick: (subtask: CalStick) => void
+  readonly onRefresh: () => void
 }
 
 export function SubtaskPanel({ parentCalstick, onSubtaskClick, onRefresh }: SubtaskPanelProps) {
@@ -146,12 +146,13 @@ export function SubtaskPanel({ parentCalstick, onSubtaskClick, onRefresh }: Subt
 
   const handleToggleComplete = async (subtask: CalStick) => {
     try {
+      const isNowCompleted = !subtask.calstick_completed
       const response = await fetch(`/api/sticks/replies/${subtask.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          calstick_completed: !subtask.calstick_completed,
-          calstick_completed_at: !subtask.calstick_completed ? new Date().toISOString() : null,
+          calstick_completed: isNowCompleted,
+          calstick_completed_at: isNowCompleted ? new Date().toISOString() : null,
         }),
       })
 
@@ -190,18 +191,13 @@ export function SubtaskPanel({ parentCalstick, onSubtaskClick, onRefresh }: Subt
           {subtasks.map((subtask) => (
             <div
               key={subtask.id}
-              role="button"
-              tabIndex={0}
-              className="flex items-start gap-3 p-3 rounded-lg border hover:bg-muted/50 cursor-pointer transition-colors"
-              onClick={() => onSubtaskClick(subtask)}
-              onKeyDown={(e) => e.key === "Enter" && onSubtaskClick(subtask)}
+              className="flex items-start gap-3 p-3 rounded-lg border hover:bg-muted/50 transition-colors"
             >
               <button
-                onClick={(e) => {
-                  e.stopPropagation()
-                  handleToggleComplete(subtask)
-                }}
+                type="button"
+                onClick={() => handleToggleComplete(subtask)}
                 className="hover:scale-110 transition-transform mt-0.5"
+                aria-label={subtask.calstick_completed ? "Mark as incomplete" : "Mark as complete"}
               >
                 {subtask.calstick_completed ? (
                   <CheckCircle2 className="h-4 w-4 text-green-600" />
@@ -209,7 +205,11 @@ export function SubtaskPanel({ parentCalstick, onSubtaskClick, onRefresh }: Subt
                   <Circle className="h-4 w-4 text-gray-400" />
                 )}
               </button>
-              <div className="flex-1 min-w-0">
+              <button
+                type="button"
+                className="flex-1 min-w-0 text-left cursor-pointer"
+                onClick={() => onSubtaskClick(subtask)}
+              >
                 <p className={`text-sm ${subtask.calstick_completed ? "line-through text-muted-foreground" : ""}`}>
                   {subtask.content}
                 </p>
@@ -240,7 +240,7 @@ export function SubtaskPanel({ parentCalstick, onSubtaskClick, onRefresh }: Subt
                     </span>
                   )}
                 </div>
-              </div>
+              </button>
             </div>
           ))}
         </div>

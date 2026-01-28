@@ -18,8 +18,8 @@ import {
 import type { VelocityTrend } from "@/types/sprint"
 
 interface VelocityChartProps {
-  className?: string
-  limit?: number
+  readonly className?: string
+  readonly limit?: number
 }
 
 export function VelocityChart({ className, limit = 8 }: VelocityChartProps) {
@@ -202,7 +202,7 @@ export function VelocityChart({ className, limit = 8 }: VelocityChartProps) {
                   name === "planned" ? "Planned" : "Completed",
                 ]}
                 labelFormatter={(_, payload: any) => {
-                  if (payload && payload[0]) {
+                  if (payload?.[0]) {
                     return payload[0].payload.fullName
                   }
                   return ""

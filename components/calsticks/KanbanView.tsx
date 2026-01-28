@@ -62,15 +62,15 @@ export interface QuickFilters {
 }
 
 interface KanbanViewProps {
-  calsticks: CalStick[]
-  onToggleComplete: (id: string, completed: boolean) => void
-  onUpdateStatus: (id: string, status: string) => void
-  onStickClick: (calstick: CalStick) => void
-  autoArchiveDays?: number
-  wipLimits?: WipLimits
-  onWipLimitsChange?: (limits: WipLimits) => void
-  swimlaneGroupBy?: SwimlaneGroupBy
-  onSwimlaneGroupByChange?: (groupBy: SwimlaneGroupBy) => void
+  readonly calsticks: CalStick[]
+  readonly onToggleComplete: (id: string, completed: boolean) => void
+  readonly onUpdateStatus: (id: string, status: string) => void
+  readonly onStickClick: (calstick: CalStick) => void
+  readonly autoArchiveDays?: number
+  readonly wipLimits?: WipLimits
+  readonly onWipLimitsChange?: (limits: WipLimits) => void
+  readonly swimlaneGroupBy?: SwimlaneGroupBy
+  readonly onSwimlaneGroupByChange?: (groupBy: SwimlaneGroupBy) => void
 }
 
 const DEFAULT_WIP_LIMITS: WipLimits = {
@@ -111,6 +111,35 @@ const agingBgColors = {
   critical: "bg-red-50/50",
 }
 
+// Helper to get badge variant based on due date status
+function getDueDateBadgeVariant(isOverdue: boolean, isDueToday: boolean): "destructive" | "default" | "outline" {
+  if (isOverdue) return "destructive"
+  if (isDueToday) return "default"
+  return "outline"
+}
+
+// Helper to get badge variant based on WIP limit status
+function getWipLimitBadgeVariant(isOverLimit: boolean, isAtLimit: boolean): "destructive" | "default" | "secondary" {
+  if (isOverLimit) return "destructive"
+  if (isAtLimit) return "default"
+  return "secondary"
+}
+
+// Helper to check if task is overdue
+function isTaskOverdue(task: CalStick): boolean {
+  return Boolean(
+    task.calstick_date &&
+    isPast(parseISO(task.calstick_date)) &&
+    !task.calstick_completed &&
+    !isToday(parseISO(task.calstick_date))
+  )
+}
+
+// Helper to check if task is due today
+function isTaskDueToday(task: CalStick): boolean {
+  return Boolean(task.calstick_date && isToday(parseISO(task.calstick_date)) && !task.calstick_completed)
+}
+
 function SortableTaskCard({
   task,
   onToggleComplete,
@@ -118,11 +147,11 @@ function SortableTaskCard({
   autoArchiveDays,
   showAging = true,
 }: {
-  task: CalStick
-  onToggleComplete: (id: string, completed: boolean) => void
-  onStickClick: (task: CalStick) => void
-  autoArchiveDays?: number
-  showAging?: boolean
+  readonly task: CalStick
+  readonly onToggleComplete: (id: string, completed: boolean) => void
+  readonly onStickClick: (task: CalStick) => void
+  readonly autoArchiveDays?: number
+  readonly showAging?: boolean
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: task.id,
@@ -139,12 +168,8 @@ function SortableTaskCard({
     touchAction: "none",
   }
 
-  const isOverdue =
-    task.calstick_date &&
-    isPast(parseISO(task.calstick_date)) &&
-    !task.calstick_completed &&
-    !isToday(parseISO(task.calstick_date))
-  const isDueToday = task.calstick_date && isToday(parseISO(task.calstick_date)) && !task.calstick_completed
+  const isOverdue = isTaskOverdue(task)
+  const isDueToday = isTaskDueToday(task)
   const creatorName = task.user?.username || task.user?.full_name || task.user?.email || "Unknown"
   const assigneeName = task.assignee?.username || task.assignee?.full_name || null
 
@@ -218,7 +243,7 @@ function SortableTaskCard({
           </Badge>
           {task.calstick_date && (
             <Badge
-              variant={isOverdue ? "destructive" : isDueToday ? "default" : "outline"}
+              variant={getDueDateBadgeVariant(isOverdue, isDueToday)}
               className="text-xs flex items-center gap-1"
             >
               {isOverdue && <AlertCircle className="h-3 w-3" />}
@@ -272,12 +297,12 @@ function KanbanColumn({
   wipLimit,
   showAging,
 }: {
-  column: { id: string; title: string; tasks: CalStick[]; color: string }
-  onToggleComplete: (id: string, completed: boolean) => void
-  onStickClick: (task: CalStick) => void
-  autoArchiveDays?: number
-  wipLimit?: number | null
-  showAging?: boolean
+  readonly column: { id: string; title: string; tasks: CalStick[]; color: string }
+  readonly onToggleComplete: (id: string, completed: boolean) => void
+  readonly onStickClick: (task: CalStick) => void
+  readonly autoArchiveDays?: number
+  readonly wipLimit?: number | null
+  readonly showAging?: boolean
 }) {
   const { setNodeRef } = useDroppable({
     id: column.id,
@@ -304,7 +329,7 @@ function KanbanColumn({
         <h3 className="font-semibold text-sm">{column.title}</h3>
         <div className="flex items-center gap-1">
           <Badge
-            variant={isOverWipLimit ? "destructive" : isAtWipLimit ? "default" : "secondary"}
+            variant={getWipLimitBadgeVariant(isOverWipLimit, isAtWipLimit)}
             className={cn(
               "text-xs",
               isOverWipLimit && "animate-pulse"
@@ -428,7 +453,7 @@ export function KanbanView({
       }
       // Label filter
       if (quickFilters.label) {
-        if (!task.calstick_labels || !task.calstick_labels.includes(quickFilters.label)) {
+        if (!task.calstick_labels?.includes(quickFilters.label)) {
           return false
         }
       }
@@ -827,7 +852,7 @@ export function KanbanView({
                     placeholder="∞"
                     value={wipLimits[colId] ?? ""}
                     onChange={(e) => {
-                      const val = e.target.value === "" ? null : parseInt(e.target.value, 10)
+                      const val = e.target.value === "" ? null : Number.parseInt(e.target.value, 10)
                       handleWipLimitChange(colId, val)
                     }}
                   />
