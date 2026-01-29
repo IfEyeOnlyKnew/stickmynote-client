@@ -280,7 +280,7 @@ export const DetailsTabContent = memo(function DetailsTabContent({
       {/* AI Answers Section */}
       {aiAnswers.length > 0 && (
         <div className="space-y-2 mt-4">
-          <span className="text-sm font-medium text-gray-700 block flex items-center gap-2">
+          <span className="text-sm font-medium text-gray-700 flex items-center gap-2">
             <Sparkles className="h-4 w-4 text-purple-600" />
             Saved AI Answers
           </span>
