@@ -91,6 +91,7 @@ export function PadChatSettingsDialog({
 }: PadChatSettingsDialogProps) {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
+  const [saved, setSaved] = useState(false)
   const [settings, setSettings] = useState<PadChatSettings | null>(null)
   const [moderators, setModerators] = useState<PadChatModerator[]>([])
   const [newModeratorEmail, setNewModeratorEmail] = useState("")
@@ -133,6 +134,7 @@ export function PadChatSettingsDialog({
     if (!settings) return
 
     setSaving(true)
+    setSaved(false)
     try {
       const response = await fetch(`/api/social-pads/${padId}/chat-settings`, {
         method: "PUT",
@@ -141,7 +143,10 @@ export function PadChatSettingsDialog({
       })
 
       if (response.ok) {
-        toast.success("Chat settings saved")
+        setSaved(true)
+        toast.success("Settings saved successfully")
+        // Reset saved state after 2 seconds
+        setTimeout(() => setSaved(false), 2000)
       } else {
         throw new Error("Failed to save")
       }
@@ -710,16 +715,25 @@ export function PadChatSettingsDialog({
           <Button variant="outline" onClick={() => onOpenChange(false)}>
             Cancel
           </Button>
-          <Button onClick={handleSaveSettings} disabled={saving}>
+          <Button
+            onClick={handleSaveSettings}
+            disabled={saving}
+            className={saved ? "bg-green-600 hover:bg-green-600" : ""}
+          >
             {saving ? (
               <>
                 <Loader2 className="h-4 w-4 mr-2 animate-spin" />
                 Saving...
               </>
+            ) : saved ? (
+              <>
+                <Check className="h-4 w-4 mr-2" />
+                Saved!
+              </>
             ) : (
               <>
                 <Check className="h-4 w-4 mr-2" />
-                Save Settings
+                Save
               </>
             )}
           </Button>
