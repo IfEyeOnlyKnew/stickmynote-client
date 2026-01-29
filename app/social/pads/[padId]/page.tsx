@@ -646,7 +646,9 @@ export default function SocialPadPage({ params }: Readonly<{ params: { padId: st
       {showPadChat && user && (
         <PadChatPanel
           padId={padId}
+          padName={pad.name}
           currentUserId={user.id}
+          isOwner={!!isOwner}
           isCollapsed={padChatCollapsed}
           onToggleCollapse={() => setPadChatCollapsed(!padChatCollapsed)}
           onClose={() => setShowPadChat(false)}
