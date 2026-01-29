@@ -197,7 +197,7 @@ async function fetchReplies(
 // AI Summary Generation
 // ============================================================================
 
-async function generateAISummary(repliesText: string, tone: string): Promise<{ summary: string | null; error: boolean }> {
+async function generateAISummary(repliesText: string, tone: string): Promise<{ summary: string | null; error: boolean; errorMessage?: string }> {
   try {
     const prompt = `${getTonePrompt(tone)}
 
@@ -207,15 +207,18 @@ ${repliesText}
 
 Summary:`
 
+    console.log("[summarize-replies] Calling AI provider...")
     const { text } = await generateText({
       prompt,
       maxTokens: 500,
     })
+    console.log("[summarize-replies] AI provider returned successfully")
 
     return { summary: text || "Unable to generate summary", error: false }
   } catch (error) {
-    console.error("[summarize-replies] AI generation error:", error)
-    return { summary: null, error: true }
+    const errorMessage = error instanceof Error ? error.message : "Unknown AI error"
+    console.error("[summarize-replies] AI generation error:", errorMessage)
+    return { summary: null, error: true, errorMessage }
   }
 }
 
@@ -297,7 +300,8 @@ async function generateDocxDocument(
   })
 
   const buffer = await Packer.toBuffer(doc)
-  const filename = `reply-summary-${noteId}-${Date.now()}.docx`
+  const toneLabel = tone.charAt(0).toUpperCase() + tone.slice(1)
+  const filename = `Reply-Summary-${toneLabel}-${noteId.slice(0, 8)}-${Date.now()}.docx`
   const blob = await put(filename, Buffer.from(buffer), { folder: "documents" })
 
   return { url: blob.url, filename }
@@ -313,20 +317,45 @@ interface ExportLink {
 async function saveExportLinkToDetailsTab(
   db: any,
   noteId: string,
-  userId: string,
+  currentUserId: string,
   exportLink: ExportLink
 ): Promise<void> {
   try {
-    // Check if details tab exists
+    console.log("[summarize-replies] Saving export link for noteId:", noteId)
+
+    // First, get the note owner's user_id - exports should be saved to the owner's tabs
+    // so they appear when anyone views the note (tabs API fetches by note owner)
+    const { data: note, error: noteError } = await db
+      .from("personal_sticks")
+      .select("user_id")
+      .eq("id", noteId)
+      .single()
+
+    if (noteError) {
+      console.error("[summarize-replies] Error fetching note:", noteError)
+      return
+    }
+
+    if (!note) {
+      console.error("[summarize-replies] Note not found:", noteId)
+      return
+    }
+
+    const noteOwnerId = note.user_id
+    console.log("[summarize-replies] Note owner ID:", noteOwnerId)
+
+    // Check if details tab exists for the note owner
     const { data: existingTab } = await db
       .from("personal_sticks_tabs")
       .select("id, tab_data")
       .eq("personal_stick_id", noteId)
+      .eq("user_id", noteOwnerId)
       .eq("tab_type", "details")
       .maybeSingle()
 
     if (existingTab) {
       // Update existing tab
+      console.log("[summarize-replies] Found existing details tab, updating...")
       let currentData: { exports?: ExportLink[]; [key: string]: any } = {}
       try {
         if (typeof existingTab.tab_data === "string") {
@@ -341,24 +370,37 @@ async function saveExportLinkToDetailsTab(
       const updatedExports = [...(currentData.exports || []), exportLink]
       const newTabData = { ...currentData, exports: updatedExports }
 
-      await db
+      const { error: updateError } = await db
         .from("personal_sticks_tabs")
         .update({
           tab_data: newTabData,
           updated_at: new Date().toISOString(),
         })
         .eq("id", existingTab.id)
+
+      if (updateError) {
+        console.error("[summarize-replies] Error updating tab:", updateError)
+      } else {
+        console.log("[summarize-replies] Successfully updated details tab with export")
+      }
     } else {
-      // Create new details tab
-      await db.from("personal_sticks_tabs").insert({
+      // Create new details tab for the note owner
+      console.log("[summarize-replies] No existing details tab, creating new one...")
+      const { error: insertError } = await db.from("personal_sticks_tabs").insert({
         personal_stick_id: noteId,
-        user_id: userId,
+        user_id: noteOwnerId,
         tab_type: "details",
         tab_name: "Details",
         tab_content: "Note details and exports",
         tab_data: { exports: [exportLink] },
         tab_order: 3,
       })
+
+      if (insertError) {
+        console.error("[summarize-replies] Error inserting tab:", insertError)
+      } else {
+        console.log("[summarize-replies] Successfully created details tab with export")
+      }
     }
   } catch (error) {
     console.error("[summarize-replies] Failed to save export link:", error)
@@ -393,14 +435,19 @@ async function tryCleanupDocx(blobUrl: string, filename: string): Promise<string
 // ============================================================================
 
 export async function POST(request: NextRequest) {
-  await initializeModules()
+  console.log("[summarize-replies] POST request received")
 
   try {
+    await initializeModules()
+    console.log("[summarize-replies] Modules initialized")
+
     const db = await createDatabaseClient()
     const serviceDb = await createServiceDatabaseClient()
+    console.log("[summarize-replies] Database clients created")
 
     // Auth check
     const authResult = await getCachedAuthUser()
+    console.log("[summarize-replies] Auth result:", authResult.user?.id ? "authenticated" : "not authenticated")
     if (authResult.rateLimited) {
       return Errors.rateLimit()
     }
@@ -408,63 +455,88 @@ export async function POST(request: NextRequest) {
     // Rate limit check
     const rateLimitResult = await applyRateLimit(request, authResult.user?.id, "ai_summarize")
     if (!rateLimitResult.success) {
+      console.log("[summarize-replies] Rate limited")
       return Errors.summarizeRateLimit(rateLimitResult.headers || {})
     }
 
     // Parse and validate request
     const { noteId, tone = DEFAULT_TONE, replies: providedReplies, generateDocx = false }: SummarizeRequest = await request.json()
+    console.log("[summarize-replies] Request parsed:", { noteId, tone, generateDocx, hasReplies: !!providedReplies })
 
     if (!noteId) {
+      console.log("[summarize-replies] Error: noteId required")
       return Errors.noteIdRequired()
     }
 
+    console.log("[summarize-replies] Checking AI availability...")
     if (!isAIAvailable()) {
+      console.log("[summarize-replies] Error: AI not configured")
       return Errors.aiNotConfigured()
     }
+    console.log("[summarize-replies] AI is available")
 
     // Fetch replies
+    console.log("[summarize-replies] Fetching replies...")
     const repliesResult = await fetchReplies(db, noteId, providedReplies)
     if (!repliesResult.success) {
+      console.log("[summarize-replies] Error: Failed to fetch replies")
       return repliesResult.response
     }
 
     const { replies, userIds } = repliesResult
+    console.log("[summarize-replies] Found", replies.length, "replies")
 
     if (replies.length === 0) {
+      console.log("[summarize-replies] No replies to summarize")
       return NextResponse.json({ summary: "No replies to summarize." })
     }
 
     // Fetch user data if needed
+    console.log("[summarize-replies] Fetching user data...")
     const { userMap, error: usersError } = await fetchUserMap(serviceDb, userIds)
     if (usersError) {
+      console.log("[summarize-replies] Error: Failed to fetch users")
       return Errors.fetchUsersFailed()
     }
+    console.log("[summarize-replies] User data fetched")
 
     // Generate AI summary
+    console.log("[summarize-replies] Generating AI summary with tone:", tone)
     const repliesText = formatRepliesText(replies, userMap)
-    const { summary, error: aiError } = await generateAISummary(repliesText, tone)
+    const { summary, error: aiError, errorMessage } = await generateAISummary(repliesText, tone)
 
     if (aiError || !summary) {
-      return Errors.summaryFailed()
+      console.error("[summarize-replies] AI generation failed:", errorMessage)
+      return NextResponse.json(
+        { error: `AI generation failed: ${errorMessage || "Unknown error"}` },
+        { status: 500 }
+      )
     }
+    console.log("[summarize-replies] AI summary generated successfully")
 
     // Generate DOCX if requested
     if (generateDocx) {
+      console.log("[summarize-replies] Generating DOCX document...")
       const { url: docxUrl, filename } = await generateDocxDocument(summary, replies, tone, noteId)
+      console.log("[summarize-replies] DOCX generated:", filename, "URL:", docxUrl)
+
       const cleanedUrl = await tryCleanupDocx(docxUrl, filename)
       const finalUrl = cleanedUrl || docxUrl
 
       // Save export link to the note's Details tab
+      // Use serviceDb to bypass RLS - we need to query/update the note owner's tabs
       if (authResult.user?.id) {
+        console.log("[summarize-replies] Saving export link to details tab...")
         const exportLink: ExportLink = {
           url: finalUrl,
           filename,
           created_at: new Date().toISOString(),
-          type: "reply-summary",
+          type: `reply-summary-${tone}`,
         }
-        await saveExportLinkToDetailsTab(db, noteId, authResult.user.id, exportLink)
+        await saveExportLinkToDetailsTab(serviceDb, noteId, authResult.user.id, exportLink)
       }
 
+      console.log("[summarize-replies] Returning success response")
       return NextResponse.json({
         summary,
         replyCount: replies.length,

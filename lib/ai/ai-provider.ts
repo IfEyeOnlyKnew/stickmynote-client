@@ -207,27 +207,82 @@ export async function generateText(options: GenerateTextOptions): Promise<{ text
   const provider = getActiveProvider()
 
   if (provider === "ollama" && config.ollama) {
-    // Use dedicated Ollama provider for AI SDK 5 compatibility
-    const ollama = createOllama({
-      baseURL: config.ollama.baseURL,
-    })
+    // Try direct Ollama API first (more reliable than AI SDK for some versions)
+    const ollamaUrl = `${config.ollama.baseURL}/api/generate`
+    try {
+      console.log("[ai-provider] Using direct Ollama API at:", ollamaUrl)
+      console.log("[ai-provider] Model:", config.ollama.model)
 
-    const generatePromise = aiGenerateText({
-      model: ollama(config.ollama.model) as any,
-      prompt: options.prompt,
-      maxOutputTokens: options.maxTokens,
-      temperature: options.temperature,
-      system: options.systemPrompt,
-    })
+      const controller = new AbortController()
+      const timeoutId = setTimeout(() => controller.abort(), AI_TIMEOUT_MS)
 
-    // Wrap with timeout to prevent hanging forever
-    const result = await withTimeout(
-      generatePromise,
-      AI_TIMEOUT_MS,
-      `Ollama request timed out after ${AI_TIMEOUT_MS / 1000}s - server may be slow or unreachable at ${config.ollama.baseURL}`
-    )
+      const response = await fetch(ollamaUrl, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          model: config.ollama.model,
+          prompt: options.systemPrompt
+            ? `${options.systemPrompt}\n\n${options.prompt}`
+            : options.prompt,
+          stream: false,
+          options: {
+            num_predict: options.maxTokens || 500,
+            temperature: options.temperature || 0.7,
+          },
+        }),
+        signal: controller.signal,
+        cache: "no-store" as RequestCache,
+      })
 
-    return { text: result.text, provider: "ollama" }
+      clearTimeout(timeoutId)
+
+      if (!response.ok) {
+        const errorText = await response.text()
+        throw new Error(`Ollama API error: ${response.status} - ${errorText}`)
+      }
+
+      const data = await response.json()
+      console.log("[ai-provider] Ollama direct API returned successfully")
+      return { text: data.response || "", provider: "ollama" }
+    } catch (directError: any) {
+      // Detailed error logging
+      const errorName = directError?.name || "Unknown"
+      const errorMessage = directError?.message || "No message"
+      const errorCause = directError?.cause ? JSON.stringify(directError.cause) : "No cause"
+      console.error("[ai-provider] Direct Ollama API failed:")
+      console.error("  - URL:", ollamaUrl)
+      console.error("  - Error name:", errorName)
+      console.error("  - Error message:", errorMessage)
+      console.error("  - Error cause:", errorCause)
+      console.error("  - Full error:", directError)
+
+      // Fallback to AI SDK
+      console.log("[ai-provider] Falling back to AI SDK...")
+      try {
+        const ollama = createOllama({
+          baseURL: config.ollama.baseURL,
+        })
+
+        const generatePromise = aiGenerateText({
+          model: ollama(config.ollama.model) as any,
+          prompt: options.prompt,
+          maxOutputTokens: options.maxTokens,
+          temperature: options.temperature,
+          system: options.systemPrompt,
+        })
+
+        const result = await withTimeout(
+          generatePromise,
+          AI_TIMEOUT_MS,
+          `Ollama request timed out after ${AI_TIMEOUT_MS / 1000}s - server may be slow or unreachable at ${config.ollama.baseURL}`
+        )
+
+        return { text: result.text, provider: "ollama" }
+      } catch (sdkError) {
+        console.error("[ai-provider] AI SDK also failed:", sdkError)
+        throw directError // Throw the original direct API error
+      }
+    }
   }
 
   if (provider === "azure" && config.azure) {

@@ -665,7 +665,7 @@ export const UnifiedReplies: React.FC<UnifiedRepliesProps> = ({
                     )}
                   </Button>
                 </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="z-[9999] bg-white border shadow-lg">
+                <DropdownMenuContent align="end" className="bg-white border shadow-lg">
                   {tones.map((tone) => (
                     <DropdownMenuItem
                       key={tone.value}
@@ -702,7 +702,7 @@ export const UnifiedReplies: React.FC<UnifiedRepliesProps> = ({
                     )}
                   </Button>
                 </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="z-[9999] bg-white border shadow-lg">
+                <DropdownMenuContent align="end" className="bg-white border shadow-lg">
                   {tones.map((tone) => (
                     <DropdownMenuItem
                       key={`text-${tone.value}`}
