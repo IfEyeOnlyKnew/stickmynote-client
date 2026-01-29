@@ -151,6 +151,16 @@ export const noteTabSchema = z.object({
             url: z.string().url(),
             created_at: timestampSchema,
             type: z.string().optional(),
+            filename: z.string().optional(),
+          }),
+        )
+        .optional(),
+      ai_answers: z
+        .array(
+          z.object({
+            question: z.string(),
+            answer: z.string(),
+            created_at: timestampSchema,
           }),
         )
         .optional(),
