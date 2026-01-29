@@ -33,6 +33,8 @@ import {
   BarChart3,
 } from "lucide-react"
 import { CreateChatModal } from "@/components/stick-chats/CreateChatModal"
+import { PadChatPanel } from "@/components/social/pad-chat-panel"
+import { PadPresenceIndicator } from "@/components/social/pad-presence-indicator"
 
 interface SocialPad {
   id: string
@@ -79,6 +81,10 @@ export default function SocialPadPage({ params }: Readonly<{ params: { padId: st
   const [selectedStick, setSelectedStick] = useState<{ id: string; topic: string } | null>(null)
   const [chatModalOpen, setChatModalOpen] = useState(false)
   const [chatStickTopic, setChatStickTopic] = useState("")
+  const [showPadChat, setShowPadChat] = useState(false)
+  const [padChatCollapsed, setPadChatCollapsed] = useState(false)
+  const [padMembers, setPadMembers] = useState<Array<{ user_id: string; role?: string; user?: any }>>([])
+
 
   /* eslint-disable react-hooks/exhaustive-deps */
   useEffect(() => {
@@ -173,6 +179,8 @@ export default function SocialPadPage({ params }: Readonly<{ params: { padId: st
         const data = await response.json()
         const member = data.members?.find((m: any) => m.user_id === user.id)
         setUserRole(member?.role || null)
+        // Store all members for presence indicator
+        setPadMembers(data.members || [])
       }
     } catch (error) {
       console.error("Error fetching user role:", error)
@@ -292,6 +300,19 @@ export default function SocialPadPage({ params }: Readonly<{ params: { padId: st
               </div>
             </div>
             <div className="flex items-center gap-3">
+              {/* Pad Chat Button */}
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  setShowPadChat(true)
+                  setPadChatCollapsed(false)
+                }}
+                className="text-purple-600 border-purple-200 hover:bg-purple-50"
+              >
+                <MessagesSquare className="h-4 w-4 mr-2" />
+                Pad Chat
+              </Button>
               {isOwner && (
                 <>
                   <Button variant="outline" size="sm" onClick={() => router.push(`/social/pads/${padId}/analytics`)}>
@@ -341,6 +362,14 @@ export default function SocialPadPage({ params }: Readonly<{ params: { padId: st
                 <Pin className="h-3 w-3 mr-1" />
                 {pinnedSticks.length} Pinned
               </Badge>
+            )}
+            {/* Real-time presence indicator */}
+            {padMembers.length > 0 && (
+              <PadPresenceIndicator
+                members={padMembers}
+                currentUserId={user?.id}
+                maxDisplay={5}
+              />
             )}
           </div>
           {user && canAddSticks && (
@@ -612,6 +641,17 @@ export default function SocialPadPage({ params }: Readonly<{ params: { padId: st
         defaultName={chatStickTopic}
         autoSubmit
       />
+
+      {/* Embedded Pad Chat Panel */}
+      {showPadChat && user && (
+        <PadChatPanel
+          padId={padId}
+          currentUserId={user.id}
+          isCollapsed={padChatCollapsed}
+          onToggleCollapse={() => setPadChatCollapsed(!padChatCollapsed)}
+          onClose={() => setShowPadChat(false)}
+        />
+      )}
     </div>
   )
 }
