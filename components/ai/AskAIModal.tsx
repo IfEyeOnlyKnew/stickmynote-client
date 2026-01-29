@@ -123,7 +123,13 @@ export function AskAIModal({ open, onOpenChange, stickId, stickType, onAnswerKep
         throw new Error("Failed to save answer")
       }
 
-      toast.success("Answer saved to stick details")
+      toast.success("Answer saved to Details tab")
+
+      // Refresh note tabs to show the saved answer in Details tab
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(new CustomEvent("refreshNoteTabs"))
+      }
+
       onAnswerKept?.()
       handleClose()
     } catch (error) {
@@ -136,6 +142,13 @@ export function AskAIModal({ open, onOpenChange, stickId, stickType, onAnswerKep
     setAnswer("")
     setHasAsked(false)
     onOpenChange(false)
+  }
+
+  const handleAskAnother = () => {
+    setQuestion("")
+    setAnswer("")
+    setHasAsked(false)
+    // Don't close the modal - let user ask another question
   }
 
   const isTextareaEnabled = !isLoading && (checkingSession || sessionError || sessionInfo?.can_ask)
@@ -231,9 +244,9 @@ export function AskAIModal({ open, onOpenChange, stickId, stickType, onAnswerKep
                   <Check className="h-4 w-4 mr-2" />
                   Keep
                 </Button>
-                <Button onClick={handleClose} variant="outline" className="flex-1 bg-transparent">
+                <Button onClick={handleAskAnother} variant="outline" className="flex-1 bg-transparent">
                   <X className="h-4 w-4 mr-2" />
-                  Delete
+                  Ask Another
                 </Button>
               </div>
             </>

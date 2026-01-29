@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import { Maximize2, Share2, Lock, Trash2, HelpCircle } from "lucide-react"
+import { Maximize2, Share2, Lock, Trash2, Sparkles } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { ColorPalette } from "@/components/ColorPalette"
 import { AskAIModal } from "@/components/ai/AskAIModal"
@@ -75,10 +75,11 @@ export const NoteCardHeader: React.FC<NoteCardHeaderProps> = ({
               e.stopPropagation()
               setAskAIOpen(true)
             }}
-            className="h-6 w-6 p-0 text-purple-600 hover:text-purple-700 hover:bg-purple-50 flex-shrink-0"
-            title="Ask me a question"
+            className="h-6 px-2 text-purple-600 hover:text-purple-700 hover:bg-purple-50 flex-shrink-0 flex items-center gap-1"
+            title="Ask AI a question about this stick"
           >
-            <HelpCircle className="h-3 w-3" />
+            <Sparkles className="h-3 w-3" />
+            <span className="text-xs font-medium">Ask AI</span>
           </Button>
           {onColorChange && <ColorPalette currentColor={currentColor} onColorChange={handleColorChange} size="sm" />}
           <Button

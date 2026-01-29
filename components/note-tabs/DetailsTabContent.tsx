@@ -3,7 +3,7 @@
 import { useState, useEffect, memo } from "react"
 import dynamic from "next/dynamic"
 import { Button } from "@/components/ui/button"
-import { Download, Trash2, X, Save } from "lucide-react"
+import { Download, Trash2, X, Save, Sparkles } from "lucide-react"
 import { toast } from "@/hooks/use-toast"
 import type { NoteTab } from "@/types/note"
 import type { StickTab } from "@/types/pad"
@@ -127,6 +127,7 @@ export const DetailsTabContent = memo(function DetailsTabContent({
 
   const detailsTab = noteTabs.find((tab) => tab.tab_type === "details")
   const exportLinks = detailsTab?.tab_data?.exports || []
+  const aiAnswers = detailsTab?.tab_data?.ai_answers || []
 
   return (
     <div className="space-y-4">
@@ -273,6 +274,33 @@ export const DetailsTabContent = memo(function DetailsTabContent({
       ) : (
         <div className="text-sm text-gray-500 italic">
           No export links available. Use the Export button to create downloadable exports.
+        </div>
+      )}
+
+      {/* AI Answers Section */}
+      {aiAnswers.length > 0 && (
+        <div className="space-y-2 mt-4">
+          <span className="text-sm font-medium text-gray-700 block flex items-center gap-2">
+            <Sparkles className="h-4 w-4 text-purple-600" />
+            Saved AI Answers
+          </span>
+          <div className="space-y-3">
+            {aiAnswers.map((aiAnswer: any, index: number) => (
+              <div
+                key={`ai-answer-${index}`}
+                className="p-3 bg-purple-50 border border-purple-200 rounded-md"
+              >
+                <div className="text-xs text-purple-600 font-medium mb-1">Question:</div>
+                <div className="text-sm text-gray-800 mb-2">{aiAnswer.question}</div>
+                <div className="text-xs text-purple-600 font-medium mb-1">Answer:</div>
+                <div className="text-sm text-gray-700 whitespace-pre-wrap">{aiAnswer.answer}</div>
+                <div className="text-xs text-gray-400 mt-2">
+                  Saved on {new Date(aiAnswer.created_at).toLocaleDateString()} at{" "}
+                  {new Date(aiAnswer.created_at).toLocaleTimeString()}
+                </div>
+              </div>
+            ))}
+          </div>
         </div>
       )}
     </div>

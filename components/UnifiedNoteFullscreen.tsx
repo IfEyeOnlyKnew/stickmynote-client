@@ -10,12 +10,14 @@ import { NoteFullscreenHeader } from "./note-fullscreen/NoteFullscreenHeader"
 import { NoteFullscreenContent } from "./note-fullscreen/NoteFullscreenContent"
 import { NoteFullscreenReplies } from "./note-fullscreen/NoteFullscreenReplies"
 import { SummarizeLinksButton } from "./ui/summarize-links-button"
-import { Trash2, Share2, Lock, MessagesSquare, Video } from "lucide-react"
+import { Trash2, Share2, Lock, MessagesSquare, Video, Sparkles } from "lucide-react"
 import { useState } from "react"
 import { CreateChatModal } from "@/components/stick-chats/CreateChatModal"
+import { AskAIModal } from "@/components/ai/AskAIModal"
 
 export const UnifiedNoteFullscreen: React.FC = () => {
   const [chatModalOpen, setChatModalOpen] = useState(false)
+  const [askAIOpen, setAskAIOpen] = useState(false)
   const context = useNoteContext()
   const {
     note,
@@ -254,6 +256,20 @@ export const UnifiedNoteFullscreen: React.FC = () => {
               <NoteFullscreenHeader onClose={onClose} />
             </div>
             <div className="flex items-center gap-1 md:gap-2">
+              {/* Ask AI Button */}
+              {!isNewNote && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setAskAIOpen(true)}
+                  className="h-7 px-2 text-purple-600 hover:text-purple-700 hover:bg-purple-50 flex items-center gap-1"
+                  title="Ask AI a question about this stick"
+                >
+                  <Sparkles className="h-4 w-4" />
+                  <span className="text-xs font-medium hidden sm:inline">Ask AI</span>
+                </Button>
+              )}
+
               {/* Chat Icon */}
               {!isNewNote && (
                 <Button
@@ -378,6 +394,14 @@ export const UnifiedNoteFullscreen: React.FC = () => {
         onOpenChange={setChatModalOpen}
         defaultName={note.topic || note.title || "Untitled Note"}
         autoSubmit
+      />
+
+      {/* Ask AI Modal */}
+      <AskAIModal
+        open={askAIOpen}
+        onOpenChange={setAskAIOpen}
+        stickId={note.id}
+        stickType="personal"
       />
     </div>
   )
