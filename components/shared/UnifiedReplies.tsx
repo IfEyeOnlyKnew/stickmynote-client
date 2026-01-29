@@ -789,11 +789,13 @@ export const UnifiedReplies: React.FC<UnifiedRepliesProps> = ({
                 <div className="mb-2 flex items-center justify-between text-sm text-blue-600 bg-blue-50 px-3 py-2 rounded-lg">
                   <span>Replying to @{replyingTo.user?.username || replyingTo.user?.email || "User"}</span>
                   <button
+                    type="button"
                     onClick={() => {
                       setReplyingTo(null)
                       setReplyContent("")
                     }}
                     className="text-blue-400 hover:text-blue-600"
+                    aria-label="Cancel reply"
                   >
                     <X className="h-4 w-4" />
                   </button>

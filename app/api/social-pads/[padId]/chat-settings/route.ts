@@ -104,12 +104,23 @@ export async function PUT(
     const body = await request.json()
     const { settings } = body
 
+    // Extract only the settings fields we want to save (exclude id, social_pad_id, created_at)
+    const {
+      id: _id,
+      social_pad_id: _padId,
+      created_at: _createdAt,
+      updated_at: _updatedAt,
+      ...settingsToSave
+    } = settings || {}
+
+    console.log("[ChatSettings] Saving settings for pad:", padId, settingsToSave)
+
     // Upsert settings
     const { data: updatedSettings, error } = await db
       .from("social_pad_chat_settings")
       .upsert({
         social_pad_id: padId,
-        ...settings,
+        ...settingsToSave,
         updated_at: new Date().toISOString(),
       }, {
         onConflict: "social_pad_id",
