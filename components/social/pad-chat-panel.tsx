@@ -244,12 +244,16 @@ export function PadChatPanel({
       return
     }
 
+    // Save message content and clear input immediately for better UX
+    const messageContent = newMessage.trim()
+    setNewMessage("")
     setIsSending(true)
+
     try {
       const response = await fetch(`/api/social-pads/${padId}/messages`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ content: newMessage.trim() }),
+        body: JSON.stringify({ content: messageContent }),
       })
 
       if (response.ok) {
@@ -260,16 +264,19 @@ export function PadChatPanel({
         if (aiMessage) {
           setMessages((prev) => [...prev, aiMessage])
         }
-        setNewMessage("")
         // Clear typing status
         sendTypingStatus(false)
       } else {
         const error = await response.json()
         toast.error(error.error || "Failed to send message")
+        // Restore message on error so user can retry
+        setNewMessage(messageContent)
       }
     } catch (error) {
       console.error("[PadChat] Error sending message:", error)
       toast.error("Failed to send message")
+      // Restore message on error so user can retry
+      setNewMessage(messageContent)
     } finally {
       setIsSending(false)
     }
