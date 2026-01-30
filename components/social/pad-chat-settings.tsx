@@ -38,6 +38,7 @@ import {
   Loader2,
   X,
   Check,
+  Search,
 } from "lucide-react"
 import { toast } from "sonner"
 import type {
@@ -94,22 +95,25 @@ export function PadChatSettingsDialog({
   const [saved, setSaved] = useState(false)
   const [settings, setSettings] = useState<PadChatSettings | null>(null)
   const [moderators, setModerators] = useState<PadChatModerator[]>([])
-  const [padMembers, setPadMembers] = useState<Array<{
+  const [addingModerator, setAddingModerator] = useState(false)
+
+  // Search state for adding moderators
+  const [searchQuery, setSearchQuery] = useState("")
+  const [searchResults, setSearchResults] = useState<Array<{
     id: string
     user_id: string
     users: { id: string; email: string; full_name: string | null; avatar_url: string | null } | null
   }>>([])
-  const [selectedMemberId, setSelectedMemberId] = useState<string>("")
-  const [addingModerator, setAddingModerator] = useState(false)
+  const [searching, setSearching] = useState(false)
+  const [showSearchResults, setShowSearchResults] = useState(false)
 
-  // Fetch settings, moderators, and pad members
+  // Fetch settings and moderators
   const fetchData = useCallback(async () => {
     setLoading(true)
     try {
-      const [settingsRes, moderatorsRes, membersRes] = await Promise.all([
+      const [settingsRes, moderatorsRes] = await Promise.all([
         fetch(`/api/social-pads/${padId}/chat-settings`),
         fetch(`/api/social-pads/${padId}/chat-moderators`),
-        fetch(`/api/social-pads/${padId}/members`),
       ])
 
       if (settingsRes.ok) {
@@ -121,11 +125,6 @@ export function PadChatSettingsDialog({
         const data = await moderatorsRes.json()
         setModerators(data.moderators || [])
       }
-
-      if (membersRes.ok) {
-        const data = await membersRes.json()
-        setPadMembers(data.members || [])
-      }
     } catch (error) {
       console.error("[ChatSettings] Error fetching:", error)
       toast.error("Failed to load chat settings")
@@ -133,6 +132,40 @@ export function PadChatSettingsDialog({
       setLoading(false)
     }
   }, [padId])
+
+  // Debounced search for members
+  useEffect(() => {
+    if (!searchQuery || searchQuery.length < 2) {
+      setSearchResults([])
+      setShowSearchResults(false)
+      return
+    }
+
+    const timeoutId = setTimeout(async () => {
+      setSearching(true)
+      try {
+        const response = await fetch(
+          `/api/social-pads/${padId}/members?search=${encodeURIComponent(searchQuery)}&limit=10`
+        )
+        if (response.ok) {
+          const data = await response.json()
+          // Filter out users who are already moderators
+          const available = (data.members || []).filter(
+            (member: { user_id: string }) =>
+              !moderators.some((mod) => mod.user_id === member.user_id)
+          )
+          setSearchResults(available)
+          setShowSearchResults(true)
+        }
+      } catch (error) {
+        console.error("[ChatSettings] Error searching members:", error)
+      } finally {
+        setSearching(false)
+      }
+    }, 300) // 300ms debounce
+
+    return () => clearTimeout(timeoutId)
+  }, [searchQuery, padId, moderators])
 
   useEffect(() => {
     if (open) {
@@ -169,17 +202,11 @@ export function PadChatSettingsDialog({
     }
   }
 
-  // Get available members (not already moderators)
-  const availableMembers = padMembers.filter((member) => {
-    const isAlreadyModerator = moderators.some((mod) => mod.user_id === member.user_id)
-    return !isAlreadyModerator && member.users
-  })
-
-  // Add moderator
-  const handleAddModerator = async () => {
-    if (!selectedMemberId) return
-
-    const member = padMembers.find((m) => m.user_id === selectedMemberId)
+  // Add moderator from search result
+  const handleAddModerator = async (member: {
+    user_id: string
+    users: { id: string; email: string; full_name: string | null; avatar_url: string | null } | null
+  }) => {
     if (!member?.users?.email) {
       toast.error("Invalid member selected")
       return
@@ -196,7 +223,9 @@ export function PadChatSettingsDialog({
       if (response.ok) {
         const data = await response.json()
         setModerators((prev) => [...prev, data.moderator])
-        setSelectedMemberId("")
+        setSearchQuery("")
+        setSearchResults([])
+        setShowSearchResults(false)
         toast.success("Moderator added")
       } else {
         const error = await response.json()
@@ -412,52 +441,67 @@ export function PadChatSettingsDialog({
                   {isOwner && (
                     <div className="space-y-2">
                       <Label>Add a pad member as moderator</Label>
-                      <div className="flex gap-2">
-                        <Select
-                          value={selectedMemberId}
-                          onValueChange={setSelectedMemberId}
-                        >
-                          <SelectTrigger className="flex-1">
-                            <SelectValue placeholder="Select a member..." />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {availableMembers.length === 0 ? (
-                              <SelectItem value="_none" disabled>
-                                No available members
-                              </SelectItem>
-                            ) : (
-                              availableMembers.map((member) => (
-                                <SelectItem key={member.user_id} value={member.user_id}>
-                                  <div className="flex items-center gap-2">
-                                    <span>{member.users?.full_name || member.users?.email}</span>
-                                    {member.users?.full_name && (
-                                      <span className="text-xs text-gray-500">
-                                        ({member.users.email})
-                                      </span>
-                                    )}
-                                  </div>
-                                </SelectItem>
-                              ))
-                            )}
-                          </SelectContent>
-                        </Select>
-                        <Button
-                          onClick={handleAddModerator}
-                          disabled={addingModerator || !selectedMemberId}
-                          size="sm"
-                        >
-                          {addingModerator ? (
-                            <Loader2 className="h-4 w-4 animate-spin" />
-                          ) : (
-                            <Plus className="h-4 w-4" />
+                      <div className="relative">
+                        <div className="relative">
+                          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+                          <Input
+                            value={searchQuery}
+                            onChange={(e) => setSearchQuery(e.target.value)}
+                            placeholder="Search members by name or email..."
+                            className="pl-9"
+                            disabled={addingModerator}
+                          />
+                          {searching && (
+                            <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 animate-spin text-gray-400" />
                           )}
-                        </Button>
+                        </div>
+
+                        {/* Search results dropdown */}
+                        {showSearchResults && searchResults.length > 0 && (
+                          <div className="absolute z-50 w-full mt-1 bg-white border rounded-lg shadow-lg max-h-48 overflow-y-auto">
+                            {searchResults.map((member) => (
+                              <button
+                                key={member.user_id}
+                                onClick={() => handleAddModerator(member)}
+                                disabled={addingModerator}
+                                className="w-full flex items-center gap-3 p-3 hover:bg-gray-50 text-left transition-colors"
+                              >
+                                <Avatar className="h-8 w-8">
+                                  {member.users?.avatar_url && (
+                                    <AvatarImage src={member.users.avatar_url} />
+                                  )}
+                                  <AvatarFallback className="text-xs bg-purple-100 text-purple-700">
+                                    {getInitials(member.users?.full_name || null, member.users?.email || "")}
+                                  </AvatarFallback>
+                                </Avatar>
+                                <div className="flex-1 min-w-0">
+                                  <p className="text-sm font-medium truncate">
+                                    {member.users?.full_name || member.users?.email}
+                                  </p>
+                                  {member.users?.full_name && (
+                                    <p className="text-xs text-gray-500 truncate">
+                                      {member.users.email}
+                                    </p>
+                                  )}
+                                </div>
+                                <Plus className="h-4 w-4 text-gray-400 flex-shrink-0" />
+                              </button>
+                            ))}
+                          </div>
+                        )}
+
+                        {/* No results message */}
+                        {showSearchResults && searchResults.length === 0 && searchQuery.length >= 2 && !searching && (
+                          <div className="absolute z-50 w-full mt-1 bg-white border rounded-lg shadow-lg p-3">
+                            <p className="text-sm text-gray-500 text-center">
+                              No matching members found
+                            </p>
+                          </div>
+                        )}
                       </div>
-                      {availableMembers.length === 0 && padMembers.length > 0 && (
-                        <p className="text-xs text-gray-500">
-                          All pad members are already moderators
-                        </p>
-                      )}
+                      <p className="text-xs text-gray-500">
+                        Type at least 2 characters to search
+                      </p>
                     </div>
                   )}
 

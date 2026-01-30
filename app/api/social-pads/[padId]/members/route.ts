@@ -347,12 +347,74 @@ export async function GET(request: Request, { params }: { params: Promise<{ padI
       return Errors.forbidden("Access denied")
     }
 
-    const { data: members, error } = await db
+    // Check for search query parameter
+    const { searchParams } = new URL(request.url)
+    const searchQuery = searchParams.get("search")?.trim()
+    const limit = parseInt(searchParams.get("limit") || "0", 10)
+
+    // If search query provided, search users first then filter members
+    if (searchQuery && searchQuery.length >= 2) {
+      // Search users by name or email
+      const { data: matchingUsers, error: userSearchError } = await serviceClient
+        .from("users")
+        .select("id, full_name, email, avatar_url")
+        .or(`full_name.ilike.%${searchQuery}%,email.ilike.%${searchQuery}%`)
+        .limit(limit > 0 ? limit : 20)
+
+      if (userSearchError) {
+        console.error("[v0] Error searching users:", userSearchError)
+        return Errors.serverError("Failed to search users")
+      }
+
+      if (!matchingUsers?.length) {
+        return NextResponse.json({
+          members: [],
+          isOwner: ownerId === user.id,
+        })
+      }
+
+      // Find which of these users are members of this pad
+      const userIds = matchingUsers.map((u) => u.id)
+      const { data: members, error } = await db
+        .from("social_pad_members")
+        .select("*")
+        .eq("social_pad_id", contextPadId)
+        .eq("org_id", orgContext.orgId)
+        .in("user_id", userIds)
+
+      if (error) {
+        if (isRateLimitError(error)) {
+          return Errors.rateLimit({ members: [], isOwner: ownerId === user.id })
+        }
+        console.error("[v0] Error fetching members:", error)
+        return Errors.serverError("Failed to fetch members")
+      }
+
+      // Attach user data to members
+      const membersWithUsers = (members || []).map((member) => ({
+        ...member,
+        users: matchingUsers.find((u) => u.id === member.user_id) || null,
+      }))
+
+      return NextResponse.json({
+        members: membersWithUsers,
+        isOwner: ownerId === user.id,
+      })
+    }
+
+    // No search - return all members (with optional limit)
+    let query = db
       .from("social_pad_members")
       .select("*")
       .eq("social_pad_id", contextPadId)
       .eq("org_id", orgContext.orgId)
       .order("created_at", { ascending: true })
+
+    if (limit > 0) {
+      query = query.limit(limit)
+    }
+
+    const { data: members, error } = await query
 
     if (error) {
       if (isRateLimitError(error)) {
