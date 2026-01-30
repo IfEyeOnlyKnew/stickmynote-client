@@ -64,6 +64,7 @@ export interface PadChatModerator {
   can_mute: boolean
   can_manage_settings: boolean
   is_active: boolean
+  is_owner?: boolean // True if this is the pad owner (implicit moderator)
   created_at: string
   updated_at: string
 

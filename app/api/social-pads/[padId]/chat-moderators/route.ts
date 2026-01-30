@@ -163,16 +163,43 @@ export async function POST(
       return NextResponse.json({ error: "User not found with that email" }, { status: 404 })
     }
 
-    // Check if user is already a moderator
+    // Check if user is already an active moderator
     const { data: existing } = await db
       .from("social_pad_chat_moderators")
-      .select("id")
+      .select("id, is_active")
       .eq("social_pad_id", padId)
       .eq("user_id", user.id)
       .maybeSingle()
 
     if (existing) {
-      return NextResponse.json({ error: "User is already a moderator" }, { status: 400 })
+      if (existing.is_active) {
+        return NextResponse.json({ error: "User is already a moderator" }, { status: 400 })
+      }
+      // Reactivate existing moderator
+      const { data: reactivated, error: reactivateError } = await db
+        .from("social_pad_chat_moderators")
+        .update({
+          is_active: true,
+          can_pin: permissions?.can_pin ?? true,
+          can_delete: permissions?.can_delete ?? true,
+          can_mute: permissions?.can_mute ?? true,
+          can_manage_settings: permissions?.can_manage_settings ?? false,
+        })
+        .eq("id", existing.id)
+        .select()
+        .single()
+
+      if (reactivateError) {
+        console.error("[ChatModerators] Error reactivating:", reactivateError)
+        return NextResponse.json({ error: "Failed to add moderator" }, { status: 500 })
+      }
+
+      return NextResponse.json({
+        moderator: {
+          ...reactivated,
+          user,
+        },
+      })
     }
 
     // Add moderator

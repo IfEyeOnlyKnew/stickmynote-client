@@ -94,16 +94,22 @@ export function PadChatSettingsDialog({
   const [saved, setSaved] = useState(false)
   const [settings, setSettings] = useState<PadChatSettings | null>(null)
   const [moderators, setModerators] = useState<PadChatModerator[]>([])
-  const [newModeratorEmail, setNewModeratorEmail] = useState("")
+  const [padMembers, setPadMembers] = useState<Array<{
+    id: string
+    user_id: string
+    users: { id: string; email: string; full_name: string | null; avatar_url: string | null } | null
+  }>>([])
+  const [selectedMemberId, setSelectedMemberId] = useState<string>("")
   const [addingModerator, setAddingModerator] = useState(false)
 
-  // Fetch settings and moderators
+  // Fetch settings, moderators, and pad members
   const fetchData = useCallback(async () => {
     setLoading(true)
     try {
-      const [settingsRes, moderatorsRes] = await Promise.all([
+      const [settingsRes, moderatorsRes, membersRes] = await Promise.all([
         fetch(`/api/social-pads/${padId}/chat-settings`),
         fetch(`/api/social-pads/${padId}/chat-moderators`),
+        fetch(`/api/social-pads/${padId}/members`),
       ])
 
       if (settingsRes.ok) {
@@ -114,6 +120,11 @@ export function PadChatSettingsDialog({
       if (moderatorsRes.ok) {
         const data = await moderatorsRes.json()
         setModerators(data.moderators || [])
+      }
+
+      if (membersRes.ok) {
+        const data = await membersRes.json()
+        setPadMembers(data.members || [])
       }
     } catch (error) {
       console.error("[ChatSettings] Error fetching:", error)
@@ -158,22 +169,34 @@ export function PadChatSettingsDialog({
     }
   }
 
+  // Get available members (not already moderators)
+  const availableMembers = padMembers.filter((member) => {
+    const isAlreadyModerator = moderators.some((mod) => mod.user_id === member.user_id)
+    return !isAlreadyModerator && member.users
+  })
+
   // Add moderator
   const handleAddModerator = async () => {
-    if (!newModeratorEmail.trim()) return
+    if (!selectedMemberId) return
+
+    const member = padMembers.find((m) => m.user_id === selectedMemberId)
+    if (!member?.users?.email) {
+      toast.error("Invalid member selected")
+      return
+    }
 
     setAddingModerator(true)
     try {
       const response = await fetch(`/api/social-pads/${padId}/chat-moderators`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: newModeratorEmail.trim() }),
+        body: JSON.stringify({ email: member.users.email }),
       })
 
       if (response.ok) {
         const data = await response.json()
         setModerators((prev) => [...prev, data.moderator])
-        setNewModeratorEmail("")
+        setSelectedMemberId("")
         toast.success("Moderator added")
       } else {
         const error = await response.json()
@@ -387,25 +410,54 @@ export function PadChatSettingsDialog({
                 <CardContent className="space-y-4">
                   {/* Add moderator */}
                   {isOwner && (
-                    <div className="flex gap-2">
-                      <Input
-                        type="email"
-                        placeholder="Enter email to add moderator..."
-                        value={newModeratorEmail}
-                        onChange={(e) => setNewModeratorEmail(e.target.value)}
-                        onKeyDown={(e) => e.key === "Enter" && handleAddModerator()}
-                      />
-                      <Button
-                        onClick={handleAddModerator}
-                        disabled={addingModerator || !newModeratorEmail.trim()}
-                        size="sm"
-                      >
-                        {addingModerator ? (
-                          <Loader2 className="h-4 w-4 animate-spin" />
-                        ) : (
-                          <Plus className="h-4 w-4" />
-                        )}
-                      </Button>
+                    <div className="space-y-2">
+                      <Label>Add a pad member as moderator</Label>
+                      <div className="flex gap-2">
+                        <Select
+                          value={selectedMemberId}
+                          onValueChange={setSelectedMemberId}
+                        >
+                          <SelectTrigger className="flex-1">
+                            <SelectValue placeholder="Select a member..." />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {availableMembers.length === 0 ? (
+                              <SelectItem value="_none" disabled>
+                                No available members
+                              </SelectItem>
+                            ) : (
+                              availableMembers.map((member) => (
+                                <SelectItem key={member.user_id} value={member.user_id}>
+                                  <div className="flex items-center gap-2">
+                                    <span>{member.users?.full_name || member.users?.email}</span>
+                                    {member.users?.full_name && (
+                                      <span className="text-xs text-gray-500">
+                                        ({member.users.email})
+                                      </span>
+                                    )}
+                                  </div>
+                                </SelectItem>
+                              ))
+                            )}
+                          </SelectContent>
+                        </Select>
+                        <Button
+                          onClick={handleAddModerator}
+                          disabled={addingModerator || !selectedMemberId}
+                          size="sm"
+                        >
+                          {addingModerator ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                          ) : (
+                            <Plus className="h-4 w-4" />
+                          )}
+                        </Button>
+                      </div>
+                      {availableMembers.length === 0 && padMembers.length > 0 && (
+                        <p className="text-xs text-gray-500">
+                          All pad members are already moderators
+                        </p>
+                      )}
                     </div>
                   )}
 
@@ -430,7 +482,7 @@ export function PadChatSettingsDialog({
                               <span className="text-sm font-medium">
                                 {mod.user?.full_name || mod.user?.email}
                               </span>
-                              {mod.can_manage_settings && (
+                              {mod.is_owner && (
                                 <Badge variant="secondary" className="text-xs bg-amber-100 text-amber-700">
                                   <Crown className="h-3 w-3 mr-1" />
                                   Owner
@@ -440,7 +492,7 @@ export function PadChatSettingsDialog({
                             <p className="text-xs text-gray-500">{mod.user?.email}</p>
                           </div>
                         </div>
-                        {isOwner && !mod.can_manage_settings && (
+                        {isOwner && !mod.is_owner && (
                           <Button
                             variant="ghost"
                             size="sm"
