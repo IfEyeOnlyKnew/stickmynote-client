@@ -25,6 +25,14 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command"
+import {
   Settings,
   Users,
   Bell,
@@ -105,7 +113,6 @@ export function PadChatSettingsDialog({
     users: { id: string; email: string; full_name: string | null; avatar_url: string | null } | null
   }>>([])
   const [searching, setSearching] = useState(false)
-  const [showSearchResults, setShowSearchResults] = useState(false)
 
   // Fetch settings and moderators
   const fetchData = useCallback(async () => {
@@ -137,7 +144,6 @@ export function PadChatSettingsDialog({
   useEffect(() => {
     if (!searchQuery || searchQuery.length < 2) {
       setSearchResults([])
-      setShowSearchResults(false)
       return
     }
 
@@ -155,7 +161,6 @@ export function PadChatSettingsDialog({
               !moderators.some((mod) => mod.user_id === member.user_id)
           )
           setSearchResults(available)
-          setShowSearchResults(true)
         }
       } catch (error) {
         console.error("[ChatSettings] Error searching members:", error)
@@ -225,7 +230,6 @@ export function PadChatSettingsDialog({
         setModerators((prev) => [...prev, data.moderator])
         setSearchQuery("")
         setSearchResults([])
-        setShowSearchResults(false)
         toast.success("Moderator added")
       } else {
         const error = await response.json()
@@ -360,6 +364,21 @@ export function PadChatSettingsDialog({
                       </SelectContent>
                     </Select>
                   </div>
+
+                  <div className="flex items-center justify-between pt-2 border-t">
+                    <div>
+                      <Label>Private Conversations</Label>
+                      <p className="text-xs text-gray-500">
+                        Users only see their own messages and moderator replies
+                      </p>
+                    </div>
+                    <Switch
+                      checked={settings?.private_conversations ?? false}
+                      onCheckedChange={(checked) =>
+                        setSettings((s) => (s ? { ...s, private_conversations: checked } : s))
+                      }
+                    />
+                  </div>
                 </CardContent>
               </Card>
 
@@ -441,64 +460,60 @@ export function PadChatSettingsDialog({
                   {isOwner && (
                     <div className="space-y-2">
                       <Label>Add a pad member as moderator</Label>
-                      <div className="relative">
-                        <div className="relative">
-                          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
-                          <Input
-                            value={searchQuery}
-                            onChange={(e) => setSearchQuery(e.target.value)}
-                            placeholder="Search members by name or email..."
-                            className="pl-9"
-                            disabled={addingModerator}
-                          />
-                          {searching && (
-                            <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 animate-spin text-gray-400" />
+                      <Command className="rounded-lg border" shouldFilter={false}>
+                        <CommandInput
+                          placeholder="Search members by name or email..."
+                          value={searchQuery}
+                          onValueChange={setSearchQuery}
+                          disabled={addingModerator}
+                        />
+                        {searching && (
+                          <div className="absolute right-3 top-3">
+                            <Loader2 className="h-4 w-4 animate-spin text-gray-400" />
+                          </div>
+                        )}
+                        <CommandList>
+                          {searchQuery.length >= 2 && !searching && searchResults.length === 0 && (
+                            <CommandEmpty>No matching members found</CommandEmpty>
                           )}
-                        </div>
-
-                        {/* Search results dropdown */}
-                        {showSearchResults && searchResults.length > 0 && (
-                          <div className="absolute z-50 w-full mt-1 bg-white border rounded-lg shadow-lg max-h-48 overflow-y-auto">
-                            {searchResults.map((member) => (
-                              <button
-                                key={member.user_id}
-                                onClick={() => handleAddModerator(member)}
-                                disabled={addingModerator}
-                                className="w-full flex items-center gap-3 p-3 hover:bg-gray-50 text-left transition-colors"
-                              >
-                                <Avatar className="h-8 w-8">
-                                  {member.users?.avatar_url && (
-                                    <AvatarImage src={member.users.avatar_url} />
-                                  )}
-                                  <AvatarFallback className="text-xs bg-purple-100 text-purple-700">
-                                    {getInitials(member.users?.full_name || null, member.users?.email || "")}
-                                  </AvatarFallback>
-                                </Avatar>
-                                <div className="flex-1 min-w-0">
-                                  <p className="text-sm font-medium truncate">
-                                    {member.users?.full_name || member.users?.email}
-                                  </p>
-                                  {member.users?.full_name && (
-                                    <p className="text-xs text-gray-500 truncate">
-                                      {member.users.email}
+                          {searchQuery.length >= 2 && searchResults.length > 0 && (
+                            <CommandGroup>
+                              {searchResults.map((member) => (
+                                <CommandItem
+                                  key={member.user_id}
+                                  value={member.user_id}
+                                  onSelect={() => {
+                                    if (!addingModerator) {
+                                      handleAddModerator(member)
+                                    }
+                                  }}
+                                  className="cursor-pointer"
+                                >
+                                  <Avatar className="h-8 w-8">
+                                    {member.users?.avatar_url && (
+                                      <AvatarImage src={member.users.avatar_url} />
+                                    )}
+                                    <AvatarFallback className="text-xs bg-purple-100 text-purple-700">
+                                      {getInitials(member.users?.full_name || null, member.users?.email || "")}
+                                    </AvatarFallback>
+                                  </Avatar>
+                                  <div className="flex-1 min-w-0">
+                                    <p className="text-sm font-medium truncate">
+                                      {member.users?.full_name || member.users?.email}
                                     </p>
-                                  )}
-                                </div>
-                                <Plus className="h-4 w-4 text-gray-400 flex-shrink-0" />
-                              </button>
-                            ))}
-                          </div>
-                        )}
-
-                        {/* No results message */}
-                        {showSearchResults && searchResults.length === 0 && searchQuery.length >= 2 && !searching && (
-                          <div className="absolute z-50 w-full mt-1 bg-white border rounded-lg shadow-lg p-3">
-                            <p className="text-sm text-gray-500 text-center">
-                              No matching members found
-                            </p>
-                          </div>
-                        )}
-                      </div>
+                                    {member.users?.full_name && (
+                                      <p className="text-xs text-gray-500 truncate">
+                                        {member.users.email}
+                                      </p>
+                                    )}
+                                  </div>
+                                  <Plus className="h-4 w-4 text-gray-400 flex-shrink-0" />
+                                </CommandItem>
+                              ))}
+                            </CommandGroup>
+                          )}
+                        </CommandList>
+                      </Command>
                       <p className="text-xs text-gray-500">
                         Type at least 2 characters to search
                       </p>

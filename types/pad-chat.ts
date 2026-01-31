@@ -98,6 +98,7 @@ export interface PadChatSettings {
   // General settings
   chat_enabled: boolean
   who_can_chat: WhoCanChat
+  private_conversations: boolean // Users only see their own messages + moderator replies
 
   // AI First-Responder
   ai_enabled: boolean
@@ -131,6 +132,7 @@ export interface PadChatSettings {
 export const DEFAULT_CHAT_SETTINGS: Omit<PadChatSettings, "id" | "social_pad_id" | "created_at" | "updated_at"> = {
   chat_enabled: true,
   who_can_chat: "all_members",
+  private_conversations: false,
   ai_enabled: false,
   ai_greeting: "Hello! How can I help you today?",
   ai_auto_escalate: true,

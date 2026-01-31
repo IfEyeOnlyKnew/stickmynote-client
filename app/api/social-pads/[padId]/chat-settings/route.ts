@@ -2,6 +2,7 @@ import { type NextRequest, NextResponse } from "next/server"
 import { createServiceDatabaseClient } from "@/lib/database/database-adapter"
 import { getCachedAuthUser, createRateLimitResponse, createUnauthorizedResponse } from "@/lib/auth/cached-auth"
 import { DEFAULT_CHAT_SETTINGS } from "@/types/pad-chat"
+import { padChatCache, type CachedSettings } from "@/lib/cache/pad-chat-cache"
 
 export const dynamic = "force-dynamic"
 
@@ -51,6 +52,14 @@ export async function GET(
       return createUnauthorizedResponse()
     }
 
+    // Try cache first
+    const cached = await padChatCache.getSettings(padId)
+    if (cached) {
+      return NextResponse.json({
+        settings: { ...cached, social_pad_id: padId },
+      })
+    }
+
     const db = await createServiceDatabaseClient()
 
     // Fetch settings or return defaults
@@ -64,8 +73,13 @@ export async function GET(
       console.error("[ChatSettings] Error fetching:", error)
     }
 
+    const result = settings || { ...DEFAULT_CHAT_SETTINGS, social_pad_id: padId }
+
+    // Cache the settings
+    await padChatCache.setSettings(padId, result as CachedSettings)
+
     return NextResponse.json({
-      settings: settings || { ...DEFAULT_CHAT_SETTINGS, social_pad_id: padId },
+      settings: result,
     })
   } catch (error) {
     console.error("[ChatSettings] GET error:", error)
@@ -132,6 +146,9 @@ export async function PUT(
       console.error("[ChatSettings] Error updating:", error)
       return NextResponse.json({ error: "Failed to update settings" }, { status: 500 })
     }
+
+    // Invalidate cache after update
+    await padChatCache.invalidateSettings(padId)
 
     return NextResponse.json({ settings: updatedSettings })
   } catch (error) {

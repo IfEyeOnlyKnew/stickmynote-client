@@ -23,6 +23,7 @@ import {
   MessageSquare,
   ChevronDown,
   ChevronUp,
+  ChevronRight,
   X,
   Settings,
   Pin,
@@ -35,6 +36,9 @@ import {
   AlertCircle,
   Bell,
   BellOff,
+  Users,
+  List,
+  Lock,
 } from "lucide-react"
 import { formatDistanceToNow } from "date-fns"
 import { toast } from "sonner"
@@ -104,11 +108,18 @@ export function PadChatPanel({
   const [typingUsers, setTypingUsers] = useState<string[]>([])
   const [showReactions, setShowReactions] = useState<string | null>(null)
   const [unreadCount, setUnreadCount] = useState(0)
+  const [isNearBottom, setIsNearBottom] = useState(true)
+  const [hasNewMessages, setHasNewMessages] = useState(false)
+  const [viewMode, setViewMode] = useState<"chronological" | "grouped">("chronological")
+  const [expandedUsers, setExpandedUsers] = useState<Set<string>>(new Set())
+  const [unreadPerUser, setUnreadPerUser] = useState<Map<string, number>>(new Map())
   const messagesEndRef = useRef<HTMLDivElement>(null)
+  const messagesContainerRef = useRef<HTMLDivElement>(null)
   const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null)
   const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   const lastMessageCountRef = useRef(0)
   const lastMessageIdRef = useRef<string | null>(null)
+  const shouldScrollRef = useRef(true) // Track if we should auto-scroll on next message update
 
   // Check if current user is a moderator
   const isModerator = useMemo(() => {
@@ -130,52 +141,78 @@ export function PadChatPanel({
     return isWithinOfficeHours(settings)
   }, [settings])
 
-  // Fetch messages
-  const fetchMessages = useCallback(async () => {
+  // Fetch messages - optimized with cursor-based polling
+  // Initial fetch gets all messages, subsequent polls only get new ones
+  const fetchMessages = useCallback(async (isInitialFetch = false) => {
     try {
-      const response = await fetch(`/api/social-pads/${padId}/messages`)
+      // Use cursor for incremental fetches (reduces data transfer by ~99% on polls)
+      const cursor = !isInitialFetch && lastMessageIdRef.current
+        ? `?after=${lastMessageIdRef.current}`
+        : ""
+      const response = await fetch(`/api/social-pads/${padId}/messages${cursor}`)
+
       if (response.ok) {
         const data = await response.json()
-        const newMessages: PadMessage[] = data.messages || []
+        const fetchedMessages: PadMessage[] = data.messages || []
 
-        // Check for new messages (for notifications)
-        if (newMessages.length > 0) {
-          const latestMessage = newMessages[newMessages.length - 1]
-          const hasNewMessage = lastMessageIdRef.current &&
-            latestMessage.id !== lastMessageIdRef.current &&
-            latestMessage.user_id !== currentUserId
+        if (fetchedMessages.length > 0) {
+          // Handle new messages from poll
+          if (!isInitialFetch && lastMessageIdRef.current) {
+            // Incremental update - append new messages
+            setMessages(prev => {
+              // Deduplicate just in case
+              const existingIds = new Set(prev.map(m => m.id))
+              const newOnes = fetchedMessages.filter(m => !existingIds.has(m.id))
+              return newOnes.length > 0 ? [...prev, ...newOnes] : prev
+            })
 
-          if (hasNewMessage) {
-            const newCount = newMessages.length - lastMessageCountRef.current
-            if (isCollapsed && newCount > 0) {
-              setUnreadCount((prev) => prev + newCount)
+            // Notify for each new message from others
+            for (const msg of fetchedMessages) {
+              if (msg.user_id !== currentUserId) {
+                // Track unread
+                if (isCollapsed) {
+                  setUnreadCount(prev => prev + 1)
+                }
+
+                // Track unread per user for grouped view
+                if (viewMode === "grouped" && !expandedUsers.has(msg.user_id)) {
+                  setUnreadPerUser(prev => {
+                    const newMap = new Map(prev)
+                    newMap.set(msg.user_id, (newMap.get(msg.user_id) || 0) + 1)
+                    return newMap
+                  })
+                }
+
+                // Play sound if enabled (once for batch)
+                if (settings?.enable_sounds && msg === fetchedMessages[fetchedMessages.length - 1]) {
+                  playNotificationSound()
+                }
+
+                // Browser notification for moderators
+                if (msg.user) {
+                  const senderName = msg.user.full_name ||
+                    msg.user.email?.split("@")[0] || "Someone"
+                  notifyNewMessage(senderName, msg.content)
+                }
+              }
             }
-
-            // Play sound if enabled
-            if (settings?.enable_sounds) {
-              playNotificationSound()
-            }
-
-            // Send browser notification for moderators
-            if (latestMessage.user) {
-              const senderName = latestMessage.user.full_name ||
-                latestMessage.user.email?.split("@")[0] || "Someone"
-              notifyNewMessage(senderName, latestMessage.content)
-            }
+          } else {
+            // Initial fetch - replace all
+            setMessages(fetchedMessages)
           }
 
+          // Update cursor to latest message
+          const latestMessage = fetchedMessages[fetchedMessages.length - 1]
           lastMessageIdRef.current = latestMessage.id
+          lastMessageCountRef.current = fetchedMessages.length
         }
-        lastMessageCountRef.current = newMessages.length
-
-        setMessages(newMessages)
       }
     } catch (error) {
       console.error("[PadChat] Error fetching messages:", error)
     } finally {
       setIsLoading(false)
     }
-  }, [padId, isCollapsed, settings?.enable_sounds, currentUserId, notifyNewMessage])
+  }, [padId, isCollapsed, settings?.enable_sounds, currentUserId, notifyNewMessage, viewMode, expandedUsers])
 
   // Fetch settings and moderators
   const fetchSettingsAndModerators = useCallback(async () => {
@@ -202,11 +239,12 @@ export function PadChatPanel({
 
   // Initial fetch and polling
   useEffect(() => {
-    fetchMessages()
+    shouldScrollRef.current = true // Scroll to bottom on initial load
+    fetchMessages(true) // Initial fetch - get all messages
     fetchSettingsAndModerators()
 
-    // Poll for new messages every 3 seconds
-    pollingIntervalRef.current = setInterval(fetchMessages, 3000)
+    // Poll for new messages every 3 seconds (cursor-based - only fetches new messages)
+    pollingIntervalRef.current = setInterval(() => fetchMessages(false), 3000)
 
     return () => {
       if (pollingIntervalRef.current) {
@@ -215,13 +253,43 @@ export function PadChatPanel({
     }
   }, [fetchMessages, fetchSettingsAndModerators])
 
-  // Auto-scroll to bottom on new messages
-  useEffect(() => {
-    if (!isLoading && !isCollapsed) {
-      messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
+  // Handle scroll position tracking
+  const handleScroll = useCallback(() => {
+    const container = messagesContainerRef.current
+    if (!container) return
+
+    const { scrollTop, scrollHeight, clientHeight } = container
+    const distanceFromBottom = scrollHeight - scrollTop - clientHeight
+    const nearBottom = distanceFromBottom < 100 // Within 100px of bottom
+
+    setIsNearBottom(nearBottom)
+    if (nearBottom) {
+      setHasNewMessages(false)
       setUnreadCount(0)
     }
-  }, [messages, isLoading, isCollapsed])
+  }, [])
+
+  // Auto-scroll to bottom on new messages (only if user is near bottom or just sent a message)
+  useEffect(() => {
+    if (!isLoading && !isCollapsed && messages.length > 0) {
+      if (shouldScrollRef.current || isNearBottom) {
+        messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
+        setUnreadCount(0)
+        setHasNewMessages(false)
+        shouldScrollRef.current = false
+      } else {
+        // User is scrolled up, show indicator
+        setHasNewMessages(true)
+      }
+    }
+  }, [messages, isLoading, isCollapsed, isNearBottom])
+
+  // Scroll to bottom helper
+  const scrollToBottom = useCallback(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
+    setHasNewMessages(false)
+    setUnreadCount(0)
+  }, [])
 
   // Play notification sound
   const playNotificationSound = () => {
@@ -248,6 +316,7 @@ export function PadChatPanel({
     const messageContent = newMessage.trim()
     setNewMessage("")
     setIsSending(true)
+    shouldScrollRef.current = true // Scroll to bottom when user sends their own message
 
     try {
       const response = await fetch(`/api/social-pads/${padId}/messages`, {
@@ -382,8 +451,8 @@ export function PadChatPanel({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ emoji }),
       })
-      // Refresh messages to get updated reactions
-      fetchMessages()
+      // Refresh messages to get updated reactions (full fetch needed)
+      fetchMessages(true)
     } catch {
       // Silent fail
     }
@@ -416,6 +485,63 @@ export function PadChatPanel({
 
   // Pinned messages
   const pinnedMessages = useMemo(() => messages.filter((m) => m.is_pinned), [messages])
+
+  // Grouped messages by user (for moderator view)
+  interface GroupedUser {
+    userId: string
+    user: PadMessage["user"]
+    messages: PadMessage[]
+    lastMessageTime: string
+    unreadCount: number
+  }
+
+  const groupedMessages = useMemo((): GroupedUser[] => {
+    const groups = new Map<string, GroupedUser>()
+    const visibleMessages = messages.filter(m => !m.is_deleted && !m.is_ai_message && !m.is_system_message)
+
+    for (const msg of visibleMessages) {
+      const userId = msg.user_id
+      if (!groups.has(userId)) {
+        groups.set(userId, {
+          userId,
+          user: msg.user,
+          messages: [],
+          lastMessageTime: msg.created_at,
+          unreadCount: unreadPerUser.get(userId) || 0,
+        })
+      }
+      const group = groups.get(userId)!
+      group.messages.push(msg)
+      // Update last message time if newer
+      if (new Date(msg.created_at) > new Date(group.lastMessageTime)) {
+        group.lastMessageTime = msg.created_at
+      }
+    }
+
+    // Sort by last message time (most recent first)
+    return Array.from(groups.values()).sort(
+      (a, b) => new Date(b.lastMessageTime).getTime() - new Date(a.lastMessageTime).getTime()
+    )
+  }, [messages, unreadPerUser])
+
+  // Toggle user expansion in grouped view
+  const toggleUserExpanded = useCallback((userId: string) => {
+    setExpandedUsers(prev => {
+      const next = new Set(prev)
+      if (next.has(userId)) {
+        next.delete(userId)
+      } else {
+        next.add(userId)
+        // Clear unread count for this user when expanded
+        setUnreadPerUser(prevUnread => {
+          const newMap = new Map(prevUnread)
+          newMap.delete(userId)
+          return newMap
+        })
+      }
+      return next
+    })
+  }, [])
 
   if (isCollapsed) {
     return (
@@ -456,6 +582,30 @@ export function PadChatPanel({
             )}
           </div>
           <div className="flex items-center gap-1">
+            {/* View mode toggle for moderators */}
+            {isModerator && (
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setViewMode(viewMode === "chronological" ? "grouped" : "chronological")}
+                      className="h-7 w-7 p-0 text-white hover:bg-white/20"
+                    >
+                      {viewMode === "chronological" ? (
+                        <Users className="h-4 w-4" />
+                      ) : (
+                        <List className="h-4 w-4" />
+                      )}
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>{viewMode === "chronological" ? "Group by user" : "Chronological view"}</p>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            )}
             {/* Notification toggle for moderators */}
             {notificationsSupported && isModerator && (
               <TooltipProvider>
@@ -519,6 +669,14 @@ export function PadChatPanel({
           </div>
         )}
 
+        {/* Private conversations indicator */}
+        {settings?.private_conversations && !isModerator && (
+          <div className="px-4 py-2 bg-blue-50 border-b border-blue-200 text-xs text-blue-700 flex items-center gap-2">
+            <Lock className="h-3 w-3" />
+            Private chat - only you and moderators can see your messages
+          </div>
+        )}
+
         {/* Pinned messages */}
         {pinnedMessages.length > 0 && (
           <div className="px-3 py-2 bg-amber-50 border-b border-amber-100">
@@ -535,7 +693,11 @@ export function PadChatPanel({
         )}
 
         {/* Messages area */}
-        <div className="flex-1 overflow-y-auto p-3 space-y-3 bg-gray-50">
+        <div
+          ref={messagesContainerRef}
+          onScroll={handleScroll}
+          className="flex-1 overflow-y-auto p-3 space-y-3 bg-gray-50 relative"
+        >
           {isLoading ? (
             <div className="flex items-center justify-center h-full">
               <Loader2 className="w-6 h-6 animate-spin text-purple-500" />
@@ -552,7 +714,101 @@ export function PadChatPanel({
               <p className="text-sm">No messages yet</p>
               <p className="text-xs">Start the conversation!</p>
             </div>
+          ) : viewMode === "grouped" && isModerator ? (
+            /* Grouped view for moderators */
+            <div className="space-y-2">
+              {groupedMessages.map((group) => {
+                const isExpanded = expandedUsers.has(group.userId)
+                const displayName = group.user?.full_name || group.user?.email?.split("@")[0] || "User"
+                const userIsModerator = isUserModerator(group.userId)
+
+                return (
+                  <div key={group.userId} className="bg-white rounded-lg border shadow-sm overflow-hidden">
+                    {/* User header - clickable to expand/collapse */}
+                    <button
+                      type="button"
+                      onClick={() => toggleUserExpanded(group.userId)}
+                      className="w-full flex items-center gap-3 p-3 hover:bg-gray-50 transition-colors text-left"
+                    >
+                      <div className="relative">
+                        <Avatar className="w-10 h-10">
+                          {group.user?.avatar_url && <AvatarImage src={group.user.avatar_url} />}
+                          <AvatarFallback className={`text-sm ${userIsModerator ? "bg-amber-100 text-amber-700" : "bg-purple-100 text-purple-700"}`}>
+                            {getInitials(displayName)}
+                          </AvatarFallback>
+                        </Avatar>
+                        {userIsModerator && (
+                          <div className="absolute -bottom-0.5 -right-0.5 bg-amber-500 rounded-full p-0.5">
+                            <Shield className="h-2.5 w-2.5 text-white" />
+                          </div>
+                        )}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2">
+                          <span className="font-medium text-gray-900 truncate">{displayName}</span>
+                          {userIsModerator && (
+                            <Badge className="text-[9px] px-1 py-0 bg-amber-100 text-amber-700 border-0">MOD</Badge>
+                          )}
+                          {group.unreadCount > 0 && (
+                            <span className="bg-red-500 text-white text-xs px-1.5 py-0.5 rounded-full animate-pulse">
+                              {group.unreadCount}
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-xs text-gray-500 truncate">
+                          {group.messages.length} message{group.messages.length !== 1 ? "s" : ""} · Last {formatMessageTime(group.lastMessageTime)}
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        {isExpanded ? (
+                          <ChevronDown className="h-4 w-4 text-gray-400" />
+                        ) : (
+                          <ChevronRight className="h-4 w-4 text-gray-400" />
+                        )}
+                      </div>
+                    </button>
+
+                    {/* Expanded messages */}
+                    {isExpanded && (
+                      <div className="border-t bg-gray-50 p-3 space-y-2 max-h-60 overflow-y-auto">
+                        {group.messages.map((msg) => (
+                          <div key={msg.id} className="flex gap-2 group">
+                            <div className="flex-1 bg-white rounded-lg px-3 py-2 border">
+                              <p className="text-sm whitespace-pre-wrap break-words">{msg.content}</p>
+                              <p className="text-xs text-gray-400 mt-1">{formatMessageTime(msg.created_at)}</p>
+                            </div>
+                            {canModerate && (
+                              <div className="opacity-0 group-hover:opacity-100 transition-opacity flex flex-col gap-1">
+                                {!msg.is_pinned && (
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => handlePinMessage(msg.id)}
+                                    className="h-6 w-6 p-0 text-gray-400 hover:text-amber-600"
+                                  >
+                                    <Pin className="h-3 w-3" />
+                                  </Button>
+                                )}
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => handleDeleteMessage(msg.id)}
+                                  className="h-6 w-6 p-0 text-gray-400 hover:text-red-600"
+                                >
+                                  <Trash2 className="h-3 w-3" />
+                                </Button>
+                              </div>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )
+              })}
+            </div>
           ) : (
+            /* Chronological view (default) */
             messages.filter(m => !m.is_deleted).map((msg) => {
               const isOwnMessage = msg.user_id === currentUserId
               const displayName = getDisplayName(msg)
@@ -742,6 +998,18 @@ export function PadChatPanel({
           )}
 
           <div ref={messagesEndRef} />
+
+          {/* Scroll to bottom button */}
+          {hasNewMessages && !isNearBottom && (
+            <button
+              type="button"
+              onClick={scrollToBottom}
+              className="sticky bottom-2 left-1/2 -translate-x-1/2 bg-purple-600 text-white px-3 py-1.5 rounded-full text-xs font-medium shadow-lg hover:bg-purple-700 transition-colors flex items-center gap-1 z-10"
+            >
+              <ChevronDown className="h-3 w-3" />
+              New messages
+            </button>
+          )}
         </div>
 
         {/* Input area */}

@@ -2,6 +2,7 @@ import { type NextRequest, NextResponse } from "next/server"
 import { createServiceDatabaseClient } from "@/lib/database/database-adapter"
 import { getCachedAuthUser, createRateLimitResponse, createUnauthorizedResponse } from "@/lib/auth/cached-auth"
 import { generateChatResponse } from "@/lib/ai/chat-ai-responder"
+import { padChatCache, type CachedSettings, type CachedUserInfo } from "@/lib/cache/pad-chat-cache"
 
 export const dynamic = "force-dynamic"
 
@@ -35,27 +36,45 @@ interface UserInfo {
   avatar_url: string | null
 }
 
+interface PadAccessInfo {
+  hasAccess: boolean
+  ownerId: string | null
+  isPublic: boolean
+}
+
 // ============================================================================
-// Helpers
+// Helpers - Optimized for Scale
 // ============================================================================
 
-async function verifyPadAccess(db: any, padId: string, userId: string): Promise<boolean> {
-  // Check if pad exists and user has access
+/**
+ * Verify pad access and return owner info in a single query
+ * This combines what was previously 2 queries into 1
+ */
+async function verifyPadAccessWithInfo(
+  db: any,
+  padId: string,
+  userId: string
+): Promise<PadAccessInfo> {
+  // Single query to get pad info
   const { data: pad } = await db
     .from("social_pads")
     .select("id, is_public, owner_id")
     .eq("id", padId)
     .maybeSingle()
 
-  if (!pad) return false
+  if (!pad) return { hasAccess: false, ownerId: null, isPublic: false }
 
   // Owner always has access
-  if (pad.owner_id === userId) return true
+  if (pad.owner_id === userId) {
+    return { hasAccess: true, ownerId: pad.owner_id, isPublic: pad.is_public }
+  }
 
   // Public pads are accessible to all
-  if (pad.is_public) return true
+  if (pad.is_public) {
+    return { hasAccess: true, ownerId: pad.owner_id, isPublic: true }
+  }
 
-  // Check if user is a member
+  // Check membership only if needed
   const { data: membership } = await db
     .from("social_pad_members")
     .select("id")
@@ -63,33 +82,35 @@ async function verifyPadAccess(db: any, padId: string, userId: string): Promise<
     .eq("user_id", userId)
     .maybeSingle()
 
-  return !!membership
+  return {
+    hasAccess: !!membership,
+    ownerId: pad.owner_id,
+    isPublic: false,
+  }
 }
 
-async function fetchUserMap(db: any, userIds: string[]): Promise<Record<string, UserInfo>> {
-  if (userIds.length === 0) return {}
-
-  const { data: users } = await db
-    .from("users")
-    .select("id, email, full_name, avatar_url")
-    .in("id", userIds)
-
-  if (!users) return {}
-
-  return Object.fromEntries(users.map((u: UserInfo) => [u.id, u]))
-}
-
-async function fetchModerators(db: any, padId: string): Promise<Set<string>> {
-  // Get pad owner
-  const { data: pad } = await db
-    .from("social_pads")
-    .select("owner_id")
-    .eq("id", padId)
-    .maybeSingle()
+/**
+ * Fetch moderator IDs - returns owner + explicit moderators
+ * Uses cache when available for faster lookups
+ */
+async function fetchModeratorIds(
+  db: any,
+  padId: string,
+  knownOwnerId?: string | null
+): Promise<Set<string>> {
+  // Try cache first
+  const cached = await padChatCache.getModerators(padId)
+  if (cached) {
+    const moderatorIds = new Set<string>(cached.ids)
+    if (cached.ownerId) moderatorIds.add(cached.ownerId)
+    return moderatorIds
+  }
 
   const moderatorIds = new Set<string>()
-  if (pad?.owner_id) {
-    moderatorIds.add(pad.owner_id)
+
+  // Add known owner if provided
+  if (knownOwnerId) {
+    moderatorIds.add(knownOwnerId)
   }
 
   // Get active moderators
@@ -105,7 +126,47 @@ async function fetchModerators(db: any, padId: string): Promise<Set<string>> {
     }
   }
 
+  // Cache the result
+  await padChatCache.setModerators(padId, {
+    ids: Array.from(moderatorIds),
+    ownerId: knownOwnerId || null,
+  })
+
   return moderatorIds
+}
+
+async function fetchUserMap(db: any, userIds: string[]): Promise<Record<string, UserInfo>> {
+  if (userIds.length === 0) return {}
+
+  // Check cache first
+  const cachedUsers = await padChatCache.getUsers(userIds)
+  const missingIds = userIds.filter(id => !cachedUsers.has(id))
+
+  // Fetch missing users from DB
+  let dbUsers: UserInfo[] = []
+  if (missingIds.length > 0) {
+    const { data } = await db
+      .from("users")
+      .select("id, email, full_name, avatar_url")
+      .in("id", missingIds)
+
+    if (data) {
+      dbUsers = data
+      // Cache the fetched users
+      await padChatCache.setUsers(dbUsers as CachedUserInfo[])
+    }
+  }
+
+  // Combine cached and fetched users
+  const result: Record<string, UserInfo> = {}
+  for (const [id, user] of cachedUsers) {
+    result[id] = user
+  }
+  for (const user of dbUsers) {
+    result[user.id] = user
+  }
+
+  return result
 }
 
 interface ReactionSummary {
@@ -161,7 +222,15 @@ async function fetchReactionsForMessages(
 }
 
 // ============================================================================
-// GET - Fetch pad messages
+// GET - Fetch pad messages (Optimized with pagination)
+// ============================================================================
+//
+// Query Parameters:
+//   - limit: number (default 50, max 100) - messages to fetch
+//   - after: string - cursor (message ID) to fetch messages after
+//   - before: string - cursor (message ID) to fetch messages before
+//
+// For polling, use: ?after=<lastMessageId> to only get new messages
 // ============================================================================
 
 export async function GET(
@@ -180,42 +249,144 @@ export async function GET(
       return createUnauthorizedResponse()
     }
 
+    const userId = authResult.user.id
     const db = await createServiceDatabaseClient()
 
-    // Verify access
-    const hasAccess = await verifyPadAccess(db, padId, authResult.user.id)
-    if (!hasAccess) {
+    // Parse pagination params
+    const { searchParams } = new URL(request.url)
+    const limitParam = Math.min(parseInt(searchParams.get("limit") || "50", 10), 100)
+    const afterCursor = searchParams.get("after") // Message ID to fetch after
+    const beforeCursor = searchParams.get("before") // Message ID to fetch before
+
+    // Step 1: Verify access and get pad info (combined query)
+    const accessInfo = await verifyPadAccessWithInfo(db, padId, userId)
+    if (!accessInfo.hasAccess) {
       return NextResponse.json({ error: "Access denied" }, { status: 403 })
     }
 
-    // Fetch messages with enhanced fields
-    const { data: messages, error } = await db
+    // Step 2: Parallel fetch - settings (with cache) and moderators
+    const [chatSettings, moderatorIds] = await Promise.all([
+      (async () => {
+        // Try cache first for settings
+        const cached = await padChatCache.getSettings(padId)
+        if (cached) return cached
+
+        const { data } = await db
+          .from("social_pad_chat_settings")
+          .select("private_conversations, chat_enabled, ai_enabled")
+          .eq("social_pad_id", padId)
+          .maybeSingle()
+
+        if (data) {
+          await padChatCache.setSettings(padId, data as CachedSettings)
+        }
+        return data
+      })(),
+      fetchModeratorIds(db, padId, accessInfo.ownerId),
+    ])
+
+    const isModerator = moderatorIds.has(userId)
+    const isPrivateMode = chatSettings?.private_conversations === true && !isModerator
+
+    // Step 3: Build optimized message query
+    let query = db
       .from("social_pad_messages")
       .select("id, content, created_at, updated_at, user_id, social_pad_id, is_pinned, pinned_by, pinned_at, is_edited, edited_at, is_deleted, deleted_by, reply_to_id, is_ai_message, is_system_message")
       .eq("social_pad_id", padId)
-      .order("created_at", { ascending: true })
-      .limit(100)
 
-    if (error) {
-      // Table might not exist yet - return empty array
-      if (error.code === "42P01") {
-        return NextResponse.json({ messages: [] })
+    // Apply cursor-based pagination
+    if (afterCursor) {
+      // Get the timestamp of the cursor message for efficient filtering
+      const { data: cursorMsg } = await db
+        .from("social_pad_messages")
+        .select("created_at")
+        .eq("id", afterCursor)
+        .single()
+
+      if (cursorMsg) {
+        query = query.gt("created_at", cursorMsg.created_at)
       }
-      console.error("[PadMessages] Error fetching:", error)
-      return NextResponse.json({ messages: [] })
+    } else if (beforeCursor) {
+      const { data: cursorMsg } = await db
+        .from("social_pad_messages")
+        .select("created_at")
+        .eq("id", beforeCursor)
+        .single()
+
+      if (cursorMsg) {
+        query = query.lt("created_at", cursorMsg.created_at)
+      }
     }
 
-    // Enrich with user data, moderator status, and reactions
-    const userIds = [...new Set((messages || []).map((m: PadMessage) => m.user_id))] as string[]
-    const messageIds = (messages || []).map((m: PadMessage) => m.id)
+    // For private mode, filter at database level where possible
+    if (isPrivateMode) {
+      // Database-level filter: user's own messages OR pinned OR AI messages
+      // Note: reply_to filtering requires post-processing due to complexity
+      query = query.or(`user_id.eq.${userId},is_pinned.eq.true,is_ai_message.eq.true`)
+    }
 
-    const [usersMap, moderatorIds, reactionsMap] = await Promise.all([
+    query = query
+      .order("created_at", { ascending: !beforeCursor }) // Reverse for "before" pagination
+      .limit(limitParam)
+
+    const { data: messages, error } = await query
+
+    if (error) {
+      if (error.code === "42P01") {
+        return NextResponse.json({ messages: [], hasMore: false, nextCursor: null })
+      }
+      console.error("[PadMessages] Error fetching:", error)
+      return NextResponse.json({ messages: [], hasMore: false, nextCursor: null })
+    }
+
+    // Reverse if we fetched "before" (to maintain chronological order)
+    let filteredMessages: PadMessage[] = beforeCursor ? (messages || []).reverse() : (messages || [])
+
+    // Step 4: Additional filtering for private mode (reply_to logic)
+    // This handles moderator replies to user's messages
+    if (isPrivateMode && filteredMessages.length > 0) {
+      const ownMessageIds = new Set(
+        filteredMessages
+          .filter((m: PadMessage) => m.user_id === userId)
+          .map((m: PadMessage) => m.id)
+      )
+
+      filteredMessages = filteredMessages.filter((msg: PadMessage) => {
+        // Already filtered at DB level: own messages, pinned, AI
+        if (msg.user_id === userId) return true
+        if (msg.is_pinned) return true
+
+        // AI messages that follow user's messages (context-aware)
+        if (msg.is_ai_message) {
+          const msgIndex = filteredMessages.findIndex((m: PadMessage) => m.id === msg.id)
+          if (msgIndex > 0) {
+            const prevMsg = filteredMessages[msgIndex - 1]
+            if (prevMsg.user_id === userId) return true
+          }
+          // Also allow if it's a reply to user's message
+          if (msg.reply_to_id && ownMessageIds.has(msg.reply_to_id)) return true
+        }
+
+        // Moderator replies to user's messages
+        if (msg.reply_to_id && ownMessageIds.has(msg.reply_to_id)) {
+          return moderatorIds.has(msg.user_id)
+        }
+
+        return false
+      })
+    }
+
+    // Step 5: Parallel fetch user data and reactions
+    const userIds = [...new Set(filteredMessages.map((m: PadMessage) => m.user_id))] as string[]
+    const messageIds = filteredMessages.map((m: PadMessage) => m.id)
+
+    const [usersMap, reactionsMap] = await Promise.all([
       fetchUserMap(db, userIds),
-      fetchModerators(db, padId),
-      fetchReactionsForMessages(db, messageIds, authResult.user.id),
+      fetchReactionsForMessages(db, messageIds, userId),
     ])
 
-    const messagesWithUsers = (messages || []).map((msg: PadMessage) => ({
+    // Step 6: Build response with pagination info
+    const messagesWithUsers = filteredMessages.map((msg: PadMessage) => ({
       ...msg,
       user: usersMap[msg.user_id]
         ? {
@@ -226,7 +397,22 @@ export async function GET(
       reactions: reactionsMap[msg.id] || [],
     }))
 
-    return NextResponse.json({ messages: messagesWithUsers })
+    // Determine pagination cursors
+    const hasMore = filteredMessages.length === limitParam
+    const nextCursor = filteredMessages.length > 0
+      ? filteredMessages[filteredMessages.length - 1].id
+      : null
+    const prevCursor = filteredMessages.length > 0
+      ? filteredMessages[0].id
+      : null
+
+    return NextResponse.json({
+      messages: messagesWithUsers,
+      hasMore,
+      nextCursor,
+      prevCursor,
+      isPrivateMode, // Let client know filtering is active
+    })
   } catch (error) {
     console.error("[PadMessages] GET error:", error)
     return NextResponse.json({ error: "Internal server error" }, { status: 500 })
@@ -256,35 +442,33 @@ export async function POST(
     const user = authResult.user
     const db = await createServiceDatabaseClient()
 
-    // Verify access
-    const hasAccess = await verifyPadAccess(db, padId, user.id)
-    if (!hasAccess) {
+    // Verify access (optimized)
+    const accessInfo = await verifyPadAccessWithInfo(db, padId, user.id)
+    if (!accessInfo.hasAccess) {
       return NextResponse.json({ error: "Access denied" }, { status: 403 })
     }
 
     const body = await request.json()
-    const { content } = body
+    const { content, reply_to_id } = body
 
     if (!content?.trim()) {
       return NextResponse.json({ error: "Content is required" }, { status: 400 })
     }
 
-    // Ensure the table exists (create if not)
-    // This is a safety check - ideally the table should exist via migrations
-    try {
-      await db.rpc("ensure_social_pad_messages_table")
-    } catch {
-      // RPC might not exist, continue anyway
+    // Insert message with optional reply_to_id
+    const insertData: Record<string, unknown> = {
+      social_pad_id: padId,
+      user_id: user.id,
+      content: content.trim(),
     }
 
-    // Insert message
+    if (reply_to_id) {
+      insertData.reply_to_id = reply_to_id
+    }
+
     const { data: message, error: insertError } = await db
       .from("social_pad_messages")
-      .insert({
-        social_pad_id: padId,
-        user_id: user.id,
-        content: content.trim(),
-      })
+      .insert(insertData)
       .select()
       .single()
 
@@ -336,7 +520,7 @@ export async function POST(
           aiGreeting: chatSettings.ai_greeting,
         })
 
-        // Insert AI response
+        // Insert AI response with reply_to pointing to user's message
         const { data: aiMessageData, error: aiInsertError } = await db
           .from("social_pad_messages")
           .insert({
@@ -344,6 +528,7 @@ export async function POST(
             user_id: user.id, // Use the same user for now (will be filtered by is_ai_message)
             content: aiResponse.text,
             is_ai_message: true,
+            reply_to_id: message.id, // Link AI response to user's message
           })
           .select()
           .single()
