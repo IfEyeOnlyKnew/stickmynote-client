@@ -47,7 +47,20 @@ import {
   X,
   Check,
   Search,
+  AlertTriangle,
+  Calendar,
 } from "lucide-react"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog"
 import { toast } from "sonner"
 import type {
   PadChatSettings,
@@ -113,6 +126,9 @@ export function PadChatSettingsDialog({
     users: { id: string; email: string; full_name: string | null; avatar_url: string | null } | null
   }>>([])
   const [searching, setSearching] = useState(false)
+
+  // Clear all messages state
+  const [clearing, setClearing] = useState(false)
 
   // Fetch settings and moderators
   const fetchData = useCallback(async () => {
@@ -259,6 +275,30 @@ export function PadChatSettingsDialog({
     } catch (error) {
       console.error("[ChatSettings] Error removing moderator:", error)
       toast.error("Failed to remove moderator")
+    }
+  }
+
+  // Clear all messages (owner only)
+  const handleClearAllMessages = async (keepPinned: boolean) => {
+    setClearing(true)
+    try {
+      const response = await fetch(
+        `/api/social-pads/${padId}/messages?keepPinned=${keepPinned}`,
+        { method: "DELETE" }
+      )
+
+      if (response.ok) {
+        const data = await response.json()
+        toast.success(`Cleared ${data.deletedCount} messages`)
+      } else {
+        const error = await response.json()
+        toast.error(error.error || "Failed to clear messages")
+      }
+    } catch (error) {
+      console.error("[ChatSettings] Error clearing messages:", error)
+      toast.error("Failed to clear messages")
+    } finally {
+      setClearing(false)
     }
   }
 
@@ -441,6 +481,144 @@ export function PadChatSettingsDialog({
                   </div>
                 </CardContent>
               </Card>
+
+              {/* Message Retention */}
+              <Card>
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-sm flex items-center gap-2">
+                    <Calendar className="h-4 w-4" />
+                    Message Retention
+                  </CardTitle>
+                  <CardDescription>
+                    Automatically delete old messages to keep chats manageable
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <Label>Enable auto-cleanup</Label>
+                      <p className="text-xs text-gray-500">
+                        Automatically delete messages older than the retention period
+                      </p>
+                    </div>
+                    <Switch
+                      checked={settings?.message_retention_enabled ?? false}
+                      onCheckedChange={(checked) =>
+                        setSettings((s) => (s ? { ...s, message_retention_enabled: checked } : s))
+                      }
+                    />
+                  </div>
+
+                  {settings?.message_retention_enabled && (
+                    <div className="space-y-2 pl-4 border-l-2 border-purple-200">
+                      <Label>Keep messages for</Label>
+                      <Select
+                        value={String(settings?.message_retention_days ?? 30)}
+                        onValueChange={(value) =>
+                          setSettings((s) => (s ? { ...s, message_retention_days: parseInt(value) } : s))
+                        }
+                      >
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="7">7 days</SelectItem>
+                          <SelectItem value="14">14 days</SelectItem>
+                          <SelectItem value="30">30 days</SelectItem>
+                          <SelectItem value="60">60 days</SelectItem>
+                          <SelectItem value="90">90 days</SelectItem>
+                          <SelectItem value="180">180 days</SelectItem>
+                          <SelectItem value="365">1 year</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <p className="text-xs text-gray-500">
+                        Pinned messages are never deleted automatically
+                      </p>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+
+              {/* Danger Zone - Owner Only */}
+              {isOwner && (
+                <Card className="border-red-200">
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-sm flex items-center gap-2 text-red-600">
+                      <AlertTriangle className="h-4 w-4" />
+                      Danger Zone
+                    </CardTitle>
+                    <CardDescription>
+                      Destructive actions - use with caution
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <Label>Clear All Messages</Label>
+                        <p className="text-xs text-gray-500">
+                          Permanently delete all chat messages in this pad
+                        </p>
+                      </div>
+                      <AlertDialog>
+                        <AlertDialogTrigger asChild>
+                          <Button
+                            variant="destructive"
+                            size="sm"
+                            disabled={clearing}
+                          >
+                            {clearing ? (
+                              <>
+                                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                                Clearing...
+                              </>
+                            ) : (
+                              <>
+                                <Trash2 className="h-4 w-4 mr-2" />
+                                Clear All
+                              </>
+                            )}
+                          </Button>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent>
+                          <AlertDialogHeader>
+                            <AlertDialogTitle className="flex items-center gap-2">
+                              <AlertTriangle className="h-5 w-5 text-red-500" />
+                              Clear All Messages?
+                            </AlertDialogTitle>
+                            <AlertDialogDescription>
+                              This will permanently delete all chat messages in this pad.
+                              This action cannot be undone.
+                            </AlertDialogDescription>
+                          </AlertDialogHeader>
+                          <div className="py-4">
+                            <div className="flex items-center space-x-2 mb-4">
+                              <Switch
+                                id="keep-pinned"
+                                defaultChecked={true}
+                              />
+                              <Label htmlFor="keep-pinned" className="text-sm">
+                                Keep pinned messages
+                              </Label>
+                            </div>
+                          </div>
+                          <AlertDialogFooter>
+                            <AlertDialogCancel>Cancel</AlertDialogCancel>
+                            <AlertDialogAction
+                              className="bg-red-600 hover:bg-red-700"
+                              onClick={(e) => {
+                                const keepPinned = (document.getElementById("keep-pinned") as HTMLButtonElement)?.getAttribute("data-state") === "checked"
+                                handleClearAllMessages(keepPinned)
+                              }}
+                            >
+                              Yes, Clear All Messages
+                            </AlertDialogAction>
+                          </AlertDialogFooter>
+                        </AlertDialogContent>
+                      </AlertDialog>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
             </TabsContent>
 
             {/* Moderators */}

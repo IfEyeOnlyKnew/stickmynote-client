@@ -87,14 +87,15 @@ Goal: Surpass Microsoft's suite by providing a unified, intelligent, and
      - Print/export Gantt to PDF
      Status: PARTIAL (basic Gantt exists)
 
-[  ] 2.2 KANBAN BOARD VIEW
-     - Customizable swim lanes
-     - WIP (Work in Progress) limits
-     - Card aging visualization
-     - Quick filters on board
-     - Board-level automation rules
-     - Multiple board views per project
-     Status: MISSING (CalSticks is list-based)
+[✓ ] 2.2 KANBAN BOARD VIEW
+     - Customizable swim lanes ✓
+     - WIP (Work in Progress) limits ✓
+     - Card aging visualization ✓
+     - Quick filters on board ✓
+     - Board-level automation rules (partial)
+     - Multiple board views per project ✓
+     Status: IMPLEMENTED (components/calsticks/KanbanView.tsx - 897 lines)
+     Updated: 2026-01-27
 
 [  ] 2.3 RESOURCE MANAGEMENT
      - Team capacity planning
@@ -114,14 +115,17 @@ Goal: Surpass Microsoft's suite by providing a unified, intelligent, and
      - Dependency conflict detection
      Status: PARTIAL (basic dependencies exist)
 
-[  ] 2.5 SPRINTS & AGILE FEATURES
-     - Sprint planning board
-     - Sprint backlog management
-     - Velocity tracking
-     - Burndown/burnup charts
-     - Story points estimation
-     - Sprint retrospectives
-     Status: MISSING
+[✓ ] 2.5 SPRINTS & AGILE FEATURES
+     - Sprint planning board ✓
+     - Sprint backlog management ✓
+     - Velocity tracking ✓ (VelocityChart.tsx - 256 lines)
+     - Burndown/burnup charts ✓ (BurndownChart.tsx + BurnupChart.tsx)
+     - Story points estimation ✓
+     - Sprint retrospectives ✓ (SprintRetrospective.tsx - full feature)
+     Status: FULLY IMPLEMENTED
+     Updated: 2026-01-27
+     New: Added SprintRetrospective with team mood, what went well,
+          improvements, action items, voting, and meeting notes
 
 [  ] 2.6 TIME TRACKING ENHANCEMENTS
      - Timer widget (start/stop)

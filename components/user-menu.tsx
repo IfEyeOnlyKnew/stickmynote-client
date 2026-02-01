@@ -8,12 +8,20 @@ import {
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
+  DropdownMenuSub,
+  DropdownMenuSubTrigger,
+  DropdownMenuSubContent,
+  DropdownMenuPortal,
 } from "@/components/ui/dropdown-menu"
 import { useUser } from "@/contexts/user-context"
 import { useOrganization } from "@/contexts/organization-context"
 import { useRouter } from "next/navigation"
-import { User, Settings, LogOut, BarChart3, FolderKanban, Users, Building, StickyNote, MessageSquare, Video } from "lucide-react"
+import { User, Settings, LogOut, BarChart3, FolderKanban, Users, Building, StickyNote, MessageSquare, Video, Circle } from "lucide-react"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { useUserStatus } from "@/hooks/useUserStatus"
+import { UserStatusIndicator, StatusIcon } from "@/components/user-status"
+import { STATUS_LABELS } from "@/types/user-status"
+import type { UserStatusType } from "@/types/user-status"
 
 interface UserMenuProps {
   hideSettings?: boolean
@@ -37,6 +45,7 @@ export function UserMenu({
   const { user, profile } = useUser()
   const { currentOrg, canManage, currentOrgRole } = useOrganization()
   const router = useRouter()
+  const { effective, setOnline, setAway, setBusy, setDND, updating } = useUserStatus()
 
   const isAdmin = user?.email === "chrisdoran63@outlook.com"
   const isOwner = currentOrgRole === "owner"
@@ -89,6 +98,25 @@ export function UserMenu({
     }
   }
 
+  const currentStatus = effective?.status || "online"
+
+  const handleStatusChange = async (status: UserStatusType) => {
+    switch (status) {
+      case "online":
+        await setOnline()
+        break
+      case "away":
+        await setAway()
+        break
+      case "busy":
+        await setBusy()
+        break
+      case "dnd":
+        await setDND()
+        break
+    }
+  }
+
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
@@ -101,6 +129,13 @@ export function UserMenu({
             ) : null}
             <AvatarFallback>{orgLogoUrl ? getOrgInitials() : getInitials()}</AvatarFallback>
           </Avatar>
+          {/* Status indicator dot */}
+          <UserStatusIndicator
+            status={currentStatus}
+            size="xs"
+            showTooltip={false}
+            className="absolute bottom-0 right-0 border-2 border-background"
+          />
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent className="w-56" align="end" forceMount>
@@ -113,6 +148,40 @@ export function UserMenu({
             )}
           </div>
         </DropdownMenuLabel>
+        <DropdownMenuSeparator />
+
+        {/* Status Selector */}
+        <DropdownMenuSub>
+          <DropdownMenuSubTrigger className="gap-2" disabled={updating}>
+            <UserStatusIndicator status={currentStatus} size="xs" showTooltip={false} />
+            <span>{STATUS_LABELS[currentStatus]}</span>
+          </DropdownMenuSubTrigger>
+          <DropdownMenuPortal>
+            <DropdownMenuSubContent>
+              <DropdownMenuItem onClick={() => handleStatusChange("online")} className="gap-2">
+                <StatusIcon status="online" className="h-4 w-4" />
+                <span>Online</span>
+                {currentStatus === "online" && <Circle className="h-2 w-2 fill-primary text-primary ml-auto" />}
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => handleStatusChange("away")} className="gap-2">
+                <StatusIcon status="away" className="h-4 w-4" />
+                <span>Away</span>
+                {currentStatus === "away" && <Circle className="h-2 w-2 fill-primary text-primary ml-auto" />}
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => handleStatusChange("busy")} className="gap-2">
+                <StatusIcon status="busy" className="h-4 w-4" />
+                <span>Busy</span>
+                {currentStatus === "busy" && <Circle className="h-2 w-2 fill-primary text-primary ml-auto" />}
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => handleStatusChange("dnd")} className="gap-2">
+                <StatusIcon status="dnd" className="h-4 w-4" />
+                <span>Do Not Disturb</span>
+                {currentStatus === "dnd" && <Circle className="h-2 w-2 fill-primary text-primary ml-auto" />}
+              </DropdownMenuItem>
+            </DropdownMenuSubContent>
+          </DropdownMenuPortal>
+        </DropdownMenuSub>
+
         <DropdownMenuSeparator />
         <DropdownMenuItem onClick={() => router.push("/dashboard")}>
           <BarChart3 className="mr-2 h-4 w-4" />

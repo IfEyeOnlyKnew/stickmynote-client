@@ -125,6 +125,10 @@ export interface PadChatSettings {
   enable_sounds: boolean
   enable_typing_indicator: boolean
 
+  // Message retention
+  message_retention_enabled: boolean
+  message_retention_days: number // 0 = keep forever, otherwise days to keep
+
   created_at: string
   updated_at: string
 }
@@ -150,6 +154,8 @@ export const DEFAULT_CHAT_SETTINGS: Omit<PadChatSettings, "id" | "social_pad_id"
   show_timestamps: true,
   enable_sounds: true,
   enable_typing_indicator: true,
+  message_retention_enabled: false,
+  message_retention_days: 30,
 }
 
 // ----------------------------------------------------------------------------

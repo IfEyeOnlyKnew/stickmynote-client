@@ -563,3 +563,74 @@ export async function POST(
     return NextResponse.json({ error: "Internal server error" }, { status: 500 })
   }
 }
+
+// ============================================================================
+// DELETE - Clear all messages (Owner only)
+// ============================================================================
+
+export async function DELETE(
+  request: NextRequest,
+  { params }: { params: Promise<{ padId: string }> }
+) {
+  try {
+    const { padId } = await params
+    const authResult = await getCachedAuthUser()
+
+    if (authResult.rateLimited) {
+      return createRateLimitResponse()
+    }
+
+    if (!authResult.user) {
+      return createUnauthorizedResponse()
+    }
+
+    const db = await createServiceDatabaseClient()
+
+    // Check if user is pad owner (only owner can clear all messages)
+    const { data: pad } = await db
+      .from("social_pads")
+      .select("owner_id")
+      .eq("id", padId)
+      .maybeSingle()
+
+    if (!pad) {
+      return NextResponse.json({ error: "Pad not found" }, { status: 404 })
+    }
+
+    if (pad.owner_id !== authResult.user.id) {
+      return NextResponse.json({ error: "Only the pad owner can clear all messages" }, { status: 403 })
+    }
+
+    // Parse query params for options
+    const { searchParams } = new URL(request.url)
+    const keepPinned = searchParams.get("keepPinned") === "true"
+
+    // Delete messages (optionally keep pinned)
+    let deleteQuery = db
+      .from("social_pad_messages")
+      .delete()
+      .eq("social_pad_id", padId)
+
+    if (keepPinned) {
+      deleteQuery = deleteQuery.eq("is_pinned", false)
+    }
+
+    const { error: deleteError, count } = await deleteQuery
+
+    if (deleteError) {
+      console.error("[PadMessages] Delete error:", deleteError)
+      return NextResponse.json({ error: "Failed to clear messages" }, { status: 500 })
+    }
+
+    console.log(`[PadMessages] Cleared ${count || 0} messages from pad ${padId} by owner ${authResult.user.id}`)
+
+    return NextResponse.json({
+      success: true,
+      deletedCount: count || 0,
+      keptPinned: keepPinned,
+    })
+  } catch (error) {
+    console.error("[PadMessages] DELETE error:", error)
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 })
+  }
+}

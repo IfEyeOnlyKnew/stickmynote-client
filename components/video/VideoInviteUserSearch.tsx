@@ -95,8 +95,9 @@ export const VideoInviteUserSearch: React.FC<VideoInviteUserSearchProps> = ({
           const data = await response.json()
           setPresence(data.presence || {})
         }
-      } catch (err) {
+      } catch {
         // Silent fail - presence is not critical
+        void 0
       }
     }
 
