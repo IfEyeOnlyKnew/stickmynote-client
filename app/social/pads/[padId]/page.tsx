@@ -92,7 +92,7 @@ function ScheduleMeetingButton({
       // Update context with stick info
       paletteContext.updateContext({ stickId, stickTopic })
       // Open the schedule meeting modal
-      paletteContext.openModal("scheduleMeeting")
+      paletteContext.openModal("schedule-meeting")
     }
   }
 
