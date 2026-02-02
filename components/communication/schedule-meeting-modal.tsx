@@ -37,6 +37,7 @@ interface ScheduleMeetingModalProps {
   onOpenChange: (open: boolean) => void
   onSuccess?: (meeting: any) => void
   defaultDate?: Date
+  defaultParticipants?: string[]
 }
 
 // ----------------------------------------------------------------------------
@@ -69,6 +70,7 @@ export function ScheduleMeetingModal({
   onOpenChange,
   onSuccess,
   defaultDate,
+  defaultParticipants,
 }: ScheduleMeetingModalProps) {
   const { context } = useCommunicationPaletteContext()
 
@@ -81,8 +83,19 @@ export function ScheduleMeetingModal({
   useEffect(() => {
     if (defaultDate) {
       setDate(format(defaultDate, "yyyy-MM-dd"))
+      // Also set start time if it's a specific time
+      if (defaultDate.getHours() !== 0 || defaultDate.getMinutes() !== 0) {
+        setStartTime(format(defaultDate, "HH:mm"))
+      }
     }
   }, [defaultDate])
+
+  // Update participants when defaultParticipants changes
+  useEffect(() => {
+    if (defaultParticipants && defaultParticipants.length > 0) {
+      setSelectedEmails(defaultParticipants)
+    }
+  }, [defaultParticipants])
   const [startTime, setStartTime] = useState("09:00")
   const [duration, setDuration] = useState(DEFAULT_MEETING_DURATION.toString())
   const [location, setLocation] = useState("")

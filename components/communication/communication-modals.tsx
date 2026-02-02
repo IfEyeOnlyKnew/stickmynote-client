@@ -9,6 +9,7 @@ import { QuickCallModal, ScreenShareModal } from "./quick-call-modal"
 import { ScheduleMeetingModal } from "./schedule-meeting-modal"
 import { FullCalendarModal } from "./full-calendar-modal"
 import { MeetingNotesModal } from "./meeting-notes-modal"
+import { SchedulingAssistant } from "./scheduling-assistant"
 
 /**
  * CommunicationModals - Renders the communication palette, FAB trigger, and all associated modals
@@ -35,6 +36,7 @@ export function CommunicationModals() {
 
   // Track selected date from calendar for scheduling
   const [schedulingDate, setSchedulingDate] = useState<Date | undefined>(undefined)
+  const [schedulingParticipants, setSchedulingParticipants] = useState<string[]>([])
 
   // Handle switching from calendar to schedule meeting
   const handleScheduleFromCalendar = (selectedDate?: Date) => {
@@ -46,11 +48,27 @@ export function CommunicationModals() {
     }, 100)
   }
 
-  // Clear scheduling date when schedule modal closes
+  // Handle scheduling from the assistant
+  const handleScheduleFromAssistant = (slot: {
+    date: Date
+    startTime: Date
+    endTime: Date
+    participants: string[]
+  }) => {
+    setSchedulingDate(slot.startTime)
+    setSchedulingParticipants(slot.participants)
+    closeModal()
+    setTimeout(() => {
+      openModal("schedule-meeting")
+    }, 100)
+  }
+
+  // Clear scheduling date and participants when schedule modal closes
   const handleScheduleModalClose = (open: boolean) => {
     if (!open) {
       closeModal()
       setSchedulingDate(undefined)
+      setSchedulingParticipants([])
     }
   }
 
@@ -86,6 +104,7 @@ export function CommunicationModals() {
         open={activeModal === "schedule-meeting"}
         onOpenChange={handleScheduleModalClose}
         defaultDate={schedulingDate}
+        defaultParticipants={schedulingParticipants}
       />
 
       {/* Full Calendar Modal */}
@@ -99,6 +118,13 @@ export function CommunicationModals() {
       <MeetingNotesModal
         open={activeModal === "meeting-notes"}
         onOpenChange={(open) => !open && closeModal()}
+      />
+
+      {/* Scheduling Assistant */}
+      <SchedulingAssistant
+        open={activeModal === "scheduling-assistant"}
+        onOpenChange={(open) => !open && closeModal()}
+        onSchedule={handleScheduleFromAssistant}
       />
     </>
   )

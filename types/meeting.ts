@@ -140,6 +140,7 @@ export type CommunicationAction =
   | "quick-call"
   | "screen-share"
   | "schedule-meeting"
+  | "scheduling-assistant"
   | "calendar-view"
   | "meeting-notes"
 

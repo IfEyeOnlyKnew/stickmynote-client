@@ -65,6 +65,14 @@ const COMMUNICATION_ACTIONS: CommunicationActionItem[] = [
     group: "Communication",
   },
   {
+    id: "scheduling-assistant",
+    label: "Scheduling Assistant",
+    description: "Find available times across participants",
+    icon: <Users className="mr-2 h-4 w-4 text-indigo-500" />,
+    keywords: ["schedule", "availability", "assistant", "find time", "free", "busy"],
+    group: "Calendar",
+  },
+  {
     id: "calendar-view",
     label: "Calendar View",
     description: "View your calendar and scheduled meetings",
