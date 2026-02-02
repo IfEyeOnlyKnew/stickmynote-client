@@ -10,6 +10,10 @@ import { UserMenu } from "@/components/user-menu"
 import { ManageMembersDialog } from "@/components/social/manage-members-dialog"
 import { Users, Settings, ArrowLeft } from "lucide-react"
 import { BreadcrumbNav } from "@/components/breadcrumb-nav"
+import {
+  CommunicationPaletteProvider,
+  CommunicationModals,
+} from "@/components/communication"
 
 interface SocialPad {
   id: string
@@ -77,6 +81,7 @@ export default function MySocialPadsPage() {
   if (!user) return null
 
   return (
+    <CommunicationPaletteProvider>
     <div className="min-h-screen bg-gray-50">
       <header className="bg-white border-b sticky top-0 z-50">
         <div className="container mx-auto px-4 py-4">
@@ -157,6 +162,10 @@ export default function MySocialPadsPage() {
           padName={selectedPad.name}
         />
       )}
+
+      {/* Communication Palette Modals */}
+      <CommunicationModals />
     </div>
+    </CommunicationPaletteProvider>
   )
 }

@@ -8,6 +8,10 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { UserMenu } from "@/components/user-menu"
 import { FileText, ArrowLeft, Clock } from "lucide-react"
 import { BreadcrumbNav } from "@/components/breadcrumb-nav"
+import {
+  CommunicationPaletteProvider,
+  CommunicationModals,
+} from "@/components/communication"
 
 interface SocialStick {
   id: string
@@ -65,6 +69,7 @@ export default function MySocialSticksPage() {
   if (!user) return null
 
   return (
+    <CommunicationPaletteProvider>
     <div className="min-h-screen bg-gray-50">
       <header className="bg-white border-b sticky top-0 z-50">
         <div className="container mx-auto px-4 py-4">
@@ -123,6 +128,10 @@ export default function MySocialSticksPage() {
           </div>
         )}
       </main>
+
+      {/* Communication Palette Modals */}
+      <CommunicationModals />
     </div>
+    </CommunicationPaletteProvider>
   )
 }

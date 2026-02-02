@@ -47,6 +47,10 @@ import { COLORS } from "@/utils/noteUtils"
 
 // components
 import { UnifiedNote } from "@/components/UnifiedNote"
+import {
+  CommunicationPaletteProvider,
+  CommunicationModals,
+} from "@/components/communication"
 
 // Props contract passed from server component (page.tsx)
 interface NotesClientProps {
@@ -472,6 +476,7 @@ export function NotesClient({ initialNotes, userId, stats }: Readonly<NotesClien
   }
 
   return (
+    <CommunicationPaletteProvider>
     <div className="min-h-screen bg-gray-50 relative">
       {/* Header: title, search, filter, creation & navigation actions, user menu */}
       <div className="sticky top-0 z-50 bg-white border-b shadow-sm">
@@ -735,6 +740,10 @@ export function NotesClient({ initialNotes, userId, stats }: Readonly<NotesClien
           {error}
         </div>
       )}
+
+      {/* Communication Palette Modals */}
+      <CommunicationModals />
     </div>
+    </CommunicationPaletteProvider>
   )
 }

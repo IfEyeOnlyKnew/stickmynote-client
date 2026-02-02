@@ -14,6 +14,10 @@ import { PermissionBasedStickFullscreen } from "@/components/permission-based/Pe
 import { CreateChatModal } from "@/components/stick-chats/CreateChatModal"
 import { Button } from "@/components/ui/button"
 import type { Stick } from "@/types/pad"
+import {
+  CommunicationPaletteProvider,
+  CommunicationModals,
+} from "@/components/communication"
 
 interface MySticksClientProps {
   readonly initialSticks: StickWithRole[]
@@ -154,10 +158,11 @@ export function MySticksClient({ initialSticks }: MySticksClientProps) {
   }
 
   return (
+    <CommunicationPaletteProvider>
     <div className="container mx-auto p-6">
       <div className="mb-6">
         <BreadcrumbNav
-          items={[            
+          items={[
             { label: "Dashboard", href: "/dashboard" },
             { label: "Paks-Hub", href: "/paks" },
             { label: "My Sticks", href: "/mysticks", current: true },
@@ -269,6 +274,10 @@ export function MySticksClient({ initialSticks }: MySticksClientProps) {
         defaultName={chatStickTopic}
         autoSubmit
       />
+
+      {/* Communication Palette Modals */}
+      <CommunicationModals />
     </div>
+    </CommunicationPaletteProvider>
   )
 }

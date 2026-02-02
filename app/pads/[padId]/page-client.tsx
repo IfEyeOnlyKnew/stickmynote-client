@@ -17,6 +17,10 @@ import { StickGanttModal } from "@/components/stick-gantt-modal"
 import { PadSettingsDialog } from "@/components/pad-settings-dialog"
 import { PadSummaryModal } from "@/components/ai/PadSummaryModal"
 import type { Pad, Stick } from "@/types/pad"
+import {
+  CommunicationPaletteProvider,
+  CommunicationModals,
+} from "@/components/communication"
 
 // ============================================================================
 // Types
@@ -458,6 +462,7 @@ export function PadPageClient({ pad, sticks, userRole }: Readonly<PadPageClientP
   }
 
   return (
+    <CommunicationPaletteProvider padId={pad.id} padName={pad.name}>
     <div className="min-h-screen bg-background">
       <div className="container mx-auto px-4 py-8">
         {/* Header */}
@@ -584,6 +589,10 @@ export function PadPageClient({ pad, sticks, userRole }: Readonly<PadPageClientP
           />
         )}
       </div>
+
+      {/* Communication Palette Modals */}
+      <CommunicationModals />
     </div>
+    </CommunicationPaletteProvider>
   )
 }

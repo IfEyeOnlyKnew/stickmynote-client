@@ -12,6 +12,10 @@ import { BreadcrumbNav } from "@/components/breadcrumb-nav"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Button } from "@/components/ui/button"
 import { CreatePadModal } from "@/components/create-pad-modal"
+import {
+  CommunicationPaletteProvider,
+  CommunicationModals,
+} from "@/components/communication"
 
 interface MyPadsClientProps {
   initialPads: PadWithRole[]
@@ -94,10 +98,11 @@ export function MyPadsClient({ initialPads }: Readonly<MyPadsClientProps>) {
   }
 
   return (
+    <CommunicationPaletteProvider>
     <div className="container mx-auto p-6">
       <div className="mb-6">
         <BreadcrumbNav
-          items={[            
+          items={[
             { label: "Dashboard", href: "/dashboard" },
             { label: "Paks-Hub", href: "/paks" },
             { label: "My Pads", href: "/mypads", current: true },
@@ -165,6 +170,10 @@ export function MyPadsClient({ initialPads }: Readonly<MyPadsClientProps>) {
           )}
         </TabsContent>
       </Tabs>
+
+      {/* Communication Palette Modals */}
+      <CommunicationModals />
     </div>
+    </CommunicationPaletteProvider>
   )
 }

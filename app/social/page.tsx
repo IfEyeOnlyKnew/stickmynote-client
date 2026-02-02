@@ -65,6 +65,10 @@ import { FollowButton } from "@/components/social/follow-button"
 import { WorkflowStatusBadge } from "@/components/social/workflow-status-badge"
 import { SocialAnalyticsSidebar } from "@/components/social/social-analytics-sidebar"
 import { CreateChatModal } from "@/components/stick-chats/CreateChatModal"
+import {
+  CommunicationPaletteProvider,
+  CommunicationModals,
+} from "@/components/communication"
 
 async function fetchWithRetry(
   url: string,
@@ -1074,6 +1078,7 @@ export default function SocialHubPage() {
   }
 
   return (
+    <CommunicationPaletteProvider>
     <div className="min-h-screen bg-gray-50">
       <div className="container mx-auto px-3 sm:px-4 py-4 sm:py-8 max-w-7xl">
         <BreadcrumbNav
@@ -1318,6 +1323,10 @@ export default function SocialHubPage() {
           onPromote={handlePromoteReplyToCalStick}
         />
       )}
+
+      {/* Communication Palette (Cmd+Shift+J) */}
+      <CommunicationModals />
     </div>
+    </CommunicationPaletteProvider>
   )
 }

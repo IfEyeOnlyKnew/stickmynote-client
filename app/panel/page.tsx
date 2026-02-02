@@ -22,6 +22,10 @@ import { OptimisticSearchResultCard } from "@/components/panel/OptimisticSearchR
 import { UnifiedNote } from "@/components/UnifiedNote"
 import { SearchStatsDialog } from "@/components/SearchStatsDialog"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import {
+  CommunicationPaletteProvider,
+  CommunicationModals,
+} from "@/components/communication"
 
 const DEFAULT_CHUNK_SIZE = 9
 
@@ -659,6 +663,7 @@ export default function CommunityPanelPage() {
   }
 
   return (
+    <CommunicationPaletteProvider>
     <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-white to-purple-50 relative panel-page-transition">
       <div className="sticky top-0 z-50 bg-white/90 backdrop-blur-lg border-b border-indigo-100 shadow-sm">
         <div className="container mx-auto px-4 py-4">
@@ -780,6 +785,10 @@ export default function CommunityPanelPage() {
         })()}
 
       {user && <SearchStatsDialog open={showStats} onOpenChange={setShowStats} userId={user.id} />}
+
+      {/* Communication Palette Modals */}
+      <CommunicationModals />
     </div>
+    </CommunicationPaletteProvider>
   )
 }

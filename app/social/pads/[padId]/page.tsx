@@ -31,10 +31,16 @@ import {
   Pin,
   PinOff,
   BarChart3,
+  Calendar,
 } from "lucide-react"
 import { CreateChatModal } from "@/components/stick-chats/CreateChatModal"
 import { PadChatPanel } from "@/components/social/pad-chat-panel"
 import { PadPresenceIndicator } from "@/components/social/pad-presence-indicator"
+import {
+  CommunicationPaletteProvider,
+  CommunicationModals,
+  useCommunicationPaletteContextSafe,
+} from "@/components/communication"
 
 interface SocialPad {
   id: string
@@ -63,6 +69,44 @@ interface SocialStick {
   profiles?: { email: string; full_name: string | null }
   social_stick_replies?: Array<{ count: number }>
   reaction_counts?: Record<string, number>
+}
+
+// Schedule Meeting Button - uses communication palette context
+function ScheduleMeetingButton({
+  stickId,
+  stickTopic,
+  onClick,
+}: {
+  stickId: string
+  stickTopic: string
+  onClick?: (e: React.MouseEvent) => void
+}) {
+  const paletteContext = useCommunicationPaletteContextSafe()
+
+  const handleClick = (e: React.MouseEvent) => {
+    e.stopPropagation()
+    e.preventDefault()
+    onClick?.(e)
+
+    if (paletteContext) {
+      // Update context with stick info
+      paletteContext.updateContext({ stickId, stickTopic })
+      // Open the schedule meeting modal
+      paletteContext.openModal("scheduleMeeting")
+    }
+  }
+
+  return (
+    <Button
+      variant="ghost"
+      size="sm"
+      className="h-7 w-7 p-0"
+      onClick={handleClick}
+      title="Schedule meeting"
+    >
+      <Calendar className="h-4 w-4 text-purple-500 hover:text-purple-600" />
+    </Button>
+  )
 }
 
 export default function SocialPadPage({ params }: Readonly<{ params: { padId: string } }>) {
@@ -277,6 +321,7 @@ export default function SocialPadPage({ params }: Readonly<{ params: { padId: st
   const regularSticks = sticks.filter((s) => !s.is_pinned)
 
   return (
+    <CommunicationPaletteProvider padId={pad.id} padName={pad.name}>
     <div className="min-h-screen bg-gray-50">
       <header className="sticky top-0 z-50 backdrop-blur-lg bg-white/80 border-b border-purple-100 shadow-sm">
         <div className="container mx-auto px-4 py-4">
@@ -449,6 +494,7 @@ export default function SocialPadPage({ params }: Readonly<{ params: { padId: st
                               >
                                 <Video className="h-4 w-4 text-blue-500 hover:text-blue-600" />
                               </Button>
+                              <ScheduleMeetingButton stickId={stick.id} stickTopic={stick.topic} />
                               {canManageSticks && (
                                 <>
                                   <Button
@@ -540,6 +586,7 @@ export default function SocialPadPage({ params }: Readonly<{ params: { padId: st
                               >
                                 <Video className="h-4 w-4 text-blue-500 hover:text-blue-600" />
                               </Button>
+                              <ScheduleMeetingButton stickId={stick.id} stickTopic={stick.topic} />
                               {canManageSticks && (
                                 <>
                                   <Button
@@ -654,6 +701,10 @@ export default function SocialPadPage({ params }: Readonly<{ params: { padId: st
           onClose={() => setShowPadChat(false)}
         />
       )}
+
+      {/* Communication Palette Modals */}
+      <CommunicationModals />
     </div>
+    </CommunicationPaletteProvider>
   )
 }
