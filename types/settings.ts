@@ -37,7 +37,7 @@ export const initialSettings: UserSettings = {
   preferences: {
     theme: "system",
     language: "en",
-    timezone: "UTC-5",
+    timezone: "America/New_York",
     autoSave: true,
     spellCheck: true,
     defaultNoteColor: "#fef3c7",

@@ -3,9 +3,10 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Settings, Sun, Moon, Palette } from "lucide-react"
+import { Settings, Sun, Moon, Palette, Clock } from "lucide-react"
 import type { UserSettings } from "@/types/settings"
 import { SettingSwitch } from "./SettingSwitch"
+import { TimezoneSelector } from "./timezone-selector"
 
 interface PreferencesSettingsProps {
   preferences: UserSettings["preferences"]
@@ -67,6 +68,21 @@ export function PreferencesSettings({ preferences, onUpdate }: PreferencesSettin
               </SelectContent>
             </Select>
           </div>
+        </div>
+
+        <div className="space-y-2">
+          <Label className="flex items-center gap-2">
+            <Clock className="h-4 w-4" />
+            Timezone
+          </Label>
+          <p className="text-xs text-muted-foreground mb-2">
+            Used for displaying meeting times and scheduling
+          </p>
+          <TimezoneSelector
+            value={preferences.timezone || "America/New_York"}
+            onChange={(value) => onUpdate("timezone", value)}
+            showAutoDetect
+          />
         </div>
 
         <div className="space-y-4">

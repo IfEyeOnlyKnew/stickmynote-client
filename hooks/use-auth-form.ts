@@ -275,6 +275,14 @@ async function performSignIn(
   return { success: false, error: "Sign in failed" }
 }
 
+function detectBrowserTimezone(): string | null {
+  try {
+    return Intl.DateTimeFormat().resolvedOptions().timeZone
+  } catch {
+    return null
+  }
+}
+
 async function handlePostSignInRedirect(
   user: { id: string; email?: string },
   originalEmail: string
@@ -292,17 +300,22 @@ async function handlePostSignInRedirect(
     }
   }
 
-  // Call post-login API to update login count and get redirect
+  // Detect browser timezone for auto-setting on first login
+  const detectedTimezone = detectBrowserTimezone()
+
+  // Call post-login API to update login count, save timezone, and get redirect
   try {
     const response = await fetch("/api/auth/post-login", {
       method: "POST",
+      headers: JSON_HEADERS,
       ...FETCH_OPTIONS,
+      body: JSON.stringify({ timezone: detectedTimezone }),
     })
-    
+
     if (response.ok) {
       const data = await response.json()
-      return { 
-        redirect: data.redirect || "/dashboard", 
+      return {
+        redirect: data.redirect || "/dashboard",
         membership,
         isFirstLogin: data.isFirstLogin,
         isOwner: data.isOwner
