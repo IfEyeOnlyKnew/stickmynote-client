@@ -134,7 +134,6 @@ export function CommunicationPalette() {
     <CommandDialog
       open={isOpen}
       onOpenChange={setIsOpen}
-      dialogClassName="max-w-[95vw] sm:max-w-md md:max-w-lg"
     >
       <CommandInput
         placeholder="Search communication actions..."
