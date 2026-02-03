@@ -635,13 +635,13 @@ export function PermissionBasedStickFullscreen({
 
   return (
     <div
-      className="fixed inset-0 bg-black/50 flex items-start justify-center z-50 overflow-y-auto"
+      className="fixed inset-0 bg-black/50 flex items-start justify-center z-50 overflow-y-auto overflow-x-hidden"
       role="dialog"
       aria-modal="true"
       style={{ WebkitOverflowScrolling: 'touch' }}
     >
-      <div className="w-full min-h-[100dvh] lg:h-[calc(100vh-4rem)] flex flex-col lg:flex-row lg:gap-6 lg:items-start pb-6 lg:pb-0 px-2 sm:px-4 lg:px-0">
-        <div className="w-full lg:w-1/2 lg:flex-shrink-0 rounded-lg shadow-md border overflow-hidden mt-4 lg:mt-0 lg:h-full lg:flex lg:flex-col bg-white">
+      <div className="w-full max-w-full min-w-0 min-h-[100dvh] lg:h-[calc(100vh-4rem)] flex flex-col lg:flex-row lg:gap-6 lg:items-start pb-6 lg:pb-0 px-2 sm:px-4 lg:px-0 overflow-hidden">
+        <div className="w-full min-w-0 lg:w-1/2 lg:flex-shrink-0 rounded-lg shadow-md border overflow-hidden mt-4 lg:mt-0 lg:h-full lg:flex lg:flex-col bg-white">
           <div className="flex items-center justify-between px-4 py-3 bg-white/80 border-b flex-shrink-0">
             <div className="flex items-center gap-2">
               <Badge variant="outline" className="text-xs">

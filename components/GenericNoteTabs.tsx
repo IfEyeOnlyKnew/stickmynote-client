@@ -134,7 +134,7 @@ export function GenericNoteTabs({
   }
 
   return (
-    <div className="w-full">
+    <div className="w-full min-w-0 overflow-hidden">
       <Tabs
         value={activeTab}
         onValueChange={(v) => {
