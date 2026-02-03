@@ -187,12 +187,12 @@ export function MySticksClient({ initialSticks }: MySticksClientProps) {
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="mb-6">
-        <TabsList>
-          <TabsTrigger value="all">All ({countByRole("all")})</TabsTrigger>
-          <TabsTrigger value="owner">Owner ({countByRole("owner")})</TabsTrigger>
-          <TabsTrigger value="admin">Admin ({countByRole("admin")})</TabsTrigger>
-          <TabsTrigger value="edit">Edit ({countByRole("edit")})</TabsTrigger>
-          <TabsTrigger value="view">View ({countByRole("view")})</TabsTrigger>
+        <TabsList className="flex w-full overflow-x-auto">
+          <TabsTrigger value="all" className="flex-1 min-w-0 text-xs sm:text-sm px-2 sm:px-3">All ({countByRole("all")})</TabsTrigger>
+          <TabsTrigger value="owner" className="flex-1 min-w-0 text-xs sm:text-sm px-2 sm:px-3">Owner ({countByRole("owner")})</TabsTrigger>
+          <TabsTrigger value="admin" className="flex-1 min-w-0 text-xs sm:text-sm px-2 sm:px-3">Admin ({countByRole("admin")})</TabsTrigger>
+          <TabsTrigger value="edit" className="flex-1 min-w-0 text-xs sm:text-sm px-2 sm:px-3">Edit ({countByRole("edit")})</TabsTrigger>
+          <TabsTrigger value="view" className="flex-1 min-w-0 text-xs sm:text-sm px-2 sm:px-3">View ({countByRole("view")})</TabsTrigger>
         </TabsList>
 
         <TabsContent value={activeTab} className="mt-6">

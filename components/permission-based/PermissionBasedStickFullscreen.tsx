@@ -642,29 +642,29 @@ export function PermissionBasedStickFullscreen({
     >
       <div className="w-full max-w-full min-w-0 min-h-[100dvh] lg:h-[calc(100vh-4rem)] flex flex-col lg:flex-row lg:gap-6 lg:items-start pb-6 lg:pb-0 px-2 sm:px-4 lg:px-0 overflow-hidden">
         <div className="w-full min-w-0 lg:w-1/2 lg:flex-shrink-0 rounded-lg shadow-md border overflow-hidden mt-4 lg:mt-0 lg:h-full lg:flex lg:flex-col bg-white">
-          <div className="flex items-center justify-between px-4 py-3 bg-white/80 border-b flex-shrink-0">
-            <div className="flex items-center gap-2">
-              <Badge variant="outline" className="text-xs">
+          <div className="flex items-center justify-between px-2 sm:px-4 py-2 sm:py-3 bg-white/80 border-b flex-shrink-0 overflow-hidden min-w-0">
+            <div className="flex items-center gap-1 sm:gap-2 min-w-0 flex-shrink">
+              <Badge variant="outline" className="text-xs flex-shrink-0">
                 {permissions.canAdmin && "Admin"}
                 {!permissions.canAdmin && permissions.canEdit && "Edit"}
                 {!permissions.canAdmin && !permissions.canEdit && "View"}
               </Badge>
               {permissions.canEdit && (
-                <div className="flex items-center gap-2 ml-2" role="presentation" onClick={(e) => e.stopPropagation()} onKeyDown={(e) => e.stopPropagation()}>
+                <div className="flex items-center gap-1 sm:gap-2 ml-1 sm:ml-2 min-w-0" role="presentation" onClick={(e) => e.stopPropagation()} onKeyDown={(e) => e.stopPropagation()}>
                   <Checkbox
                     id="quickstick"
                     checked={isQuickStick}
                     onCheckedChange={handleQuickStickToggle}
-                    className="h-4 w-4"
+                    className="h-4 w-4 flex-shrink-0"
                   />
-                  <Label htmlFor="quickstick" className="text-xs font-medium cursor-pointer flex items-center gap-1">
+                  <Label htmlFor="quickstick" className="text-xs font-medium cursor-pointer flex items-center gap-1 flex-shrink-0">
                     <Zap className="h-3 w-3 text-yellow-600" />
-                    QuickStick
+                    <span className="hidden sm:inline">QuickStick</span>
                   </Label>
                   <Button
                     variant="ghost"
                     size="sm"
-                    className="h-7 w-7 p-0 ml-1"
+                    className="h-6 w-6 sm:h-7 sm:w-7 p-0 flex-shrink-0"
                     title="Start chat for this stick"
                     onClick={() => setChatModalOpen(true)}
                   >
@@ -673,7 +673,7 @@ export function PermissionBasedStickFullscreen({
                   <Button
                     variant="ghost"
                     size="sm"
-                    className="h-7 w-7 p-0"
+                    className="h-6 w-6 sm:h-7 sm:w-7 p-0 flex-shrink-0"
                     title="Start video call"
                     onClick={() => window.open("/video", "_blank")}
                   >
