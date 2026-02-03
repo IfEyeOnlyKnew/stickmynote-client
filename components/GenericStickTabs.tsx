@@ -182,34 +182,34 @@ export function GenericStickTabs({
         <TabsList className={`grid w-full ${gridCols}`}>
           <TabsTrigger
             value="main"
-            className="flex items-center gap-2 data-[state=inactive]:border-2 data-[state=inactive]:border-gray-400 data-[state=inactive]:bg-white data-[state=inactive]:shadow-sm"
+            className="flex items-center gap-1 sm:gap-2 px-2 sm:px-3 data-[state=inactive]:border-2 data-[state=inactive]:border-gray-400 data-[state=inactive]:bg-white data-[state=inactive]:shadow-sm"
           >
             <FileText className="h-4 w-4" />
-            Main
+            <span className="hidden sm:inline">Main</span>
           </TabsTrigger>
 
           <TabsTrigger
             value="videos"
-            className="flex items-center gap-2 data-[state=inactive]:border-2 data-[state=inactive]:border-gray-400 data-[state=inactive]:bg-white data-[state=inactive]:shadow-sm"
+            className="flex items-center gap-1 sm:gap-2 px-2 sm:px-3 data-[state=inactive]:border-2 data-[state=inactive]:border-gray-400 data-[state=inactive]:bg-white data-[state=inactive]:shadow-sm"
           >
             <Play className="h-4 w-4" />
-            Videos
+            <span className="hidden sm:inline">Videos</span>
           </TabsTrigger>
 
           <TabsTrigger
             value="images"
-            className="flex items-center gap-2 data-[state=inactive]:border-2 data-[state=inactive]:border-gray-400 data-[state=inactive]:bg-white data-[state=inactive]:shadow-sm"
+            className="flex items-center gap-1 sm:gap-2 px-2 sm:px-3 data-[state=inactive]:border-2 data-[state=inactive]:border-gray-400 data-[state=inactive]:bg-white data-[state=inactive]:shadow-sm"
           >
             <ImageIcon className="h-4 w-4" />
-            Images
+            <span className="hidden sm:inline">Images</span>
           </TabsTrigger>
 
           <TabsTrigger
             value="details"
-            className="flex items-center gap-2 data-[state=inactive]:border-2 data-[state=inactive]:border-gray-400 data-[state=inactive]:bg-white data-[state=inactive]:shadow-sm"
+            className="flex items-center gap-1 sm:gap-2 px-2 sm:px-3 data-[state=inactive]:border-2 data-[state=inactive]:border-gray-400 data-[state=inactive]:bg-white data-[state=inactive]:shadow-sm"
           >
             <FileText className="h-4 w-4" />
-            Details
+            <span className="hidden sm:inline">Details</span>
           </TabsTrigger>
         </TabsList>
 
