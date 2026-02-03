@@ -716,7 +716,7 @@ export function PermissionBasedStickFullscreen({
             </div>
           </div>
 
-          <div className="p-2 sm:p-4 md:p-6 bg-white text-gray-900 flex-1 overflow-y-auto">
+          <div className="p-2 sm:p-4 md:p-6 bg-white text-gray-900 flex-1 overflow-y-auto w-full min-w-0">
             <GenericStickTabs
               stickId={editedStick.id}
               initialTopic={editedStick.topic}

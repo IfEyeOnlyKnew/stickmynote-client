@@ -917,7 +917,7 @@ export function StickDetailModal({ open, onOpenChange, stickId, onUpdate }: Stic
                           </div>
                         </div>
                       </CardHeader>
-                      <CardContent>
+                      <CardContent className="overflow-hidden">
                         <SocialStickTabs
                           noteId={stickId}
                           initialTopic={currentTopic}
