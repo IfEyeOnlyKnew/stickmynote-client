@@ -167,7 +167,6 @@ export function GenericStickTabs({
   }
 
   const availableTabs = ["main", "videos", "images", "details"]
-  const gridCols = `grid-cols-${availableTabs.length}`
 
   return (
     <div className="w-full">
@@ -179,37 +178,37 @@ export function GenericStickTabs({
         }}
         className="w-full"
       >
-        <TabsList className={`grid w-full ${gridCols}`}>
+        <TabsList className="flex w-full">
           <TabsTrigger
             value="main"
-            className="flex items-center gap-1 sm:gap-2 px-2 sm:px-3 data-[state=inactive]:border-2 data-[state=inactive]:border-gray-400 data-[state=inactive]:bg-white data-[state=inactive]:shadow-sm"
+            className="flex-1 flex items-center justify-center gap-1 sm:gap-2 px-1 sm:px-3 min-w-0 data-[state=inactive]:border-2 data-[state=inactive]:border-gray-400 data-[state=inactive]:bg-white data-[state=inactive]:shadow-sm"
           >
-            <FileText className="h-4 w-4" />
-            <span className="hidden sm:inline">Main</span>
+            <FileText className="h-4 w-4 flex-shrink-0" />
+            <span className="hidden sm:inline truncate">Main</span>
           </TabsTrigger>
 
           <TabsTrigger
             value="videos"
-            className="flex items-center gap-1 sm:gap-2 px-2 sm:px-3 data-[state=inactive]:border-2 data-[state=inactive]:border-gray-400 data-[state=inactive]:bg-white data-[state=inactive]:shadow-sm"
+            className="flex-1 flex items-center justify-center gap-1 sm:gap-2 px-1 sm:px-3 min-w-0 data-[state=inactive]:border-2 data-[state=inactive]:border-gray-400 data-[state=inactive]:bg-white data-[state=inactive]:shadow-sm"
           >
-            <Play className="h-4 w-4" />
-            <span className="hidden sm:inline">Videos</span>
+            <Play className="h-4 w-4 flex-shrink-0" />
+            <span className="hidden sm:inline truncate">Videos</span>
           </TabsTrigger>
 
           <TabsTrigger
             value="images"
-            className="flex items-center gap-1 sm:gap-2 px-2 sm:px-3 data-[state=inactive]:border-2 data-[state=inactive]:border-gray-400 data-[state=inactive]:bg-white data-[state=inactive]:shadow-sm"
+            className="flex-1 flex items-center justify-center gap-1 sm:gap-2 px-1 sm:px-3 min-w-0 data-[state=inactive]:border-2 data-[state=inactive]:border-gray-400 data-[state=inactive]:bg-white data-[state=inactive]:shadow-sm"
           >
-            <ImageIcon className="h-4 w-4" />
-            <span className="hidden sm:inline">Images</span>
+            <ImageIcon className="h-4 w-4 flex-shrink-0" />
+            <span className="hidden sm:inline truncate">Images</span>
           </TabsTrigger>
 
           <TabsTrigger
             value="details"
-            className="flex items-center gap-1 sm:gap-2 px-2 sm:px-3 data-[state=inactive]:border-2 data-[state=inactive]:border-gray-400 data-[state=inactive]:bg-white data-[state=inactive]:shadow-sm"
+            className="flex-1 flex items-center justify-center gap-1 sm:gap-2 px-1 sm:px-3 min-w-0 data-[state=inactive]:border-2 data-[state=inactive]:border-gray-400 data-[state=inactive]:bg-white data-[state=inactive]:shadow-sm"
           >
-            <FileText className="h-4 w-4" />
-            <span className="hidden sm:inline">Details</span>
+            <FileText className="h-4 w-4 flex-shrink-0" />
+            <span className="hidden sm:inline truncate">Details</span>
           </TabsTrigger>
         </TabsList>
 
