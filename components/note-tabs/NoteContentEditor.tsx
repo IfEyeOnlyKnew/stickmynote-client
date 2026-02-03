@@ -83,8 +83,8 @@ export function NoteContentEditor({
   }
 
   return (
-    <div className="space-y-4">
-      <div>
+    <div className="space-y-4 overflow-hidden">
+      <div className="min-w-0">
         <span className="text-sm font-medium text-gray-700 mb-2 block">Topic</span>
         <Input
           value={safeTopic === "Untitled Note" ? "" : safeTopic}
@@ -93,12 +93,12 @@ export function NoteContentEditor({
           placeholder="Enter topic (max 75 characters)"
           maxLength={75}
           disabled={readOnly}
-          className="w-full text-gray-900 disabled:text-gray-900 disabled:bg-gray-50 disabled:border-gray-300"
+          className="w-full text-gray-900 disabled:text-gray-900 disabled:bg-gray-50 disabled:border-gray-300 box-border"
         />
         <div className="text-xs text-gray-500 mt-1 text-right">{safeTopic.length}/75 characters</div>
       </div>
 
-      <div>
+      <div className="min-w-0">
         <span className="text-sm font-medium text-gray-700 mb-2 block">Content</span>
         <Textarea
           value={safeContent}
@@ -108,7 +108,7 @@ export function NoteContentEditor({
           maxLength={1000}
           disabled={readOnly}
           rows={isContentExpanded ? 12 : 7}
-          className="w-full resize-y text-gray-900 disabled:text-gray-900 disabled:bg-gray-50 disabled:border-gray-300"
+          className="w-full resize-y text-gray-900 disabled:text-gray-900 disabled:bg-gray-50 disabled:border-gray-300 box-border"
         />
         <div className="flex items-center justify-between mt-1">
           {shouldShowExpandLink() && (
