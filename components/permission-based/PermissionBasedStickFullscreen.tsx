@@ -640,8 +640,8 @@ export function PermissionBasedStickFullscreen({
       aria-modal="true"
       style={{ WebkitOverflowScrolling: 'touch' }}
     >
-      <div className="w-full min-h-[100dvh] lg:h-[calc(100vh-4rem)] flex flex-col lg:flex-row lg:gap-6 lg:items-start pb-6 lg:pb-0">
-        <div className="w-full lg:w-1/2 lg:flex-shrink-0 rounded-lg shadow-md border overflow-hidden mt-4 mx-4 lg:mx-0 lg:mt-0 lg:h-full lg:flex lg:flex-col bg-white">
+      <div className="w-full min-h-[100dvh] lg:h-[calc(100vh-4rem)] flex flex-col lg:flex-row lg:gap-6 lg:items-start pb-6 lg:pb-0 px-4 lg:px-0">
+        <div className="w-full lg:w-1/2 lg:flex-shrink-0 rounded-lg shadow-md border overflow-hidden mt-4 lg:mt-0 lg:h-full lg:flex lg:flex-col bg-white">
           <div className="flex items-center justify-between px-4 py-3 bg-white/80 border-b flex-shrink-0">
             <div className="flex items-center gap-2">
               <Badge variant="outline" className="text-xs">
@@ -747,7 +747,7 @@ export function PermissionBasedStickFullscreen({
         </div>
 
         {permissions.canView && (
-          <div className="w-full lg:w-1/2 lg:flex-shrink-0 mt-4 mx-4 lg:mx-0 lg:mt-0 lg:h-full">
+          <div className="w-full lg:w-1/2 lg:flex-shrink-0 mt-4 lg:mt-0 lg:h-full">
             <ThreadedReplies
               noteId={editedStick.id}
               context="stick"
