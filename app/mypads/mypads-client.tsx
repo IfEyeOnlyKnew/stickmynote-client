@@ -80,12 +80,12 @@ export function MyPadsClient({ initialPads }: Readonly<MyPadsClientProps>) {
             ]}
           />
         </div>
-        <div className="flex justify-between items-center mb-6">
-          <h1 className="text-3xl font-bold">My Pads</h1>
-          <div className="flex items-center gap-3">
-            <div className="relative">
+        <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4 mb-6">
+          <h1 className="text-2xl sm:text-3xl font-bold">My Pads</h1>
+          <div className="flex items-center gap-2 sm:gap-3">
+            <div className="relative flex-1 sm:flex-none">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
-              <Input placeholder="Search Pads..." value="" disabled className="pl-10 w-96" />
+              <Input placeholder="Search Pads..." value="" disabled className="pl-10 w-full sm:w-64 md:w-96" />
             </div>
             <UserMenu hideSettings={true} hideHowToSearch={true} />
           </div>
@@ -110,24 +110,24 @@ export function MyPadsClient({ initialPads }: Readonly<MyPadsClientProps>) {
         />
       </div>
 
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-3xl font-bold">My Pads</h1>
-        <div className="flex items-center gap-3">
-          <div className="relative">
+      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4 mb-6">
+        <h1 className="text-2xl sm:text-3xl font-bold">My Pads</h1>
+        <div className="flex items-center gap-2 sm:gap-3">
+          <div className="relative flex-1 sm:flex-none">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
             <Input
               placeholder="Search Pads..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-10 w-96"
+              className="pl-10 w-full sm:w-64 md:w-96"
             />
           </div>
           <CreatePadModal
             onPadCreated={(padId) => router.push(`/pads/${padId}`)}
             trigger={
-              <Button className="bg-indigo-600 hover:bg-indigo-700">
-                <Plus className="h-4 w-4 mr-2" />
-                Create Pad
+              <Button className="bg-indigo-600 hover:bg-indigo-700 flex-shrink-0">
+                <Plus className="h-4 w-4 sm:mr-2" />
+                <span className="hidden sm:inline">Create Pad</span>
               </Button>
             }
           />

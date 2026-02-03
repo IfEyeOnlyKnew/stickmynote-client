@@ -140,12 +140,12 @@ export function MySticksClient({ initialSticks }: MySticksClientProps) {
             ]}
           />
         </div>
-        <div className="flex justify-between items-center mb-6">
-          <h1 className="text-3xl font-bold">My Sticks</h1>
-          <div className="flex items-center gap-3">
-            <div className="relative">
+        <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4 mb-6">
+          <h1 className="text-2xl sm:text-3xl font-bold">My Sticks</h1>
+          <div className="flex items-center gap-2 sm:gap-3">
+            <div className="relative flex-1 sm:flex-none">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
-              <Input placeholder="Search Sticks..." value="" disabled className="pl-10 w-64" />
+              <Input placeholder="Search Sticks..." value="" disabled className="pl-10 w-full sm:w-48 md:w-64" />
             </div>
             <UserMenu hideSettings={true} hideHowToSearch={true} />
           </div>
@@ -170,16 +170,16 @@ export function MySticksClient({ initialSticks }: MySticksClientProps) {
         />
       </div>
 
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-3xl font-bold">My Sticks</h1>
-        <div className="flex items-center gap-3">
-          <div className="relative">
+      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4 mb-6">
+        <h1 className="text-2xl sm:text-3xl font-bold">My Sticks</h1>
+        <div className="flex items-center gap-2 sm:gap-3">
+          <div className="relative flex-1 sm:flex-none">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
             <Input
               placeholder="Search Sticks..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-10 w-64"
+              className="pl-10 w-full sm:w-48 md:w-64"
             />
           </div>
           <UserMenu hideSettings={true} hideHowToSearch={true} />
