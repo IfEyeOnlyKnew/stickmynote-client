@@ -332,19 +332,19 @@ export default function SocialPadPage({ params }: Readonly<{ params: { padId: st
               { label: pad.name, current: true },
             ]}
           />
-          <div className="flex items-center justify-between mt-4">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mt-4 gap-3">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl social-gradient flex items-center justify-center shadow-lg">
+              <div className="w-10 h-10 rounded-xl social-gradient flex items-center justify-center shadow-lg flex-shrink-0">
                 <Users className="h-5 w-5 text-white" />
               </div>
-              <div>
-                <h1 className="text-2xl font-bold bg-gradient-to-r from-purple-600 to-blue-600 bg-clip-text text-transparent">
+              <div className="min-w-0">
+                <h1 className="text-xl sm:text-2xl font-bold bg-gradient-to-r from-purple-600 to-blue-600 bg-clip-text text-transparent truncate">
                   {pad.name}
                 </h1>
-                {pad.description && <p className="text-sm text-gray-600">{pad.description}</p>}
+                {pad.description && <p className="text-sm text-gray-600 line-clamp-1">{pad.description}</p>}
               </div>
             </div>
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2 flex-wrap">
               {/* Pad Chat Button */}
               <Button
                 variant="outline"
@@ -355,22 +355,29 @@ export default function SocialPadPage({ params }: Readonly<{ params: { padId: st
                 }}
                 className="text-purple-600 border-purple-200 hover:bg-purple-50"
               >
-                <MessagesSquare className="h-4 w-4 mr-2" />
-                Pad Chat
+                <MessagesSquare className="h-4 w-4 sm:mr-2" />
+                <span className="hidden sm:inline">Pad Chat</span>
               </Button>
               {isOwner && (
                 <>
-                  <Button variant="outline" size="sm" onClick={() => router.push(`/social/pads/${padId}/analytics`)}>
+                  <Button variant="outline" size="sm" onClick={() => router.push(`/social/pads/${padId}/analytics`)} className="hidden md:flex">
                     <BarChart3 className="h-4 w-4 mr-2" />
                     Analytics
                   </Button>
-                  <Button variant="outline" size="sm" onClick={() => setManageMembersOpen(true)}>
+                  <Button variant="outline" size="sm" onClick={() => setManageMembersOpen(true)} className="hidden md:flex">
                     <Users className="h-4 w-4 mr-2" />
                     Manage Members
                   </Button>
                   <Button variant="outline" size="sm" onClick={() => setSettingsOpen(true)}>
-                    <Settings className="h-4 w-4 mr-2" />
-                    Settings
+                    <Settings className="h-4 w-4 sm:mr-2" />
+                    <span className="hidden sm:inline">Settings</span>
+                  </Button>
+                  {/* Mobile-only icon buttons for hidden actions */}
+                  <Button variant="outline" size="sm" onClick={() => router.push(`/social/pads/${padId}/analytics`)} className="md:hidden">
+                    <BarChart3 className="h-4 w-4" />
+                  </Button>
+                  <Button variant="outline" size="sm" onClick={() => setManageMembersOpen(true)} className="md:hidden">
+                    <Users className="h-4 w-4" />
                   </Button>
                 </>
               )}
@@ -381,31 +388,31 @@ export default function SocialPadPage({ params }: Readonly<{ params: { padId: st
       </header>
 
       <main className="container mx-auto px-4 py-8">
-        <div className="mb-6 flex items-center justify-between">
-          <div className="flex items-center gap-4">
+        <div className="mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+          <div className="flex items-center gap-2 flex-wrap">
             {pad.is_public ? (
               <Badge variant="secondary" className="bg-green-100 text-green-700 border-0">
                 <Globe className="h-3 w-3 mr-1" />
-                Public Pad
+                <span className="hidden xs:inline">Public</span> Pad
               </Badge>
             ) : (
               <Badge variant="secondary" className="bg-gray-100 text-gray-700 border-0">
                 <Lock className="h-3 w-3 mr-1" />
-                Private Pad
+                <span className="hidden xs:inline">Private</span> Pad
               </Badge>
             )}
             <Badge variant="secondary" className="bg-purple-100 text-purple-700 border-0">
               <Users className="h-3 w-3 mr-1" />
-              {memberCount} {memberCount === 1 ? "Member" : "Members"}
+              {memberCount}
             </Badge>
             <Badge variant="secondary" className="bg-blue-100 text-blue-700 border-0">
               <FileText className="h-3 w-3 mr-1" />
-              {sticks.length} {sticks.length === 1 ? "Stick" : "Sticks"}
+              {sticks.length}
             </Badge>
             {pinnedSticks.length > 0 && (
               <Badge variant="secondary" className="bg-amber-100 text-amber-700 border-0">
                 <Pin className="h-3 w-3 mr-1" />
-                {pinnedSticks.length} Pinned
+                {pinnedSticks.length}
               </Badge>
             )}
             {/* Real-time presence indicator */}
@@ -413,12 +420,12 @@ export default function SocialPadPage({ params }: Readonly<{ params: { padId: st
               <PadPresenceIndicator
                 members={padMembers}
                 currentUserId={user?.id}
-                maxDisplay={5}
+                maxDisplay={3}
               />
             )}
           </div>
           {user && canAddSticks && (
-            <Button onClick={() => setCreateStickOpen(true)} className="social-gradient text-white">
+            <Button onClick={() => setCreateStickOpen(true)} className="social-gradient text-white w-full sm:w-auto">
               <Plus className="h-4 w-4 mr-2" />
               Add Stick
             </Button>

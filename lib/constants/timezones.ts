@@ -137,3 +137,33 @@ export function getClosestTimezone(browserTimezone: string): string {
   // Default fallback
   return "America/New_York"
 }
+
+// Get timezone abbreviation (e.g., "EST", "PST", "GMT")
+export function getTimezoneAbbreviation(timezone: string): string {
+  try {
+    const formatter = new Intl.DateTimeFormat("en-US", {
+      timeZone: timezone,
+      timeZoneName: "short",
+    })
+    const parts = formatter.formatToParts(new Date())
+    const tzPart = parts.find((part) => part.type === "timeZoneName")
+    return tzPart?.value || timezone.split("/").pop() || ""
+  } catch {
+    // Fallback: extract city name from IANA identifier
+    return timezone.split("/").pop()?.replace(/_/g, " ") || ""
+  }
+}
+
+// Get current time in a timezone for display
+export function getCurrentTimeInTimezone(timezone: string): string {
+  try {
+    return new Intl.DateTimeFormat("en-US", {
+      timeZone: timezone,
+      hour: "numeric",
+      minute: "2-digit",
+      hour12: true,
+    }).format(new Date())
+  } catch {
+    return ""
+  }
+}

@@ -107,7 +107,8 @@ export function NoteContentEditor({
           placeholder="Enter content (max 1000 characters)"
           maxLength={1000}
           disabled={readOnly}
-          className={`w-full resize-y text-gray-900 disabled:text-gray-900 disabled:bg-gray-50 disabled:border-gray-300 ${isContentExpanded ? "min-h-[300px]" : "min-h-[80px]"}`}
+          rows={isContentExpanded ? 12 : 7}
+          className="w-full resize-y text-gray-900 disabled:text-gray-900 disabled:bg-gray-50 disabled:border-gray-300"
         />
         <div className="flex items-center justify-between mt-1">
           {shouldShowExpandLink() && (

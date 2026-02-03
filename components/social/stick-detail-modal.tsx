@@ -861,36 +861,28 @@ export function StickDetailModal({ open, onOpenChange, stickId, onUpdate }: Stic
     <>
       <Dialog open={open} onOpenChange={onOpenChange}>
         <DialogContent
-          className="max-w-[95vw] w-full p-0"
-          style={{
-            height: '95vh',
-            maxHeight: '95vh',
-            display: 'flex',
-            flexDirection: 'column',
-            top: '2.5vh',
-            transform: 'translateX(-50%)',
-          }}
+          className="max-w-full sm:max-w-[95vw] md:max-w-[90vw] w-full p-0 h-[100dvh] sm:h-[95vh] sm:max-h-[95vh] flex flex-col rounded-none sm:rounded-lg top-0 sm:top-[2.5vh] translate-x-[-50%] translate-y-0"
         >
           <DialogTitle className="sr-only">Stick Details</DialogTitle>
           <DialogDescription className="sr-only">View and manage stick content, replies, and media</DialogDescription>
 
-          <div style={{ padding: '24px', borderBottom: '1px solid #e5e7eb', backgroundColor: 'white', flexShrink: 0 }}>
-            <h2 className="text-2xl font-bold text-gray-900">Stick Details</h2>
+          <div className="p-4 sm:p-6 border-b border-gray-200 bg-white flex-shrink-0 sm:rounded-t-lg">
+            <h2 className="text-xl sm:text-2xl font-bold text-gray-900">Stick Details</h2>
           </div>
 
-          <div className="custom-scrollbar" style={{ flex: '1 1 0%', minHeight: 0, overflowY: 'auto', overflowX: 'hidden' }}>
+          <div className="custom-scrollbar" style={{ flex: '1 1 0%', minHeight: 0, overflowY: 'auto', overflowX: 'hidden', WebkitOverflowScrolling: 'touch' }}>
               {loading && (
                 <div className="flex items-center justify-center h-full">
                   <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600" />
                 </div>
               )}
               {!loading && stick && (
-                <div className="p-6 pb-16 bg-gray-50">
-                  <div className="max-w-4xl mx-auto space-y-6">
+                <div className="p-4 sm:p-6 pb-16 bg-gray-50">
+                  <div className="max-w-4xl mx-auto space-y-4 sm:space-y-6">
                     <Card className="bg-white border-2 shadow-lg">
-                      <CardHeader>
-                        <div className="flex items-center justify-between mb-4">
-                          <CardTitle className="text-2xl">Stick Content</CardTitle>
+                      <CardHeader className="p-4 sm:p-6">
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-4 gap-3">
+                          <CardTitle className="text-xl sm:text-2xl">Stick Content</CardTitle>
                           <div className="flex gap-2">
                             <FollowButton
                               entityType="social_stick"
@@ -1140,8 +1132,8 @@ export function StickDetailModal({ open, onOpenChange, stickId, onUpdate }: Stic
 
                     <div className="space-y-4">
                       {/* Header with View Toggle */}
-                      <div className="flex items-center justify-between">
-                        <h3 className="text-xl font-bold text-gray-900">Replies ({replyCount})</h3>
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                        <h3 className="text-lg sm:text-xl font-bold text-gray-900">Replies ({replyCount})</h3>
                         <div className="flex items-center gap-2">
                           {/* View Mode Toggle */}
                           <div className="flex items-center bg-gray-100 rounded-lg p-0.5">

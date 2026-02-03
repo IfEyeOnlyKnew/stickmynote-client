@@ -22,6 +22,7 @@ import { useUserStatus } from "@/hooks/useUserStatus"
 import { UserStatusIndicator, StatusIcon } from "@/components/user-status"
 import { STATUS_LABELS } from "@/types/user-status"
 import type { UserStatusType } from "@/types/user-status"
+import { getTimezoneAbbreviation } from "@/lib/constants/timezones"
 
 interface UserMenuProps {
   hideSettings?: boolean
@@ -142,7 +143,14 @@ export function UserMenu({
         <DropdownMenuLabel className="font-normal">
           <div className="flex flex-col space-y-1">
             <p className="text-sm font-medium leading-none">{getDisplayName()}</p>
-            <p className="text-xs leading-none text-muted-foreground">{user?.email}</p>
+            <div className="flex items-center gap-2">
+              <p className="text-xs leading-none text-muted-foreground">{user?.email}</p>
+              {(profile as any)?.timezone && (
+                <span className="text-[10px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground font-medium">
+                  {getTimezoneAbbreviation((profile as any).timezone)}
+                </span>
+              )}
+            </div>
             {currentOrg && (
               <p className="text-xs leading-none text-primary font-medium mt-1">{currentOrg.name}</p>
             )}

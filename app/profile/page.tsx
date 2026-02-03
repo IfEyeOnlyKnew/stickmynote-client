@@ -22,7 +22,9 @@ import {
   Download,
   Trash2,
   AlertTriangle,
+  Clock,
 } from "lucide-react"
+import { TimezoneSelector } from "@/components/settings/timezone-selector"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -46,6 +48,7 @@ type Profile = {
   location: string | null
   avatar_url: string | null
   organize_notes: boolean | null
+  timezone: string | null
   created_at?: string | null
   updated_at?: string | null
 }
@@ -77,6 +80,7 @@ export default function ProfilePage() {
         location: contextProfile.location || null,
         avatar_url: contextProfile.avatar_url || null,
         organize_notes: contextProfile.organize_notes ?? null,
+        timezone: (contextProfile as any).timezone || null,
         created_at: contextProfile.created_at || null,
         updated_at: contextProfile.updated_at || null,
       })
@@ -102,6 +106,7 @@ export default function ProfilePage() {
           phone: profile.phone,
           location: profile.location,
           organize_notes: profile.organize_notes ?? false,
+          timezone: profile.timezone,
         }),
       })
 
@@ -335,6 +340,21 @@ export default function ProfilePage() {
                         maxLength={100}
                       />
                     </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label className="flex items-center gap-2">
+                      <Clock className="h-4 w-4" />
+                      Timezone
+                    </Label>
+                    <p className="text-xs text-muted-foreground">
+                      Used for displaying meeting times and scheduling
+                    </p>
+                    <TimezoneSelector
+                      value={profile.timezone || "America/New_York"}
+                      onChange={(value) => setProfile({ ...profile, timezone: value })}
+                      showAutoDetect
+                    />
                   </div>
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

@@ -14,9 +14,9 @@ export async function GET() {
     }
 
     const result = await db.query(
-      `SELECT id, email, username, bio, website, location, full_name, avatar_url, 
-              phone, organize_notes, created_at, updated_at, hub_mode, email_verified
-       FROM users 
+      `SELECT id, email, username, bio, website, location, full_name, avatar_url,
+              phone, organize_notes, created_at, updated_at, hub_mode, email_verified, timezone
+       FROM users
        WHERE id = $1`,
       [session.user.id]
     )
@@ -45,7 +45,7 @@ export async function PUT(request: NextRequest) {
     const userId = session.user.id
 
     // Build dynamic update query based on provided fields
-    const allowedFields = ["username", "bio", "website", "location", "full_name", "phone", "organize_notes", "hub_mode"]
+    const allowedFields = ["username", "bio", "website", "location", "full_name", "phone", "organize_notes", "hub_mode", "timezone"]
     const updates: string[] = []
     const values: any[] = []
     let paramIndex = 1
