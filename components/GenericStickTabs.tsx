@@ -169,16 +169,16 @@ export function GenericStickTabs({
   const availableTabs = ["main", "videos", "images", "details"]
 
   return (
-    <div className="w-full min-w-0 overflow-hidden">
+    <div className="!w-full !min-w-0 !max-w-full !overflow-hidden">
       <Tabs
         value={activeTab}
         onValueChange={(v) => {
           setActiveTab(v)
           onTabChange?.(v)
         }}
-        className="w-full"
+        className="!w-full !max-w-full"
       >
-        <TabsList className="flex w-full">
+        <TabsList className="flex !w-full !max-w-full">
           <TabsTrigger
             value="main"
             className="flex-1 flex items-center justify-center gap-1 sm:gap-2 px-1 sm:px-3 min-w-0 data-[state=inactive]:border-2 data-[state=inactive]:border-gray-400 data-[state=inactive]:bg-white data-[state=inactive]:shadow-sm"
@@ -212,7 +212,7 @@ export function GenericStickTabs({
           </TabsTrigger>
         </TabsList>
 
-        <TabsContent value="main" className="space-y-4">
+        <TabsContent value="main" className="space-y-4 !max-w-full !overflow-hidden">
           <StickContentEditor
             topic={topic}
             content={content}
