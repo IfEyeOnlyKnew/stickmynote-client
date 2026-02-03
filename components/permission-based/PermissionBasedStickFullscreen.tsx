@@ -640,7 +640,7 @@ export function PermissionBasedStickFullscreen({
       aria-modal="true"
       style={{ WebkitOverflowScrolling: 'touch' }}
     >
-      <div className="w-full min-h-[100dvh] lg:h-[calc(100vh-4rem)] flex flex-col lg:flex-row lg:gap-6 lg:items-start pb-6 lg:pb-0 px-4 lg:px-0">
+      <div className="w-full min-h-[100dvh] lg:h-[calc(100vh-4rem)] flex flex-col lg:flex-row lg:gap-6 lg:items-start pb-6 lg:pb-0 px-2 sm:px-4 lg:px-0">
         <div className="w-full lg:w-1/2 lg:flex-shrink-0 rounded-lg shadow-md border overflow-hidden mt-4 lg:mt-0 lg:h-full lg:flex lg:flex-col bg-white">
           <div className="flex items-center justify-between px-4 py-3 bg-white/80 border-b flex-shrink-0">
             <div className="flex items-center gap-2">
@@ -716,7 +716,7 @@ export function PermissionBasedStickFullscreen({
             </div>
           </div>
 
-          <div className="p-4 md:p-6 bg-white text-gray-900 flex-1 overflow-y-auto">
+          <div className="p-2 sm:p-4 md:p-6 bg-white text-gray-900 flex-1 overflow-y-auto">
             <GenericStickTabs
               stickId={editedStick.id}
               initialTopic={editedStick.topic}
