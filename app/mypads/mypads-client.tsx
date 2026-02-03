@@ -136,12 +136,12 @@ export function MyPadsClient({ initialPads }: Readonly<MyPadsClientProps>) {
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="mb-6">
-        <TabsList>
-          <TabsTrigger value="all">All ({countByRole("all")})</TabsTrigger>
-          <TabsTrigger value="owner">Owner ({countByRole("owner")})</TabsTrigger>
-          <TabsTrigger value="admin">Admin ({countByRole("admin")})</TabsTrigger>
-          <TabsTrigger value="editor">Editor ({countByRole("editor")})</TabsTrigger>
-          <TabsTrigger value="viewer">Viewer ({countByRole("viewer")})</TabsTrigger>
+        <TabsList className="flex w-full overflow-x-auto">
+          <TabsTrigger value="all" className="flex-1 min-w-0 text-xs sm:text-sm px-2 sm:px-3">All ({countByRole("all")})</TabsTrigger>
+          <TabsTrigger value="owner" className="flex-1 min-w-0 text-xs sm:text-sm px-2 sm:px-3">Owner ({countByRole("owner")})</TabsTrigger>
+          <TabsTrigger value="admin" className="flex-1 min-w-0 text-xs sm:text-sm px-2 sm:px-3">Admin ({countByRole("admin")})</TabsTrigger>
+          <TabsTrigger value="editor" className="flex-1 min-w-0 text-xs sm:text-sm px-2 sm:px-3">Editor ({countByRole("editor")})</TabsTrigger>
+          <TabsTrigger value="viewer" className="flex-1 min-w-0 text-xs sm:text-sm px-2 sm:px-3">Viewer ({countByRole("viewer")})</TabsTrigger>
         </TabsList>
 
         <TabsContent value={activeTab} className="mt-6">
