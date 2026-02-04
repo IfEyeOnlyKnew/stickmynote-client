@@ -45,11 +45,11 @@ interface SocialStick {
   topic: string
   content: string
   color: string
-  social_pad_id: string
-  user_id: string
+  social_pad_id?: string
+  user_id?: string
   created_at: string
   users?: {
-    id: string
+    id?: string
     full_name: string | null
     email: string
   } | null
@@ -62,24 +62,26 @@ interface SocialStick {
 
 interface MobileStickCardProps {
   stick: SocialStick
-  replies: Reply[]
+  replies?: Reply[]
   isExpanded: boolean
-  isSelected: boolean
-  onToggle: (stickId: string) => void
-  onSelect: (stickId: string) => void
-  onOpen: (stickId: string) => void
-  onPromoteReply: (stickId: string, topic: string, stickContent: string, replyId: string, replyContent: string) => void
-  onNavigateToCalstick: (calstickId: string) => void
+  isSelected?: boolean
+  onToggle?: (stickId: string) => void
+  onSelect?: (stickId: string) => void
+  onOpen?: (stickId: string) => void
+  onView?: (stickId: string) => void  // Alternative to onOpen for backward compatibility
+  onPromoteReply?: (stickId: string, topic: string, stickContent: string, replyId: string, replyContent: string) => void
+  onNavigateToCalstick?: (calstickId: string) => void
 }
 
 export function MobileStickCard({
   stick,
-  replies,
+  replies = [],
   isExpanded,
-  isSelected,
+  isSelected = false,
   onToggle,
   onSelect,
   onOpen,
+  onView,
   onPromoteReply,
   onNavigateToCalstick,
 }: MobileStickCardProps) {
@@ -133,16 +135,18 @@ export function MobileStickCard({
     ) {
       return
     }
-    onToggle(stick.id)
+    onToggle?.(stick.id)
   }, [onToggle, stick.id])
 
   const handleCheckboxChange = useCallback(() => {
-    onSelect(stick.id)
+    onSelect?.(stick.id)
   }, [onSelect, stick.id])
 
   const handleOpenClick = useCallback(() => {
-    onOpen(stick.id)
-  }, [onOpen, stick.id])
+    // Support both onOpen and onView for backward compatibility
+    const openFn = onOpen || onView
+    openFn?.(stick.id)
+  }, [onOpen, onView, stick.id])
 
   const handleChatClick = useCallback(() => {
     setChatModalOpen(true)
@@ -158,19 +162,23 @@ export function MobileStickCard({
         <CardContent className="p-4 space-y-3">
           {/* Header: Checkbox, Color bar, Topic, Expand */}
           <div className="flex items-start gap-2" onClick={handleCardClick}>
-            <div onClick={(e) => e.stopPropagation()}>
-              <Checkbox
-                checked={isSelected}
-                onCheckedChange={handleCheckboxChange}
-              />
-            </div>
+            {onSelect && (
+              <div onClick={(e) => e.stopPropagation()}>
+                <Checkbox
+                  checked={isSelected}
+                  onCheckedChange={handleCheckboxChange}
+                />
+              </div>
+            )}
             <div className="w-1 h-8 rounded flex-shrink-0" style={{ backgroundColor: stick.color }} />
             <div className="flex-1 min-w-0">
               <h3 className="font-medium text-gray-900 text-sm line-clamp-2">{stick.topic}</h3>
             </div>
-            <Button variant="ghost" size="icon" className="h-8 w-8 flex-shrink-0">
-              {isExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
-            </Button>
+            {onToggle && (
+              <Button variant="ghost" size="icon" className="h-8 w-8 flex-shrink-0">
+                {isExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+              </Button>
+            )}
           </div>
 
           {/* Status Badge */}
@@ -337,7 +345,7 @@ export function MobileStickCard({
                                 <Button
                                   variant="ghost"
                                   size="sm"
-                                  onClick={() => onNavigateToCalstick(reply.calstick_id!)}
+                                  onClick={() => onNavigateToCalstick?.(reply.calstick_id!)}
                                   className="text-green-600 hover:text-green-700 hover:bg-green-50 h-6 px-2 flex-shrink-0"
                                 >
                                   <ExternalLink className="h-3 w-3" />
@@ -346,7 +354,7 @@ export function MobileStickCard({
                                 <Button
                                   variant="ghost"
                                   size="sm"
-                                  onClick={() => onPromoteReply(stick.id, stick.topic, stick.content || '', reply.id, reply.content)}
+                                  onClick={() => onPromoteReply?.(stick.id, stick.topic, stick.content || '', reply.id, reply.content)}
                                   className="text-purple-600 hover:text-purple-700 hover:bg-purple-50 h-6 px-2 flex-shrink-0"
                                 >
                                   <ArrowRight className="h-3 w-3" />
@@ -411,7 +419,7 @@ export function MobileStickCard({
                                     <Button
                                       variant="ghost"
                                       size="sm"
-                                      onClick={() => onNavigateToCalstick(reply.calstick_id!)}
+                                      onClick={() => onNavigateToCalstick?.(reply.calstick_id!)}
                                       className="text-green-600 hover:text-green-700 hover:bg-green-50 h-6 px-2 flex-shrink-0"
                                     >
                                       <ExternalLink className="h-3 w-3" />
@@ -420,7 +428,7 @@ export function MobileStickCard({
                                     <Button
                                       variant="ghost"
                                       size="sm"
-                                      onClick={() => onPromoteReply(stick.id, stick.topic, stick.content || '', reply.id, reply.content)}
+                                      onClick={() => onPromoteReply?.(stick.id, stick.topic, stick.content || '', reply.id, reply.content)}
                                       className="text-purple-600 hover:text-purple-700 hover:bg-purple-50 h-6 px-2 flex-shrink-0"
                                     >
                                       <ArrowRight className="h-3 w-3" />
