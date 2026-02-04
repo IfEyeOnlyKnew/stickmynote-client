@@ -881,38 +881,46 @@ export function StickDetailModal({ open, onOpenChange, stickId, onUpdate }: Stic
                   <div className="max-w-4xl mx-auto space-y-4 sm:space-y-6">
                     <Card className="bg-white border-2 shadow-lg">
                       <CardHeader className="p-4 sm:p-6">
-                        <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-4 gap-3">
-                          <CardTitle className="text-xl sm:text-2xl">Stick Content</CardTitle>
-                          <div className="flex gap-2">
+                        <div className="space-y-3 mb-4">
+                          <div className="flex items-center justify-between">
+                            <CardTitle className="text-lg sm:text-xl md:text-2xl">Stick Content</CardTitle>
                             <FollowButton
                               entityType="social_stick"
                               entityId={stick.id}
                               entityName={stick.topic}
                               variant="icon"
                             />
+                          </div>
+                          <div className="flex gap-2 flex-wrap">
                             <Button
                               variant="outline"
-                              size="icon"
+                              size="sm"
                               onClick={() => setShowKBDrawer(true)}
                               title="View knowledge base"
+                              className="flex-1 sm:flex-none"
                             >
-                              <BookOpen className="h-4 w-4" />
+                              <BookOpen className="h-4 w-4 sm:mr-2" />
+                              <span className="hidden sm:inline">Knowledge Base</span>
                             </Button>
                             <Button
                               variant="outline"
-                              size="icon"
+                              size="sm"
                               onClick={() => setShowCitationModal(true)}
                               title="Add citation"
+                              className="flex-1 sm:flex-none"
                             >
-                              <LinkIcon className="h-4 w-4" />
+                              <LinkIcon className="h-4 w-4 sm:mr-2" />
+                              <span className="hidden sm:inline">Citation</span>
                             </Button>
                             <Button
                               variant="outline"
-                              size="icon"
+                              size="sm"
                               onClick={() => handleOpenReplyModal()}
                               title="Reply to stick"
+                              className="flex-1 sm:flex-none"
                             >
-                              <MessageSquare className="h-4 w-4" />
+                              <MessageSquare className="h-4 w-4 sm:mr-2" />
+                              <span className="hidden sm:inline">Reply</span>
                             </Button>
                           </div>
                         </div>
@@ -1133,31 +1141,31 @@ export function StickDetailModal({ open, onOpenChange, stickId, onUpdate }: Stic
                     <div className="space-y-4">
                       {/* Header with View Toggle */}
                       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                        <h3 className="text-lg sm:text-xl font-bold text-gray-900">Replies ({replyCount})</h3>
+                        <h3 className="text-base sm:text-lg md:text-xl font-bold text-gray-900">Replies ({replyCount})</h3>
                         <div className="flex items-center gap-2">
                           {/* View Mode Toggle */}
                           <div className="flex items-center bg-gray-100 rounded-lg p-0.5">
                             <button
                               onClick={() => setViewMode('grouped')}
-                              className={`px-3 py-1.5 text-sm font-medium rounded-md transition-all flex items-center gap-1.5 ${
+                              className={`px-2 sm:px-3 py-1 sm:py-1.5 text-xs sm:text-sm font-medium rounded-md transition-all flex items-center gap-1 sm:gap-1.5 ${
                                 viewMode === 'grouped'
                                   ? 'bg-white text-gray-900 shadow-sm'
                                   : 'text-gray-600 hover:text-gray-900'
                               }`}
                             >
-                              <LayoutList className="h-4 w-4" />
-                              Grouped
+                              <LayoutList className="h-3 w-3 sm:h-4 sm:w-4" />
+                              <span className="hidden sm:inline">Grouped</span>
                             </button>
                             <button
                               onClick={() => setViewMode('timeline')}
-                              className={`px-3 py-1.5 text-sm font-medium rounded-md transition-all flex items-center gap-1.5 ${
+                              className={`px-2 sm:px-3 py-1 sm:py-1.5 text-xs sm:text-sm font-medium rounded-md transition-all flex items-center gap-1 sm:gap-1.5 ${
                                 viewMode === 'timeline'
                                   ? 'bg-white text-gray-900 shadow-sm'
                                   : 'text-gray-600 hover:text-gray-900'
                               }`}
                             >
-                              <Clock className="h-4 w-4" />
-                              Timeline
+                              <Clock className="h-3 w-3 sm:h-4 sm:w-4" />
+                              <span className="hidden sm:inline">Timeline</span>
                             </button>
                           </div>
                         </div>

@@ -69,6 +69,7 @@ import {
   CommunicationPaletteProvider,
   CommunicationModals,
 } from "@/components/communication"
+import { MobileStickCard } from "@/components/social/mobile-stick-card"
 
 async function fetchWithRetry(
   url: string,
@@ -969,9 +970,11 @@ export default function SocialHubPage() {
 
           return (
             <div key={pad.id} className="space-y-4">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <h2 className="text-2xl font-bold text-gray-900">{pad.name}</h2>
+              {/* Pad Header */}
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                {/* Title and action buttons */}
+                <div className="flex items-center gap-2 flex-wrap">
+                  <h2 className="text-xl sm:text-2xl font-bold text-gray-900">{pad.name}</h2>
                   <FollowButton entityType="social_pad" entityId={pad.id} entityName={pad.name} variant="compact" />
                   {canManagePad && (
                     <Button
@@ -994,64 +997,86 @@ export default function SocialHubPage() {
                     <BookOpen className="h-4 w-4" />
                   </Button>
                 </div>
+                {/* QA Dialog and timestamp */}
                 <div className="flex items-center gap-2">
                   <PadQADialog padId={pad.id} padName={pad.name} />
-                  <span className="text-sm text-gray-500">
+                  <span className="text-xs sm:text-sm text-gray-500">
                     {formatDistanceToNow(new Date(pad.created_at), { addSuffix: true })}
                   </span>
                 </div>
               </div>
 
-              {pad.description && <p className="text-gray-600">{pad.description}</p>}
+              {pad.description && <p className="text-sm sm:text-base text-gray-600">{pad.description}</p>}
 
               {sticksByPad[pad.id] && sticksByPad[pad.id].length > 0 ? (
-                <Card>
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead className="w-12">
-                          <Checkbox
-                            checked={
-                              sticksByPad[pad.id].every((s) => selectedStickIds.has(s.id)) &&
-                              sticksByPad[pad.id].length > 0
-                            }
-                            onCheckedChange={(checked) =>
-                              handlePadCheckboxChange(pad.id, sticksByPad[pad.id], checked)
-                            }
+                <>
+                  {/* Desktop Table View */}
+                  <Card className="hidden md:block">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead className="w-12">
+                            <Checkbox
+                              checked={
+                                sticksByPad[pad.id].every((s) => selectedStickIds.has(s.id)) &&
+                                sticksByPad[pad.id].length > 0
+                              }
+                              onCheckedChange={(checked) =>
+                                handlePadCheckboxChange(pad.id, sticksByPad[pad.id], checked)
+                              }
+                            />
+                          </TableHead>
+                          <TableHead className="w-12"></TableHead>
+                          <TableHead>Topic</TableHead>
+                          <TableHead className="w-28">Status</TableHead>
+                          <TableHead>Content</TableHead>
+                          <TableHead className="w-32">Author</TableHead>
+                          <TableHead className="w-24 text-center">Replies</TableHead>
+                          <TableHead className="w-32">Created</TableHead>
+                          <TableHead className="w-20 text-center">Actions</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {sticksByPad[pad.id].map((stick) => (
+                          <StickTableRow
+                            key={stick.id}
+                            stick={stick}
+                            replies={replies[stick.id] || []}
+                            isExpanded={expandedSticks.has(stick.id)}
+                            isSelected={selectedStickIds.has(stick.id)}
+                            onToggle={toggleStick}
+                            onSelect={handleToggleStickSelection}
+                            onOpen={handleOpenStick}
+                            onPromoteReply={handleOpenPromoteReplyDialog}
+                            onNavigateToCalstick={handleNavigateToCalstick}
                           />
-                        </TableHead>
-                        <TableHead className="w-12"></TableHead>
-                        <TableHead>Topic</TableHead>
-                        <TableHead className="w-28">Status</TableHead>
-                        <TableHead>Content</TableHead>
-                        <TableHead className="w-32">Author</TableHead>
-                        <TableHead className="w-24 text-center">Replies</TableHead>
-                        <TableHead className="w-32">Created</TableHead>
-                        <TableHead className="w-20 text-center">Actions</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {sticksByPad[pad.id].map((stick) => (
-                        <StickTableRow
-                          key={stick.id}
-                          stick={stick}
-                          replies={replies[stick.id] || []}
-                          isExpanded={expandedSticks.has(stick.id)}
-                          isSelected={selectedStickIds.has(stick.id)}
-                          onToggle={toggleStick}
-                          onSelect={handleToggleStickSelection}
-                          onOpen={handleOpenStick}
-                          onPromoteReply={handleOpenPromoteReplyDialog}
-                          onNavigateToCalstick={handleNavigateToCalstick}
-                        />
-                      ))}
-                    </TableBody>
-                  </Table>
-                </Card>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </Card>
+
+                  {/* Mobile Card View */}
+                  <div className="md:hidden space-y-3">
+                    {sticksByPad[pad.id].map((stick) => (
+                      <MobileStickCard
+                        key={stick.id}
+                        stick={stick}
+                        replies={replies[stick.id] || []}
+                        isExpanded={expandedSticks.has(stick.id)}
+                        isSelected={selectedStickIds.has(stick.id)}
+                        onToggle={toggleStick}
+                        onSelect={handleToggleStickSelection}
+                        onOpen={handleOpenStick}
+                        onPromoteReply={handleOpenPromoteReplyDialog}
+                        onNavigateToCalstick={handleNavigateToCalstick}
+                      />
+                    ))}
+                  </div>
+                </>
               ) : (
                 <Card className="p-6 text-center text-gray-500">
                   <MessageSquare className="h-8 w-8 mx-auto mb-2 text-gray-400" />
-                  <p>No sticks in this pad yet</p>
+                  <p className="text-sm sm:text-base">No sticks in this pad yet</p>
                 </Card>
               )}
             </div>
