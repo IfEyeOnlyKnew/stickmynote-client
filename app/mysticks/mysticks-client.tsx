@@ -130,7 +130,7 @@ export function MySticksClient({ initialSticks }: MySticksClientProps) {
 
   if (!mounted) {
     return (
-      <div className="container mx-auto p-6">
+      <div className="container mx-auto p-4 sm:p-6 max-w-full overflow-x-hidden">
         <div className="mb-6">
           <BreadcrumbNav
             items={[
@@ -159,7 +159,7 @@ export function MySticksClient({ initialSticks }: MySticksClientProps) {
 
   return (
     <CommunicationPaletteProvider>
-    <div className="container mx-auto p-6">
+    <div className="container mx-auto p-4 sm:p-6 max-w-full overflow-x-hidden">
       <div className="mb-6">
         <BreadcrumbNav
           items={[
@@ -210,13 +210,13 @@ export function MySticksClient({ initialSticks }: MySticksClientProps) {
           </TabsTrigger>
         </TabsList>
 
-        <TabsContent value={activeTab} className="mt-6">
+        <TabsContent value={activeTab} className="mt-6 w-full max-w-full overflow-hidden">
           {filteredSticks.length > 0 ? (
-            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 w-full max-w-full">
               {filteredSticks.map((stick) => (
                 <Card
                   key={stick.id}
-                  className="hover:shadow-lg transition-shadow cursor-pointer bg-white border-2 border-gray-300"
+                  className="hover:shadow-lg transition-shadow cursor-pointer bg-white border-2 border-gray-300 w-full max-w-full min-w-0"
                   onClick={() => handleStickClick(stick)}
                 >
                   <CardHeader>

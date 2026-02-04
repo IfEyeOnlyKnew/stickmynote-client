@@ -70,7 +70,7 @@ export function MyPadsClient({ initialPads }: Readonly<MyPadsClientProps>) {
 
   if (!mounted) {
     return (
-      <div className="container mx-auto p-6">
+      <div className="container mx-auto p-4 sm:p-6 max-w-full overflow-x-hidden">
         <div className="mb-6">
           <BreadcrumbNav
             items={[              
@@ -99,7 +99,7 @@ export function MyPadsClient({ initialPads }: Readonly<MyPadsClientProps>) {
 
   return (
     <CommunicationPaletteProvider>
-    <div className="container mx-auto p-6">
+    <div className="container mx-auto p-4 sm:p-6 max-w-full overflow-x-hidden">
       <div className="mb-6">
         <BreadcrumbNav
           items={[
@@ -159,13 +159,13 @@ export function MyPadsClient({ initialPads }: Readonly<MyPadsClientProps>) {
           </TabsTrigger>
         </TabsList>
 
-        <TabsContent value={activeTab} className="mt-6">
+        <TabsContent value={activeTab} className="mt-6 w-full max-w-full overflow-hidden">
           {filteredPads.length > 0 ? (
-            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 w-full max-w-full">
               {filteredPads.map((pad) => (
                 <Card
                   key={pad.id}
-                  className="hover:shadow-lg transition-shadow cursor-pointer"
+                  className="hover:shadow-lg transition-shadow cursor-pointer w-full max-w-full min-w-0"
                   onClick={() => router.push(`/pads/${pad.id}`)}
                 >
                   <CardHeader>
