@@ -77,11 +77,11 @@ export function CommunicationModals() {
       {/* Floating Action Button (FAB) - Communication Trigger */}
       <Button
         onClick={openPalette}
-        className="fixed bottom-[104px] right-6 z-[9996] w-14 h-14 rounded-full shadow-lg hover:shadow-xl transition-all duration-200 bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white p-0"
+        className="fixed bottom-[104px] right-4 sm:right-6 z-[9996] w-10 h-10 sm:w-14 sm:h-14 rounded-full shadow-lg hover:shadow-xl transition-all duration-200 bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white p-0"
         title="Open communication palette"
         aria-label="Open communication palette"
       >
-        <Phone className="h-6 w-6" />
+        <Phone className="h-4 w-4 sm:h-6 sm:w-6" />
       </Button>
 
       {/* Main Palette */}

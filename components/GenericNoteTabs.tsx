@@ -134,16 +134,16 @@ export function GenericNoteTabs({
   }
 
   return (
-    <div className="w-full min-w-0 overflow-hidden">
+    <div className="!w-full !min-w-0 !max-w-full !overflow-hidden">
       <Tabs
         value={activeTab}
         onValueChange={(v) => {
           setActiveTab(v)
           onTabChange?.(v)
         }}
-        className="w-full"
+        className="!w-full !min-w-0 !max-w-full"
       >
-        <TabsList className="flex w-full">
+        <TabsList className="flex !w-full !min-w-0 !max-w-full">
           <TabsTrigger
             value="main"
             className="flex-1 flex items-center justify-center gap-1 sm:gap-2 px-1 sm:px-3 min-w-0 data-[state=inactive]:border-2 data-[state=inactive]:border-gray-400 data-[state=inactive]:bg-white data-[state=inactive]:shadow-sm"
@@ -179,7 +179,7 @@ export function GenericNoteTabs({
           </TabsTrigger>
         </TabsList>
 
-        <TabsContent value="main" className="space-y-4">
+        <TabsContent value="main" className="space-y-4 !w-full !min-w-0 !max-w-full !overflow-hidden">
           <NoteContentEditor
             topic={topic}
             content={content}
@@ -200,7 +200,7 @@ export function GenericNoteTabs({
           />
         </TabsContent>
 
-        <TabsContent value="videos" className="space-y-4">
+        <TabsContent value="videos" className="space-y-4 !w-full !min-w-0 !max-w-full !overflow-hidden">
           <VideoTabContent
             videos={videos}
             videoUrl={videoManagement.videoUrl}
@@ -212,7 +212,7 @@ export function GenericNoteTabs({
           />
         </TabsContent>
 
-        <TabsContent value="images" className="space-y-4">
+        <TabsContent value="images" className="space-y-4 !w-full !min-w-0 !max-w-full !overflow-hidden">
           <ImageTabContent
             images={images}
             imageUrl={imageManagement.imageUrl}
@@ -228,7 +228,7 @@ export function GenericNoteTabs({
           />
         </TabsContent>
 
-        <TabsContent value="details" className="space-y-4">
+        <TabsContent value="details" className="space-y-4 !w-full !min-w-0 !max-w-full !overflow-hidden">
           <DetailsTabContent
             noteId={noteId}
             details={details}

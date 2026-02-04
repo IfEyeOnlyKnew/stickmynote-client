@@ -71,9 +71,9 @@ export function StickContentEditor({
   const [isContentExpanded, setIsContentExpanded] = useState(false)
 
   return (
-    <div className="space-y-4 !max-w-full !overflow-hidden">
+    <div className="space-y-4 !w-full !min-w-0 !max-w-full !overflow-hidden">
       {/* Topic Field */}
-      <div className="!max-w-full !overflow-hidden">
+      <div className="!w-full !min-w-0 !max-w-full !overflow-hidden">
         <div className="flex justify-between items-center mb-1">
           <span className="block text-sm font-medium">Topic</span>
           <span className="text-xs text-gray-500">{topicLength}/75</span>
@@ -84,14 +84,14 @@ export function StickContentEditor({
           onFocus={onTopicFocus}
           placeholder="Enter topic (max 75 characters)"
           maxLength={75}
-          className="!w-full !max-w-full p-2 border rounded-md resize-none !box-border"
+          className="!w-full !min-w-0 !max-w-full p-2 border rounded-md resize-none !box-border"
           rows={1}
           disabled={readOnly}
         />
       </div>
 
       {/* Content Field */}
-      <div className="!max-w-full !overflow-hidden">
+      <div className="!w-full !min-w-0 !max-w-full !overflow-hidden">
         <div className="flex justify-between items-center mb-1">
           <span className="block text-sm font-medium">Content</span>
           <span className="text-xs text-gray-500">{contentLength}/25000</span>
@@ -102,7 +102,7 @@ export function StickContentEditor({
           onFocus={onContentFocus}
           placeholder="Enter content (max 25000 characters)"
           maxLength={25000}
-          className="!w-full !max-w-full p-2 border rounded-md resize-none !box-border"
+          className="!w-full !min-w-0 !max-w-full p-2 border rounded-md resize-none !box-border"
           rows={isContentExpanded ? 20 : 8}
           disabled={readOnly}
         />

@@ -136,12 +136,27 @@ export function MyPadsClient({ initialPads }: Readonly<MyPadsClientProps>) {
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="mb-6">
-        <TabsList className="flex w-full overflow-x-auto">
-          <TabsTrigger value="all" className="flex-1 min-w-0 text-xs sm:text-sm px-2 sm:px-3">All ({countByRole("all")})</TabsTrigger>
-          <TabsTrigger value="owner" className="flex-1 min-w-0 text-xs sm:text-sm px-2 sm:px-3">Owner ({countByRole("owner")})</TabsTrigger>
-          <TabsTrigger value="admin" className="flex-1 min-w-0 text-xs sm:text-sm px-2 sm:px-3">Admin ({countByRole("admin")})</TabsTrigger>
-          <TabsTrigger value="editor" className="flex-1 min-w-0 text-xs sm:text-sm px-2 sm:px-3">Editor ({countByRole("editor")})</TabsTrigger>
-          <TabsTrigger value="viewer" className="flex-1 min-w-0 text-xs sm:text-sm px-2 sm:px-3">Viewer ({countByRole("viewer")})</TabsTrigger>
+        <TabsList className="flex w-full">
+          <TabsTrigger value="all" className="flex-1 min-w-0 text-xs sm:text-sm px-1 sm:px-3">
+            <span className="sm:hidden">All</span>
+            <span className="hidden sm:inline">All ({countByRole("all")})</span>
+          </TabsTrigger>
+          <TabsTrigger value="owner" className="flex-1 min-w-0 text-xs sm:text-sm px-1 sm:px-3">
+            <span className="sm:hidden">Own</span>
+            <span className="hidden sm:inline">Owner ({countByRole("owner")})</span>
+          </TabsTrigger>
+          <TabsTrigger value="admin" className="flex-1 min-w-0 text-xs sm:text-sm px-1 sm:px-3">
+            <span className="sm:hidden">Adm</span>
+            <span className="hidden sm:inline">Admin ({countByRole("admin")})</span>
+          </TabsTrigger>
+          <TabsTrigger value="editor" className="flex-1 min-w-0 text-xs sm:text-sm px-1 sm:px-3">
+            <span className="sm:hidden">Edit</span>
+            <span className="hidden sm:inline">Editor ({countByRole("editor")})</span>
+          </TabsTrigger>
+          <TabsTrigger value="viewer" className="flex-1 min-w-0 text-xs sm:text-sm px-1 sm:px-3">
+            <span className="sm:hidden">View</span>
+            <span className="hidden sm:inline">Viewer ({countByRole("viewer")})</span>
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value={activeTab} className="mt-6">

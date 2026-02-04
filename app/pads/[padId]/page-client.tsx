@@ -466,57 +466,71 @@ export function PadPageClient({ pad, sticks, userRole }: Readonly<PadPageClientP
     <div className="min-h-screen bg-background">
       <div className="container mx-auto px-4 py-8">
         {/* Header */}
-        <div className="flex items-center justify-between mb-8">
-          <div>
-            <div className="mb-4">
-              <BreadcrumbNav
-                items={[
-                  { label: "Dashboard", href: "/Dashboard" },
-                  { label: "Paks-Hub", href: "/paks" },
-                  { label: "My Pads", href: "/mypads" },
-                  { label: pad.name, current: true },
-                ]}
-              />
+        <div className="flex flex-col gap-4 mb-8">
+          {/* Top row: Breadcrumb (User Menu on desktop only) */}
+          <div className="flex items-center justify-between">
+            <BreadcrumbNav
+              items={[
+                { label: "Dashboard", href: "/Dashboard" },
+                { label: "Paks-Hub", href: "/paks" },
+                { label: "My Pads", href: "/mypads" },
+                { label: pad.name, current: true },
+              ]}
+            />
+            <div className="hidden sm:block">
+              <UserMenu hideSettings={true} />
             </div>
-            <h1 className="text-3xl font-bold">{pad.name}</h1>
+          </div>
+
+          {/* Title and description */}
+          <div>
+            <div className="flex items-center gap-2 flex-wrap">
+              <h1 className="text-2xl sm:text-3xl font-bold">{pad.name}</h1>
+              <Badge variant="secondary" className="flex items-center gap-1">
+                <Users className="h-3 w-3" />
+                {userRole}
+              </Badge>
+            </div>
             {pad.description && <p className="text-muted-foreground mt-2">{pad.description}</p>}
           </div>
-          <div className="flex items-center gap-3">
-            <Badge variant="secondary" className="flex items-center gap-1">
-              <Users className="h-3 w-3" />
-              {userRole}
-            </Badge>
+
+          {/* Action buttons row */}
+          <div className="flex items-center gap-2 flex-wrap">
             <PadSummaryModal
               padId={pad.id}
               padName={pad.name}
               trigger={
                 <Button
                   variant="outline"
-                  className="gap-2 text-purple-600 border-purple-200 hover:bg-purple-50 bg-transparent"
+                  size="sm"
+                  className="gap-1 sm:gap-2 text-purple-600 border-purple-200 hover:bg-purple-50 bg-transparent"
                 >
                   <Sparkles className="h-4 w-4" />
-                  Smart Summary
+                  <span className="hidden sm:inline">Smart Summary</span>
                 </Button>
               }
             />
             {canCreateSticks && (
-              <Button onClick={handleOpenCreateModal}>
-                <Plus className="h-4 w-4 mr-2" />
-                Create Sticks
+              <Button size="sm" onClick={handleOpenCreateModal}>
+                <Plus className="h-4 w-4 sm:mr-2" />
+                <span className="hidden sm:inline">Create Sticks</span>
               </Button>
             )}
             {canInviteUsers && (
-              <Button variant="outline" onClick={handleOpenInviteModal}>
-                <UserPlus className="h-4 w-4 mr-2" />
-                Pad Invite
+              <Button variant="outline" size="sm" onClick={handleOpenInviteModal}>
+                <UserPlus className="h-4 w-4 sm:mr-2" />
+                <span className="hidden sm:inline">Pad Invite</span>
               </Button>
             )}
             {canInviteUsers && (
-              <Button variant="outline" size="icon" onClick={handleOpenSettingsDialog}>
+              <Button variant="outline" size="icon" className="h-8 w-8" onClick={handleOpenSettingsDialog}>
                 <Settings className="h-4 w-4" />
               </Button>
             )}
-            <UserMenu hideSettings={true} />
+            {/* User Menu on mobile - at end of action buttons */}
+            <div className="sm:hidden ml-auto">
+              <UserMenu hideSettings={true} />
+            </div>
           </div>
         </div>
 
