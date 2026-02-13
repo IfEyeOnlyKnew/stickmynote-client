@@ -34,15 +34,9 @@ export async function GET(request: NextRequest) {
     // Check compliance
     const compliance = await checkUserCompliance(userId, orgId)
 
-    // Return status for banner
+    // Return status - no grace period, immediate enforcement
     return NextResponse.json({
       compliant: compliance.compliant,
-      gracePeriod: compliance.gracePeriodEnds
-        ? {
-            daysRemaining: compliance.daysRemaining,
-            message: `You have ${compliance.daysRemaining} day${compliance.daysRemaining && compliance.daysRemaining > 1 ? "s" : ""} to enable two-factor authentication.`,
-          }
-        : undefined,
       requiresSetup: !compliance.compliant,
     })
   } catch (error) {
