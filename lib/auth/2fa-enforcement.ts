@@ -7,10 +7,6 @@ import { checkUserCompliance } from "@/lib/auth/2fa-policy"
 export interface EnforcementResult {
   allowed: boolean
   reason?: string
-  gracePeriod?: {
-    daysRemaining: number
-    message: string
-  }
   requiresSetup?: boolean
 }
 
@@ -39,19 +35,8 @@ export async function enforce2FAPolicy(
   // Check compliance
   const compliance = await checkUserCompliance(userId, orgId)
 
-  // User is compliant
+  // User is compliant - allow access
   if (compliance.compliant) {
-    // User in grace period - allow but show warning
-    if (compliance.gracePeriodEnds && compliance.daysRemaining) {
-      return {
-        allowed: true,
-        gracePeriod: {
-          daysRemaining: compliance.daysRemaining,
-          message: `You have ${compliance.daysRemaining} day${compliance.daysRemaining > 1 ? "s" : ""} to enable two-factor authentication.`,
-        },
-      }
-    }
-
     return { allowed: true }
   }
 
