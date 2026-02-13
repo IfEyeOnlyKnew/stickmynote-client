@@ -53,6 +53,10 @@ interface SignInResponse {
   error?: string
   locked?: boolean
   remainingMinutes?: number
+  requires2FA?: boolean
+  requiresSetup?: boolean
+  verificationToken?: string
+  expiresAt?: string
 }
 
 interface SignUpResponse {
@@ -223,6 +227,8 @@ async function sendVerificationEmail(email: string, fullName: string, userId: st
 type SignInResult =
   | { success: true; user: { id: string; email?: string }; email: string }
   | { success: false; error: string; locked?: boolean; remainingMinutes?: number }
+  | { success: "2fa_required"; verificationToken: string; expiresAt: string }
+  | { success: "setup_required" }
 
 async function performSignIn(
   email: string,
@@ -265,6 +271,22 @@ async function performSignIn(
       error: data.error || "Invalid credentials",
       locked: data.locked,
       remainingMinutes: data.remainingMinutes,
+    }
+  }
+
+  // Check if 2FA setup is required by organization (immediate - no grace period)
+  if (data.requiresSetup) {
+    return {
+      success: "setup_required",
+    }
+  }
+
+  // Check if 2FA is required
+  if (data.requires2FA && data.verificationToken && data.expiresAt) {
+    return {
+      success: "2fa_required",
+      verificationToken: data.verificationToken,
+      expiresAt: data.expiresAt,
     }
   }
 
@@ -366,6 +388,22 @@ export function useAuthForm(redirectTo = "/dashboard") {
 
       try {
         const result = await performSignIn(normalizedEmail, data.password)
+
+        // Handle 2FA setup requirement (immediate - no grace period)
+        if (result.success === "setup_required") {
+          setLoading(false)
+          router.push("/auth/setup-2fa")
+          // Return false to prevent AuthFormModal from calling handleAuthSuccess() which redirects to dashboard
+          return false
+        }
+
+        // Handle 2FA verification requirement
+        if (result.success === "2fa_required") {
+          setLoading(false)
+          router.push(`/auth/verify-2fa?token=${result.verificationToken}&expiresAt=${result.expiresAt}`)
+          // Return false to prevent dashboard redirect - user hasn't completed 2FA yet
+          return false
+        }
 
         if (!result.success) {
           const title = result.locked ? "Account Locked" : "Sign In Failed"

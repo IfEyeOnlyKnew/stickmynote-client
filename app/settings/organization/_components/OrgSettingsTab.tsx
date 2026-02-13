@@ -1,12 +1,18 @@
 "use client"
 
+import { useState, useEffect } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Loader2, Sparkles, Shield } from "lucide-react"
+import { Switch } from "@/components/ui/switch"
+import { Loader2, Sparkles, Shield, ShieldCheck, AlertCircle } from "lucide-react"
+import { Alert, AlertDescription } from "@/components/ui/alert"
+import { getCsrfToken } from "@/lib/client-csrf"
+import { useToast } from "@/hooks/use-toast"
 
 interface OrgSettingsTabProps {
+  currentOrgId: string
   aiSessionsPerDay: number
   setAiSessionsPerDay: (value: number) => void
   savingAiSettings: boolean
@@ -20,6 +26,7 @@ interface OrgSettingsTabProps {
 }
 
 export function OrgSettingsTab({
+  currentOrgId,
   aiSessionsPerDay,
   setAiSessionsPerDay,
   savingAiSettings,
@@ -48,6 +55,8 @@ export function OrgSettingsTab({
         savingLockoutSettings={savingLockoutSettings}
         handleSaveLockoutSettings={handleSaveLockoutSettings}
       />
+
+      <TwoFactorPolicyCard currentOrgId={currentOrgId} />
     </>
   )
 }
@@ -219,6 +228,232 @@ function LockoutSettingsCard({
             </>
           ) : (
             "Save Security Settings"
+          )}
+        </Button>
+      </CardFooter>
+    </Card>
+  )
+}
+
+interface TwoFactorPolicyCardProps {
+  currentOrgId: string
+}
+
+function TwoFactorPolicyCard({ currentOrgId }: Readonly<TwoFactorPolicyCardProps>) {
+  const { toast } = useToast()
+  const [loading, setLoading] = useState(true)
+  const [saving, setSaving] = useState(false)
+
+  // Policy settings
+  const [require2FA, setRequire2FA] = useState(false)
+  const [adminsOnly, setAdminsOnly] = useState(false)
+  const [gracePeriodDays, setGracePeriodDays] = useState(30)
+
+  // Compliance stats
+  const [stats, setStats] = useState<{
+    totalUsers: number
+    usersWithout2FA: number
+    usersInGracePeriod: number
+    complianceRate: number
+  } | null>(null)
+
+  useEffect(() => {
+    fetchPolicy()
+  }, [currentOrgId])
+
+  const fetchPolicy = async () => {
+    setLoading(true)
+    try {
+      const response = await fetch(`/api/organizations/${currentOrgId}/2fa-policy`)
+      if (response.ok) {
+        const data = await response.json()
+        setRequire2FA(data.policy?.require_2fa || false)
+        setAdminsOnly(data.policy?.enforce_for_admins_only || false)
+        setGracePeriodDays(data.policy?.grace_period_days || 30)
+        setStats(data.stats)
+      }
+    } catch (error) {
+      console.error("Failed to fetch 2FA policy:", error)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleSavePolicy = async () => {
+    setSaving(true)
+    try {
+      const csrfToken = await getCsrfToken()
+      const response = await fetch(`/api/organizations/${currentOrgId}/2fa-policy`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          "x-csrf-token": csrfToken,
+        },
+        body: JSON.stringify({
+          require2FA,
+          adminsOnly,
+          gracePeriodDays,
+        }),
+      })
+
+      if (response.ok) {
+        toast({
+          title: "2FA Policy Updated",
+          description: require2FA
+            ? "Two-factor authentication is now required for your organization"
+            : "Two-factor authentication enforcement has been disabled",
+        })
+        await fetchPolicy() // Refresh stats
+      } else {
+        const error = await response.json()
+        toast({
+          title: "Failed to update policy",
+          description: error.error || "An error occurred",
+          variant: "destructive",
+        })
+      }
+    } catch (error) {
+      console.error("Failed to save 2FA policy:", error)
+      toast({
+        title: "Failed to update policy",
+        description: "An error occurred while saving",
+        variant: "destructive",
+      })
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  if (loading) {
+    return (
+      <Card className="mt-6">
+        <CardContent className="flex items-center justify-center py-8">
+          <Loader2 className="h-6 w-6 animate-spin" />
+        </CardContent>
+      </Card>
+    )
+  }
+
+  return (
+    <Card className="mt-6">
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <ShieldCheck className="h-5 w-5 text-green-600" />
+          Two-Factor Authentication Policy
+        </CardTitle>
+        <CardDescription>
+          Require organization members to enable two-factor authentication for enhanced security
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-6">
+        {/* Enable 2FA Enforcement */}
+        <div className="flex items-center justify-between space-x-4">
+          <div className="flex-1 space-y-1">
+            <Label htmlFor="require-2fa" className="font-medium">
+              Require Two-Factor Authentication
+            </Label>
+            <p className="text-sm text-muted-foreground">
+              When enabled, organization members must set up 2FA to continue accessing the application
+            </p>
+          </div>
+          <Switch
+            id="require-2fa"
+            checked={require2FA}
+            onCheckedChange={setRequire2FA}
+          />
+        </div>
+
+        {require2FA && (
+          <>
+            {/* Admins Only Toggle */}
+            <div className="flex items-center justify-between space-x-4">
+              <div className="flex-1 space-y-1">
+                <Label htmlFor="admins-only" className="font-medium">
+                  Require for Admins Only
+                </Label>
+                <p className="text-sm text-muted-foreground">
+                  Only require 2FA for organization owners and admins
+                </p>
+              </div>
+              <Switch
+                id="admins-only"
+                checked={adminsOnly}
+                onCheckedChange={setAdminsOnly}
+              />
+            </div>
+
+            {/* Grace Period */}
+            <div className="space-y-2">
+              <Label htmlFor="grace-period">Grace Period (Days)</Label>
+              <p className="text-sm text-muted-foreground">
+                Number of days users have to enable 2FA before being blocked from accessing the application
+              </p>
+              <div className="flex items-center gap-4">
+                <Input
+                  id="grace-period"
+                  type="number"
+                  min={1}
+                  max={90}
+                  value={gracePeriodDays}
+                  onChange={(e) =>
+                    setGracePeriodDays(Math.max(1, Math.min(90, Number.parseInt(e.target.value) || 30)))
+                  }
+                  className="w-24"
+                />
+                <span className="text-sm text-muted-foreground">days</span>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Default is 30 days. Users will see warnings during the grace period.
+              </p>
+            </div>
+
+            {/* Compliance Stats */}
+            {stats && (
+              <div className="rounded-lg bg-green-50 dark:bg-green-950/30 p-4 border border-green-200 dark:border-green-800">
+                <h4 className="font-medium text-green-900 dark:text-green-100 mb-3">Compliance Overview</h4>
+                <div className="grid grid-cols-2 gap-4 text-sm">
+                  <div>
+                    <p className="text-green-700 dark:text-green-300">Total Users:</p>
+                    <p className="font-semibold text-green-900 dark:text-green-100">{stats.totalUsers}</p>
+                  </div>
+                  <div>
+                    <p className="text-green-700 dark:text-green-300">Compliance Rate:</p>
+                    <p className="font-semibold text-green-900 dark:text-green-100">
+                      {stats.complianceRate.toFixed(1)}%
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-green-700 dark:text-green-300">Without 2FA:</p>
+                    <p className="font-semibold text-green-900 dark:text-green-100">{stats.usersWithout2FA}</p>
+                  </div>
+                  <div>
+                    <p className="text-green-700 dark:text-green-300">In Grace Period:</p>
+                    <p className="font-semibold text-green-900 dark:text-green-100">{stats.usersInGracePeriod}</p>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Warning */}
+            <Alert>
+              <AlertCircle className="h-4 w-4" />
+              <AlertDescription>
+                Users without 2FA will see warnings during the grace period. After the grace period expires,
+                they will be unable to access the application until they enable 2FA.
+              </AlertDescription>
+            </Alert>
+          </>
+        )}
+      </CardContent>
+      <CardFooter>
+        <Button onClick={handleSavePolicy} disabled={saving}>
+          {saving ? (
+            <>
+              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              Saving...
+            </>
+          ) : (
+            "Save 2FA Policy"
           )}
         </Button>
       </CardFooter>

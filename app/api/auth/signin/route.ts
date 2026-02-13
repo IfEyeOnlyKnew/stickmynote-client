@@ -3,6 +3,10 @@ import { authenticateWithAD } from "@/lib/auth/ldap-auth"
 import { createToken } from "@/lib/auth/local-auth"
 import { checkLockout, recordLoginAttempt } from "@/lib/auth/lockout"
 import { validateCSRFMiddleware } from "@/lib/csrf"
+import { is2FAEnabled } from "@/lib/auth/2fa"
+import { createVerificationSession } from "@/lib/auth/2fa-session"
+import { checkUserCompliance } from "@/lib/auth/2fa-policy"
+import { db } from "@/lib/database/pg-client"
 import { cookies } from "next/headers"
 
 export const dynamic = "force-dynamic"
@@ -48,6 +52,73 @@ export async function POST(request: NextRequest) {
         { error: result.error || "Invalid credentials" },
         { status: 401 }
       )
+    }
+
+    // Get user's organization
+    const orgResult = await db.query(
+      `SELECT org_id FROM organization_members
+       WHERE user_id = $1 AND status = 'active'
+       LIMIT 1`,
+      [result.user.id]
+    )
+
+    let orgId: string | null = null
+    if (orgResult.rows.length > 0) {
+      orgId = orgResult.rows[0].org_id
+    }
+
+    // Check if user has 2FA enabled
+    const has2FA = await is2FAEnabled(result.user.id)
+
+    // Check org compliance if user is in an organization
+    if (orgId) {
+      const compliance = await checkUserCompliance(result.user.id, orgId)
+
+      // If org requires 2FA and user doesn't have it set up, force immediate setup
+      if (!compliance.compliant && !has2FA) {
+
+        // Create a temporary token for the setup flow (24 hour expiry)
+        const token = await createToken(result.user.id)
+        const cookieStore = await cookies()
+        cookieStore.set("session", token, {
+          httpOnly: true,
+          secure: process.env.NODE_ENV === "production",
+          sameSite: "lax",
+          maxAge: 60 * 60 * 24, // 24 hours to complete setup
+          path: "/",
+        })
+
+        return NextResponse.json({
+          requiresSetup: true,
+          user: {
+            id: result.user.id,
+            email: result.user.email,
+          },
+        })
+      }
+    }
+
+    // If user has 2FA enabled, require verification
+    if (has2FA) {
+      // Create temporary verification session
+      const ipAddress = request.headers.get("x-forwarded-for") || request.headers.get("x-real-ip")
+      const userAgent = request.headers.get("user-agent")
+      const { sessionToken, expiresAt } = await createVerificationSession(
+        result.user.id,
+        ipAddress,
+        userAgent
+      )
+
+      // Return 2FA required response (don't create full session yet)
+      return NextResponse.json({
+        requires2FA: true,
+        verificationToken: sessionToken,
+        expiresAt: expiresAt.toISOString(),
+        user: {
+          id: result.user.id,
+          email: result.user.email,
+        },
+      })
     }
 
     // Create JWT token for the authenticated user
