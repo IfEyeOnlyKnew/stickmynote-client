@@ -11,6 +11,7 @@ import {
   Settings,
   User,
   Shield,
+  ShieldCheck,
   Loader2,
   Phone,
   Crown,
@@ -38,6 +39,7 @@ import {
   MembersTab,
   AccountTab,
 } from "./_components"
+import { ComplianceDashboard } from "@/components/auth/ComplianceDashboard"
 
 interface OrgMember {
   id: string
@@ -910,6 +912,12 @@ function OrganizationSettingsPage() {
                 Automation
               </TabsTrigger>
             )}
+            {(isOwner || currentOrgRole === "admin") && !isPersonalOrg && (
+              <TabsTrigger value="2fa-compliance" className="flex items-center gap-2">
+                <ShieldCheck className="h-4 w-4" />
+                2FA Compliance
+              </TabsTrigger>
+            )}
           </TabsList>
 
           {/* General Settings */}
@@ -1011,6 +1019,7 @@ function OrganizationSettingsPage() {
           {isOwner && !isPersonalOrg && (
             <TabsContent value="org-settings">
               <OrgSettingsTab
+                currentOrgId={currentOrg.id}
                 aiSessionsPerDay={aiSessionsPerDay}
                 setAiSessionsPerDay={setAiSessionsPerDay}
                 savingAiSettings={savingAiSettings}
@@ -1058,6 +1067,13 @@ function OrganizationSettingsPage() {
                 savingAutomationSettings={savingAutomationSettings}
                 handleSaveAutomationSettings={handleSaveAutomationSettings}
               />
+            </TabsContent>
+          )}
+
+          {/* 2FA Compliance Tab */}
+          {(isOwner || currentOrgRole === "admin") && !isPersonalOrg && currentOrg && (
+            <TabsContent value="2fa-compliance">
+              <ComplianceDashboard orgId={currentOrg.id} />
             </TabsContent>
           )}
         </Tabs>
