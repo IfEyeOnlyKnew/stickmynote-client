@@ -141,6 +141,14 @@ Whether you're a solo thinker jotting down ideas or an enterprise team managing 
 | **Lucide React** | Icon library |
 | **React Hook Form + Zod** | Form handling and schema validation |
 | **Recharts** | Data visualization and charts |
+| **@dnd-kit** | Drag-and-drop interactions |
+| **cmdk** | Command palette (Cmd+K) |
+| **date-fns** | Date formatting and manipulation |
+| **next-themes** | Dark/light theme switching |
+| **react-markdown** | Markdown rendering |
+| **react-resizable-panels** | Resizable panel layouts |
+| **gantt-task-react** | Gantt chart visualization |
+| **Sonner** | Toast notifications |
 | **Embla Carousel** | Carousel components |
 
 ### Backend
@@ -156,7 +164,12 @@ Whether you're a solo thinker jotting down ideas or an enterprise team managing 
 | **Sharp** | High-performance image processing |
 | **Nodemailer + Resend** | Transactional email delivery |
 | **Daily.co** | Video calling infrastructure |
+| **Anthropic / Azure / Ollama SDKs** | Multi-provider AI integration |
+| **@mozilla/readability** | Article content extraction from URLs |
+| **qrcode** | QR code generation for 2FA setup |
+| **html2canvas** | HTML-to-image capture for exports |
 | **docx / jspdf** | Document generation (DOCX & PDF) |
+| **SearXNG** | Privacy-respecting web search for link generation |
 
 ### Quality & Tooling
 
@@ -233,6 +246,9 @@ LDAP_BIND_PASSWORD=your_password
 
 # Email
 RESEND_API_KEY=your_key
+
+# SearXNG (web search for link generation)
+SEARXNG_URL=https://searx.be
 
 # Video Calling
 DAILY_API_KEY=your_key
@@ -374,6 +390,8 @@ This project is private and proprietary. All rights reserved.
 
 <p align="center">
   Built with care by the <strong>Stick My Note</strong> team
+  <br />
+  Powered by <a href="https://claude.ai">Claude</a> by Anthropic
   <br />
   <a href="https://www.stickmynote.com">stickmynote.com</a>
 </p>
