@@ -11,7 +11,9 @@ type KeyboardShortcut = {
 
 const shortcuts: KeyboardShortcut[] = [
   { keys: ["Cmd", "K"], description: "Open command palette", category: "General" },
+  { keys: ["Cmd", "Shift", "J"], description: "Open communication palette", category: "General" },
   { keys: ["?"], description: "Show keyboard shortcuts", category: "General" },
+  { keys: ["Esc"], description: "Close dialog or clear selection", category: "General" },
   { keys: ["Cmd", "N"], description: "Create new stick", category: "Actions" },
   { keys: ["Cmd", "Shift", "N"], description: "Create new pad", category: "Actions" },
   { keys: ["Cmd", "/"], description: "Search sticks", category: "Navigation" },
@@ -20,7 +22,6 @@ const shortcuts: KeyboardShortcut[] = [
   { keys: ["G", "P"], description: "Go to my pads", category: "Navigation" },
   { keys: ["G", "A"], description: "Go to activity", category: "Navigation" },
   { keys: ["G", "N"], description: "Go to notifications", category: "Navigation" },
-  { keys: ["Esc"], description: "Close dialog or clear selection", category: "General" },
   { keys: ["Cmd", "A"], description: "Select all visible sticks", category: "Selection" },
   { keys: ["Shift", "Click"], description: "Multi-select sticks", category: "Selection" },
 ]
