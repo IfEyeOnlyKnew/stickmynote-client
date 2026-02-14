@@ -32,7 +32,13 @@ export async function checkAD() {
       }
     })
     await new Promise((resolve, reject) => {
-      client.bind('', '', err => (err ? reject(err) : resolve(true)))
+      client.bind('', '', err => {
+        if (err) {
+          reject(new Error(err instanceof Error ? err.message : String(err)))
+        } else {
+          resolve(true)
+        }
+      })
     })
     client.unbind()
     return { status: 'ok' }

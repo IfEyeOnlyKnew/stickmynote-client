@@ -3,7 +3,7 @@
 import { Card, CardContent } from "@/components/ui/card"
 import { getTimestampDisplay } from "@/utils/noteUtils"
 import type React from "react"
-import { useRef, useEffect, useMemo, useCallback } from "react"
+import { useRef, useEffect, useMemo, useCallback, useState } from "react"
 import { useNoteContext } from "./NoteContext"
 import { useNote } from "@/hooks/useNote"
 import { NoteCardHeader } from "./note-card/NoteCardHeader"
@@ -11,7 +11,6 @@ import { NoteCardContent } from "./note-card/NoteCardContent"
 import { NoteCardActions } from "./note-card/NoteCardActions"
 import { NoteCardMetadata } from "./note-card/NoteCardMetadata"
 import { NoteCardReplies } from "./note-card/NoteCardReplies"
-import { useState } from "react"
 
 interface UnifiedNoteCardProps {
   windowSize?: { width: number; height: number }
@@ -257,10 +256,10 @@ export const UnifiedNoteCard: React.FC<UnifiedNoteCardProps> = ({ windowSize, dr
   )
 
   const handleColorChange = useCallback(
-    async (noteId: string, color: string) => {
+    (noteId: string, color: string) => {
       try {
         setNoteColor(color)
-        await onUpdateColor(noteId, color)
+        onUpdateColor(noteId, color)
         if (onNoteUpdate) {
           const updatedNote = { ...note, color }
           onNoteUpdate(updatedNote)

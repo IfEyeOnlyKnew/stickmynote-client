@@ -132,7 +132,7 @@ Guidelines:
 - Never make up information about products, services, or policies
 - Always be respectful and professional
 
-${context.aiGreeting ? `Your greeting message is: "${context.aiGreeting}"` : ""}`
+${context.aiGreeting ? 'Your greeting message is: "' + context.aiGreeting + '"' : ""}`
 
   const prompt = `Recent conversation:
 ${conversationHistory || "(No previous messages)"}

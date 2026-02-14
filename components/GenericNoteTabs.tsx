@@ -61,7 +61,7 @@ export function GenericNoteTabs({
   onCancel,
   onStick,
   isSaving,
-}: GenericNoteTabsProps) {
+}: Readonly<GenericNoteTabsProps>) {
   const [activeTab, setActiveTab] = useState("main")
   const [topic, setTopic] = useState(initialTopic)
   const [content, setContent] = useState(initialContent)
@@ -118,11 +118,9 @@ export function GenericNoteTabs({
     onContentChange?.(newContent)
   }
 
-  const handleDetailsChange = async (newDetails: string) => {
+  const handleDetailsChange = (newDetails: string) => {
     setDetails(newDetails)
-    if (onDetailsChange) {
-      await onDetailsChange(newDetails)
-    }
+    onDetailsChange?.(newDetails)
   }
 
   if (loading) {

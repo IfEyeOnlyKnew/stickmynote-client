@@ -7,7 +7,7 @@ interface SafeHtmlRendererProps {
   mode?: "strict" | "rich-text"
 }
 
-export function SafeHtmlRenderer({ content, className = "", mode = "rich-text" }: SafeHtmlRendererProps) {
+export function SafeHtmlRenderer({ content, className = "", mode = "rich-text" }: Readonly<SafeHtmlRendererProps>) {
   if (!content || content === "<p></p>") {
     return null
   }

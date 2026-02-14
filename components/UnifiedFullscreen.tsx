@@ -19,7 +19,7 @@ export function UnifiedFullscreen<T extends FullscreenItem>({
   readOnly = false,
   onClose,
   children,
-}: UnifiedFullscreenProps<T>) {
+}: Readonly<UnifiedFullscreenProps<T>>) {
   const getTitle = () => {
     if (mode === "panel") return item.topic || "Community Note"
     if (mode === "stick") return item.topic || "Untitled Stick" // Added stick mode title handling
@@ -32,13 +32,12 @@ export function UnifiedFullscreen<T extends FullscreenItem>({
   }
 
   return (
-    <div
-      className="fixed inset-0 bg-black/50 flex items-start justify-center z-50 p-4 overflow-y-auto pt-8"
-      role="dialog"
-      aria-modal="true"
+    <dialog
+      open
+      className="fixed inset-0 bg-black/50 flex items-start justify-center z-50 p-4 overflow-y-auto pt-8 w-full h-full m-0 max-w-none max-h-none border-none"
     >
       <div className="w-full max-w-6xl mx-auto">
-        <div className="w-full rounded-lg shadow-md border overflow-hidden" style={{ backgroundColor: "#ffffff" }}>
+        <div className="w-full rounded-lg shadow-md border overflow-hidden bg-white">
           {/* Header */}
           <div className="flex items-center justify-between px-4 py-3 bg-white/80 border-b">
             <div className="flex items-center gap-2">
@@ -58,6 +57,6 @@ export function UnifiedFullscreen<T extends FullscreenItem>({
           <div className="p-4 md:p-6 bg-transparent text-gray-900">{children}</div>
         </div>
       </div>
-    </div>
+    </dialog>
   )
 }

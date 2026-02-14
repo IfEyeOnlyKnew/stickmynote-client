@@ -27,13 +27,7 @@ interface SavedEmail {
   source: string
 }
 
-interface PadMember {
-  id: string
-  email: string
-  role: "admin" | "editor" | "viewer"
-  username?: string
-  full_name?: string
-}
+type PadRole = "admin" | "editor" | "viewer"
 
 interface PadInviteModalProps {
   open: boolean
@@ -42,26 +36,24 @@ interface PadInviteModalProps {
   onInviteSubmit: (data: {
     userIds?: string[]
     emails?: string[]
-    role: "admin" | "editor" | "viewer"
+    role: PadRole
   }) => Promise<void>
 }
 
-export function PadInviteModal({ open, onOpenChange, padId, onInviteSubmit }: PadInviteModalProps) {
+export function PadInviteModal({ open, onOpenChange, padId, onInviteSubmit }: Readonly<PadInviteModalProps>) {
   const [searchQuery, setSearchQuery] = useState("")
   const [searchResults, setSearchResults] = useState<User[]>([])
   const [savedEmails, setSavedEmails] = useState<SavedEmail[]>([])
   const [selectedEmails, setSelectedEmails] = useState<string[]>([])
   const [selectedUsers, setSelectedUsers] = useState<User[]>([])
-  const [inviteRole, setInviteRole] = useState<"admin" | "editor" | "viewer">("viewer")
-  const [defaultManageRole, setDefaultManageRole] = useState<"admin" | "editor" | "viewer">("viewer")
+  const [inviteRole, setInviteRole] = useState<PadRole>("viewer")
+  const [defaultManageRole, setDefaultManageRole] = useState<PadRole>("viewer")
   const [isLoading, setIsLoading] = useState(false)
   const [activeTab, setActiveTab] = useState("invite")
   const [manualEmails, setManualEmails] = useState("")
   const [padName, setPadName] = useState("Pad")
-  const [existingMembers, setExistingMembers] = useState<PadMember[]>([])
   const inputRef = useRef<HTMLInputElement>(null)
   const dialogRef = useRef<HTMLDivElement>(null)
-  const closeButtonRef = useRef<HTMLButtonElement>(null)
 
   useEffect(() => {
     if (open) {
@@ -77,14 +69,11 @@ export function PadInviteModal({ open, onOpenChange, padId, onInviteSubmit }: Pa
       if (response.ok) {
         const data = await response.json()
         setPadName(data.padName || "Pad")
-        setExistingMembers(data.members || [])
       }
     } catch (err) {
       console.error("Error loading pad data:", err)
     }
   }
-
-  const filteredExistingMembers = existingMembers.filter((member) => member.role === inviteRole)
 
   useEffect(() => {
     if (!searchQuery.trim()) {
@@ -108,7 +97,7 @@ export function PadInviteModal({ open, onOpenChange, padId, onInviteSubmit }: Pa
     return () => clearTimeout(debounce)
   }, [searchQuery, padId])
 
-  const handleRoleChange = (value: "admin" | "editor" | "viewer") => {
+  const handleRoleChange = (value: PadRole) => {
     setInviteRole(value)
   }
 
@@ -182,7 +171,7 @@ export function PadInviteModal({ open, onOpenChange, padId, onInviteSubmit }: Pa
 
   const toggleUserSelection = (user: User) => {
     setSelectedUsers((prev) =>
-      prev.find((u) => u.id === user.id) ? prev.filter((u) => u.id !== user.id) : [...prev, user],
+      prev.some((u) => u.id === user.id) ? prev.filter((u) => u.id !== user.id) : [...prev, user],
     )
   }
 
@@ -235,7 +224,7 @@ export function PadInviteModal({ open, onOpenChange, padId, onInviteSubmit }: Pa
     }
   }
 
-  const handleKeyPress = (e: React.KeyboardEvent) => {
+  const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "Enter") {
       addTypedEmail()
     }
@@ -265,9 +254,9 @@ export function PadInviteModal({ open, onOpenChange, padId, onInviteSubmit }: Pa
       }
     }
     if (open) {
-      window.addEventListener("keydown", handleEscape)
+      globalThis.addEventListener("keydown", handleEscape)
     }
-    return () => window.removeEventListener("keydown", handleEscape)
+    return () => globalThis.removeEventListener("keydown", handleEscape)
   }, [open, onOpenChange])
 
   useEffect(() => {
@@ -353,7 +342,7 @@ export function PadInviteModal({ open, onOpenChange, padId, onInviteSubmit }: Pa
                     id="search"
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
-                    onKeyPress={handleKeyPress}
+                    onKeyDown={handleKeyDown}
                     placeholder="Search users or type email address..."
                     className="flex-1"
                   />
@@ -372,26 +361,24 @@ export function PadInviteModal({ open, onOpenChange, padId, onInviteSubmit }: Pa
                   </CardHeader>
                   <CardContent className="space-y-2 max-h-40 overflow-auto">
                     {searchResults.map((user) => (
-                      <div
+                      <button
                         key={user.id}
-                        role="button"
-                        tabIndex={0}
-                        className={`p-2 rounded cursor-pointer transition-colors ${
-                          selectedUsers.find((u) => u.id === user.id)
+                        type="button"
+                        className={`w-full text-left p-2 rounded cursor-pointer transition-colors ${
+                          selectedUsers.some((u) => u.id === user.id)
                             ? "bg-blue-100 border border-blue-300"
                             : "hover:bg-gray-100 border border-transparent"
                         }`}
                         onClick={() => toggleUserSelection(user)}
-                        onKeyDown={(e) => e.key === "Enter" && toggleUserSelection(user)}
                       >
                         <div className="flex items-center justify-between">
                           <div>
                             <div className="font-medium text-sm">{user.username || user.email}</div>
                             <div className="text-xs text-gray-500">{user.full_name || "No name"}</div>
                           </div>
-                          {selectedUsers.find((u) => u.id === user.id) && <Check className="h-4 w-4 text-blue-600" />}
+                          {selectedUsers.some((u) => u.id === user.id) && <Check className="h-4 w-4 text-blue-600" />}
                         </div>
-                      </div>
+                      </button>
                     ))}
                   </CardContent>
                 </Card>
@@ -404,17 +391,15 @@ export function PadInviteModal({ open, onOpenChange, padId, onInviteSubmit }: Pa
                   </CardHeader>
                   <CardContent className="space-y-2 max-h-48 overflow-auto">
                     {filteredSavedEmails.map((savedEmail) => (
-                      <div
+                      <button
                         key={savedEmail.id}
-                        role="button"
-                        tabIndex={0}
-                        className={`p-2 rounded cursor-pointer transition-colors ${
+                        type="button"
+                        className={`w-full text-left p-2 rounded cursor-pointer transition-colors ${
                           selectedEmails.includes(savedEmail.email)
                             ? "bg-green-100 border border-green-300"
                             : "hover:bg-gray-100 border border-transparent"
                         }`}
                         onClick={() => toggleEmailSelection(savedEmail.email)}
-                        onKeyDown={(e) => e.key === "Enter" && toggleEmailSelection(savedEmail.email)}
                       >
                         <div className="flex items-center justify-between">
                           <div>
@@ -423,7 +408,7 @@ export function PadInviteModal({ open, onOpenChange, padId, onInviteSubmit }: Pa
                           </div>
                           {selectedEmails.includes(savedEmail.email) && <Check className="h-4 w-4 text-green-600" />}
                         </div>
-                      </div>
+                      </button>
                     ))}
                   </CardContent>
                 </Card>
@@ -463,7 +448,7 @@ export function PadInviteModal({ open, onOpenChange, padId, onInviteSubmit }: Pa
               </Button>
               <Button onClick={handleSubmit} disabled={totalSelected === 0 || isLoading}>
                 {isLoading && "Sending..."}
-                {!isLoading && `Send ${totalSelected} Invite${totalSelected !== 1 ? "s" : ""}`}
+                {!isLoading && `Send ${totalSelected} Invite${totalSelected === 1 ? "" : "s"}`}
               </Button>
             </div>
           </TabsContent>
@@ -480,7 +465,7 @@ export function PadInviteModal({ open, onOpenChange, padId, onInviteSubmit }: Pa
               <CardContent className="pt-4">
                 <Select
                   value={defaultManageRole}
-                  onValueChange={(value: "admin" | "editor" | "viewer") => setDefaultManageRole(value)}
+                  onValueChange={(value: PadRole) => setDefaultManageRole(value)}
                 >
                   <SelectTrigger className="w-full h-12 text-base border-2">
                     <SelectValue />
@@ -550,17 +535,15 @@ export function PadInviteModal({ open, onOpenChange, padId, onInviteSubmit }: Pa
                   <CardContent className="max-h-48 overflow-auto">
                     <div className="space-y-2">
                       {savedEmails.map((savedEmail) => (
-                        <div
+                        <button
                           key={savedEmail.id}
-                          role="button"
-                          tabIndex={0}
-                          className={`p-2 rounded cursor-pointer transition-colors ${
+                          type="button"
+                          className={`w-full text-left p-2 rounded cursor-pointer transition-colors ${
                             selectedEmails.includes(savedEmail.email)
                               ? "bg-green-100 border border-green-300"
                               : "hover:bg-gray-100 border border-transparent"
                           }`}
                           onClick={() => toggleEmailSelection(savedEmail.email)}
-                          onKeyDown={(e) => e.key === "Enter" && toggleEmailSelection(savedEmail.email)}
                         >
                           <div className="flex items-center justify-between">
                             <div>
@@ -572,7 +555,7 @@ export function PadInviteModal({ open, onOpenChange, padId, onInviteSubmit }: Pa
                             </div>
                             {selectedEmails.includes(savedEmail.email) && <Check className="h-4 w-4 text-green-600" />}
                           </div>
-                        </div>
+                        </button>
                       ))}
                     </div>
                   </CardContent>
@@ -611,7 +594,7 @@ export function PadInviteModal({ open, onOpenChange, padId, onInviteSubmit }: Pa
                 className="min-w-[140px]"
               >
                 {isLoading && "Sending..."}
-                {!isLoading && `Send ${selectedEmails.length} Invite${selectedEmails.length !== 1 ? "s" : ""}`}
+                {!isLoading && `Send ${selectedEmails.length} Invite${selectedEmails.length === 1 ? "" : "s"}`}
               </Button>
             </div>
           </TabsContent>
@@ -628,7 +611,7 @@ export function PadInviteModal({ open, onOpenChange, padId, onInviteSubmit }: Pa
               <CardContent className="pt-4">
                 <Select
                   value={defaultManageRole}
-                  onValueChange={(value: "admin" | "editor" | "viewer") => setDefaultManageRole(value)}
+                  onValueChange={(value: PadRole) => setDefaultManageRole(value)}
                 >
                   <SelectTrigger className="w-full h-12 text-base border-2">
                     <SelectValue />

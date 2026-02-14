@@ -65,6 +65,182 @@ interface ReplyItemProps {
   onToggleCalStickComplete: (replyId: string, currentCompleted: boolean) => void
 }
 
+// --- Extracted sub-components to reduce cognitive complexity ---
+
+function ReplyActionButtons({
+  reply,
+  depth,
+  isEditing,
+  isReplying,
+  isOwner,
+  onReply,
+  onSubmitReply,
+  onStartChat,
+  onEdit,
+  onDelete,
+  onReplyClick,
+  onStartEdit,
+}: Readonly<{
+  reply: Reply
+  depth: number
+  isEditing: boolean
+  isReplying: boolean
+  isOwner: boolean | "" | null | undefined
+  onReply?: (reply: Reply) => void
+  onSubmitReply?: (content: string, parentReplyId: string) => Promise<void>
+  onStartChat?: (parentReply: Reply) => void
+  onEdit?: (replyId: string, content: string) => Promise<void>
+  onDelete?: (replyId: string) => void
+  onReplyClick: () => void
+  onStartEdit: () => void
+}>) {
+  const showReplyAction = (onReply || onSubmitReply || onStartChat) && !isEditing && !isReplying
+  const atMaxDepth = depth >= MAX_REPLY_DEPTH && onStartChat
+  const canReply = onReply || onSubmitReply
+
+  const renderReplyButton = () => {
+    if (atMaxDepth) {
+      return (
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() => onStartChat(reply)}
+          className="h-6 px-2 text-xs text-purple-500 hover:text-purple-600 hover:bg-purple-50 flex items-center gap-1"
+          title="Continue this discussion in a chat"
+        >
+          <MessageCircle className="h-3 w-3" />
+          <span>Start Chat</span>
+        </Button>
+      )
+    }
+    if (canReply) {
+      return (
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={onReplyClick}
+          className="h-6 w-6 p-0 text-blue-500 hover:text-blue-600 hover:bg-blue-50"
+          title="Reply to this"
+        >
+          <MessageSquare className="h-3 w-3" />
+        </Button>
+      )
+    }
+    return null
+  }
+
+  return (
+    <div className="flex items-center gap-1">
+      {showReplyAction && renderReplyButton()}
+      {isOwner && !isEditing && (
+        <>
+          {onEdit && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={onStartEdit}
+              className="h-6 w-6 p-0 text-gray-400 hover:text-blue-600 hover:bg-blue-50 opacity-0 group-hover:opacity-100 transition-opacity"
+              title="Edit reply"
+            >
+              <Pencil className="h-3 w-3" />
+            </Button>
+          )}
+          {onDelete && (
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={() => onDelete(reply.id)}
+              className="h-6 w-6 p-0 text-gray-400 hover:text-red-700 hover:bg-red-50 opacity-0 group-hover:opacity-100 transition-opacity"
+              title="Delete reply"
+            >
+              <Trash2 className="h-3 w-3" />
+            </Button>
+          )}
+        </>
+      )}
+    </div>
+  )
+}
+
+function InlineReplyForm({
+  reply,
+  depthColors,
+  replyContent,
+  isSubmittingReply,
+  replyTextareaRef,
+  displayName,
+  onContentChange,
+  onCancel,
+  onSubmit,
+}: Readonly<{
+  reply: Reply
+  depthColors: (typeof DEPTH_COLORS)[number]
+  replyContent: string
+  isSubmittingReply: boolean
+  replyTextareaRef: React.RefObject<HTMLTextAreaElement>
+  displayName: string
+  onContentChange: (value: string) => void
+  onCancel: () => void
+  onSubmit: () => void
+}>) {
+  return (
+    <div
+      className={`mt-2 p-3 rounded-lg border-2 border-dashed ${depthColors.line} ${depthColors.bg}`}
+      style={{ marginLeft: "16px" }}
+    >
+      <div className={`flex items-center gap-1 text-xs ${depthColors.text} mb-2`}>
+        <CornerDownRight className="h-3 w-3" />
+        <span>Replying to @{displayName}</span>
+        <span className="text-gray-400">&rarr; parent: #{reply.id.substring(0, 8)}</span>
+      </div>
+      <Textarea
+        ref={replyTextareaRef}
+        value={replyContent}
+        onChange={(e) => onContentChange(e.target.value)}
+        placeholder={`Reply to ${displayName}...`}
+        className="text-sm text-gray-900 min-h-[60px] resize-none mb-2"
+        maxLength={1000}
+      />
+      <div className="flex items-center justify-between">
+        <span className="text-xs text-gray-500">{replyContent.length}/1000</span>
+        <div className="flex gap-1">
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            onClick={onCancel}
+            disabled={isSubmittingReply}
+            className="h-6 px-2 text-xs"
+          >
+            <X className="h-3 w-3 mr-1" />
+            Cancel
+          </Button>
+          <Button
+            type="button"
+            variant="default"
+            size="sm"
+            onClick={onSubmit}
+            disabled={isSubmittingReply || !replyContent.trim()}
+            className="h-6 px-2 text-xs bg-blue-600 hover:bg-blue-700"
+          >
+            {isSubmittingReply ? (
+              <div className="h-3 w-3 animate-spin rounded-full border-2 border-white border-t-transparent" />
+            ) : (
+              <>
+                <Send className="h-3 w-3 mr-1" />
+                Stick
+              </>
+            )}
+          </Button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// --- Main component ---
+
 export const ReplyItem: React.FC<ReplyItemProps> = ({
   reply,
   depth = 0,
@@ -156,11 +332,9 @@ export const ReplyItem: React.FC<ReplyItemProps> = ({
 
   const handleReplyClick = () => {
     if (onSubmitReply) {
-      // Use inline reply form
       setIsReplying(true)
       setReplyContent("")
     } else if (onReply) {
-      // Fallback to old behavior (scroll to main reply form)
       onReply(reply)
     }
   }
@@ -240,61 +414,20 @@ export const ReplyItem: React.FC<ReplyItemProps> = ({
                   </span>
                 </div>
               </div>
-              <div className="flex items-center gap-1">
-                {(onReply || onSubmitReply || onStartChat) && !isEditing && !isReplying && (
-                  depth >= MAX_REPLY_DEPTH && onStartChat ? (
-                    // At max depth - show "Start a Chat" button
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => onStartChat(reply)}
-                      className="h-6 px-2 text-xs text-purple-500 hover:text-purple-600 hover:bg-purple-50 flex items-center gap-1"
-                      title="Continue this discussion in a chat"
-                    >
-                      <MessageCircle className="h-3 w-3" />
-                      <span>Start Chat</span>
-                    </Button>
-                  ) : (onReply || onSubmitReply) ? (
-                    // Below max depth - show normal reply button
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={handleReplyClick}
-                      className="h-6 w-6 p-0 text-blue-500 hover:text-blue-600 hover:bg-blue-50"
-                      title="Reply to this"
-                    >
-                      <MessageSquare className="h-3 w-3" />
-                    </Button>
-                  ) : null
-                )}
-                {isOwner && !isEditing && (
-                  <>
-                    {onEdit && (
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={handleStartEdit}
-                        className="h-6 w-6 p-0 text-gray-400 hover:text-blue-600 hover:bg-blue-50 opacity-0 group-hover:opacity-100 transition-opacity"
-                        title="Edit reply"
-                      >
-                        <Pencil className="h-3 w-3" />
-                      </Button>
-                    )}
-                    {onDelete && (
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => onDelete(reply.id)}
-                        className="h-6 w-6 p-0 text-gray-400 hover:text-red-700 hover:bg-red-50 opacity-0 group-hover:opacity-100 transition-opacity"
-                        title="Delete reply"
-                      >
-                        <Trash2 className="h-3 w-3" />
-                      </Button>
-                    )}
-                  </>
-                )}
-              </div>
+              <ReplyActionButtons
+                reply={reply}
+                depth={depth}
+                isEditing={isEditing}
+                isReplying={isReplying}
+                isOwner={isOwner}
+                onReply={onReply}
+                onSubmitReply={onSubmitReply}
+                onStartChat={onStartChat}
+                onEdit={onEdit}
+                onDelete={onDelete}
+                onReplyClick={handleReplyClick}
+                onStartEdit={handleStartEdit}
+              />
             </div>
 
             {/* Replying to indicator */}
@@ -396,57 +529,17 @@ export const ReplyItem: React.FC<ReplyItemProps> = ({
 
         {/* INLINE REPLY FORM - appears directly below this reply */}
         {isReplying && onSubmitReply && (
-          <div
-            className={`mt-2 p-3 rounded-lg border-2 border-dashed ${nextDepthColors.line} ${nextDepthColors.bg}`}
-            style={{ marginLeft: "16px" }}
-          >
-            <div className={`flex items-center gap-1 text-xs ${nextDepthColors.text} mb-2`}>
-              <CornerDownRight className="h-3 w-3" />
-              <span>Replying to @{getDisplayName(reply)}</span>
-              <span className="text-gray-400">→ parent: #{reply.id.substring(0, 8)}</span>
-            </div>
-            <Textarea
-              ref={replyTextareaRef}
-              value={replyContent}
-              onChange={(e) => setReplyContent(e.target.value)}
-              placeholder={`Reply to ${getDisplayName(reply)}...`}
-              className="text-sm text-gray-900 min-h-[60px] resize-none mb-2"
-              maxLength={1000}
-            />
-            <div className="flex items-center justify-between">
-              <span className="text-xs text-gray-500">{replyContent.length}/1000</span>
-              <div className="flex gap-1">
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  onClick={handleCancelReply}
-                  disabled={isSubmittingReply}
-                  className="h-6 px-2 text-xs"
-                >
-                  <X className="h-3 w-3 mr-1" />
-                  Cancel
-                </Button>
-                <Button
-                  type="button"
-                  variant="default"
-                  size="sm"
-                  onClick={handleSubmitInlineReply}
-                  disabled={isSubmittingReply || !replyContent.trim()}
-                  className="h-6 px-2 text-xs bg-blue-600 hover:bg-blue-700"
-                >
-                  {isSubmittingReply ? (
-                    <div className="h-3 w-3 animate-spin rounded-full border-2 border-white border-t-transparent" />
-                  ) : (
-                    <>
-                      <Send className="h-3 w-3 mr-1" />
-                      Stick
-                    </>
-                  )}
-                </Button>
-              </div>
-            </div>
-          </div>
+          <InlineReplyForm
+            reply={reply}
+            depthColors={nextDepthColors}
+            replyContent={replyContent}
+            isSubmittingReply={isSubmittingReply}
+            replyTextareaRef={replyTextareaRef as React.RefObject<HTMLTextAreaElement>}
+            displayName={getDisplayName(reply)}
+            onContentChange={setReplyContent}
+            onCancel={handleCancelReply}
+            onSubmit={handleSubmitInlineReply}
+          />
         )}
 
         {/* Nested replies */}

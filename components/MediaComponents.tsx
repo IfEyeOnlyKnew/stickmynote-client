@@ -5,7 +5,7 @@ import { ExternalLink, Trash2, Eye, AlertCircle } from "lucide-react"
 import { getVideoEmbedUrl, type VideoRenderProps, type ImageRenderProps } from "@/utils/noteUtils"
 import Image from "next/image"
 
-export function VideoCard({ video, onDelete, className = "" }: VideoRenderProps) {
+export function VideoCard({ video, onDelete, className = "" }: Readonly<VideoRenderProps>) {
   const hasRequiredFields = video.platform && video.embed_id
 
   const embedUrl = hasRequiredFields ? getVideoEmbedUrl(video) : ""
@@ -133,15 +133,14 @@ export function ImageCard({
   onDelete,
   className = "",
   fullWidth = false,
-}: ImageRenderProps & { fullWidth?: boolean }) {
+}: Readonly<ImageRenderProps & { fullWidth?: boolean }>) {
   return (
     <Card className={`overflow-hidden cursor-pointer hover:shadow-md transition-shadow group ${className}`}>
-      <div
-        role="button"
-        tabIndex={0}
+      <button
+        type="button"
+        aria-label={image.alt || "View image"}
         className={`${fullWidth ? "w-full" : "aspect-square"} bg-gray-100 relative overflow-hidden`}
         onClick={onClick}
-        onKeyDown={(e) => e.key === "Enter" && onClick?.()}
       >
         <Image
           src={image.url || "/placeholder.svg?height=600&width=600&query=note-image-placeholder"}
@@ -157,7 +156,7 @@ export function ImageCard({
         <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-20 transition-all duration-200 flex items-center justify-center">
           <Eye className="h-6 w-6 text-white opacity-0 group-hover:opacity-100 transition-opacity duration-200" />
         </div>
-      </div>
+      </button>
       {onDelete && (
         <CardContent className="p-2">
           <div className="flex justify-end">

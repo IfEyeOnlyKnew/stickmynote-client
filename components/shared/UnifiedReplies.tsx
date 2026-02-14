@@ -360,7 +360,9 @@ export const UnifiedReplies: React.FC<UnifiedRepliesProps> = ({
       try {
         await onDeleteReply(noteId, replyId)
         setLocalReplies((prev) => prev.filter((r) => r.id !== replyId))
-      } catch (error) {}
+      } catch (error) {
+        console.error("Error deleting reply:", error)
+      }
     },
     [onDeleteReply, noteId],
   )
@@ -369,15 +371,11 @@ export const UnifiedReplies: React.FC<UnifiedRepliesProps> = ({
     async (replyId: string, content: string) => {
       if (!onEditReply) return
 
-      try {
-        await onEditReply(noteId, replyId, content)
-        // Update local state after successful edit
-        setLocalReplies((prev) =>
-          prev.map((r) => (r.id === replyId ? { ...r, content, updated_at: new Date().toISOString() } : r)),
-        )
-      } catch (error) {
-        throw error // Re-throw so ReplyItem can handle it
-      }
+      await onEditReply(noteId, replyId, content)
+      // Update local state after successful edit
+      setLocalReplies((prev) =>
+        prev.map((r) => (r.id === replyId ? { ...r, content, updated_at: new Date().toISOString() } : r)),
+      )
     },
     [onEditReply, noteId],
   )
@@ -616,7 +614,16 @@ export const UnifiedReplies: React.FC<UnifiedRepliesProps> = ({
         {/* Add new top-level reply button/form */}
         {canEdit && (
           <div className="pt-2 border-t">
-            {!showReplyForm ? (
+            {showReplyForm ? (
+              <ReplyForm
+                content={replyContent}
+                onContentChange={setReplyContent}
+                onSubmit={handleStickReply}
+                onCancel={onCancelReply}
+                isSubmitting={isSubmittingReply}
+                isCompact={true}
+              />
+            ) : (
               <Button
                 variant="outline"
                 size="sm"
@@ -626,15 +633,6 @@ export const UnifiedReplies: React.FC<UnifiedRepliesProps> = ({
                 <Plus className="h-3 w-3 mr-1" />
                 Add Reply
               </Button>
-            ) : (
-              <ReplyForm
-                content={replyContent}
-                onContentChange={setReplyContent}
-                onSubmit={handleStickReply}
-                onCancel={onCancelReply}
-                isSubmitting={isSubmittingReply}
-                isCompact={true}
-              />
             )}
           </div>
         )}
@@ -760,7 +758,7 @@ export const UnifiedReplies: React.FC<UnifiedRepliesProps> = ({
                 currentUserId={currentUserId}
                 onDelete={onDeleteReply ? handleDeleteReply : undefined}
                 onEdit={onEditReply ? handleEditReply : undefined}
-                onReply={enableReplyToReply && canEdit && onAddReply ? undefined : (enableReplyToReply && canEdit ? handleReplyToReply : undefined)}
+                onReply={enableReplyToReply && canEdit && !onAddReply ? handleReplyToReply : undefined}
                 onSubmitReply={enableReplyToReply && canEdit && onAddReply ? handleSubmitInlineReply : undefined}
                 onStartChat={handleStartChat}
                 onToggleCalStick={handleToggleCalStick}

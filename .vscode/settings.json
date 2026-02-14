@@ -1,15 +1,26 @@
 {
+    "sonarlint.rules": {
+        "typescript:S6748": {
+            "level": "off"
+        }
+    },
     "cSpell.words": [
+        "Burndown",
+        "Burnup",
         "calstick",
         "calsticks",
         "CCPA",
         "crashpad",
+        "doesn",
         "Gantt",
+        "gapi",
         "ical",
         "mypads",
         "mysticks",
         "Neue",
         "okrs",
+        "onedrive",
+        "overscan",
         "Paks",
         "Prereg",
         "quicksticks",

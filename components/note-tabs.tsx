@@ -1,3 +1,6 @@
+// Legacy "note" tabs wrapper - the app has transitioned from "notes" to "sticks".
+// This component remains for backward compatibility with existing note-based features.
+// New features should use StickTabs (components/stick-tabs.tsx) instead.
 "use client"
 import { GenericNoteTabs } from "@/components/GenericNoteTabs"
 import type { NoteTabsConfig } from "@/types/note-tabs-config"
@@ -33,6 +36,6 @@ const noteTabsConfig: NoteTabsConfig = {
   globalRefreshFunctionName: "refreshNoteTabs",
 }
 
-export function NoteTabs(props: NoteTabsProps) {
+export function NoteTabs(props: Readonly<NoteTabsProps>) {
   return <GenericNoteTabs {...props} config={noteTabsConfig} />
 }

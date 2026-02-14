@@ -7,8 +7,8 @@
 
 import { JSDOM } from "jsdom"
 import { Readability } from "@mozilla/readability"
-import https from "https"
-import http from "http"
+import https from "node:https"
+import http from "node:http"
 import { generateText, isAIAvailable, getProviderDisplayName } from "./ai-provider"
 
 /**
@@ -96,6 +96,31 @@ export interface LinkSummaryResult {
 }
 
 /**
+ * Fallback content extraction when Readability fails or content is too short
+ */
+function extractFallbackContent(html: string, url: string): UrlContent {
+  const titleMatch = /<title[^>]*>([^<]*)<\/title>/i.exec(html)
+  const title = titleMatch ? titleMatch[1].trim() : new URL(url).hostname
+
+  const descMatch = /<meta[^>]*name=["']description["'][^>]*content=["']([^"']*)["']/i.exec(html) ||
+                    /<meta[^>]*content=["']([^"']*)["'][^>]*name=["']description["']/i.exec(html)
+  const description = descMatch ? descMatch[1].trim() : ""
+
+  if (description) {
+    console.log(`[URL Summarizer] Using meta description for ${url}`)
+    return { url, title, content: description, excerpt: description }
+  }
+
+  console.log(`[URL Summarizer] Could not extract content from ${url}`)
+  return {
+    url,
+    title,
+    content: "",
+    error: "Could not extract article content (may be video, login-required, or dynamic page)",
+  }
+}
+
+/**
  * Extract readable content from a URL using Mozilla Readability
  */
 export async function extractUrlContent(url: string): Promise<UrlContent> {
@@ -111,33 +136,8 @@ export async function extractUrlContent(url: string): Promise<UrlContent> {
     const reader = new Readability(dom.window.document)
     const article = reader.parse()
 
-    if (!article || !article.textContent || article.textContent.trim().length < 100) {
-      // Fall back to basic extraction if Readability fails or content too short
-      const titleMatch = html.match(/<title[^>]*>([^<]*)<\/title>/i)
-      const title = titleMatch ? titleMatch[1].trim() : new URL(url).hostname
-
-      // Try to extract meta description as fallback content
-      const descMatch = html.match(/<meta[^>]*name=["']description["'][^>]*content=["']([^"']*)["']/i) ||
-                        html.match(/<meta[^>]*content=["']([^"']*)["'][^>]*name=["']description["']/i)
-      const description = descMatch ? descMatch[1].trim() : ""
-
-      if (description) {
-        console.log(`[URL Summarizer] Using meta description for ${url}`)
-        return {
-          url,
-          title,
-          content: description,
-          excerpt: description,
-        }
-      }
-
-      console.log(`[URL Summarizer] Could not extract content from ${url}`)
-      return {
-        url,
-        title,
-        content: "",
-        error: "Could not extract article content (may be video, login-required, or dynamic page)",
-      }
+    if (!article?.textContent || article.textContent.trim().length < 100) {
+      return extractFallbackContent(html, url)
     }
 
     console.log(`[URL Summarizer] Extracted ${article.textContent.length} chars from ${url}`)
@@ -282,7 +282,7 @@ Comprehensive Overview:`,
 
       combinedSummary = text.trim()
     } catch (error) {
-      // Fall back to just concatenating summaries
+      console.error("[URL Summarizer] Combined summary failed:", error)
       combinedSummary = summaryText
       errors.push("Could not generate combined summary, showing individual summaries")
     }
@@ -303,19 +303,25 @@ export function formatSummariesAsHtml(result: LinkSummaryResult): string {
   const sections: string[] = []
 
   // Add header
-  sections.push(`<h3>Link Summary</h3>`)
-  sections.push(`<p><em>Generated using ${result.provider}</em></p>`)
+  sections.push(
+    `<h3>Link Summary</h3>`,
+    `<p><em>Generated using ${result.provider}</em></p>`,
+  )
 
   // Add combined summary if available
   if (result.combinedSummary) {
-    sections.push(`<h4>Overview</h4>`)
-    sections.push(`<p>${result.combinedSummary}</p>`)
+    sections.push(
+      `<h4>Overview</h4>`,
+      `<p>${result.combinedSummary}</p>`,
+    )
   }
 
   // Add individual summaries
   if (result.summaries.length > 0) {
-    sections.push(`<h4>Individual Summaries</h4>`)
-    sections.push(`<ul>`)
+    sections.push(
+      `<h4>Individual Summaries</h4>`,
+      `<ul>`,
+    )
 
     for (const summary of result.summaries) {
       if (summary.summary) {

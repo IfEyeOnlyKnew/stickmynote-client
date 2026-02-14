@@ -47,7 +47,12 @@
       "Bash(npm run build:*)",
       "Bash(xcopy:*)",
       "Bash(xargs cat:*)",
-      "Bash(/c/Users/chris.doran/.local/share/pnpm/pnpm.exe run build:*)"
+      "Bash(/c/Users/chris.doran/.local/share/pnpm/pnpm.exe run build:*)",
+      "Bash(npx tsc:*)",
+      "Bash(npx eslint:*)",
+      "Bash(pnpm exec next lint:*)",
+      "Bash(npx next lint)",
+      "Bash(pnpm add:*)"
     ]
   }
 }

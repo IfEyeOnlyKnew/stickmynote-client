@@ -78,7 +78,10 @@ Return ONLY the summary, nothing else.`
 New Content: "${newContent}"
 
 Existing Contents:
-${existingContents.map((item, idx) => `${idx + 1}. (ID: ${item.id}) ${item.topic ? `Topic: ${item.topic} - ` : ""}${item.content}`).join("\n")}
+${existingContents.map((item, idx) => {
+  const topicPrefix = item.topic ? "Topic: " + item.topic + " - " : ""
+  return (idx + 1) + ". (ID: " + item.id + ") " + topicPrefix + item.content
+}).join("\n")}
 
 Respond in this exact format:
 DUPLICATE: [yes/no]
@@ -93,12 +96,12 @@ Be strict - only mark as duplicate if content is very similar (>80% match).`
       })
 
       // Parse response
-      const duplicateMatch = text.match(/DUPLICATE:\s*(yes|no)/i)
-      const idMatch = text.match(/SIMILAR_TO_ID:\s*(\S+)/i)
-      const similarityMatch = text.match(/SIMILARITY:\s*(\d+)/i)
+      const duplicateMatch = /DUPLICATE:\s*(yes|no)/i.exec(text)
+      const idMatch = /SIMILAR_TO_ID:\s*(\S+)/i.exec(text)
+      const similarityMatch = /SIMILARITY:\s*(\d+)/i.exec(text)
 
       const isDuplicate = duplicateMatch?.[1]?.toLowerCase() === "yes"
-      const similarTo = idMatch?.[1] !== "none" ? idMatch?.[1] : undefined
+      const similarTo = idMatch?.[1] === "none" ? undefined : idMatch?.[1]
       const similarity = similarityMatch?.[1] ? Number.parseInt(similarityMatch[1]) : 0
 
       return {
@@ -163,8 +166,8 @@ CONFIDENCE: [0-100 percentage]`
         maxTokens: 50,
       })
 
-      const sentimentMatch = text.match(/SENTIMENT:\s*(positive|neutral|negative)/i)
-      const confidenceMatch = text.match(/CONFIDENCE:\s*(\d+)/i)
+      const sentimentMatch = /SENTIMENT:\s*(positive|neutral|negative)/i.exec(text)
+      const confidenceMatch = /CONFIDENCE:\s*(\d+)/i.exec(text)
 
       const sentiment = (sentimentMatch?.[1]?.toLowerCase() as any) || "neutral"
       const confidence = confidenceMatch?.[1] ? Number.parseInt(confidenceMatch[1]) : 50
@@ -280,17 +283,18 @@ If no action items found, return "NONE".`
       const lines = text.split("\n").filter((line) => line.trim().startsWith("ACTION:"))
 
       for (const line of lines) {
-        const titleMatch = line.match(/ACTION:\s*([^|]+)/)
-        const ownerMatch = line.match(/OWNER:\s*([^|]+)/)
-        const statusMatch = line.match(/STATUS:\s*([^|]+)/)
-        const dueMatch = line.match(/DUE:\s*([^|]+)/)
+        const titleMatch = /ACTION:\s*([^|]+)/.exec(line)
+        const ownerMatch = /OWNER:\s*([^|]+)/.exec(line)
+        const statusMatch = /STATUS:\s*([^|]+)/.exec(line)
+        const dueMatch = /DUE:\s*([^|]+)/.exec(line)
 
         if (titleMatch && ownerMatch && statusMatch) {
+          const dueHint = dueMatch?.[1]?.trim()
           actions.push({
             title: titleMatch[1].trim(),
             owner: ownerMatch[1].trim(),
             status: statusMatch[1].trim().toLowerCase(),
-            due_hint: dueMatch?.[1]?.trim() !== "none" ? dueMatch?.[1]?.trim() : undefined,
+            due_hint: dueHint === "none" ? undefined : dueHint,
           })
         }
       }
@@ -422,8 +426,8 @@ CITATIONS: [1], [2] - [why relevant]`
       })
 
       // Parse response - using [\s\S] instead of 's' flag for dotall behavior
-      const answerMatch = text.match(/ANSWER:\s*([\s\S]+?)(?=CITATIONS:|$)/)
-      const citationsMatch = text.match(/CITATIONS:\s*([\s\S]+)/)
+      const answerMatch = /ANSWER:\s*([\s\S]+?)(?=CITATIONS:|$)/.exec(text)
+      const citationsMatch = /CITATIONS:\s*([\s\S]+)/.exec(text)
 
       const answer = answerMatch?.[1]?.trim() || text.trim()
       const citations: Array<{ topic: string; relevance: string }> = []
@@ -432,12 +436,12 @@ CITATIONS: [1], [2] - [why relevant]`
         const citationText = citationsMatch[1]
         const numbers = citationText.match(/\[(\d+)\]/g) || []
         const relevance = citationText
-          .replace(/\[\d+\]/g, "")
-          .replace(/[,-]/g, "")
+          .replaceAll(/\[\d+\]/g, "")
+          .replaceAll(/[,-]/g, "")
           .trim()
 
         numbers.forEach((num) => {
-          const index = Number.parseInt(num.replace(/[[\]]/g, "")) - 1
+          const index = Number.parseInt(num.replaceAll(/[[\]]/g, "")) - 1
           if (index >= 0 && index < params.sticks.length) {
             citations.push({
               topic: params.sticks[index].topic,

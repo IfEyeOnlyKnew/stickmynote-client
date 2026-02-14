@@ -95,9 +95,7 @@ async function getLdapModule() {
   if (isBuildTime) {
     throw new Error("LDAP not available during build")
   }
-  if (!ldapModule) {
-    ldapModule = await import("ldapjs")
-  }
+  ldapModule ??= await import("ldapjs")
   return ldapModule
 }
 
@@ -214,8 +212,8 @@ async function searchUser(client: any, config: LDAPConfig, username: string): Pr
         try {
           user = parseSearchEntry(entry)
           process.stderr.write(`[LDAP] Parsed user DN: ${user?.dn || "null"}\n`)
-        } catch (parseErr) {
-          process.stderr.write(`[LDAP] Parse error: ${parseErr}\n`)
+        } catch (error_) {
+          process.stderr.write(`[LDAP] Parse error: ${error_}\n`)
         }
       })
 
@@ -251,7 +249,7 @@ function safeUnbind(client: any): void {
 
 async function isFirstUser(): Promise<boolean> {
   const result = await db.query(`SELECT COUNT(*) as count FROM users`)
-  return parseInt(result.rows[0].count, 10) === 0
+  return Number.parseInt(result.rows[0].count, 10) === 0
 }
 
 async function getOrCreateDefaultOrganization(userId: string, userEmail: string): Promise<string | null> {
@@ -408,8 +406,8 @@ async function updateOrganizationMemberships(userId: string, userDN: string): Pr
         if (userMatchesOrgPatterns(userDN, patterns)) {
           await ensureOrganizationMembership(org.id, userId, org.name)
         }
-      } catch (parseErr) {
-        console.error(`[LDAP] Error processing organization ${org.name}:`, parseErr)
+      } catch (error_) {
+        console.error(`[LDAP] Error processing organization ${org.name}:`, error_)
       }
     }
   } catch (error) {
@@ -527,7 +525,7 @@ export async function searchLDAPUsers(
 
     // Build search filter for partial matching
     // Search by displayName, sAMAccountName, mail, givenName, or sn
-    const escapedQuery = query.replace(/[\\*()]/g, (char) => `\\${char}`)
+    const escapedQuery = query.replaceAll(/[\\*()]/g, (char) => `\\${char}`)
     const searchFilter = `(&(objectClass=user)(objectCategory=person)(|(displayName=*${escapedQuery}*)(sAMAccountName=*${escapedQuery}*)(mail=*${escapedQuery}*)(givenName=*${escapedQuery}*)(sn=*${escapedQuery}*)))`
 
     const users = await searchLDAPUsersInternal(client, config, searchFilter, limit)
@@ -580,8 +578,8 @@ async function searchLDAPUsersInternal(
             givenName: ldapUser.givenName,
             surname: ldapUser.sn,
           })
-        } catch (parseErr) {
-          console.warn("[LDAP] Error parsing search entry:", parseErr)
+        } catch (error_) {
+          console.warn("[LDAP] Error parsing search entry:", error_)
         }
       })
 
@@ -682,10 +680,10 @@ export async function syncAllADUsers(): Promise<SyncResult> {
           )
           result.created++
         }
-      } catch (userErr) {
-        const errMsg = userErr instanceof Error ? userErr.message : String(userErr)
+      } catch (error_) {
+        const errMsg = error_ instanceof Error ? error_.message : String(error_)
         result.errors.push(`Error processing ${ldapUser.email}: ${errMsg}`)
-        console.error(`[LDAP Sync] Error processing user ${ldapUser.email}:`, userErr)
+        console.error(`[LDAP Sync] Error processing user ${ldapUser.email}:`, error_)
       }
     }
 
@@ -739,8 +737,8 @@ async function searchAllLDAPUsers(
               surname: ldapUser.sn,
             })
           }
-        } catch (parseErr) {
-          console.warn("[LDAP Sync] Error parsing entry:", parseErr)
+        } catch (error_) {
+          console.warn("[LDAP Sync] Error parsing entry:", error_)
         }
       })
 
@@ -803,7 +801,7 @@ export async function searchADGroups(
 
     // Build search filter for groups
     // Search by cn (common name) and description
-    const escapedQuery = query.replace(/[\\*()]/g, (char) => `\\${char}`)
+    const escapedQuery = query.replaceAll(/[\\*()]/g, (char) => `\\${char}`)
     const searchFilter = `(&(objectClass=group)(|(cn=*${escapedQuery}*)(description=*${escapedQuery}*)))`
 
     const groups = await searchADGroupsInternal(client, config, searchFilter, limit)
@@ -817,6 +815,19 @@ export async function searchADGroups(
       success: false,
       error: error instanceof Error ? error.message : "Search failed",
     }
+  }
+}
+
+function parseGroupEntry(entry: ADGroupSearchEntry): ADGroup | null {
+  try {
+    const { objectName, attributes } = entry.pojo
+    const cn = attributes.find((a) => a.type === "cn")?.values[0] || ""
+    const description = attributes.find((a) => a.type === "description")?.values[0] || ""
+    const members = attributes.find((a) => a.type === "member")?.values || []
+    return { dn: objectName || "", name: cn, description, memberCount: members.length }
+  } catch (error_) {
+    console.warn("[LDAP] Error parsing group entry:", error_)
+    return null
   }
 }
 
@@ -846,21 +857,8 @@ async function searchADGroupsInternal(
       const groups: ADGroup[] = []
 
       res.on("searchEntry", (entry: ADGroupSearchEntry) => {
-        try {
-          const { objectName, attributes } = entry.pojo
-          const cn = attributes.find((a) => a.type === "cn")?.values[0] || ""
-          const description = attributes.find((a) => a.type === "description")?.values[0] || ""
-          const members = attributes.find((a) => a.type === "member")?.values || []
-
-          groups.push({
-            dn: objectName || "",
-            name: cn,
-            description,
-            memberCount: members.length,
-          })
-        } catch (parseErr) {
-          console.warn("[LDAP] Error parsing group entry:", parseErr)
-        }
+        const group = parseGroupEntry(entry)
+        if (group) groups.push(group)
       })
 
       res.on("error", (searchErr: Error) => {
@@ -917,7 +915,7 @@ export async function getADGroupMembers(
     for (const memberDn of groupMembers) {
       try {
         const user = await getUserByDn(client, config, memberDn)
-        if (user && user.email) {
+        if (user?.email) {
           members.push(user)
         }
       } catch (err) {
@@ -937,6 +935,10 @@ export async function getADGroupMembers(
   }
 }
 
+function extractMemberDns(entry: ADGroupSearchEntry): string[] {
+  return entry.pojo.attributes.find((a) => a.type === "member")?.values || []
+}
+
 async function getGroupMemberDNs(client: any, groupDn: string): Promise<string[]> {
   return new Promise((resolve, reject) => {
     const opts = {
@@ -954,8 +956,7 @@ async function getGroupMemberDNs(client: any, groupDn: string): Promise<string[]
       let memberDns: string[] = []
 
       res.on("searchEntry", (entry: ADGroupSearchEntry) => {
-        const members = entry.pojo.attributes.find((a) => a.type === "member")?.values || []
-        memberDns = members
+        memberDns = extractMemberDns(entry)
       })
 
       res.on("error", (searchErr: Error) => {
@@ -1003,8 +1004,8 @@ async function getUserByDn(
               surname: ldapUser.sn,
             }
           }
-        } catch (parseErr) {
-          console.warn("[LDAP] Error parsing user entry:", parseErr)
+        } catch (error_) {
+          console.warn("[LDAP] Error parsing user entry:", error_)
         }
       })
 

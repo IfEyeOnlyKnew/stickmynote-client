@@ -72,7 +72,7 @@ export function GenericStickTabs({
   isGeneratingTags,
   onSummarizeLinks,
   isSummarizingLinks,
-}: GenericStickTabsProps) {
+}: Readonly<GenericStickTabsProps>) {
   const [activeTab, setActiveTab] = useState("main")
   const [topic, setTopic] = useState(initialTopic)
   const [content, setContent] = useState(initialContent)
@@ -131,8 +131,8 @@ export function GenericStickTabs({
       refreshTabs()
     }
 
-    window.addEventListener("refreshStickTabs", handleRefresh)
-    return () => window.removeEventListener("refreshStickTabs", handleRefresh)
+    globalThis.addEventListener("refreshStickTabs", handleRefresh)
+    return () => globalThis.removeEventListener("refreshStickTabs", handleRefresh)
   }, [refreshTabs])
 
   useEffect(() => {
@@ -151,11 +151,9 @@ export function GenericStickTabs({
 
   const handleDetailsChange = async (newDetails: string) => {
     setDetails(newDetails)
-    if (onDetailsChange) {
-      await onDetailsChange(newDetails)
-      // Refresh tabs to get the updated details from the database
-      await refreshTabs()
-    }
+    onDetailsChange?.(newDetails)
+    // Refresh tabs to get the updated details from the database
+    await refreshTabs()
   }
 
   if (loading) {
@@ -165,8 +163,6 @@ export function GenericStickTabs({
       </div>
     )
   }
-
-  const availableTabs = ["main", "videos", "images", "details"]
 
   return (
     <div className="!w-full !min-w-0 !max-w-full !overflow-hidden">

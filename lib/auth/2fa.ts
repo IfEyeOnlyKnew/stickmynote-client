@@ -5,7 +5,13 @@ import "server-only"
 import { TOTP, Secret } from "otpauth"
 import { db } from "@/lib/database/pg-client"
 import { encryptForOrg, decryptForOrg } from "@/lib/encryption"
-import crypto from "crypto"
+import crypto from "node:crypto"
+
+// ==================== HELPERS ====================
+
+function toJsonString(value: unknown): string {
+  return typeof value === "string" ? value : JSON.stringify(value || "[]")
+}
 
 // ==================== TYPES ====================
 
@@ -15,8 +21,8 @@ export interface TwoFactorSecret {
   org_id: string
   method: "totp" | "sms" | "fido2"
   encrypted_secret: string | null
-  backup_codes_encrypted: any | null
-  backup_codes_used: any
+  backup_codes_encrypted: string | string[] | null
+  backup_codes_used: string | string[]
   enabled: boolean
   verified: boolean
   enabled_at: string | null
@@ -298,9 +304,7 @@ export async function verify2FACode(
     const usedHashes = Array.isArray(secretRecord.backup_codes_used)
       ? secretRecord.backup_codes_used
       : JSON.parse(
-          typeof secretRecord.backup_codes_used === "string"
-            ? secretRecord.backup_codes_used
-            : JSON.stringify(secretRecord.backup_codes_used || "[]")
+          toJsonString(secretRecord.backup_codes_used)
         )
 
     const backupResult = await verifyBackupCode(code, encryptedCodes, usedHashes, orgId)
@@ -465,9 +469,7 @@ export async function get2FAStatus(userId: string): Promise<{
   const usedCodes = Array.isArray(secret.backup_codes_used)
     ? secret.backup_codes_used
     : JSON.parse(
-        typeof secret.backup_codes_used === "string"
-          ? secret.backup_codes_used
-          : JSON.stringify(secret.backup_codes_used || "[]")
+        toJsonString(secret.backup_codes_used)
       )
 
   let totalCodes = 0

@@ -1,3 +1,6 @@
+// Legacy "note" preview card - the app has transitioned from "notes" to "sticks".
+// This component remains for backward compatibility with existing note-based features.
+// New features should use stick-based components instead.
 "use client"
 
 import React, { useMemo, useState } from "react"
@@ -40,7 +43,7 @@ export const NotePreviewCard: React.FC<NotePreviewCardProps> = ({
     if (note.title) return note.title
     if (note.content) {
       // Strip HTML and get first line
-      const stripped = note.content.replace(/<[^>]*>/g, "").trim()
+      const stripped = note.content.replaceAll(/<[^>]*>/g, "").trim()
       const firstLine = stripped.split("\n")[0]
       return firstLine.length > 60 ? firstLine.substring(0, 60) + "..." : firstLine
     }
@@ -50,7 +53,7 @@ export const NotePreviewCard: React.FC<NotePreviewCardProps> = ({
   // Get content preview (strip HTML, truncate)
   const contentPreview = useMemo(() => {
     if (!note.content) return ""
-    const stripped = note.content.replace(/<[^>]*>/g, "").trim()
+    const stripped = note.content.replaceAll(/<[^>]*>/g, "").trim()
     // Skip first line if it's the same as title
     const lines = stripped.split("\n").filter(Boolean)
     const previewLines = note.topic || note.title ? lines : lines.slice(1)
@@ -117,7 +120,7 @@ export const NotePreviewCard: React.FC<NotePreviewCardProps> = ({
                   >
                     <Palette
                       className="w-4 h-4 text-gray-400 hover:text-gray-600"
-                      style={{ color: borderColor !== "#e5e7eb" ? borderColor : undefined }}
+                      style={{ color: borderColor === "#e5e7eb" ? undefined : borderColor }}
                     />
                   </button>
                 </PopoverTrigger>
@@ -157,9 +160,9 @@ export const NotePreviewCard: React.FC<NotePreviewCardProps> = ({
         {/* Tags */}
         {displayTags.length > 0 && (
           <div className="flex flex-wrap gap-1 mb-3">
-            {displayTags.map((tag, index) => (
+            {displayTags.map((tag) => (
               <Badge
-                key={index}
+                key={tag}
                 variant="secondary"
                 className="text-xs px-2 py-0.5 bg-gray-100 text-gray-900"
               >

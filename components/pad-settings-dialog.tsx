@@ -10,7 +10,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { Badge } from "@/components/ui/badge"
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Trash2, Shield, Crown } from 'lucide-react'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 
@@ -30,7 +30,7 @@ interface PadSettingsDialogProps {
   userRole: string | null
 }
 
-export function PadSettingsDialog({ open, onOpenChange, padId, padName, userRole }: PadSettingsDialogProps) {
+export function PadSettingsDialog({ open, onOpenChange, padId, padName, userRole }: Readonly<PadSettingsDialogProps>) {
   const [members, setMembers] = useState<PadMember[]>([])
   const [loading, setLoading] = useState(false)
   const [feedbackMessage, setFeedbackMessage] = useState<{ type: "success" | "error"; text: string } | null>(null)
