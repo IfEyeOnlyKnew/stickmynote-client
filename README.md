@@ -112,7 +112,7 @@ Whether you're a solo thinker jotting down ideas or an enterprise team managing 
 - **Row-Level Security (RLS)** in PostgreSQL for data isolation
 - Content sanitization with **DOMPurify** to prevent XSS
 - Secure password hashing with **bcrypt**
-- Cookie-based sessions with Redis-backed caching
+- Cookie-based session management
 
 ### Export & Integrations
 - Export to **DOCX**, **PDF**, and **CSV**
@@ -149,13 +149,11 @@ Whether you're a solo thinker jotting down ideas or an enterprise team managing 
 |------------|---------|
 | **Node.js** | Server runtime |
 | **PostgreSQL** | Primary database with Row-Level Security |
-| **Redis (Upstash)** | Session caching, rate limiting, real-time sync |
 | **ldapjs** | Enterprise LDAP/Active Directory authentication |
 | **bcryptjs** | Secure password hashing |
 | **jose** | JWT token management |
 | **otpauth** | TOTP-based two-factor authentication |
 | **Sharp** | High-performance image processing |
-| **Vercel AI SDK** | Unified AI provider integration |
 | **Nodemailer + Resend** | Transactional email delivery |
 | **Daily.co** | Video calling infrastructure |
 | **docx / jspdf** | Document generation (DOCX & PDF) |
@@ -179,7 +177,6 @@ Whether you're a solo thinker jotting down ideas or an enterprise team managing 
 - **Node.js** 20.x or later
 - **pnpm** 8.x or later
 - **PostgreSQL** 14+ database server
-- **Redis** instance (or Upstash Redis REST)
 
 ### Installation
 
@@ -211,10 +208,6 @@ POSTGRES_PORT=5432
 POSTGRES_DATABASE=stickmynote
 POSTGRES_USER=your_user
 POSTGRES_PASSWORD=your_password
-
-# Redis (optional — falls back to in-memory cache)
-UPSTASH_REDIS_REST_URL=your_redis_url
-UPSTASH_REDIS_REST_TOKEN=your_redis_token
 
 # Authentication
 AUTH_SECRET=your_random_secret_key
@@ -305,7 +298,7 @@ Stick My Note is designed for self-hosted enterprise deployments:
 |--------|------|
 | **Application Server** | Next.js application with HTTPS |
 | **Database Server** | PostgreSQL with Row-Level Security |
-| **Cache Server** | Redis for sessions, rate limiting, and sync |
+| **Cache Server** | In-memory caching for sessions and sync |
 | **AI Server** | Ollama for private, local LLM inference |
 | **DNS / Domain Controller** | Active Directory & DNS resolution |
 
