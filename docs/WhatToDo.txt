@@ -528,21 +528,41 @@ Goal: Surpass Microsoft's suite by providing a unified, intelligent, and
                           (Enterprise Requirements)
 --------------------------------------------------------------------------------
 
-[  ] 8.1 SINGLE SIGN-ON (SSO)
-     - SAML 2.0 support
-     - OpenID Connect (OIDC)
-     - Azure AD integration
-     - Okta integration
-     - JIT user provisioning
-     Status: PARTIAL (LDAP exists, needs SAML/OIDC)
+[✓ ] 8.1 SINGLE SIGN-ON (SSO)
+     - SAML 2.0 support                              [NOT IMPLEMENTED - future]
+     - OpenID Connect (OIDC)                          [DONE]
+     - Azure AD / Entra ID integration                [DONE] (preset in SSO tab)
+     - Okta integration                               [DONE] (preset in SSO tab)
+     - Google Workspace integration                   [DONE] (preset in SSO tab)
+     - Custom OIDC provider support                   [DONE]
+     - JIT user provisioning                          [DONE] (auto-create users on first SSO login)
+     - Account linking (SSO to existing LDAP users)   [DONE]
+     - Owner-controlled SSO toggle                    [DONE] (Org Settings > SSO tab)
+     - Enforce SSO-only mode                          [DONE] (blocks password login)
+     - PKCE security for auth flow                    [DONE]
+     - SSO test connection                            [DONE]
+     - SSO error page                                 [DONE]
+     - Auth method auto-detection by email domain     [DONE]
+     Status: MOSTLY COMPLETE (OIDC fully implemented, SAML 2.0 deferred)
+     Updated: 2026-02-16
+     Note: Requires migration script 36-create-sso-tables.sql to be run.
+           LDAP remains default auth. SSO is opt-in per org via Owner settings.
 
-[  ] 8.2 ADVANCED AUDIT LOGGING
-     - Detailed audit trail
-     - Export audit logs
-     - Audit log retention policies
-     - Real-time audit alerts
-     - Compliance reports
-     Status: PARTIAL (basic audit exists)
+[✓ ] 8.2 ADVANCED AUDIT LOGGING
+     - Detailed audit trail                           [DONE] (centralized logAuditEvent)
+     - Export audit logs (CSV & JSON)                 [DONE]
+     - Audit log retention policies                   [DONE] (owner-configurable: 30/60/90/180/365 days)
+     - Retention cleanup cron job                     [DONE] (per-org retention support)
+     - Audit log viewer with filters                  [DONE] (Org Settings > Audit Log tab)
+     - Paginated results with expandable details      [DONE]
+     - Search across actions, users, resources        [DONE]
+     - Real-time audit alerts                         [NOT IMPLEMENTED]
+     - Compliance reports                             [NOT IMPLEMENTED]
+     Status: MOSTLY COMPLETE (logging, viewer, export, retention all working)
+     Updated: 2026-02-16
+     Events tracked: login, login_failed, logout, SSO login/fail,
+                     SSO provider CRUD, org settings, member add/remove/role change,
+                     lockout cleared. Alerts and compliance reports deferred.
 
 [  ] 8.3 DATA LOSS PREVENTION (DLP)
      - Sensitive data detection
@@ -717,7 +737,7 @@ SHORT-TERM (3-6 months) - Competitive advantages:
 [ ] 4.3 Polls & Surveys - Engagement driver
 [ ] 6.1 Native Mobile Apps - Market expectation
 [ ] 7.1 Microsoft 365 Integration - Enterprise sales
-[ ] 8.1 SSO (SAML/OIDC) - Enterprise requirement
+[✓] 8.1 SSO (OIDC) - DONE (2026-02-16) - SAML deferred
 
 MEDIUM-TERM (6-12 months) - Market leadership:
 ----------------------------------------------------------
@@ -784,9 +804,9 @@ Enterprise:
 Total Features Identified: 78 major features across 10 categories
 
 By Status:
-- IMPLEMENTED: 5 features (6%) - 2.2, 2.5, 1.6, 10.2, 10.6
+- IMPLEMENTED: 7 features (9%) - 2.2, 2.5, 1.6, 10.2, 10.6, 8.1, 8.2
 - MISSING: 40 features (51%)
-- PARTIAL: 29 features (37%)
+- PARTIAL: 27 features (35%)
 - NEEDS AUDIT/ASSESSMENT: 4 features (5%)
 
 By Category:
@@ -804,11 +824,14 @@ By Category:
 ================================================================================
                               DOCUMENT VERSION
 ================================================================================
-Last Updated: 2026-02-01
+Last Updated: 2026-02-16
 Author: Claude Code Analysis
-Version: 1.1
+Version: 1.2
 
 Change Log:
+- 2026-02-16: Marked 8.1 SSO (OIDC) as MOSTLY COMPLETE
+- 2026-02-16: Marked 8.2 Advanced Audit Logging as MOSTLY COMPLETE
+- 2026-02-16: Updated Priority Matrix and Summary Statistics
 - 2026-02-01: Marked 1.6 Presence & Status System as IMPLEMENTED
 - 2026-02-01: Marked 10.2 Command Palette (CMD+K) as IMPLEMENTED
 - 2026-02-01: Updated 10.6 Keyboard Shortcuts to MOSTLY IMPLEMENTED

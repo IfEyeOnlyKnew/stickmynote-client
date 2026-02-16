@@ -21,6 +21,8 @@ import {
   UserPlus,
   Sparkles,
   Terminal,
+  KeyRound,
+  ScrollText,
 } from "lucide-react"
 import { useUser } from "@/contexts/user-context"
 import { useOrganization } from "@/contexts/organization-context"
@@ -38,6 +40,8 @@ import {
   AutomationTab,
   MembersTab,
   AccountTab,
+  SSOTab,
+  AuditLogTab,
 } from "./_components"
 import { ComplianceDashboard } from "@/components/auth/ComplianceDashboard"
 
@@ -918,6 +922,18 @@ function OrganizationSettingsPage() {
                 2FA Compliance
               </TabsTrigger>
             )}
+            {isOwner && !isPersonalOrg && (
+              <TabsTrigger value="sso" className="flex items-center gap-2">
+                <KeyRound className="h-4 w-4" />
+                SSO
+              </TabsTrigger>
+            )}
+            {(isOwner || currentOrgRole === "admin") && !isPersonalOrg && (
+              <TabsTrigger value="audit-log" className="flex items-center gap-2">
+                <ScrollText className="h-4 w-4" />
+                Audit Log
+              </TabsTrigger>
+            )}
           </TabsList>
 
           {/* General Settings */}
@@ -1074,6 +1090,20 @@ function OrganizationSettingsPage() {
           {(isOwner || currentOrgRole === "admin") && !isPersonalOrg && currentOrg && (
             <TabsContent value="2fa-compliance">
               <ComplianceDashboard orgId={currentOrg.id} />
+            </TabsContent>
+          )}
+
+          {/* SSO Tab */}
+          {isOwner && !isPersonalOrg && currentOrg && (
+            <TabsContent value="sso">
+              <SSOTab currentOrgId={currentOrg.id} />
+            </TabsContent>
+          )}
+
+          {/* Audit Log Tab */}
+          {(isOwner || currentOrgRole === "admin") && !isPersonalOrg && currentOrg && (
+            <TabsContent value="audit-log">
+              <AuditLogTab currentOrgId={currentOrg.id} />
             </TabsContent>
           )}
         </Tabs>

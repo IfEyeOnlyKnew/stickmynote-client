@@ -18,11 +18,11 @@ const nextConfig = {
   experimental: {
     instrumentationHook: true,
     // Prevent ldapjs from being bundled - will be loaded from node_modules at runtime only
-    serverComponentsExternalPackages: ["ldapjs"],
+    serverComponentsExternalPackages: ["ldapjs", "openid-client"],
   },
 
   // Also add to top-level serverExternalPackages for Next.js 14.2+
-  serverExternalPackages: ["ldapjs"],
+  serverExternalPackages: ["ldapjs", "openid-client"],
 
   // Production optimizations
   compress: true,
@@ -201,7 +201,9 @@ const nextConfig = {
       config.externals.push(
         "isomorphic-dompurify",
         // Externalize ldapjs to prevent it from being bundled and attempting connections during build
-        "ldapjs"
+        "ldapjs",
+        // Externalize openid-client for SSO OIDC support
+        "openid-client"
       );
     }
 

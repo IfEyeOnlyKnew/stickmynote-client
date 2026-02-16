@@ -6,6 +6,9 @@ import { validateCSRFMiddleware } from "@/lib/csrf"
 import { is2FAEnabled } from "@/lib/auth/2fa"
 import { createVerificationSession } from "@/lib/auth/2fa-session"
 import { checkUserCompliance } from "@/lib/auth/2fa-policy"
+import { resolveAuthMethod } from "@/lib/auth/sso-resolver"
+import { logAuditEvent } from "@/lib/audit/audit-logger"
+import { getRequestContext } from "@/lib/audit/request-context"
 import { db } from "@/lib/database/pg-client"
 import { cookies } from "next/headers"
 
@@ -27,6 +30,15 @@ export async function POST(request: NextRequest) {
 
     const normalizedEmail = email.trim().toLowerCase()
 
+    // Check if this email domain requires SSO-only login
+    const authResolution = await resolveAuthMethod(normalizedEmail)
+    if (authResolution.method !== "ldap" && authResolution.enforceOnly) {
+      return NextResponse.json(
+        { error: "Your organization requires Single Sign-On. Please use the SSO button to sign in." },
+        { status: 403 },
+      )
+    }
+
     // Check lockout before attempting sign in (direct DB call)
     const lockoutData = await checkLockout(normalizedEmail)
     if (lockoutData.locked) {
@@ -43,10 +55,19 @@ export async function POST(request: NextRequest) {
     // Attempt sign in with Active Directory
     const result = await authenticateWithAD(email, password)
 
+    const { ipAddress, userAgent } = getRequestContext(request)
+
     if (!result.success || !result.user) {
       // Record failed attempt (direct DB call)
-      const ipAddress = request.headers.get("x-forwarded-for") || request.headers.get("x-real-ip")
       await recordLoginAttempt(normalizedEmail, false, ipAddress)
+
+      logAuditEvent({
+        action: "user.login_failed",
+        resourceType: "user",
+        ipAddress,
+        userAgent,
+        metadata: { email: normalizedEmail, reason: result.error || "Invalid credentials" },
+      })
 
       return NextResponse.json(
         { error: result.error || "Invalid credentials" },
@@ -126,6 +147,16 @@ export async function POST(request: NextRequest) {
 
     // Record successful attempt (direct DB call)
     await recordLoginAttempt(normalizedEmail, true)
+
+    logAuditEvent({
+      userId: result.user.id,
+      action: "user.login",
+      resourceType: "user",
+      resourceId: result.user.id,
+      ipAddress,
+      userAgent,
+      metadata: { email: normalizedEmail, method: "ldap" },
+    })
 
     // Set auth cookie
     const cookieStore = await cookies()
