@@ -33,6 +33,20 @@ export type AuditAction =
   // Admin
   | "admin.lockout_cleared"
   | "admin.user_searched"
+  // DLP
+  | "dlp.share_blocked"
+  | "dlp.share_warned"
+  | "dlp.public_pad_blocked"
+  | "dlp.webhook_blocked"
+  | "dlp.ical_blocked"
+  | "dlp.invite_blocked"
+  | "dlp.sensitive_data_detected"
+  | "dlp.policy_updated"
+  // Legal Hold
+  | "legal_hold.created"
+  | "legal_hold.released"
+  // eDiscovery
+  | "ediscovery.export"
 
 export interface AuditEventParams {
   userId?: string | null

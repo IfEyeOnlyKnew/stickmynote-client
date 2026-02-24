@@ -2,6 +2,8 @@ import { createDatabaseClient } from "@/lib/database/database-adapter"
 import { NextResponse } from "next/server"
 import crypto from "node:crypto"
 import { getCachedAuthUser } from "@/lib/auth/cached-auth"
+import { getOrgContext } from "@/lib/auth/get-org-context"
+import { checkDLPPolicy } from "@/lib/dlp/policy-checker"
 
 export async function GET() {
   const db = await createDatabaseClient()
@@ -47,6 +49,20 @@ export async function POST(request: Request) {
 
   try {
     const body = await request.json()
+
+    // DLP check for webhook creation
+    const orgContext = await getOrgContext()
+    if (orgContext) {
+      const dlpResult = await checkDLPPolicy({
+        orgId: orgContext.orgId,
+        action: "create_webhook",
+        userId: user.id,
+        targetUrl: body.url,
+      })
+      if (!dlpResult.allowed) {
+        return NextResponse.json({ error: dlpResult.reason }, { status: 403 })
+      }
+    }
 
     // Generate signing secret
     const signingSecret = crypto.randomBytes(32).toString("hex")

@@ -1,7 +1,8 @@
 "use client"
+import { useState } from "react"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { ExternalLink, Trash2, Eye, AlertCircle } from "lucide-react"
+import { ExternalLink, Trash2, Eye, AlertCircle, ImageOff } from "lucide-react"
 import { getVideoEmbedUrl, type VideoRenderProps, type ImageRenderProps } from "@/utils/noteUtils"
 import Image from "next/image"
 
@@ -134,25 +135,35 @@ export function ImageCard({
   className = "",
   fullWidth = false,
 }: Readonly<ImageRenderProps & { fullWidth?: boolean }>) {
+  const [imgError, setImgError] = useState(false)
+
   return (
     <Card className={`overflow-hidden cursor-pointer hover:shadow-md transition-shadow group ${className}`}>
       <button
         type="button"
         aria-label={image.alt || "View image"}
-        className={`${fullWidth ? "w-full" : "aspect-square"} bg-gray-100 relative overflow-hidden`}
+        className={`w-full ${fullWidth ? "" : "aspect-square"} bg-gray-100 relative overflow-hidden`}
         onClick={onClick}
       >
-        <Image
-          src={image.url || "/placeholder.svg?height=600&width=600&query=note-image-placeholder"}
-          alt={image.alt || "Image"}
-          fill={!fullWidth}
-          width={fullWidth ? 800 : undefined}
-          height={fullWidth ? 600 : undefined}
-          className={`${fullWidth ? "w-full h-auto" : "object-cover"} group-hover:scale-105 transition-transform duration-200`}
-          loading="lazy"
-          sizes={fullWidth ? "100vw" : "(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"}
-          unoptimized={image.url?.includes("placeholder.svg")}
-        />
+        {imgError ? (
+          <div className="absolute inset-0 flex flex-col items-center justify-center text-gray-400">
+            <ImageOff className="h-8 w-8 mb-1" />
+            <span className="text-xs">Image unavailable</span>
+          </div>
+        ) : (
+          <Image
+            src={image.url || "/placeholder.svg?height=600&width=600&query=note-image-placeholder"}
+            alt={image.alt || "Image"}
+            fill={!fullWidth}
+            width={fullWidth ? 800 : undefined}
+            height={fullWidth ? 600 : undefined}
+            className={`${fullWidth ? "w-full h-auto" : "object-cover"} group-hover:scale-105 transition-transform duration-200`}
+            loading="lazy"
+            sizes={fullWidth ? "100vw" : "(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"}
+            unoptimized
+            onError={() => setImgError(true)}
+          />
+        )}
         <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-20 transition-all duration-200 flex items-center justify-center">
           <Eye className="h-6 w-6 text-white opacity-0 group-hover:opacity-100 transition-opacity duration-200" />
         </div>

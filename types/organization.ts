@@ -16,6 +16,48 @@ export interface Organization {
   updated_at: string
 }
 
+export interface DLPSettings {
+  // Sharing Controls (all default false = unrestricted)
+  block_community_sharing?: boolean
+  block_public_pads?: boolean
+  block_ical_feeds?: boolean
+  block_external_webhooks?: boolean
+  block_video_external_invite?: boolean
+
+  // Domain Controls
+  allowed_webhook_domains?: string[]
+  allowed_invite_domains?: string[]
+
+  // Content Scanning
+  content_scanning_enabled?: boolean
+  scan_patterns?: string[]
+  scan_action?: "warn" | "block"
+
+  // Classification
+  require_classification?: boolean
+  default_sensitivity?: "public" | "internal" | "confidential" | "restricted"
+}
+
+export interface EncryptionSettings {
+  // Per-org toggle: when true + master key configured, new uploads are encrypted
+  file_encryption_enabled?: boolean
+  // Timestamp of when encryption was first enabled
+  enabled_at?: string
+  // Email of the user who enabled it
+  enabled_by?: string
+}
+
+export interface ComplianceSettings {
+  data_retention_days?: number       // 0 = indefinite, else 30/60/90/180/365
+  dpa_accepted?: boolean             // GDPR Data Processing Agreement
+  dpa_accepted_at?: string
+  dpa_accepted_by?: string
+  data_residency_region?: string     // "on-premise", "us-east", "eu-west"
+  hipaa_baa_signed?: boolean         // HIPAA Business Associate Agreement
+  hipaa_baa_signed_at?: string
+  hipaa_baa_signed_by?: string
+}
+
 export interface OrganizationSettings {
   allow_public_pads?: boolean
   max_members?: number
@@ -31,6 +73,9 @@ export interface OrganizationSettings {
     organization_display_name?: string
     favicon_url?: string
   }
+  dlp?: DLPSettings
+  encryption?: EncryptionSettings
+  compliance?: ComplianceSettings
 }
 
 export interface OrganizationMember {

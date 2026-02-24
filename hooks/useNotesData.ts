@@ -77,7 +77,10 @@ async function updateNote(noteId: string, updates: Record<string, unknown>) {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(updates),
   })
-  if (!res.ok) throw new Error('Failed to update note')
+  if (!res.ok) {
+    const errorData = await res.json().catch(() => ({}))
+    throw new Error(errorData.error || 'Failed to update note')
+  }
   return res.json()
 }
 

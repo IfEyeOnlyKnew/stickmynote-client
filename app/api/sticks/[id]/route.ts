@@ -4,6 +4,7 @@ import { validateUUID } from "@/lib/input-validation-enhanced"
 import { applyRateLimit } from "@/lib/rate-limiter-enhanced"
 import { getCachedAuthUser, createRateLimitResponse, createUnauthorizedResponse } from "@/lib/auth/cached-auth"
 import { getOrgContext } from "@/lib/auth/get-org-context"
+import { isUnderLegalHold } from "@/lib/legal-hold/check-hold"
 
 async function safeRateLimit(request: NextRequest, userId: string, action: string) {
   try {
@@ -82,6 +83,10 @@ export async function DELETE(request: NextRequest, context: { params: Promise<{ 
 
     if (!isStickOwner && !isPadOwner && !isPadAdmin) {
       return NextResponse.json({ error: "Permission denied" }, { status: 403 })
+    }
+
+    if (await isUnderLegalHold(user.id, orgContext.orgId)) {
+      return NextResponse.json({ error: "Content cannot be deleted: active legal hold" }, { status: 403 })
     }
 
     const { error } = await db.from("paks_pad_sticks").delete().eq("id", stickId).eq("org_id", orgContext.orgId)

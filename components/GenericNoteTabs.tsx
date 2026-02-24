@@ -223,6 +223,7 @@ export function GenericNoteTabs({
             onFileSelect={fileUpload.handleFileSelect}
             onUploadPersonalImage={() => fileUpload.handleUploadPersonalImage(images)}
             onDeleteImage={imageManagement.handleDeleteImage}
+            onPasteImage={(file) => fileUpload.handlePasteImage(file, images)}
           />
         </TabsContent>
 

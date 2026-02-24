@@ -23,6 +23,9 @@ import {
   Terminal,
   KeyRound,
   ScrollText,
+  ShieldAlert,
+  Lock,
+  ClipboardCheck,
 } from "lucide-react"
 import { useUser } from "@/contexts/user-context"
 import { useOrganization } from "@/contexts/organization-context"
@@ -42,6 +45,9 @@ import {
   AccountTab,
   SSOTab,
   AuditLogTab,
+  DLPTab,
+  EncryptionTab,
+  ComplianceTab,
 } from "./_components"
 import { ComplianceDashboard } from "@/components/auth/ComplianceDashboard"
 
@@ -848,7 +854,7 @@ function OrganizationSettingsPage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <div className="container mx-auto px-4 py-8 max-w-4xl">
+      <div className="container mx-auto px-4 py-8 max-w-6xl">
         <BreadcrumbNav
           items={[
             { label: "Dashboard", href: "/dashboard" },
@@ -870,71 +876,98 @@ function OrganizationSettingsPage() {
           <h1 className="text-3xl font-bold text-gray-900">Organization Settings</h1>
           <p className="text-gray-600 mt-1">Manage your organization, members, and permissions</p>
         </div>
-        <Tabs defaultValue="general" className="space-y-6">
-          <TabsList>
-            <TabsTrigger value="general" className="flex items-center gap-2">
+        <Tabs defaultValue="general" orientation="vertical" className="flex gap-6">
+          <TabsList className="flex flex-col h-auto w-56 shrink-0 items-stretch bg-white border rounded-lg shadow-sm p-2 sticky top-8 self-start">
+            <TabsTrigger value="general" className="justify-start gap-2 px-3 py-2 text-sm rounded-md data-[state=active]:bg-gray-100 data-[state=active]:shadow-none">
               <Settings className="h-4 w-4" />
               General
             </TabsTrigger>
             {!isPersonalOrg && (
-              <TabsTrigger value="branding" className="flex items-center gap-2">
+              <TabsTrigger value="branding" className="justify-start gap-2 px-3 py-2 text-sm rounded-md data-[state=active]:bg-gray-100 data-[state=active]:shadow-none">
                 <Palette className="h-4 w-4" />
                 Branding
               </TabsTrigger>
             )}
-            <TabsTrigger value="members" className="flex items-center gap-2">
+            <TabsTrigger value="members" className="justify-start gap-2 px-3 py-2 text-sm rounded-md data-[state=active]:bg-gray-100 data-[state=active]:shadow-none">
               <Users className="h-4 w-4" />
               Members ({members.length})
             </TabsTrigger>
             {isOwner && !isPersonalOrg && (
-              <TabsTrigger value="org-settings" className="flex items-center gap-2">
+              <TabsTrigger value="org-settings" className="justify-start gap-2 px-3 py-2 text-sm rounded-md data-[state=active]:bg-gray-100 data-[state=active]:shadow-none">
                 <Sparkles className="h-4 w-4" />
                 Org Settings
               </TabsTrigger>
             )}
             {isOwner && !isPersonalOrg && (
-              <TabsTrigger value="account" className="flex items-center gap-2">
+              <TabsTrigger value="account" className="justify-start gap-2 px-3 py-2 text-sm rounded-md data-[state=active]:bg-gray-100 data-[state=active]:shadow-none">
                 <User className="h-4 w-4" />
                 Account
               </TabsTrigger>
             )}
             {isOwner && !isPersonalOrg && (
-              <TabsTrigger value="contacts" className="flex items-center gap-2">
+              <TabsTrigger value="contacts" className="justify-start gap-2 px-3 py-2 text-sm rounded-md data-[state=active]:bg-gray-100 data-[state=active]:shadow-none">
                 <Phone className="h-4 w-4" />
-                Support Contacts
+                Contacts
               </TabsTrigger>
             )}
             {canManage && !isPersonalOrg && accessRequests.length > 0 && (
-              <TabsTrigger value="requests" className="flex items-center gap-2">
+              <TabsTrigger value="requests" className="justify-start gap-2 px-3 py-2 text-sm rounded-md data-[state=active]:bg-gray-100 data-[state=active]:shadow-none">
                 <UserPlus className="h-4 w-4" />
                 Requests ({accessRequests.length})
               </TabsTrigger>
             )}
             {isOwner && !isPersonalOrg && (
-              <TabsTrigger value="automation" className="flex items-center gap-2">
+              <TabsTrigger value="automation" className="justify-start gap-2 px-3 py-2 text-sm rounded-md data-[state=active]:bg-gray-100 data-[state=active]:shadow-none">
                 <Terminal className="h-4 w-4" />
                 Automation
               </TabsTrigger>
             )}
+
+            {/* Security section divider */}
+            {!isPersonalOrg && (
+              <div className="border-t my-2 mx-1" />
+            )}
+
             {(isOwner || currentOrgRole === "admin") && !isPersonalOrg && (
-              <TabsTrigger value="2fa-compliance" className="flex items-center gap-2">
+              <TabsTrigger value="2fa-compliance" className="justify-start gap-2 px-3 py-2 text-sm rounded-md data-[state=active]:bg-gray-100 data-[state=active]:shadow-none">
                 <ShieldCheck className="h-4 w-4" />
                 2FA Compliance
               </TabsTrigger>
             )}
             {isOwner && !isPersonalOrg && (
-              <TabsTrigger value="sso" className="flex items-center gap-2">
+              <TabsTrigger value="sso" className="justify-start gap-2 px-3 py-2 text-sm rounded-md data-[state=active]:bg-gray-100 data-[state=active]:shadow-none">
                 <KeyRound className="h-4 w-4" />
                 SSO
               </TabsTrigger>
             )}
             {(isOwner || currentOrgRole === "admin") && !isPersonalOrg && (
-              <TabsTrigger value="audit-log" className="flex items-center gap-2">
+              <TabsTrigger value="audit-log" className="justify-start gap-2 px-3 py-2 text-sm rounded-md data-[state=active]:bg-gray-100 data-[state=active]:shadow-none">
                 <ScrollText className="h-4 w-4" />
                 Audit Log
               </TabsTrigger>
             )}
+            {isOwner && !isPersonalOrg && (
+              <TabsTrigger value="dlp" className="justify-start gap-2 px-3 py-2 text-sm rounded-md data-[state=active]:bg-gray-100 data-[state=active]:shadow-none">
+                <ShieldAlert className="h-4 w-4" />
+                DLP
+              </TabsTrigger>
+            )}
+            {isOwner && !isPersonalOrg && (
+              <TabsTrigger value="encryption" className="justify-start gap-2 px-3 py-2 text-sm rounded-md data-[state=active]:bg-gray-100 data-[state=active]:shadow-none">
+                <Lock className="h-4 w-4" />
+                Encryption
+              </TabsTrigger>
+            )}
+            {isOwner && !isPersonalOrg && (
+              <TabsTrigger value="compliance" className="justify-start gap-2 px-3 py-2 text-sm rounded-md data-[state=active]:bg-gray-100 data-[state=active]:shadow-none">
+                <ClipboardCheck className="h-4 w-4" />
+                Compliance
+              </TabsTrigger>
+            )}
           </TabsList>
+
+          {/* Content Area */}
+          <div className="flex-1 min-w-0">
 
           {/* General Settings */}
           <TabsContent value="general">
@@ -1106,6 +1139,28 @@ function OrganizationSettingsPage() {
               <AuditLogTab currentOrgId={currentOrg.id} />
             </TabsContent>
           )}
+
+          {/* DLP Tab */}
+          {isOwner && !isPersonalOrg && currentOrg && (
+            <TabsContent value="dlp">
+              <DLPTab currentOrgId={currentOrg.id} />
+            </TabsContent>
+          )}
+
+          {/* Encryption Tab */}
+          {isOwner && !isPersonalOrg && currentOrg && (
+            <TabsContent value="encryption">
+              <EncryptionTab currentOrgId={currentOrg.id} />
+            </TabsContent>
+          )}
+
+          {/* Compliance Tab */}
+          {isOwner && !isPersonalOrg && currentOrg && (
+            <TabsContent value="compliance">
+              <ComplianceTab currentOrgId={currentOrg.id} />
+            </TabsContent>
+          )}
+          </div>
         </Tabs>
       </div>
     </div>

@@ -3,6 +3,8 @@ import { getSession } from "@/lib/auth/local-auth"
 import { db } from "@/lib/database/pg-client"
 import { validateUUID } from "@/lib/input-validation-enhanced"
 import { sanitizeRequestBody } from "@/lib/html-sanitizer"
+import { checkDLPPolicy } from "@/lib/dlp/policy-checker"
+import { isUnderLegalHold } from "@/lib/legal-hold/check-hold"
 
 export const runtime = "nodejs"
 export const dynamic = "force-dynamic"
@@ -124,6 +126,27 @@ export async function PUT(request: NextRequest, context: { params: Promise<{ id:
     const body = await request.json()
     const sanitizedBody = sanitizeRequestBody(body, ["topic", "content"])
 
+    // DLP check when sharing a note
+    if (sanitizedBody.is_shared === true) {
+      const noteForDLP = await db.query(
+        `SELECT org_id, topic, content, sensitivity_level FROM personal_sticks WHERE id = $1 AND user_id = $2`,
+        [noteId, session.user.id],
+      )
+      if (noteForDLP.rows.length > 0) {
+        const note = noteForDLP.rows[0]
+        const dlpResult = await checkDLPPolicy({
+          orgId: note.org_id,
+          action: "share_note",
+          userId: session.user.id,
+          content: `${note.topic || ""} ${note.content || ""} ${sanitizedBody.topic || ""} ${sanitizedBody.content || ""}`,
+          sensitivityLevel: note.sensitivity_level,
+        })
+        if (!dlpResult.allowed) {
+          return NextResponse.json({ error: dlpResult.reason }, { status: 403 })
+        }
+      }
+    }
+
     const now = new Date().toISOString()
 
     const result = await db.query(
@@ -185,6 +208,27 @@ export async function PATCH(request: NextRequest, context: { params: Promise<{ i
     const body = await request.json()
     const sanitizedBody = sanitizeRequestBody(body, ["topic", "content"])
 
+    // DLP check when sharing a note
+    if (sanitizedBody.is_shared === true) {
+      const noteForDLP = await db.query(
+        `SELECT org_id, topic, content, sensitivity_level FROM personal_sticks WHERE id = $1 AND user_id = $2`,
+        [noteId, session.user.id],
+      )
+      if (noteForDLP.rows.length > 0) {
+        const note = noteForDLP.rows[0]
+        const dlpResult = await checkDLPPolicy({
+          orgId: note.org_id,
+          action: "share_note",
+          userId: session.user.id,
+          content: `${note.topic || ""} ${note.content || ""} ${sanitizedBody.topic || ""} ${sanitizedBody.content || ""}`,
+          sensitivityLevel: note.sensitivity_level,
+        })
+        if (!dlpResult.allowed) {
+          return NextResponse.json({ error: dlpResult.reason }, { status: 403 })
+        }
+      }
+    }
+
     const now = new Date().toISOString()
 
     const result = await db.query(
@@ -240,6 +284,10 @@ export async function DELETE(request: NextRequest, context: { params: Promise<{ 
     const noteId = params.id
     if (!validateUUID(noteId)) {
       return NextResponse.json({ error: "Invalid note ID" }, { status: 400 })
+    }
+
+    if (await isUnderLegalHold(session.user.id)) {
+      return NextResponse.json({ error: "Content cannot be deleted: active legal hold" }, { status: 403 })
     }
 
     const result = await db.query(

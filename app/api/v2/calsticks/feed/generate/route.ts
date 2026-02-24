@@ -4,6 +4,8 @@ import { db } from '@/lib/database/pg-client'
 import { getCachedAuthUser } from '@/lib/auth/cached-auth'
 import { handleApiError } from '@/lib/api/handle-api-error'
 import { randomBytes } from 'crypto'
+import { getOrgContext } from '@/lib/auth/get-org-context'
+import { checkDLPPolicy } from '@/lib/dlp/policy-checker'
 
 export const dynamic = 'force-dynamic'
 
@@ -21,6 +23,19 @@ export async function POST(request: NextRequest) {
       return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401 })
     }
     const user = authResult.user
+
+    // DLP check for iCal feed generation
+    const orgContext = await getOrgContext()
+    if (orgContext) {
+      const dlpResult = await checkDLPPolicy({
+        orgId: orgContext.orgId,
+        action: 'generate_ical',
+        userId: user.id,
+      })
+      if (!dlpResult.allowed) {
+        return new Response(JSON.stringify({ error: dlpResult.reason }), { status: 403 })
+      }
+    }
 
     // Generate a secure random token
     const token = randomBytes(32).toString('hex')

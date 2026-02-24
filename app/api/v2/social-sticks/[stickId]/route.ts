@@ -4,6 +4,7 @@ import { db } from '@/lib/database/pg-client'
 import { getCachedAuthUser } from '@/lib/auth/cached-auth'
 import { getOrgContext } from '@/lib/auth/get-org-context'
 import { handleApiError } from '@/lib/api/handle-api-error'
+import { isUnderLegalHold } from '@/lib/legal-hold/check-hold'
 
 export const dynamic = 'force-dynamic'
 
@@ -224,6 +225,10 @@ export async function DELETE(
     // Only stick creator or pad owner can delete
     if (stick.user_id !== user.id && stick.pad_owner_id !== user.id) {
       return new Response(JSON.stringify({ error: 'Permission denied' }), { status: 403 })
+    }
+
+    if (await isUnderLegalHold(user.id, orgContext.orgId)) {
+      return new Response(JSON.stringify({ error: 'Content cannot be deleted: active legal hold' }), { status: 403 })
     }
 
     await db.query(

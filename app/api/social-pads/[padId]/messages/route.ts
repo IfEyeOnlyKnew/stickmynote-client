@@ -1,6 +1,7 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { createServiceDatabaseClient } from "@/lib/database/database-adapter"
 import { getCachedAuthUser, createRateLimitResponse, createUnauthorizedResponse } from "@/lib/auth/cached-auth"
+import { isUnderLegalHold } from "@/lib/legal-hold/check-hold"
 import { generateChatResponse } from "@/lib/ai/chat-ai-responder"
 import { padChatCache, type CachedSettings, type CachedUserInfo } from "@/lib/cache/pad-chat-cache"
 
@@ -604,6 +605,10 @@ export async function DELETE(
     // Parse query params for options
     const { searchParams } = new URL(request.url)
     const keepPinned = searchParams.get("keepPinned") === "true"
+
+    if (await isUnderLegalHold(authResult.user.id)) {
+      return NextResponse.json({ error: "Content cannot be deleted: active legal hold" }, { status: 403 })
+    }
 
     // Delete messages (optionally keep pinned)
     let deleteQuery = db

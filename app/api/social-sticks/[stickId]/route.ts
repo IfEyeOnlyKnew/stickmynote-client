@@ -2,6 +2,7 @@ import { createDatabaseClient, createServiceDatabaseClient } from "@/lib/databas
 import { NextResponse } from "next/server"
 import { getOrgContext, type OrgContext } from "@/lib/auth/get-org-context"
 import { getCachedAuthUser, createRateLimitResponse, createUnauthorizedResponse } from "@/lib/auth/cached-auth"
+import { isUnderLegalHold } from "@/lib/legal-hold/check-hold"
 
 // ============================================================================
 // Types
@@ -370,6 +371,10 @@ export async function DELETE(request: Request, { params }: { params: Promise<{ s
     const { padOwnerId } = extractPadInfo(stick as StickWithPad)
     if (!canDeleteStick(stick as StickWithPad, user.id, padOwnerId)) {
       return Errors.permissionDenied()
+    }
+
+    if (await isUnderLegalHold(user.id, orgContext.orgId)) {
+      return NextResponse.json({ error: "Content cannot be deleted: active legal hold" }, { status: 403 })
     }
 
     // Delete stick

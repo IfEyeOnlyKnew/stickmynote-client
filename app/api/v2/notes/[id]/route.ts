@@ -3,6 +3,8 @@ import { type NextRequest } from 'next/server'
 import { db } from '@/lib/database/pg-client'
 import { getCachedAuthUser } from '@/lib/auth/cached-auth'
 import { handleApiError } from '@/lib/api/handle-api-error'
+import { checkDLPPolicy } from '@/lib/dlp/policy-checker'
+import { isUnderLegalHold } from '@/lib/legal-hold/check-hold'
 
 export const dynamic = 'force-dynamic'
 
@@ -117,6 +119,27 @@ export async function PUT(
 
     const body = await request.json()
 
+    // DLP check when sharing a note
+    if (body.is_shared === true) {
+      const noteForDLP = await db.query(
+        `SELECT org_id, topic, content, sensitivity_level FROM personal_sticks WHERE id = $1 AND user_id = $2`,
+        [noteId, user.id],
+      )
+      if (noteForDLP.rows.length > 0) {
+        const note = noteForDLP.rows[0]
+        const dlpResult = await checkDLPPolicy({
+          orgId: note.org_id,
+          action: 'share_note',
+          userId: user.id,
+          content: `${note.topic || ''} ${note.content || ''} ${body.topic || ''} ${body.content || ''}`,
+          sensitivityLevel: note.sensitivity_level,
+        })
+        if (!dlpResult.allowed) {
+          return new Response(JSON.stringify({ error: dlpResult.reason }), { status: 403 })
+        }
+      }
+    }
+
     const result = await db.query(
       `UPDATE personal_sticks SET
         title = COALESCE($1, title),
@@ -174,6 +197,27 @@ export async function PATCH(
 
     const body = await request.json()
 
+    // DLP check when sharing a note
+    if (body.is_shared === true) {
+      const noteForDLP = await db.query(
+        `SELECT org_id, topic, content, sensitivity_level FROM personal_sticks WHERE id = $1 AND user_id = $2`,
+        [noteId, user.id],
+      )
+      if (noteForDLP.rows.length > 0) {
+        const note = noteForDLP.rows[0]
+        const dlpResult = await checkDLPPolicy({
+          orgId: note.org_id,
+          action: 'share_note',
+          userId: user.id,
+          content: `${note.topic || ''} ${note.content || ''} ${body.topic || ''} ${body.content || ''}`,
+          sensitivityLevel: note.sensitivity_level,
+        })
+        if (!dlpResult.allowed) {
+          return new Response(JSON.stringify({ error: dlpResult.reason }), { status: 403 })
+        }
+      }
+    }
+
     const result = await db.query(
       `UPDATE personal_sticks SET
         title = COALESCE($1, title),
@@ -228,6 +272,10 @@ export async function DELETE(
       return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401 })
     }
     const user = authResult.user
+
+    if (await isUnderLegalHold(user.id)) {
+      return new Response(JSON.stringify({ error: 'Content cannot be deleted: active legal hold' }), { status: 403 })
+    }
 
     const result = await db.query(
       `DELETE FROM personal_sticks WHERE id = $1 AND user_id = $2 RETURNING id`,

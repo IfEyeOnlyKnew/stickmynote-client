@@ -564,35 +564,73 @@ Goal: Surpass Microsoft's suite by providing a unified, intelligent, and
                      SSO provider CRUD, org settings, member add/remove/role change,
                      lockout cleared. Alerts and compliance reports deferred.
 
-[  ] 8.3 DATA LOSS PREVENTION (DLP)
-     - Sensitive data detection
-     - Sharing restrictions
-     - External sharing controls
-     - Classification labels
-     - Policy enforcement
-     Status: MISSING
+[✓ ] 8.3 DATA LOSS PREVENTION (DLP)
+     - Sensitive data detection (PII scanner)       [DONE] (SSN, credit cards, phone, API keys, IPs)
+     - Sharing restrictions                         [DONE] (block community sharing, public pads, iCal feeds)
+     - External sharing controls                    [DONE] (block webhooks, video invites, domain whitelists)
+     - Classification labels                        [DONE] (public/internal/confidential/restricted)
+     - Policy enforcement                           [DONE] (server-side 403 blocks on all egress routes)
+     - Content scanning with warn/block modes       [DONE]
+     - DLP audit trail integration                  [DONE] (8 DLP event types logged)
+     - Owner DLP settings tab                       [DONE] (Org Settings > DLP tab)
+     - Client-side error messages for blocked actions [DONE]
+     Status: MOSTLY COMPLETE (all core controls implemented)
+     Updated: 2026-02-17
+     Note: Requires migration script 37-add-sensitivity-columns.sql to be run.
+           DLP is opt-in per org — no settings configured = everything allowed.
 
-[  ] 8.4 ENCRYPTION AT REST
-     - Database encryption
-     - File storage encryption
-     - Key management
-     - Customer-managed keys (BYOK)
-     Status: NEEDS VERIFICATION
+[✓ ] 8.4 ENCRYPTION AT REST
+     - AES-256-GCM file encryption (per-org keys)       [DONE]
+     - PBKDF2 key derivation (100k iterations)           [DONE]
+     - Encryption settings UI in Org Settings             [DONE]
+     - Per-org file encryption toggle                     [DONE]
+     - Authenticated image serving proxy                  [DONE]
+     - 2FA secrets encrypted at rest                      [DONE]
+     - SSO client secrets encrypted at rest               [DONE]
+     - Key generation script                              [DONE]
+     - Encryption status API                              [DONE]
+     - Customer-managed keys (BYOK)                       [NOT IMPLEMENTED - future]
+     - Key rotation UI                                    [NOT IMPLEMENTED - manual only]
+     - Database column-level encryption                   [Managed by PostgreSQL TDE]
+     Status: MOSTLY COMPLETE (file + secret encryption, settings UI, key management info)
+     Updated: 2026-02-19
+     Note: Requires ENCRYPTION_MASTER_KEY in server env. Avatars/branding
+           are not encrypted (public by design). Existing unencrypted files
+           remain accessible. BYOK and key rotation deferred.
 
-[  ] 8.5 COMPLIANCE CERTIFICATIONS
-     - SOC 2 Type II
-     - ISO 27001
-     - GDPR compliance
-     - HIPAA readiness
-     - Data residency options
-     Status: NEEDS ASSESSMENT
+[✓ ] 8.5 COMPLIANCE CERTIFICATIONS
+     - SOC 2 Type II readiness dashboard              [DONE]
+     - ISO 27001 readiness dashboard                   [DONE]
+     - GDPR compliance (DPA, data retention, export)   [DONE]
+     - HIPAA readiness (BAA tracking)                  [DONE]
+     - Data residency options                          [DONE]
+     - Auto-detection of existing controls             [DONE]
+     - Framework-by-framework pass/fail checklist      [DONE]
+     - Compliance settings (DPA, BAA, retention)       [DONE]
+     - Actual certification audits                     [NOT IMPLEMENTED - organizational process]
+     Status: MOSTLY COMPLETE (readiness dashboard, settings, auto-detection all working)
+     Updated: 2026-02-20
+     Note: Compliance tab in Org Settings shows readiness % per framework.
+           Auto-detects SSO, 2FA, encryption, DLP, audit logging status.
+           GDPR: DPA toggle, data retention policy, built-in export/deletion.
+           HIPAA: BAA toggle, control checklist. Actual certifications
+           require organizational audits beyond software scope.
 
-[  ] 8.6 INFORMATION BARRIERS
-     - Team isolation policies
-     - Cross-team communication blocks
-     - Legal hold support
-     - eDiscovery export
-     Status: MISSING
+[✓ ] 8.6 INFORMATION BARRIERS (PARTIAL)
+     - [SKIP] Team isolation policies (cross-cutting, touches every API route)
+     - [SKIP] Cross-team communication blocks (same reason)
+     - [DONE] Legal hold support
+       * legal_holds table (migration 38)
+       * isUnderLegalHold() check in 11 DELETE routes
+       * Create/release holds via API (owner only)
+       * Compliance tab: create holds, view active/released, release
+       * Audit logging: legal_hold.created, legal_hold.released
+     - [DONE] eDiscovery export
+       * Admin-level cross-user data export (8 tables, max 10K rows each)
+       * Date range filtering, JSON download
+       * Compliance tab: member picker, date range, export button
+       * Audit logging: ediscovery.export
+     Status: PARTIALLY COMPLETE (legal hold + eDiscovery done)
 
 [X ] 8.7 TWO-FACTOR AUTHENTICATION (2FA)
      - TOTP support (Google Auth, Authy)         [DONE]
@@ -747,13 +785,13 @@ MEDIUM-TERM (6-12 months) - Market leadership:
 [ ] 4.4 Recognition & Praise - Culture/engagement
 [ ] 5.2 Meeting Intelligence - AI differentiation
 [ ] 7.2 Google Workspace Integration - Market expansion
-[ ] 8.3 Data Loss Prevention - Enterprise security
+[✓] 8.3 Data Loss Prevention - DONE (2026-02-17)
 
 LONG-TERM (12+ months) - Vision features:
 ----------------------------------------------------------
 [ ] 5.5 Knowledge Graph - Unique differentiation
 [ ] 4.8 Sentiment Analysis - HR/culture value
-[ ] 8.6 Information Barriers - Regulated industries
+[~] 8.6 Information Barriers - Partial (legal hold + eDiscovery done)
 [ ] 7.4 Developer Platform/SDK - Ecosystem building
 [ ] 3.6 Audio Notes & Transcription - Premium feature
 
@@ -804,10 +842,10 @@ Enterprise:
 Total Features Identified: 78 major features across 10 categories
 
 By Status:
-- IMPLEMENTED: 7 features (9%) - 2.2, 2.5, 1.6, 10.2, 10.6, 8.1, 8.2
-- MISSING: 40 features (51%)
+- IMPLEMENTED: 10 features (13%) - 2.2, 2.5, 1.6, 10.2, 10.6, 8.1, 8.2, 8.3, 8.4, 8.5
+- MISSING: 39 features (50%)
 - PARTIAL: 27 features (35%)
-- NEEDS AUDIT/ASSESSMENT: 4 features (5%)
+- NEEDS AUDIT/ASSESSMENT: 3 features (4%)
 
 By Category:
 - Real-Time Communication: 7 features
@@ -824,11 +862,17 @@ By Category:
 ================================================================================
                               DOCUMENT VERSION
 ================================================================================
-Last Updated: 2026-02-16
+Last Updated: 2026-02-20
 Author: Claude Code Analysis
-Version: 1.2
+Version: 1.5
 
 Change Log:
+- 2026-02-20: Marked 8.5 Compliance Certifications as MOSTLY COMPLETE
+- 2026-02-20: Updated Summary Statistics (10 implemented features)
+- 2026-02-19: Marked 8.4 Encryption at Rest as MOSTLY COMPLETE
+- 2026-02-19: Updated Summary Statistics (9 implemented features)
+- 2026-02-17: Marked 8.3 Data Loss Prevention (DLP) as MOSTLY COMPLETE
+- 2026-02-17: Updated Priority Matrix and Summary Statistics
 - 2026-02-16: Marked 8.1 SSO (OIDC) as MOSTLY COMPLETE
 - 2026-02-16: Marked 8.2 Advanced Audit Logging as MOSTLY COMPLETE
 - 2026-02-16: Updated Priority Matrix and Summary Statistics

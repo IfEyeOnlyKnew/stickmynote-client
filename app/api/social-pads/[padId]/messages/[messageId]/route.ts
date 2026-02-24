@@ -1,6 +1,7 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { createServiceDatabaseClient } from "@/lib/database/database-adapter"
 import { getCachedAuthUser, createRateLimitResponse, createUnauthorizedResponse } from "@/lib/auth/cached-auth"
+import { isUnderLegalHold } from "@/lib/legal-hold/check-hold"
 
 export const dynamic = "force-dynamic"
 
@@ -78,6 +79,10 @@ export async function DELETE(
     const { allowed, isOwner, isModerator } = await canDeleteMessage(db, padId, messageId, userId)
     if (!allowed) {
       return NextResponse.json({ error: "Permission denied" }, { status: 403 })
+    }
+
+    if (await isUnderLegalHold(userId)) {
+      return NextResponse.json({ error: "Content cannot be deleted: active legal hold" }, { status: 403 })
     }
 
     // Soft delete by marking as deleted

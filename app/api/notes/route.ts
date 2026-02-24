@@ -6,6 +6,7 @@ import { APICache } from "@/lib/api-cache"
 import { getOrgContext } from "@/lib/auth/get-org-context"
 import { validateCSRFMiddleware } from "@/lib/csrf"
 import { getCachedAuthUser, createRateLimitResponse, createUnauthorizedResponse } from "@/lib/auth/cached-auth"
+import { checkDLPPolicy } from "@/lib/dlp/policy-checker"
 
 // ============================================================================
 // Types
@@ -586,6 +587,19 @@ const createNoteAction = createSafeAction(
       return error("No organization context", 403)
     }
 
+    // DLP check if note is being created as shared
+    if (input.is_shared) {
+      const dlpResult = await checkDLPPolicy({
+        orgId: orgContext.orgId,
+        action: "share_note",
+        userId: user.id,
+        content: `${input.topic || ""} ${input.content || ""}`,
+      })
+      if (!dlpResult.allowed) {
+        return error(dlpResult.reason || "Blocked by DLP policy", 403)
+      }
+    }
+
     const noteToCreate = createNotePayload(input, user.id, orgContext.orgId)
 
     const { data: note, error: dbError } = await db
@@ -676,6 +690,20 @@ const updateNoteAction = createSafeAction(
     }
 
     const { id, ...updateData } = input
+
+    // DLP check when sharing a note
+    if (updateData.is_shared === true) {
+      const dlpResult = await checkDLPPolicy({
+        orgId: orgContext.orgId,
+        action: "share_note",
+        userId: user.id,
+        content: `${updateData.topic || ""} ${updateData.content || ""}`,
+      })
+      if (!dlpResult.allowed) {
+        return error(dlpResult.reason || "Blocked by DLP policy", 403)
+      }
+    }
+
     const updatePayload = buildUpdatePayload(updateData)
 
     const { data: note, error: dbError } = await db

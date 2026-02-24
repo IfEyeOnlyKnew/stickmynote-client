@@ -3,6 +3,7 @@ import { NextResponse, type NextRequest } from "next/server"
 import { validateCSRFMiddleware } from "@/lib/csrf"
 import { getCachedAuthUser } from "@/lib/auth/cached-auth"
 import { clearSession } from "@/lib/auth/local-auth"
+import { isUnderLegalHold } from "@/lib/legal-hold/check-hold"
 
 export async function DELETE(request: NextRequest) {
   try {
@@ -25,6 +26,13 @@ export async function DELETE(request: NextRequest) {
     }
 
     const userId = authResult.user.id
+
+    if (await isUnderLegalHold(userId)) {
+      return NextResponse.json(
+        { error: "Account cannot be deleted: you are under an active legal hold" },
+        { status: 403 },
+      )
+    }
 
     // Delete user data in the correct order (respecting foreign key constraints)
 

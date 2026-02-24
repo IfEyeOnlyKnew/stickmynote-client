@@ -3,6 +3,10 @@ import { getCachedAuthUser } from "@/lib/auth/cached-auth"
 import { writeFile, mkdir } from "fs/promises"
 import { existsSync } from "fs"
 import path from "path"
+import { getOrgContext } from "@/lib/auth/get-org-context"
+import { encryptFileForOrg } from "@/lib/encryption"
+import { isOrgFileEncryptionEnabled } from "@/lib/encryption-settings"
+import { put } from "@/lib/storage/local-storage"
 
 const ALLOWED_TYPES = ["image/jpeg", "image/jpg", "image/png", "image/webp", "image/gif"]
 const MAX_FILE_SIZE = 5 * 1024 * 1024
@@ -108,7 +112,44 @@ export async function POST(request: NextRequest) {
 
     const filename = generateFilename(user.id, file.name)
 
-    // Save to local storage
+    // Check if org-level file encryption is enabled
+    let orgContext: Awaited<ReturnType<typeof getOrgContext>> | null = null
+    try {
+      orgContext = await getOrgContext()
+    } catch {
+      // Continue without encryption if org context unavailable
+    }
+
+    const shouldEncrypt =
+      orgContext && (await isOrgFileEncryptionEnabled(orgContext.orgId))
+
+    if (shouldEncrypt && orgContext) {
+      // Encrypt and store in non-public org-scoped directory
+      const arrBuf = new Uint8Array(optimizedBuffer).buffer as ArrayBuffer
+      const encrypted = await encryptFileForOrg(arrBuf, orgContext.orgId)
+      const orgFilename = filename
+      const orgPath = `orgs/${orgContext.orgId}/images/${orgFilename}`
+
+      await put(orgPath, Buffer.from(encrypted), {
+        contentType: `application/x-encrypted;original=${file.type}`,
+      })
+
+      const proxyUrl = `/api/serve-image?path=${encodeURIComponent(orgPath)}`
+
+      console.log(`[upload-image] Encrypted image saved: ${orgPath}`)
+
+      return NextResponse.json({
+        url: proxyUrl,
+        filename: orgPath,
+        size: optimizedBuffer.length,
+        originalSize: file.size,
+        type: file.type,
+        optimized: optimizedBuffer.length < file.size,
+        encrypted: true,
+      })
+    }
+
+    // Default: save unencrypted to public local storage
     const storage = await saveToLocalStorage(optimizedBuffer, user.id, filename, file.type)
 
     console.log(`[upload-image] Saved image to local storage: ${storage.url}`)

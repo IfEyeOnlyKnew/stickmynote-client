@@ -2,6 +2,7 @@ import { createDatabaseClient } from "@/lib/database/database-adapter"
 import { type NextRequest, NextResponse } from "next/server"
 import { getOrgContext } from "@/lib/auth/get-org-context"
 import { getCachedAuthUser } from "@/lib/auth/cached-auth"
+import { checkDLPPolicy } from "@/lib/dlp/policy-checker"
 
 export async function GET(request: NextRequest, { params }: { params: Promise<{ padId: string }> }) {
   try {
@@ -161,6 +162,18 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
 
     if (!pad || pad.owner_id !== user.id) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 403 })
+    }
+
+    // DLP check when making a pad public
+    if (is_public === true) {
+      const dlpResult = await checkDLPPolicy({
+        orgId: orgContext.orgId,
+        action: "make_pad_public",
+        userId: user.id,
+      })
+      if (!dlpResult.allowed) {
+        return NextResponse.json({ error: dlpResult.reason }, { status: 403 })
+      }
     }
 
     const { data: updatedPad, error } = await db

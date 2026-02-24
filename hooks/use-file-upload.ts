@@ -40,38 +40,73 @@ export function useFileUpload(
     }
   }
 
+  const uploadFile = async (file: File, existingImages: ImageItem[]) => {
+    const formData = new FormData()
+    formData.append("file", file)
+
+    const response = await fetch("/api/upload-image", {
+      method: "POST",
+      body: formData,
+    })
+
+    if (!response.ok) {
+      const errorData = await response.json()
+      throw new Error(errorData.error || "Upload failed")
+    }
+
+    const { url, size, type } = await response.json()
+
+    const newImage: ImageItem = {
+      id: `image_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+      url,
+      alt: file.name,
+      caption: "",
+      size,
+      format: type,
+    }
+
+    await baseHook.handleAdd(existingImages, newImage)
+  }
+
   const handleUploadPersonalImage = async (existingImages: ImageItem[]) => {
     if (!selectedFile || baseHook.isLoading) return
 
     try {
-      const formData = new FormData()
-      formData.append("file", selectedFile)
-
-      const response = await fetch("/api/upload-image", {
-        method: "POST",
-        body: formData,
-      })
-
-      if (!response.ok) {
-        const errorData = await response.json()
-        throw new Error(errorData.error || "Upload failed")
-      }
-
-      const { url, size, type } = await response.json()
-
-      const newImage: ImageItem = {
-        id: `image_${Date.now()}`,
-        url: url,
-        alt: selectedFile.name,
-        caption: "",
-        size: size,
-        format: type,
-      }
-
-      await baseHook.handleAdd(existingImages, newImage)
+      await uploadFile(selectedFile, existingImages)
       setSelectedFile(null)
     } catch (error: any) {
       baseHook.showError("Upload failed", error.message || "Failed to upload image.")
+    }
+  }
+
+  const handlePasteImage = async (file: File, existingImages: ImageItem[]) => {
+    console.log("[FileUpload] handlePasteImage called:", file.name, file.type, file.size, "isLoading:", baseHook.isLoading)
+
+    if (baseHook.isLoading) {
+      console.log("[FileUpload] Skipping paste - already loading")
+      return
+    }
+
+    if (!file.type.startsWith("image/")) {
+      console.log("[FileUpload] Skipping paste - not an image:", file.type)
+      baseHook.showError("Invalid File", "Pasted content is not an image.")
+      return
+    }
+
+    if (file.size > 5 * 1024 * 1024) {
+      console.log("[FileUpload] Skipping paste - file too large:", file.size)
+      baseHook.showError("File Too Large", "Image must be less than 5MB.")
+      return
+    }
+
+    try {
+      console.log("[FileUpload] Starting paste upload...")
+      await uploadFile(file, existingImages)
+      console.log("[FileUpload] Paste upload successful!")
+      baseHook.showSuccess("Image pasted", "Image uploaded and saved to this note.")
+    } catch (error: any) {
+      console.error("[FileUpload] Paste upload failed:", error)
+      baseHook.showError("Paste failed", error.message || "Failed to upload pasted image.")
     }
   }
 
@@ -80,5 +115,6 @@ export function useFileUpload(
     uploadingFile: baseHook.isLoading,
     handleFileSelect,
     handleUploadPersonalImage,
+    handlePasteImage,
   }
 }

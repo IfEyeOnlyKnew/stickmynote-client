@@ -4,6 +4,7 @@ import { db } from '@/lib/database/pg-client'
 import { getCachedAuthUser } from '@/lib/auth/cached-auth'
 import { getOrgContext } from '@/lib/auth/get-org-context'
 import { handleApiError } from '@/lib/api/handle-api-error'
+import { isUnderLegalHold } from '@/lib/legal-hold/check-hold'
 
 export const dynamic = 'force-dynamic'
 
@@ -197,6 +198,10 @@ export async function DELETE(
 
     if (padResult.rows.length === 0 || padResult.rows[0].owner_id !== user.id) {
       return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 403 })
+    }
+
+    if (await isUnderLegalHold(user.id, orgContext.orgId)) {
+      return new Response(JSON.stringify({ error: 'Content cannot be deleted: active legal hold' }), { status: 403 })
     }
 
     // Delete pad (cascade should handle members, sticks, etc.)

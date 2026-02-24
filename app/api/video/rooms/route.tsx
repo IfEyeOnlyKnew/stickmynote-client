@@ -1,5 +1,7 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { createDatabaseClient } from "@/lib/database/database-adapter"
+import { getOrgContext } from "@/lib/auth/get-org-context"
+import { checkDLPPolicy } from "@/lib/dlp/policy-checker"
 
 export const dynamic = "force-dynamic"
 
@@ -115,6 +117,24 @@ export async function POST(request: NextRequest) {
     if (dbError) {
       console.error("Database insert error:", dbError)
       throw dbError
+    }
+
+    // DLP check for external video invites
+    if (inviteEmails.length > 0) {
+      const orgContext = await getOrgContext()
+      if (orgContext) {
+        for (const email of inviteEmails) {
+          const dlpResult = await checkDLPPolicy({
+            orgId: orgContext.orgId,
+            action: "invite_external",
+            userId: user.id,
+            targetEmail: email,
+          })
+          if (!dlpResult.allowed) {
+            return NextResponse.json({ error: dlpResult.reason }, { status: 403 })
+          }
+        }
+      }
     }
 
     // Send invitation emails if provided
