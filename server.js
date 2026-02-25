@@ -8,6 +8,11 @@ const port = Number.parseInt(process.env.PORT || "80", 10)
 
 // Initialize Next.js app
 const app = next({ dev, hostname, port })
+// Prevent Next.js from registering its own upgrade handler on the server.
+// Next.js's setupWebSocketHandler() adds an upgrade listener that calls
+// handleRequestImpl with the socket as res, corrupting WebSocket connections.
+// We handle WebSocket upgrades ourselves in lib/ws/ws-server.js.
+app.didWebSocketSetup = true
 const handle = app.getRequestHandler()
 
 app.prepare().then(() => {
