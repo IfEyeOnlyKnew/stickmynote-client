@@ -1,5 +1,4 @@
 const { createServer } = require("http")
-const { parse } = require("url")
 const next = require("next")
 const { createWebSocketServer } = require("./lib/ws/ws-server")
 
@@ -14,8 +13,7 @@ const handle = app.getRequestHandler()
 app.prepare().then(() => {
   const server = createServer(async (req, res) => {
     try {
-      const parsedUrl = parse(req.url, true)
-      await handle(req, res, parsedUrl)
+      await handle(req, res)
     } catch (err) {
       console.error("Error occurred handling", req.url, err)
       res.statusCode = 500
