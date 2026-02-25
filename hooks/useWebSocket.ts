@@ -21,6 +21,10 @@ const globalListeners = new Set<() => void>()
 function getWsUrl(): string {
   if (typeof window === "undefined") return ""
   const protocol = window.location.protocol === "https:" ? "wss:" : "ws:"
+  const wsPort = process.env.NEXT_PUBLIC_WS_PORT
+  if (wsPort) {
+    return `${protocol}//${window.location.hostname}:${wsPort}/ws`
+  }
   return `${protocol}//${window.location.host}/ws`
 }
 

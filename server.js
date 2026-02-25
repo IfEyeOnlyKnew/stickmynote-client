@@ -21,8 +21,8 @@ app.prepare().then(() => {
     }
   })
 
-  // Attach WebSocket server for real-time push events
-  createWebSocketServer(server)
+  // Start WebSocket server on its own port (avoids upgrade event conflicts)
+  createWebSocketServer()
 
   server.listen(port, () => {
     console.log(`> Ready on http://${hostname}:${port}`)
