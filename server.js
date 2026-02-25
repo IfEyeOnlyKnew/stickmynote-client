@@ -21,8 +21,8 @@ app.prepare().then(() => {
     }
   })
 
-  // Start WebSocket server on its own port (avoids upgrade event conflicts)
-  createWebSocketServer()
+  // Attach WebSocket server to the main HTTP server
+  createWebSocketServer(server)
 
   server.listen(port, () => {
     console.log(`> Ready on http://${hostname}:${port}`)
