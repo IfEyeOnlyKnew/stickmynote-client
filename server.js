@@ -12,6 +12,8 @@ const handle = app.getRequestHandler()
 
 app.prepare().then(() => {
   const server = createServer(async (req, res) => {
+    // Skip WebSocket upgrade requests — handled by ws library via upgrade event
+    if (req.headers.upgrade) return
     try {
       await handle(req, res)
     } catch (err) {
