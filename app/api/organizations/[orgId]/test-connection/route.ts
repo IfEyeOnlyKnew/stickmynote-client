@@ -20,8 +20,8 @@ export async function POST(request: Request, { params }: { params: Promise<{ org
         return await testDatabaseConnection(config)
       case "smtp":
         return await testSmtpConnection(config)
-      case "redis":
-        return await testRedisConnection(config)
+      case "memcached":
+        return await testMemcachedConnection(config)
       default:
         return NextResponse.json({ error: "Invalid connection type" }, { status: 400 })
     }
@@ -86,28 +86,25 @@ async function testSmtpConnection(config: any) {
   }
 }
 
-async function testRedisConnection(config: any) {
+async function testMemcachedConnection(config: any) {
   try {
-    const { createClient } = await import("redis")
-    const client = createClient({
-      socket: {
-        host: config.redis_host,
-        port: config.redis_port,
-        connectTimeout: 5000,
-      },
-      password: config.redis_password || undefined,
-      database: config.redis_database,
+    const memjs = await import("memjs")
+    const servers = config.memcache_servers || `${config.memcached_host || "localhost"}:${config.memcached_port || 11211}`
+    const client = memjs.default.Client.create(servers, { timeout: 5 })
+
+    await new Promise<void>((resolve, reject) => {
+      client.stats((err) => {
+        if (err) reject(err)
+        else resolve()
+      })
     })
+    client.close()
 
-    await client.connect()
-    await client.ping()
-    await client.quit()
-
-    return NextResponse.json({ success: true, message: "Redis connection successful" })
+    return NextResponse.json({ success: true, message: "Memcached connection successful" })
   } catch (error) {
     return NextResponse.json({
       success: false,
-      error: error instanceof Error ? error.message : "Redis connection failed",
+      error: error instanceof Error ? error.message : "Memcached connection failed",
     })
   }
 }

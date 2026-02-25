@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback, useRef } from "react"
 import { useUser } from "@/contexts/user-context"
+import { useWebSocket } from "@/hooks/useWebSocket"
 
 export interface ActivityMetadata {
   stick_id?: string
@@ -69,10 +70,30 @@ export function useSocialActivityFeed() {
     [offset, user],
   )
 
+  // WebSocket subscription for real-time social activity updates
+  const { connected: wsConnected, subscribe } = useWebSocket()
+
+  useEffect(() => {
+    if (!wsConnected) return
+
+    const unsub = subscribe("social_activity.new", () => {
+      fetchActivities(true)
+    })
+
+    return unsub
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [wsConnected, subscribe])
+
+  // Initial fetch
   useEffect(() => {
     fetchActivities(true)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
-    // Poll every 30 seconds for new activities
+  // Polling fallback — only when WebSocket is disconnected
+  useEffect(() => {
+    if (wsConnected) return
+
     pollIntervalRef.current = setInterval(() => {
       fetchActivities(true)
     }, 30000)
@@ -83,7 +104,7 @@ export function useSocialActivityFeed() {
       }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  }, [wsConnected])
 
   const loadMore = () => {
     if (!loading && hasMore) {

@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect, useCallback, useRef } from "react"
+import { useWebSocket } from "@/hooks/useWebSocket"
 import type { NotificationWithUser } from "@/types/notifications"
 
 // ============================================================================
@@ -195,11 +196,39 @@ export function useNotifications() {
     }
   }, [])
 
-  // Setup polling for notifications instead of realtime subscription
+  // WebSocket subscription for real-time push
+  const { connected: wsConnected, subscribe } = useWebSocket()
+
+  useEffect(() => {
+    if (!wsConnected) return
+
+    const unsubs = [
+      subscribe("notification.new", () => {
+        fetchNotifications()
+      }),
+      subscribe("notification.read", (payload: { id: string }) => {
+        setState((prev) => ({
+          ...prev,
+          notifications: prev.notifications.map((n) =>
+            n.id === payload.id ? { ...n, read: true } : n
+          ),
+          unreadCount: Math.max(0, prev.unreadCount - 1),
+        }))
+      }),
+    ]
+
+    return () => unsubs.forEach((unsub) => unsub())
+  }, [wsConnected, subscribe, fetchNotifications])
+
+  // Initial fetch
   useEffect(() => {
     fetchNotifications()
+  }, [fetchNotifications])
 
-    // Poll every 30 seconds for new notifications
+  // Polling fallback — only when WebSocket is disconnected
+  useEffect(() => {
+    if (wsConnected) return
+
     pollIntervalRef.current = setInterval(() => {
       fetchNotifications()
     }, 30000)
@@ -209,7 +238,7 @@ export function useNotifications() {
         clearInterval(pollIntervalRef.current)
       }
     }
-  }, [fetchNotifications])
+  }, [wsConnected, fetchNotifications])
 
   return {
     notifications: state.notifications,

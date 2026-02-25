@@ -2,6 +2,7 @@ import { createDatabaseClient, createServiceDatabaseClient } from "@/lib/databas
 import { NextResponse } from "next/server"
 import { getOrgContext, type OrgContext } from "@/lib/auth/get-org-context"
 import { getCachedAuthUser, createRateLimitResponse, createUnauthorizedResponse } from "@/lib/auth/cached-auth"
+import { publishToOrg } from "@/lib/ws/publish-event"
 
 // ============================================================================
 // Types
@@ -351,6 +352,18 @@ export async function POST(request: Request, { params }: { params: Promise<{ sti
     // Fetch user data for response
     const serviceDb = await createServiceDatabaseClient()
     const userData = await fetchUserData(serviceDb, user.id)
+
+    // Broadcast real-time events to org
+    publishToOrg(orgContext.orgId, {
+      type: "social_activity.new",
+      payload: { stickId, replyId: reply.id, userId: user.id, activityType: "replied" },
+      timestamp: Date.now(),
+    })
+    publishToOrg(orgContext.orgId, {
+      type: "social_notification.new",
+      payload: { stickId, replyId: reply.id, userId: user.id, type: "stick_replied" },
+      timestamp: Date.now(),
+    })
 
     return NextResponse.json({
       reply: { ...reply, users: userData },

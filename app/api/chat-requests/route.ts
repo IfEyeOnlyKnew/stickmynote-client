@@ -3,6 +3,7 @@ import { createServiceDatabaseClient, type DatabaseClient } from "@/lib/database
 import { getCachedAuthUser, createRateLimitResponse, createUnauthorizedResponse } from "@/lib/auth/cached-auth"
 import { getOrgContext } from "@/lib/auth/get-org-context"
 import { validateCSRFMiddleware } from "@/lib/csrf"
+import { publishToUser } from "@/lib/ws/publish-event"
 import type { ChatRequest, ChatRequestStatus } from "@/types/chat-request"
 
 /**
@@ -309,6 +310,13 @@ export async function POST(request: NextRequest) {
 
     // Enrich with user data
     const enrichedRequest = await enrichRequestWithUsers(db, newRequest)
+
+    // Push real-time event to recipient
+    publishToUser(finalRecipientId, {
+      type: "chat_request.new",
+      payload: enrichedRequest,
+      timestamp: Date.now(),
+    })
 
     return NextResponse.json({ request: enrichedRequest }, { status: 201 })
   } catch (error) {

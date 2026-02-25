@@ -10,7 +10,7 @@ export async function getStickTabs(id: string): Promise<StickTab[]> {
     return (data.tabs || []).map((tab: any) => ({
       id: tab.id,
       stick_id: tab.stick_id || id,
-      tab_type: tab.tab_type,
+      tab_type: tab.tab_type === "video" ? "videos" : tab.tab_type,
       tab_data: tab.tab_data || {},
       created_at: tab.created_at,
       updated_at: tab.updated_at,

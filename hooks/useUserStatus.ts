@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback, useRef } from "react"
 import { useUser } from "@/contexts/user-context"
+import { useWebSocket } from "@/hooks/useWebSocket"
 import type {
   UserStatus,
   EffectiveUserStatus,
@@ -43,7 +44,21 @@ export function useUserStatus() {
     }
   }, [user])
 
-  // Initial fetch and polling
+  // WebSocket subscription for real-time status updates
+  const { connected: wsConnected, subscribe } = useWebSocket()
+
+  useEffect(() => {
+    if (!wsConnected || !user) return
+
+    const unsub = subscribe("status.update", (payload: any) => {
+      if (payload.status) setStatusState(payload.status)
+      if (payload.effective) setEffective(payload.effective)
+    })
+
+    return unsub
+  }, [wsConnected, subscribe, user])
+
+  // Initial fetch
   useEffect(() => {
     if (!user) {
       setStatusState(null)
@@ -51,10 +66,13 @@ export function useUserStatus() {
       setLoading(false)
       return
     }
-
     fetchStatus()
+  }, [user, fetchStatus])
 
-    // Poll for status updates (e.g., focus mode expiration)
+  // Polling fallback — only when WebSocket is disconnected
+  useEffect(() => {
+    if (wsConnected || !user) return
+
     intervalRef.current = setInterval(fetchStatus, STATUS_POLL_INTERVAL)
 
     return () => {
@@ -62,7 +80,7 @@ export function useUserStatus() {
         clearInterval(intervalRef.current)
       }
     }
-  }, [user, fetchStatus])
+  }, [wsConnected, user, fetchStatus])
 
   // Update status
   const updateStatus = useCallback(async (updates: UpdateStatusRequest): Promise<boolean> => {
@@ -198,34 +216,54 @@ export function useUserStatus() {
 export function useOtherUserStatus(userIds: string[]) {
   const [statuses, setStatuses] = useState<Record<string, EffectiveUserStatus>>({})
   const [loading, setLoading] = useState(false)
+  const { connected: wsConnected, subscribe } = useWebSocket()
+  const userIdsKey = userIds.join(",")
 
+  const fetchStatuses = async () => {
+    if (userIds.length === 0) return
+    setLoading(true)
+    try {
+      const response = await fetch(`/api/user/status?ids=${userIds.join(",")}`)
+      if (response.ok) {
+        const data = await response.json()
+        setStatuses(data.statuses || {})
+      }
+    } catch (error) {
+      console.error("[useOtherUserStatus] Fetch error:", error)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  // WebSocket subscription for real-time status updates from other users
+  useEffect(() => {
+    if (!wsConnected || userIds.length === 0) return
+
+    const unsub = subscribe("status.update", (payload: any) => {
+      if (payload.userId && userIds.includes(payload.userId) && payload.effective) {
+        setStatuses((prev) => ({ ...prev, [payload.userId]: payload.effective }))
+      }
+    })
+
+    return unsub
+  }, [wsConnected, subscribe, userIdsKey])
+
+  // Initial fetch
   useEffect(() => {
     if (userIds.length === 0) {
       setStatuses({})
       return
     }
-
-    const fetchStatuses = async () => {
-      setLoading(true)
-      try {
-        const response = await fetch(`/api/user/status?ids=${userIds.join(",")}`)
-        if (response.ok) {
-          const data = await response.json()
-          setStatuses(data.statuses || {})
-        }
-      } catch (error) {
-        console.error("[useOtherUserStatus] Fetch error:", error)
-      } finally {
-        setLoading(false)
-      }
-    }
-
     fetchStatuses()
+  }, [userIdsKey])
 
-    // Poll for updates
+  // Polling fallback — only when WebSocket is disconnected
+  useEffect(() => {
+    if (wsConnected || userIds.length === 0) return
+
     const interval = setInterval(fetchStatuses, STATUS_POLL_INTERVAL)
     return () => clearInterval(interval)
-  }, [userIds.join(",")])
+  }, [wsConnected, userIdsKey])
 
   return { statuses, loading }
 }

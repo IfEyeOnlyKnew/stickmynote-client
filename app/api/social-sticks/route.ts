@@ -3,6 +3,7 @@ import { NextResponse } from "next/server"
 import { APICache, withCache } from "@/lib/api-cache"
 import { getOrgContext } from "@/lib/auth/get-org-context"
 import { getCachedAuthUser, createRateLimitResponse, createUnauthorizedResponse } from "@/lib/auth/cached-auth"
+import { publishToOrg } from "@/lib/ws/publish-event"
 import type { OrgContext } from "@/lib/auth/get-org-context"
 
 // ============================================================================
@@ -609,6 +610,19 @@ export async function POST(request: Request) {
       APICache.invalidate(`social-sticks:userId=${user.id}:orgId=${orgContext.orgId}`),
       APICache.invalidate(`social-sticks:public=true`),
     ])
+
+    // Broadcast real-time events to org
+    const stickOrgId = pad?.org_id || orgContext.orgId
+    publishToOrg(stickOrgId, {
+      type: "social_activity.new",
+      payload: { stickId: stick?.id, userId: user.id, activityType: "created" },
+      timestamp: Date.now(),
+    })
+    publishToOrg(stickOrgId, {
+      type: "social_notification.new",
+      payload: { stickId: stick?.id, userId: user.id, type: "stick_created" },
+      timestamp: Date.now(),
+    })
 
     return NextResponse.json({ stick })
   } catch (error) {

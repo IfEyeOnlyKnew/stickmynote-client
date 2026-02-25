@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback, useRef } from "react"
 import { useUser } from "@/contexts/user-context"
+import { useWebSocket } from "@/hooks/useWebSocket"
 
 interface SocialNotification {
   id: string
@@ -86,10 +87,28 @@ export function useSocialNotifications() {
     fetchSubscriptions()
   }, [fetchSubscriptions])
 
+  // WebSocket subscription for real-time social notifications
+  const { connected: wsConnected, subscribe } = useWebSocket()
+
+  useEffect(() => {
+    if (!wsConnected) return
+
+    const unsub = subscribe("social_notification.new", () => {
+      fetchNotifications()
+    })
+
+    return unsub
+  }, [wsConnected, subscribe, fetchNotifications])
+
+  // Initial fetch
   useEffect(() => {
     fetchNotifications()
+  }, [fetchNotifications])
 
-    // Poll every 30 seconds for new notifications
+  // Polling fallback — only when WebSocket is disconnected
+  useEffect(() => {
+    if (wsConnected) return
+
     pollIntervalRef.current = setInterval(() => {
       fetchNotifications()
     }, 30000)
@@ -99,7 +118,7 @@ export function useSocialNotifications() {
         clearInterval(pollIntervalRef.current)
       }
     }
-  }, [fetchNotifications])
+  }, [wsConnected, fetchNotifications])
 
   const markAsRead = async (notificationId: string) => {
     try {

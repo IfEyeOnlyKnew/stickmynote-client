@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect, useCallback, useRef } from "react"
+import { useWebSocket } from "@/hooks/useWebSocket"
 import type { ChatRequest, ChatRequestStatus } from "@/types/chat-request"
 
 // ============================================================================
@@ -278,13 +279,53 @@ export function useChatRequests(options: UseChatRequestsOptions = {}): UseChatRe
     )
   }, [state.incomingRequests, state.outgoingRequests])
 
-  // Initial fetch and polling setup
+  // WebSocket subscription — real-time push events
+  const { connected: wsConnected, subscribe } = useWebSocket()
+
+  useEffect(() => {
+    if (!wsConnected) return
+
+    const unsubs = [
+      subscribe("chat_request.new", (payload: ChatRequest) => {
+        // New incoming request
+        setState((prev) => {
+          if (prev.incomingRequests.some((r) => r.id === payload.id)) return prev
+          return { ...prev, incomingRequests: [payload, ...prev.incomingRequests] }
+        })
+        onNewRequest?.(payload)
+      }),
+      subscribe("chat_request.updated", (payload: ChatRequest) => {
+        // Outgoing request was responded to
+        setState((prev) => ({
+          ...prev,
+          outgoingRequests: prev.outgoingRequests.map((r) =>
+            r.id === payload.id ? payload : r
+          ),
+        }))
+        onRequestStatusChange?.(payload)
+      }),
+      subscribe("chat_request.cancelled", (payload: { id: string }) => {
+        // An incoming request was cancelled by requester
+        setState((prev) => ({
+          ...prev,
+          incomingRequests: prev.incomingRequests.filter((r) => r.id !== payload.id),
+        }))
+      }),
+    ]
+
+    return () => unsubs.forEach((unsub) => unsub())
+  }, [wsConnected, subscribe, onNewRequest, onRequestStatusChange])
+
+  // Initial fetch always runs once
   useEffect(() => {
     refreshRequests()
+  }, [refreshRequests])
 
-    if (enablePolling) {
-      pollIntervalRef.current = setInterval(refreshRequests, pollingInterval)
-    }
+  // Polling fallback — only when WebSocket is disconnected
+  useEffect(() => {
+    if (wsConnected || !enablePolling) return
+
+    pollIntervalRef.current = setInterval(refreshRequests, pollingInterval)
 
     return () => {
       if (pollIntervalRef.current) {
@@ -292,7 +333,7 @@ export function useChatRequests(options: UseChatRequestsOptions = {}): UseChatRe
         pollIntervalRef.current = null
       }
     }
-  }, [enablePolling, pollingInterval, refreshRequests])
+  }, [wsConnected, enablePolling, pollingInterval, refreshRequests])
 
   return {
     incomingRequests: state.incomingRequests,

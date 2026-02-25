@@ -78,7 +78,10 @@ export function UnifiedTabs({
         const response = await fetch(`${config.apiEndpoint}/${entityId}/tabs`)
         if (response.ok) {
           const data = await response.json()
-          setTabs(data.tabs || [])
+          setTabs((data.tabs || []).map((tab: any) => ({
+            ...tab,
+            tab_type: tab.tab_type === "video" ? "videos" : tab.tab_type,
+          })))
         }
       } catch (error) {
         console.error("Error loading tabs:", error)

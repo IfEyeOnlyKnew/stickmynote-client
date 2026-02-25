@@ -2,6 +2,7 @@ import { createDatabaseClient } from "@/lib/database/database-adapter"
 import { NextResponse } from "next/server"
 import { getOrgContext } from "@/lib/auth/get-org-context"
 import { getCachedAuthUser } from "@/lib/auth/cached-auth"
+import { publishToUser } from "@/lib/ws/publish-event"
 
 // GET /api/notifications - Fetch user notifications
 export async function GET(request: Request) {
@@ -109,6 +110,13 @@ export async function POST(request: Request) {
       console.error("Error creating notification:", error)
       return NextResponse.json({ error: "Failed to create notification" }, { status: 500 })
     }
+
+    // Push real-time event to the notification recipient
+    publishToUser(user_id, {
+      type: "notification.new",
+      payload: data,
+      timestamp: Date.now(),
+    })
 
     return NextResponse.json({ notification: data })
   } catch (error) {

@@ -3,6 +3,7 @@ import { createServiceDatabaseClient, type DatabaseClient } from "@/lib/database
 import { getCachedAuthUser, createRateLimitResponse, createUnauthorizedResponse } from "@/lib/auth/cached-auth"
 import { getOrgContext } from "@/lib/auth/get-org-context"
 import { validateCSRFMiddleware } from "@/lib/csrf"
+import { publishToUser } from "@/lib/ws/publish-event"
 import type { ChatRequest, ChatRequestStatus } from "@/types/chat-request"
 
 /**
@@ -293,6 +294,13 @@ export async function PATCH(
 
     const enrichedRequest = await enrichRequestWithUsers(db, updatedRequest)
 
+    // Push real-time event to requester (they need to know the response)
+    publishToUser(existingRequest.requester_id, {
+      type: "chat_request.updated",
+      payload: enrichedRequest,
+      timestamp: Date.now(),
+    })
+
     return NextResponse.json({ request: enrichedRequest })
   } catch (error) {
     console.error("[ChatRequest PATCH] Error:", error)
@@ -323,7 +331,7 @@ export async function DELETE(
     // Get existing request
     const { data: existingRequest, error: fetchError } = await db
       .from("chat_requests")
-      .select("id, requester_id, status")
+      .select("id, requester_id, recipient_id, status")
       .eq("id", requestId)
       .maybeSingle()
 
@@ -353,6 +361,15 @@ export async function DELETE(
     if (updateError) {
       console.error("[ChatRequest DELETE] Update error:", updateError)
       return Errors.updateFailed()
+    }
+
+    // Push real-time event to recipient (request was cancelled)
+    if (existingRequest.recipient_id) {
+      publishToUser(existingRequest.recipient_id, {
+        type: "chat_request.cancelled",
+        payload: { id: requestId, requester_id: user.id },
+        timestamp: Date.now(),
+      })
     }
 
     return NextResponse.json({ success: true, message: "Chat request cancelled" })

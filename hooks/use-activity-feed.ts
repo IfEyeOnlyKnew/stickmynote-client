@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect, useCallback, useMemo, useRef } from "react"
+import { useWebSocket } from "@/hooks/useWebSocket"
 import type { Activity, ActivityFeedGroup } from "@/types/activity"
 import { format, isToday, isYesterday, parseISO } from "date-fns"
 
@@ -121,13 +122,29 @@ export function useActivityFeed(userId: string | null) {
     fetchActivities(state.activities.length)
   }, [state.activities.length, state.hasMore, state.loading, fetchActivities])
 
-  // Setup polling instead of realtime subscription
+  // WebSocket subscription for real-time activity updates
+  const { connected: wsConnected, subscribe } = useWebSocket()
+
+  useEffect(() => {
+    if (!wsConnected || !userId) return
+
+    const unsub = subscribe("activity.new", () => {
+      fetchActivities()
+    })
+
+    return unsub
+  }, [wsConnected, subscribe, userId, fetchActivities])
+
+  // Initial fetch
   useEffect(() => {
     if (!userId) return
-
     fetchActivities()
+  }, [userId, fetchActivities])
 
-    // Poll every 30 seconds for new activities
+  // Polling fallback — only when WebSocket is disconnected
+  useEffect(() => {
+    if (wsConnected || !userId) return
+
     pollIntervalRef.current = setInterval(() => {
       fetchActivities()
     }, 30000)
@@ -137,7 +154,7 @@ export function useActivityFeed(userId: string | null) {
         clearInterval(pollIntervalRef.current)
       }
     }
-  }, [userId, fetchActivities])
+  }, [wsConnected, userId, fetchActivities])
 
   return {
     activities: state.activities,

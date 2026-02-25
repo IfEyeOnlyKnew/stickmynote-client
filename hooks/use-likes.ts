@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from "react"
 import { useUser } from "@/contexts/user-context"
+import { useWebSocket } from "@/hooks/useWebSocket"
 
 export function useLikes(targetId: string, targetType: "stick" | "reply" = "stick") {
   const { user } = useUser()
@@ -9,13 +10,41 @@ export function useLikes(targetId: string, targetType: "stick" | "reply" = "stic
   const [isLiked, setIsLiked] = useState(false)
   const [loading, setLoading] = useState(true)
   const pollIntervalRef = useRef<NodeJS.Timeout | null>(null)
+  const { connected: wsConnected, subscribe } = useWebSocket()
 
+  // WebSocket subscription for real-time like updates
+  useEffect(() => {
+    if (!wsConnected || !targetId) return
+
+    const unsubs = [
+      subscribe("like.added", (payload: any) => {
+        if (payload.targetId === targetId) {
+          setLikeCount((prev) => prev + 1)
+          if (user && payload.userId === user.id) setIsLiked(true)
+        }
+      }),
+      subscribe("like.removed", (payload: any) => {
+        if (payload.targetId === targetId) {
+          setLikeCount((prev) => Math.max(0, prev - 1))
+          if (user && payload.userId === user.id) setIsLiked(false)
+        }
+      }),
+    ]
+
+    return () => unsubs.forEach((unsub) => unsub())
+  }, [wsConnected, subscribe, targetId, user])
+
+  // Initial fetch
   useEffect(() => {
     if (!targetId) return
-
     fetchLikes()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [targetId, targetType])
 
-    // Poll for updates every 30 seconds instead of realtime subscription
+  // Polling fallback — only when WebSocket is disconnected
+  useEffect(() => {
+    if (wsConnected || !targetId) return
+
     pollIntervalRef.current = setInterval(fetchLikes, 30000)
 
     return () => {
@@ -24,7 +53,7 @@ export function useLikes(targetId: string, targetType: "stick" | "reply" = "stic
       }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [targetId, targetType])
+  }, [wsConnected, targetId, targetType])
 
   const fetchLikes = async () => {
     try {

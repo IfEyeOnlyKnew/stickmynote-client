@@ -3,6 +3,7 @@ import { createServiceDatabaseClient, type DatabaseClient } from "@/lib/database
 import { getCachedAuthUser, createRateLimitResponse, createUnauthorizedResponse } from "@/lib/auth/cached-auth"
 import { getOrgContext } from "@/lib/auth/get-org-context"
 import { validateCSRFMiddleware } from "@/lib/csrf"
+import { publishToUser } from "@/lib/ws/publish-event"
 
 /**
  * AUTHORIZATION MODEL FOR PERSONAL STICK REPLIES:
@@ -305,15 +306,6 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       if (!user || user.id !== note.user_id) {
         return Errors.accessDeniedPrivate()
       }
-
-      const orgContextResult = await safeGetOrgContext(user.id)
-      if (isRateLimited(orgContextResult)) {
-        return createRateLimitResponse()
-      }
-
-      if (!orgContextResult || orgContextResult.orgId !== note.org_id) {
-        return Errors.wrongOrganization()
-      }
     }
 
     // Fetch replies
@@ -403,6 +395,20 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
 
     const userData = await fetchUserInfo(db, user.id)
     const completeReply = buildCompleteReply(reply, userData, user.email)
+
+    // Push notification + activity event to the note owner (if someone else replied)
+    if (note.user_id && note.user_id !== user.id) {
+      publishToUser(note.user_id, {
+        type: "notification.new",
+        payload: { noteId, replyId: reply.id, userId: user.id, actionType: "replied" },
+        timestamp: Date.now(),
+      })
+      publishToUser(note.user_id, {
+        type: "activity.new",
+        payload: { noteId, replyId: reply.id, userId: user.id, actionType: "replied" },
+        timestamp: Date.now(),
+      })
+    }
 
     return NextResponse.json({ reply: completeReply })
   } catch (error) {

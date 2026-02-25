@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server"
 import { db } from "@/lib/database/pg-client"
-import { redis } from "@/lib/redis/local-redis"
+import { cache } from "@/lib/cache/memcached-client"
 import { emailService } from "@/lib/email/smtp"
 import { localStorage } from "@/lib/storage/local-storage"
 
@@ -17,7 +17,7 @@ export async function GET() {
     },
     services: {
       database: { healthy: false, message: "", details: {} },
-      redis: { healthy: false, message: "", details: {} },
+      cache: { healthy: false, message: "", details: {} },
       email: { healthy: false, message: "", details: {} },
       storage: { healthy: false, message: "", details: {} },
     },
@@ -57,21 +57,21 @@ export async function GET() {
     }
   }
 
-  // Check Redis
+  // Check Memcached
   try {
-    const redisHealth = await redis.healthCheck()
-    checks.services.redis = {
-      healthy: redisHealth.healthy,
-      message: redisHealth.message,
+    const cacheHealth = await cache.healthCheck()
+    checks.services.cache = {
+      healthy: cacheHealth.healthy,
+      message: cacheHealth.message,
       details: {
-        usingFallback: redisHealth.usingFallback,
-        host: process.env.REDIS_URL?.split("@")[1] || "localhost:6379",
+        usingFallback: cacheHealth.usingFallback,
+        servers: process.env.MEMCACHE_SERVERS || "not configured",
       },
     }
   } catch (error: any) {
-    checks.services.redis = {
+    checks.services.cache = {
       healthy: false,
-      message: `Redis error: ${error.message}`,
+      message: `Memcached error: ${error.message}`,
       details: {},
     }
   }

@@ -55,7 +55,7 @@ export async function GET(
       if (tab.tab_type === 'details' && tab.tab_data?.content) {
         details = tab.tab_data.content
       }
-      if (tab.tab_type === 'videos' && tab.tab_data) {
+      if ((tab.tab_type === 'videos' || tab.tab_type === 'video') && tab.tab_data) {
         videos = Array.isArray(tab.tab_data) ? tab.tab_data : tab.tab_data.videos || []
       }
       if (tab.tab_type === 'images' && tab.tab_data) {

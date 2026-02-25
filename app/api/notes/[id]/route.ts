@@ -58,7 +58,7 @@ export async function GET(request: NextRequest, context: { params: Promise<{ id:
         details = detailsTab.tab_data.content
       }
 
-      const videosTab = noteTabs.find((tab: any) => tab.tab_type === "videos")
+      const videosTab = noteTabs.find((tab: any) => tab.tab_type === "videos" || tab.tab_type === "video")
       if (videosTab && videosTab.tab_data) {
         videos = Array.isArray(videosTab.tab_data) ? videosTab.tab_data : []
       }

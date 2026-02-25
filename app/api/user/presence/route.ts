@@ -1,6 +1,8 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { getCachedAuthUser, createRateLimitResponse, createUnauthorizedResponse } from "@/lib/auth/cached-auth"
 import { db } from "@/lib/database/pg-client"
+import { publishToOrg } from "@/lib/ws/publish-event"
+import { getOrgContext } from "@/lib/auth/get-org-context"
 
 /**
  * USER PRESENCE API
@@ -33,6 +35,20 @@ export async function POST(request: NextRequest) {
       `UPDATE users SET last_seen_at = NOW() WHERE id = $1`,
       [user.id]
     )
+
+    // Broadcast presence update to org members
+    try {
+      const orgContext = await getOrgContext()
+      if (orgContext) {
+        publishToOrg(orgContext.orgId, {
+          type: "presence.update",
+          payload: { userId: user.id, isOnline: true, lastSeenAt: new Date().toISOString() },
+          timestamp: Date.now(),
+        })
+      }
+    } catch {
+      // Non-critical, don't fail the heartbeat
+    }
 
     return NextResponse.json({ success: true })
   } catch (error) {

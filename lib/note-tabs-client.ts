@@ -17,7 +17,7 @@ export async function getNoteTabs(noteId: string): Promise<NoteTab[]> {
     return (data.tabs || []).map((tab: any) => ({
       id: tab.id,
       note_id: tab.personal_stick_id || noteId,
-      tab_type: tab.tab_type,
+      tab_type: tab.tab_type === "video" ? "videos" : tab.tab_type,
       tab_data: tab.tab_data || {},
       created_at: tab.created_at,
       updated_at: tab.updated_at,

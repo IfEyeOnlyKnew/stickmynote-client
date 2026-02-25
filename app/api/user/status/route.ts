@@ -1,6 +1,8 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { getCachedAuthUser, createRateLimitResponse, createUnauthorizedResponse } from "@/lib/auth/cached-auth"
 import { db } from "@/lib/database/pg-client"
+import { publishToOrg } from "@/lib/ws/publish-event"
+import { getOrgContext } from "@/lib/auth/get-org-context"
 import type {
   UserStatus,
   EffectiveUserStatus,
@@ -195,6 +197,20 @@ export async function PUT(request: NextRequest) {
     // Get effective status
     const effective = await getEffectiveStatus(user.id, updatedStatus)
 
+    // Broadcast status change to org members
+    try {
+      const orgContext = await getOrgContext()
+      if (orgContext) {
+        publishToOrg(orgContext.orgId, {
+          type: "status.update",
+          payload: { userId: user.id, status: updatedStatus, effective },
+          timestamp: Date.now(),
+        })
+      }
+    } catch {
+      // Non-critical
+    }
+
     return NextResponse.json({ status: updatedStatus, effective })
   } catch (error) {
     console.error("[UserStatus] PUT error:", error)
@@ -238,6 +254,20 @@ export async function POST(request: NextRequest) {
 
     const updatedStatus = result.rows[0]
     const effective = await getEffectiveStatus(user.id, updatedStatus)
+
+    // Broadcast status change to org members
+    try {
+      const orgContext = await getOrgContext()
+      if (orgContext) {
+        publishToOrg(orgContext.orgId, {
+          type: "status.update",
+          payload: { userId: user.id, status: updatedStatus, effective },
+          timestamp: Date.now(),
+        })
+      }
+    } catch {
+      // Non-critical
+    }
 
     return NextResponse.json({ status: updatedStatus, effective })
   } catch (error) {

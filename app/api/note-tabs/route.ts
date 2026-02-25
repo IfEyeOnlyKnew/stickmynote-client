@@ -250,18 +250,26 @@ export async function POST(request: NextRequest) {
 
     const dbType: DbTabType = tabType === "videos" ? "video" : "images"
 
-    // Find existing tab
-    const findResult = await db.query(
-      `SELECT id, tab_type, tab_data FROM personal_sticks_tabs
-       WHERE personal_stick_id = $1 AND tab_type = $2
-       LIMIT 1`,
-      [noteId, dbType]
-    )
+    // Find existing tab (check both singular and plural forms for video tabs)
+    const findResult = tabType === "videos"
+      ? await db.query(
+          `SELECT id, tab_type, tab_data FROM personal_sticks_tabs
+           WHERE personal_stick_id = $1 AND tab_type IN ('video', 'videos')
+           LIMIT 1`,
+          [noteId]
+        )
+      : await db.query(
+          `SELECT id, tab_type, tab_data FROM personal_sticks_tabs
+           WHERE personal_stick_id = $1 AND tab_type = $2
+           LIMIT 1`,
+          [noteId, dbType]
+        )
 
     let tab = findResult.rows[0] as NoteTabRow | undefined
 
     if (!tab) {
-      // Create new tab
+      // Create new tab — always store "videos" (plural) for consistency with notes/route.ts
+      const storeType = tabType === "videos" ? "videos" : "images"
       const insertResult = await db.query(
         `INSERT INTO personal_sticks_tabs
          (personal_stick_id, user_id, tab_type, tab_name, tab_content, tab_data, tab_order, created_at, updated_at)
@@ -270,10 +278,10 @@ export async function POST(request: NextRequest) {
         [
           noteId,
           userId,
-          dbType,
-          dbType === "video" ? "Videos" : "Images",
-          JSON.stringify(dbType === "video" ? { videos: [] } : { images: [] }),
-          dbType === "video" ? 1 : 2,
+          storeType,
+          storeType === "videos" ? "Videos" : "Images",
+          JSON.stringify(storeType === "videos" ? { videos: [] } : { images: [] }),
+          storeType === "videos" ? 1 : 2,
         ]
       )
       tab = insertResult.rows[0]
@@ -308,11 +316,9 @@ export async function POST(request: NextRequest) {
 
     await db.query(
       `UPDATE personal_sticks_tabs
-       SET tab_type = $1, tab_name = $2, tab_data = $3, updated_at = NOW()
-       WHERE id = $4`,
+       SET tab_data = $1, updated_at = NOW()
+       WHERE id = $2`,
       [
-        dbType,
-        dbType === "video" ? "Videos" : "Images",
         JSON.stringify(newTabData),
         tab.id,
       ]
@@ -364,12 +370,20 @@ export async function DELETE(request: NextRequest) {
 
     const dbType: DbTabType = tabType === "videos" ? "video" : "images"
 
-    const findResult = await db.query(
-      `SELECT id, tab_type, tab_data FROM personal_sticks_tabs
-       WHERE personal_stick_id = $1 AND tab_type = $2
-       LIMIT 1`,
-      [noteId, dbType]
-    )
+    // Find existing tab (check both singular and plural forms for video tabs)
+    const findResult = tabType === "videos"
+      ? await db.query(
+          `SELECT id, tab_type, tab_data FROM personal_sticks_tabs
+           WHERE personal_stick_id = $1 AND tab_type IN ('video', 'videos')
+           LIMIT 1`,
+          [noteId]
+        )
+      : await db.query(
+          `SELECT id, tab_type, tab_data FROM personal_sticks_tabs
+           WHERE personal_stick_id = $1 AND tab_type = $2
+           LIMIT 1`,
+          [noteId, dbType]
+        )
 
     const tab = findResult.rows[0]
     if (!tab) return NextResponse.json({ success: true, count: 0 })
@@ -381,11 +395,9 @@ export async function DELETE(request: NextRequest) {
 
     await db.query(
       `UPDATE personal_sticks_tabs
-       SET tab_type = $1, tab_name = $2, tab_data = $3, updated_at = NOW()
-       WHERE id = $4`,
+       SET tab_data = $1, updated_at = NOW()
+       WHERE id = $2`,
       [
-        dbType,
-        dbType === "video" ? "Videos" : "Images",
         JSON.stringify(newTabData),
         tab.id,
       ]

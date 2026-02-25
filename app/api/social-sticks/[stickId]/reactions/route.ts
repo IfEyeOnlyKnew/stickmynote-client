@@ -1,6 +1,8 @@
 import { createDatabaseClient } from "@/lib/database/database-adapter"
 import { NextResponse } from "next/server"
 import { getCachedAuthUser, createRateLimitResponse, createUnauthorizedResponse } from "@/lib/auth/cached-auth"
+import { publishToOrg } from "@/lib/ws/publish-event"
+import { getOrgContext } from "@/lib/auth/get-org-context"
 
 export async function GET(request: Request, { params }: { params: Promise<{ stickId: string }> }) {
   try {
@@ -61,12 +63,33 @@ export async function POST(request: Request, { params }: { params: Promise<{ sti
       .eq("reaction_type", reaction_type)
       .maybeSingle()
 
+    // Helper to publish reaction events
+    const publishReactionEvent = (added: boolean) => {
+      getOrgContext().then((orgContext) => {
+        if (!orgContext) return
+        const eventType = added ? "reaction.added" : "reaction.removed"
+        publishToOrg(orgContext.orgId, {
+          type: eventType,
+          payload: { targetId: stickId, targetType: "stick", userId: user.id, reactionType: reaction_type },
+          timestamp: Date.now(),
+        })
+        if (reaction_type === "heart") {
+          publishToOrg(orgContext.orgId, {
+            type: added ? "like.added" : "like.removed",
+            payload: { targetId: stickId, targetType: "stick", userId: user.id },
+            timestamp: Date.now(),
+          })
+        }
+      }).catch(() => {})
+    }
+
     if (existing) {
       // Remove the reaction if it already exists (toggle behavior)
       const { error } = await db.from("social_stick_reactions").delete().eq("id", existing.id)
 
       if (error) throw error
 
+      publishReactionEvent(false)
       return NextResponse.json({ removed: true, reactionType: reaction_type })
     } else {
       // Add the new reaction
@@ -82,6 +105,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ sti
 
       if (error) throw error
 
+      publishReactionEvent(true)
       return NextResponse.json({ reaction, added: true })
     }
   } catch (error) {
