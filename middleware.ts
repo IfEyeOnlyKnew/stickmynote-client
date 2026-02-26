@@ -36,7 +36,30 @@ export async function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl
 
   if (pathname.startsWith("/api/")) {
-    return NextResponse.next()
+    const res = NextResponse.next()
+    // Auth endpoints: never cache — stale auth responses cause redirect loops
+    if (pathname.startsWith("/api/auth/")) {
+      res.headers.set("Cache-Control", "no-store, no-cache, must-revalidate")
+      res.headers.set("Pragma", "no-cache")
+    }
+    // Public API endpoints (sitemap, robots): moderate cache
+    else if (pathname === "/api/sitemap" || pathname === "/api/robots") {
+      res.headers.set("Cache-Control", "public, max-age=3600, stale-while-revalidate=86400")
+    }
+    // All other API: private, no cache
+    else {
+      res.headers.set("Cache-Control", "private, no-cache")
+    }
+    res.headers.set("Vary", "Cookie, Authorization, Accept")
+    return res
+  }
+
+  // Service worker must never be cached long-term — browsers rely on fresh responses for update detection
+  if (pathname === "/sw.js") {
+    const res = NextResponse.next()
+    res.headers.set("Cache-Control", "public, max-age=0, must-revalidate")
+    res.headers.set("Service-Worker-Allowed", "/")
+    return res
   }
 
   // Let Next handle static assets quickly
@@ -48,6 +71,8 @@ export async function middleware(req: NextRequest) {
   if (isStaticAsset) {
     const res = NextResponse.next()
     res.headers.set("Cache-Control", "public, max-age=31536000, immutable")
+    res.headers.set("X-Content-Type-Options", "nosniff")
+    res.headers.set("Vary", "Accept-Encoding")
     return res
   }
 

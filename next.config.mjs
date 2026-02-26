@@ -147,6 +147,87 @@ const nextConfig = {
           },
         ],
       },
+      // User-uploaded content — moderate TTL with background revalidation
+      {
+        source: "/uploads/:path*",
+        headers: [
+          {
+            key: "Cache-Control",
+            value: "public, max-age=86400, stale-while-revalidate=604800",
+          },
+        ],
+      },
+      // User-generated exports — short TTL, private (user-specific)
+      {
+        source: "/exports/:path*",
+        headers: [
+          {
+            key: "Cache-Control",
+            value: "private, max-age=300, no-transform",
+          },
+        ],
+      },
+      // Favicon and icons — 30-day TTL
+      {
+        source: "/favicon.ico",
+        headers: [
+          {
+            key: "Cache-Control",
+            value: "public, max-age=2592000",
+          },
+        ],
+      },
+      {
+        source: "/apple-icon.png",
+        headers: [
+          {
+            key: "Cache-Control",
+            value: "public, max-age=2592000",
+          },
+        ],
+      },
+      {
+        source: "/icon:path*",
+        headers: [
+          {
+            key: "Cache-Control",
+            value: "public, max-age=2592000",
+          },
+        ],
+      },
+      {
+        source: "/placeholder:path*",
+        headers: [
+          {
+            key: "Cache-Control",
+            value: "public, max-age=2592000",
+          },
+        ],
+      },
+      // PWA manifest — short TTL (can change when app metadata changes)
+      {
+        source: "/manifest.json",
+        headers: [
+          {
+            key: "Cache-Control",
+            value: "public, max-age=3600, stale-while-revalidate=86400",
+          },
+        ],
+      },
+      // Service worker — never cache (browsers rely on fresh responses for update detection)
+      {
+        source: "/sw.js",
+        headers: [
+          {
+            key: "Cache-Control",
+            value: "public, max-age=0, must-revalidate",
+          },
+          {
+            key: "Service-Worker-Allowed",
+            value: "/",
+          },
+        ],
+      },
     ];
   },
 

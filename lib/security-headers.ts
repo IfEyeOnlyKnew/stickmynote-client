@@ -23,8 +23,12 @@ export function getSecurityHeaders(): SecurityHeaders {
     `script-src ${scriptSrcDirective}`,
     `script-src-elem ${scriptSrcDirective}`,
     "worker-src 'self' blob:",
-    "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
-    "font-src 'self' data: https://fonts.gstatic.com https://r2cdn.perplexity.ai",
+    // CDN-READY: Add CDN origin to style-src when deploying a CDN (e.g., https://cdn.stickmynote.com)
+    "style-src 'self' 'unsafe-inline'",
+    // Fonts are self-hosted via next/font/google — no external font sources needed
+    // CDN-READY: Add CDN origin to font-src when deploying a CDN
+    "font-src 'self' data: https://r2cdn.perplexity.ai",
+    // CDN-READY: Add CDN origin to img-src when deploying a CDN
     "img-src 'self' data: blob: https://i.ytimg.com https://img.youtube.com https://i.vimeocdn.com https://*.vimeo.com https://*.cloudfront.net https://*.canva.com https://*.imgur.com https://*.googleusercontent.com",
     "media-src 'self' blob: https://www.youtube.com https://player.vimeo.com https://rumble.com https://*.rumble.com https://www.loom.com https://*.loom.com",
     `connect-src 'self' https://*.upstash.io https://www.youtube.com https://vimeo.com https://*.vimeo.com ${isDevelopment ? "http://localhost:* ws://localhost:* wss://localhost:* http://127.0.0.1:* ws://127.0.0.1:* wss://127.0.0.1:*" : "wss://stickmynote.com"}`.trim(),
@@ -66,6 +70,7 @@ export function getSecurityHeaders(): SecurityHeaders {
     ].join(", "),
     "Cross-Origin-Embedder-Policy": "unsafe-none",
     "Cross-Origin-Opener-Policy": "same-origin-allow-popups",
+    // CDN-READY: Change to "cross-origin" when serving assets from a CDN subdomain
     "Cross-Origin-Resource-Policy": "same-site",
   }
 }
