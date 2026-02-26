@@ -1,5 +1,5 @@
-const CACHE_NAME = "stickmynote-v2"
-const API_CACHE_NAME = "stickmynote-api-v2"
+const CACHE_NAME = "stickmynote-v3"
+const API_CACHE_NAME = "stickmynote-api-v3"
 
 // Assets to cache immediately
 const PRECACHE_ASSETS = ["/", "/manifest.json", "/placeholder-logo.png", "/globals.css"]
@@ -38,6 +38,11 @@ self.addEventListener("fetch", (event) => {
   if (url.pathname.startsWith("/api/")) {
     // Skip non-GET requests for caching to avoid side effects
     if (event.request.method !== "GET") {
+      return
+    }
+
+    // Never cache auth endpoints — stale auth responses cause redirect loops
+    if (url.pathname.startsWith("/api/auth/")) {
       return
     }
 
