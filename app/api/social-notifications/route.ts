@@ -16,6 +16,12 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: "Organization context required" }, { status: 401 })
     }
 
+    const { searchParams } = new URL(req.url)
+    const limit = Math.min(Math.max(parseInt(searchParams.get("limit") || "25", 10), 1), 100)
+    const offset = Math.max(parseInt(searchParams.get("offset") || "0", 10), 0)
+    // Over-fetch to have enough rows after merge/sort
+    const sqlLimit = offset + limit + 1
+
     const readNotificationsResult = await db.query(
       `SELECT notification_key FROM social_notification_reads WHERE user_id = $1`,
       [user.id]
@@ -57,8 +63,8 @@ export async function GET(req: NextRequest) {
          AND ss.user_id != $2
          AND ss.org_id = $3
        ORDER BY ss.created_at DESC
-       LIMIT 25`,
-      [padIds, user.id, orgContext.orgId]
+       LIMIT $4`,
+      [padIds, user.id, orgContext.orgId, sqlLimit]
     )
 
     const replyActivitiesResult = await db.query(
@@ -79,8 +85,8 @@ export async function GET(req: NextRequest) {
        WHERE ssr.user_id != $1
          AND ssr.org_id = $2
        ORDER BY ssr.created_at DESC
-       LIMIT 25`,
-      [user.id, orgContext.orgId]
+       LIMIT $3`,
+      [user.id, orgContext.orgId, sqlLimit]
     )
 
     const filteredReplies = replyActivitiesResult.rows.filter((reply: any) => {
@@ -148,7 +154,11 @@ export async function GET(req: NextRequest) {
       (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
     )
 
-    return NextResponse.json({ notifications: sortedNotifications.slice(0, 50) })
+    const hasMore = sortedNotifications.length > offset + limit
+    return NextResponse.json({
+      notifications: sortedNotifications.slice(offset, offset + limit),
+      hasMore,
+    })
   } catch (error) {
     console.error("[v0] Error in social notifications route:", error)
     return NextResponse.json({ error: "Internal server error" }, { status: 500 })

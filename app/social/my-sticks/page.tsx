@@ -1,12 +1,13 @@
 "use client"
 
-import { useState, useEffect, useCallback } from "react"
+import { useState, useEffect, useCallback, useRef } from "react"
 import { useUser } from "@/contexts/user-context"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Skeleton } from "@/components/ui/skeleton"
 import { UserMenu } from "@/components/user-menu"
-import { FileText, ArrowLeft, Clock } from "lucide-react"
+import { FileText, ArrowLeft, Clock, Loader2 } from "lucide-react"
 import { BreadcrumbNav } from "@/components/breadcrumb-nav"
 import {
   CommunicationPaletteProvider,
@@ -23,11 +24,32 @@ interface SocialStick {
   color: string
 }
 
+const PAGE_SIZE = 20
+
+function StickCardSkeleton() {
+  return (
+    <Card>
+      <CardHeader>
+        <Skeleton className="h-5 w-3/4" />
+      </CardHeader>
+      <CardContent>
+        <Skeleton className="h-16 w-full mb-4" />
+        <Skeleton className="h-3 w-32" />
+      </CardContent>
+    </Card>
+  )
+}
+
 export default function MySocialSticksPage() {
   const { user, loading } = useUser()
   const router = useRouter()
   const [sticks, setSticks] = useState<SocialStick[]>([])
   const [loadingSticks, setLoadingSticks] = useState(true)
+  const [isLoadingMore, setIsLoadingMore] = useState(false)
+  const [hasMore, setHasMore] = useState(false)
+  const [offset, setOffset] = useState(0)
+  const sentinelRef = useRef<HTMLDivElement>(null)
+  const observerRef = useRef<IntersectionObserver | null>(null)
 
   useEffect(() => {
     if (!loading && !user) {
@@ -35,30 +57,66 @@ export default function MySocialSticksPage() {
     }
   }, [user, loading, router])
 
-  const fetchSticks = useCallback(async () => {
+  const fetchSticks = useCallback(async (reset = false) => {
+    if (!user?.id) return
+    const currentOffset = reset ? 0 : offset
     try {
-      setLoadingSticks(true)
-      const response = await fetch("/api/social-sticks")
+      if (reset) {
+        setLoadingSticks(true)
+      } else {
+        setIsLoadingMore(true)
+      }
+      const response = await fetch(
+        `/api/social-sticks?userId=${user.id}&limit=${PAGE_SIZE}&offset=${currentOffset}`
+      )
       if (response.ok) {
         const data = await response.json()
-        // Filter to only show sticks created by the current user
-        const userSticks = data.sticks?.filter((stick: SocialStick) => stick.user_id === user?.id) || []
-        setSticks(userSticks)
+        const newSticks = data.sticks || []
+        if (reset) {
+          setSticks(newSticks)
+          setOffset(newSticks.length)
+        } else {
+          setSticks((prev) => [...prev, ...newSticks])
+          setOffset(currentOffset + newSticks.length)
+        }
+        setHasMore(data.hasMore ?? false)
       }
     } catch (error) {
       console.error("Error fetching sticks:", error)
     } finally {
       setLoadingSticks(false)
+      setIsLoadingMore(false)
     }
-  }, [user?.id])
+  }, [user?.id, offset])
 
   useEffect(() => {
     if (user) {
-      fetchSticks()
+      fetchSticks(true)
     }
-  }, [user, fetchSticks])
+  }, [user?.id]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  if (loading || loadingSticks) {
+  const loadMore = useCallback(() => {
+    if (!isLoadingMore && hasMore) {
+      fetchSticks(false)
+    }
+  }, [isLoadingMore, hasMore, fetchSticks])
+
+  // IntersectionObserver for infinite scroll
+  useEffect(() => {
+    if (!sentinelRef.current || !hasMore) return
+    observerRef.current = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting && hasMore && !isLoadingMore) {
+          loadMore()
+        }
+      },
+      { rootMargin: "200px", threshold: 0.1 }
+    )
+    observerRef.current.observe(sentinelRef.current)
+    return () => observerRef.current?.disconnect()
+  }, [hasMore, isLoadingMore, loadMore])
+
+  if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600" />
@@ -95,7 +153,13 @@ export default function MySocialSticksPage() {
       </header>
 
       <main className="container mx-auto px-4 py-8">
-        {sticks.length === 0 ? (
+        {loadingSticks ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {Array.from({ length: 9 }).map((_, i) => (
+              <StickCardSkeleton key={i} />
+            ))}
+          </div>
+        ) : sticks.length === 0 ? (
           <Card>
             <CardContent className="py-12 text-center">
               <FileText className="h-12 w-12 text-gray-400 mx-auto mb-4" />
@@ -105,27 +169,35 @@ export default function MySocialSticksPage() {
             </CardContent>
           </Card>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {sticks.map((stick) => (
-              <Card
-                key={stick.id}
-                className="cursor-pointer hover:shadow-lg transition-shadow"
-                style={{ backgroundColor: stick.color }}
-                onClick={() => router.push(`/social/sticks/${stick.id}`)}
-              >
-                <CardHeader>
-                  <CardTitle className="text-base line-clamp-1">{stick.topic}</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <p className="text-sm text-gray-700 line-clamp-4 mb-4">{stick.content}</p>
-                  <div className="flex items-center gap-2 text-xs text-gray-500">
-                    <Clock className="h-3 w-3" />
-                    {new Date(stick.created_at).toLocaleDateString()}
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
+          <>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {sticks.map((stick) => (
+                <Card
+                  key={stick.id}
+                  className="cursor-pointer hover:shadow-lg transition-shadow"
+                  style={{ backgroundColor: stick.color }}
+                  onClick={() => router.push(`/social/sticks/${stick.id}`)}
+                >
+                  <CardHeader>
+                    <CardTitle className="text-base line-clamp-1">{stick.topic}</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <p className="text-sm text-gray-700 line-clamp-4 mb-4">{stick.content}</p>
+                    <div className="flex items-center gap-2 text-xs text-gray-500">
+                      <Clock className="h-3 w-3" />
+                      {new Date(stick.created_at).toLocaleDateString()}
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+            {hasMore && <div ref={sentinelRef} className="h-4 w-full" />}
+            {isLoadingMore && (
+              <div className="flex justify-center py-6">
+                <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+              </div>
+            )}
+          </>
         )}
       </main>
 

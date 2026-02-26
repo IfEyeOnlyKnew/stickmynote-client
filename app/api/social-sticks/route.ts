@@ -116,13 +116,21 @@ function parseQueryParams(request: Request): {
   isAdmin: boolean
   isPrivate: boolean
   cacheInvalidation: string | null
+  limit: number
+  offset: number
+  userId: string | null
 } {
   const { searchParams } = new URL(request.url)
+  const rawLimit = parseInt(searchParams.get("limit") || "20", 10)
+  const rawOffset = parseInt(searchParams.get("offset") || "0", 10)
   return {
     isPublic: searchParams.get("public") === "true",
     isAdmin: searchParams.get("admin") === "true",
     isPrivate: searchParams.get("private") === "true",
     cacheInvalidation: searchParams.get("_t"),
+    limit: Math.min(Math.max(rawLimit, 1), 100),
+    offset: Math.max(rawOffset, 0),
+    userId: searchParams.get("userId"),
   }
 }
 
@@ -197,7 +205,10 @@ async function enrichSticksWithData(
   }))
 }
 
-async function fetchPublicSticks(db: DatabaseClient): Promise<SocialStick[]> {
+async function fetchPublicSticks(
+  db: DatabaseClient,
+  options?: { limit?: number; offset?: number }
+): Promise<SocialStick[]> {
   // First get public pad IDs
   const publicPadIds = await fetchPublicPadIds(db)
 
@@ -206,11 +217,21 @@ async function fetchPublicSticks(db: DatabaseClient): Promise<SocialStick[]> {
   }
 
   // Then fetch sticks for those pads
-  const { data, error } = await db
+  let query = db
     .from("social_sticks")
     .select(STICK_SELECT_FIELDS)
     .in("social_pad_id", publicPadIds)
     .order("created_at", { ascending: false })
+
+  if (options?.limit) {
+    query = query.limit(options.limit + 1)
+  }
+
+  if (options?.offset) {
+    query = query.range(options.offset, options.offset + (options.limit || 20))
+  }
+
+  const { data, error } = await query
 
   if (error) {
     console.error(`${LOG_PREFIX} Error fetching public sticks:`, error)
@@ -284,7 +305,8 @@ async function fetchPublicPadIds(db: DatabaseClient): Promise<string[]> {
 async function fetchSticksByPadIds(
   db: DatabaseClient,
   padIds: string[],
-  orgId?: string
+  orgId?: string,
+  options?: { limit?: number; offset?: number; userId?: string | null }
 ): Promise<SocialStick[]> {
   if (padIds.length === 0) return []
 
@@ -296,6 +318,19 @@ async function fetchSticksByPadIds(
 
   if (orgId) {
     query = query.eq("org_id", orgId)
+  }
+
+  if (options?.userId) {
+    query = query.eq("user_id", options.userId)
+  }
+
+  if (options?.limit) {
+    // Fetch one extra to detect hasMore
+    query = query.limit(options.limit + 1)
+  }
+
+  if (options?.offset) {
+    query = query.range(options.offset, options.offset + (options.limit || 20))
   }
 
   const { data, error } = await query
@@ -371,16 +406,20 @@ async function createStick(
 
 async function handlePublicSticksRequest(
   db: DatabaseClient,
-  serviceDb: DatabaseClient
+  serviceDb: DatabaseClient,
+  limit: number,
+  offset: number
 ): Promise<Response> {
-  const cacheKey = APICache.getCacheKey("social-sticks", { public: true })
+  const cacheKey = APICache.getCacheKey("social-sticks", { public: true, limit, offset })
 
   return withCache(
     cacheKey,
     async () => {
-      const publicSticks = await fetchPublicSticks(db)
-      const enrichedSticks = await enrichSticksWithData(db, serviceDb, publicSticks)
-      return { sticks: enrichedSticks }
+      const publicSticks = await fetchPublicSticks(db, { limit, offset })
+      const hasMore = publicSticks.length > limit
+      const pageSticks = hasMore ? publicSticks.slice(0, limit) : publicSticks
+      const enrichedSticks = await enrichSticksWithData(db, serviceDb, pageSticks)
+      return { sticks: enrichedSticks, hasMore }
     },
     { ttl: CACHE_TTL_MEDIUM, staleWhileRevalidate: CACHE_STALE_LONG }
   )
@@ -390,12 +429,16 @@ async function handlePrivateSticksRequest(
   db: DatabaseClient,
   serviceDb: DatabaseClient,
   user: { id: string; email?: string },
-  orgContext: OrgContext
+  orgContext: OrgContext,
+  limit: number,
+  offset: number
 ): Promise<Response> {
   const cacheKey = APICache.getCacheKey("social-sticks", {
     private: true,
     userId: user.id,
     orgId: orgContext.orgId,
+    limit,
+    offset,
   })
 
   return withCache(
@@ -415,12 +458,14 @@ async function handlePrivateSticksRequest(
       const privatePadIds = [...ownedPrivatePadIds, ...memberPrivatePadIds]
 
       if (privatePadIds.length === 0) {
-        return { sticks: [] }
+        return { sticks: [], hasMore: false }
       }
 
-      const privateSticks = await fetchSticksByPadIds(db, privatePadIds, orgContext.orgId)
-      const enrichedSticks = await enrichSticksWithData(db, serviceDb, privateSticks)
-      return { sticks: enrichedSticks }
+      const privateSticks = await fetchSticksByPadIds(db, privatePadIds, orgContext.orgId, { limit, offset })
+      const hasMore = privateSticks.length > limit
+      const pageSticks = hasMore ? privateSticks.slice(0, limit) : privateSticks
+      const enrichedSticks = await enrichSticksWithData(db, serviceDb, pageSticks)
+      return { sticks: enrichedSticks, hasMore }
     },
     {
       ttl: CACHE_TTL_SHORT,
@@ -450,11 +495,15 @@ async function handleDefaultSticksRequest(
   serviceDb: DatabaseClient,
   user: { id: string; email?: string },
   orgContext: OrgContext,
-  cacheInvalidation: string | null
+  options: { cacheInvalidation: string | null; limit: number; offset: number; filterUserId: string | null }
 ): Promise<Response> {
+  const { cacheInvalidation, limit, offset, filterUserId } = options
   const cacheKey = APICache.getCacheKey("social-sticks", {
     userId: user.id,
     orgId: orgContext.orgId,
+    limit,
+    offset,
+    filterUserId: filterUserId || undefined,
   })
 
   if (cacheInvalidation) {
@@ -473,12 +522,18 @@ async function handleDefaultSticksRequest(
       const uniquePadIds = [...new Set([...ownedPadIds, ...memberPadIds, ...publicPadIds])]
 
       if (uniquePadIds.length === 0) {
-        return { sticks: [] }
+        return { sticks: [], hasMore: false }
       }
 
-      const sticks = await fetchSticksByPadIds(db, uniquePadIds)
-      const enrichedSticks = await enrichSticksWithData(db, serviceDb, sticks)
-      return { sticks: enrichedSticks }
+      const sticks = await fetchSticksByPadIds(db, uniquePadIds, undefined, {
+        limit,
+        offset,
+        userId: filterUserId,
+      })
+      const hasMore = sticks.length > limit
+      const pageSticks = hasMore ? sticks.slice(0, limit) : sticks
+      const enrichedSticks = await enrichSticksWithData(db, serviceDb, pageSticks)
+      return { sticks: enrichedSticks, hasMore }
     },
     {
       ttl: CACHE_TTL_SHORT,
@@ -506,7 +561,7 @@ async function getOrgContextSafe(): Promise<OrgContext | null> {
 
 export async function GET(request: Request) {
   try {
-    const { isPublic, isAdmin, isPrivate, cacheInvalidation } = parseQueryParams(request)
+    const { isPublic, isAdmin, isPrivate, cacheInvalidation, limit, offset, userId } = parseQueryParams(request)
     const db = await createDatabaseClient()
     const serviceDb = await createServiceDatabaseClient()
 
@@ -518,7 +573,7 @@ export async function GET(request: Request) {
 
     // Handle public sticks request (no auth required)
     if (isPublic) {
-      return handlePublicSticksRequest(db, serviceDb)
+      return handlePublicSticksRequest(db, serviceDb, limit, offset)
     }
 
     // All other requests require authentication
@@ -539,18 +594,20 @@ export async function GET(request: Request) {
       if (!orgContext) {
         return Errors.unauthorized("No organization context")
       }
-      return handlePrivateSticksRequest(db, serviceDb, user, orgContext)
+      return handlePrivateSticksRequest(db, serviceDb, user, orgContext, limit, offset)
     }
 
     // Handle default request - fallback to public if no org context
     if (!orgContext) {
       console.warn(`${LOG_PREFIX} No org context for user, falling back to public sticks only:`, user.email)
-      const publicSticks = await fetchPublicSticks(db)
-      const enrichedSticks = await enrichSticksWithData(db, serviceDb, publicSticks)
-      return NextResponse.json({ sticks: enrichedSticks })
+      const publicSticks = await fetchPublicSticks(db, { limit, offset })
+      const hasMore = publicSticks.length > limit
+      const pageSticks = hasMore ? publicSticks.slice(0, limit) : publicSticks
+      const enrichedSticks = await enrichSticksWithData(db, serviceDb, pageSticks)
+      return NextResponse.json({ sticks: enrichedSticks, hasMore })
     }
 
-    return handleDefaultSticksRequest(db, serviceDb, user, orgContext, cacheInvalidation)
+    return handleDefaultSticksRequest(db, serviceDb, user, orgContext, { cacheInvalidation, limit, offset, filterUserId: userId })
   } catch (error) {
     if (isRateLimitError(error)) {
       return Errors.rateLimit()

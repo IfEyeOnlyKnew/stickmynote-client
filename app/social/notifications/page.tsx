@@ -5,6 +5,7 @@ import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
+import { Skeleton } from "@/components/ui/skeleton"
 import { BreadcrumbNav } from "@/components/breadcrumb-nav"
 import { useUser } from "@/contexts/user-context"
 import { useSocialNotifications } from "@/hooks/use-social-notifications"
@@ -13,19 +14,30 @@ import { formatDistanceToNow } from "date-fns"
 import { NotificationPreferencesModal } from "@/components/social/notification-preferences-modal"
 import { StickDetailModal } from "@/components/social/stick-detail-modal"
 
+function NotificationSkeleton() {
+  return (
+    <Card>
+      <CardContent className="p-4">
+        <div className="flex items-start gap-4">
+          <Skeleton className="h-5 w-5 rounded-full shrink-0 mt-1" />
+          <div className="flex-1 min-w-0">
+            <Skeleton className="h-5 w-3/4 mb-2" />
+            <Skeleton className="h-4 w-1/2 mb-2" />
+            <Skeleton className="h-3 w-24" />
+          </div>
+          <Skeleton className="h-8 w-8 shrink-0" />
+        </div>
+      </CardContent>
+    </Card>
+  )
+}
+
 export default function SocialNotificationsPage() {
   const router = useRouter()
   const { user, loading: userLoading } = useUser()
   const { notifications, loading, markAsRead, markAllAsRead, deleteNotification } = useSocialNotifications()
   const [showPreferences, setShowPreferences] = useState(false)
   const [selectedStickId, setSelectedStickId] = useState<string | null>(null)
-
-  useEffect(() => {
-    console.log("[v0] Notifications loaded:", notifications.length)
-    notifications.forEach((n: any) => {
-      console.log("[v0] Notification:", n.activity_type, n.note_id, n.metadata)
-    })
-  }, [notifications])
 
   useEffect(() => {
     if (!userLoading && !user) {
@@ -96,7 +108,6 @@ export default function SocialNotificationsPage() {
   }
 
   const handleNotificationClick = (notification: any) => {
-    console.log("[v0] Notification clicked:", notification.id, notification.note_id)
     markAsRead(notification.id)
 
     if (notification.note_id) {
@@ -106,11 +117,10 @@ export default function SocialNotificationsPage() {
 
   const handleDeleteNotification = (e: React.MouseEvent, notificationId: string) => {
     e.stopPropagation()
-    console.log("[v0] Deleting notification:", notificationId)
     deleteNotification(notificationId)
   }
 
-  if (userLoading || loading) {
+  if (userLoading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600" />
@@ -138,9 +148,11 @@ export default function SocialNotificationsPage() {
           <div>
             <h1 className="text-4xl font-bold text-gray-900 mb-2">Social Notifications</h1>
             <p className="text-gray-600">
-              {unreadCount > 0
-                ? `You have ${unreadCount} unread notification${pluralSuffix}`
-                : "You're all caught up!"}
+              {loading
+                ? "Loading notifications..."
+                : unreadCount > 0
+                  ? `You have ${unreadCount} unread notification${pluralSuffix}`
+                  : "You're all caught up!"}
             </p>
           </div>
           <div className="flex gap-2">
@@ -157,7 +169,15 @@ export default function SocialNotificationsPage() {
           </div>
         </div>
 
-        {notifications.length === 0 ? (
+        {loading && notifications.length === 0 && (
+          <div className="space-y-2">
+            {["n1", "n2", "n3", "n4", "n5", "n6", "n7", "n8"].map((key) => (
+              <NotificationSkeleton key={key} />
+            ))}
+          </div>
+        )}
+
+        {!loading && notifications.length === 0 && (
           <Card className="text-center py-12">
             <CardContent>
               <Bell className="h-12 w-12 text-gray-400 mx-auto mb-4" />
@@ -166,7 +186,9 @@ export default function SocialNotificationsPage() {
               <Button onClick={() => router.push("/social")}>Go to Social Hub</Button>
             </CardContent>
           </Card>
-        ) : (
+        )}
+
+        {notifications.length > 0 && (
           <div className="space-y-2">
             {notifications.map((notification: any) => {
               const { title, message } = getNotificationContent(notification)

@@ -8,6 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge"
 import { UserMenu } from "@/components/user-menu"
 import { ManageMembersDialog } from "@/components/social/manage-members-dialog"
+import { Skeleton } from "@/components/ui/skeleton"
 import { Users, Settings, ArrowLeft } from "lucide-react"
 import { BreadcrumbNav } from "@/components/breadcrumb-nav"
 import {
@@ -70,7 +71,7 @@ export default function MySocialPadsPage() {
     setManageMembersOpen(true)
   }
 
-  if (loading || loadingPads) {
+  if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600" />
@@ -107,7 +108,29 @@ export default function MySocialPadsPage() {
       </header>
 
       <main className="container mx-auto px-4 py-8">
-        {pads.length === 0 ? (
+        {loadingPads ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {Array.from({ length: 6 }).map((_, i) => (
+              <Card key={i}>
+                <CardHeader>
+                  <div className="flex items-start justify-between">
+                    <div className="flex-1">
+                      <Skeleton className="h-6 w-3/4 mb-2" />
+                      <Skeleton className="h-4 w-full" />
+                    </div>
+                    <Skeleton className="h-5 w-16 rounded-full" />
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  <div className="flex items-center justify-between">
+                    <Skeleton className="h-4 w-24" />
+                    <Skeleton className="h-8 w-16" />
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        ) : pads.length === 0 ? (
           <Card>
             <CardContent className="py-12 text-center">
               <Users className="h-12 w-12 text-gray-400 mx-auto mb-4" />

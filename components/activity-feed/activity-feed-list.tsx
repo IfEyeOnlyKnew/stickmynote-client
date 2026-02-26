@@ -1,21 +1,53 @@
 "use client"
 
+import { useEffect, useRef } from "react"
 import { useActivityFeed } from "@/hooks/use-activity-feed"
 import { ActivityItem } from "./activity-item"
-import { Button } from "@/components/ui/button"
+import { Skeleton } from "@/components/ui/skeleton"
 import { Loader2, ActivityIcon } from "lucide-react"
 
 interface ActivityFeedListProps {
   readonly userId: string | null
 }
 
+function ActivitySkeleton() {
+  return (
+    <div className="flex items-start gap-3 px-3 py-2">
+      <Skeleton className="h-8 w-8 rounded-full shrink-0" />
+      <div className="flex-1 min-w-0">
+        <Skeleton className="h-4 w-3/4 mb-1" />
+        <Skeleton className="h-3 w-1/2" />
+      </div>
+    </div>
+  )
+}
+
 export function ActivityFeedList({ userId }: ActivityFeedListProps) {
   const { groupedActivities, loading, error, hasMore, loadMore } = useActivityFeed(userId)
+  const sentinelRef = useRef<HTMLDivElement>(null)
+  const observerRef = useRef<IntersectionObserver | null>(null)
+
+  // IntersectionObserver for auto-loading more items
+  useEffect(() => {
+    if (!sentinelRef.current || !hasMore) return
+    observerRef.current = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting && hasMore && !loading) {
+          loadMore()
+        }
+      },
+      { rootMargin: "200px", threshold: 0.1 }
+    )
+    observerRef.current.observe(sentinelRef.current)
+    return () => observerRef.current?.disconnect()
+  }, [hasMore, loading, loadMore])
 
   if (loading && groupedActivities.length === 0) {
     return (
-      <div className="flex items-center justify-center p-8">
-        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+      <div className="space-y-4">
+        {["s1", "s2", "s3", "s4", "s5", "s6"].map((key) => (
+          <ActivitySkeleton key={key} />
+        ))}
       </div>
     )
   }
@@ -53,18 +85,10 @@ export function ActivityFeedList({ userId }: ActivityFeedListProps) {
         </div>
       ))}
 
-      {hasMore && (
-        <div className="flex justify-center pt-4">
-          <Button variant="outline" onClick={loadMore} disabled={loading}>
-            {loading ? (
-              <>
-                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                Loading...
-              </>
-            ) : (
-              "Load More"
-            )}
-          </Button>
+      {hasMore && <div ref={sentinelRef} className="h-4 w-full" />}
+      {hasMore && loading && (
+        <div className="flex justify-center py-4">
+          <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
         </div>
       )}
     </div>

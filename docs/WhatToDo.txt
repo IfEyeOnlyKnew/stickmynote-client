@@ -646,19 +646,25 @@ Goal: Surpass Microsoft's suite by providing a unified, intelligent, and
                            (Enterprise Readiness)
 --------------------------------------------------------------------------------
 
-[  ] 9.1 GLOBAL CDN
-     - Static asset CDN
-     - Edge caching
-     - Multi-region deployment
-     - Latency optimization
-     Status: NEEDS IMPLEMENTATION
+[OK] 9.1 GLOBAL CDN (CDN-Ready Preparation)
+     - Granular cache headers for all asset types (static, uploads, exports, icons, manifest, sw.js)
+     - API response cache headers (auth=no-store, sitemap/robots=public, other=private)
+     - Fixed sw.js 1-year cache bug (must never be cached long-term)
+     - CSP cleanup: removed unused Google Fonts allowances (fonts self-hosted via next/font)
+     - CDN-ready annotations throughout security-headers.ts for future CDN deployment
+     - Vary + X-Content-Type-Options on static assets for proper CDN cache segmentation
+     - CDN deployment reference guide: docs/cdn-configuration.md
+     Status: DONE (CDN-ready, see docs/cdn-configuration.md for deployment steps)
 
-[  ] 9.2 INFINITE SCROLL OPTIMIZATION
-     - Virtual scrolling everywhere
-     - Lazy loading images
-     - Skeleton loaders
-     - Pagination fallbacks
-     Status: PARTIAL
+[OK] 9.2 INFINITE SCROLL OPTIMIZATION
+     - API pagination: social-sticks (limit/offset/userId), social-notifications (limit/offset/hasMore)
+     - Infinite scroll: my-sticks page (IntersectionObserver + server-side userId filter)
+     - Skeleton loaders: my-sticks, my-pads, notifications (page + loading.tsx), activity-feed-list, activity-feed-modal
+     - IntersectionObserver auto-scroll: activity-feed-list, activity-feed-modal (replaces Load More buttons)
+     - Lazy loading images: all next/image uses default lazy (already correct)
+     - Virtual scrolling: CalSticks ListView uses @tanstack/react-virtual (already correct)
+     - Removed unused react-window package (~35KB bundle reduction)
+     Status: DONE
 
 [  ] 9.3 SEARCH PERFORMANCE
      - Full-text search index (Elasticsearch/Meilisearch)
