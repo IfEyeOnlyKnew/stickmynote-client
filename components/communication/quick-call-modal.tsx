@@ -49,6 +49,7 @@ export function QuickCallModal({
 
   // Video room state
   const [activeRoomUrl, setActiveRoomUrl] = useState<string | null>(null)
+  const [activeLivekitRoomName, setActiveLivekitRoomName] = useState<string | null>(null)
 
   // Generate default room name from context
   const getDefaultRoomName = useCallback(() => {
@@ -86,6 +87,7 @@ export function QuickCallModal({
       // Close the setup dialog and open the video room
       onOpenChange(false)
       setActiveRoomUrl(room.room_url)
+      setActiveLivekitRoomName(room.livekit_room_name || null)
 
       if (selectedEmails.length > 0) {
         toast.success(`Invitations sent to ${selectedEmails.length} participant(s)`)
@@ -100,6 +102,7 @@ export function QuickCallModal({
 
   const handleCloseVideoRoom = () => {
     setActiveRoomUrl(null)
+    setActiveLivekitRoomName(null)
     // Reset form for next time
     setRoomName("")
     setAudioOnly(false)
@@ -108,7 +111,7 @@ export function QuickCallModal({
 
   // If we have an active room, show the video modal
   if (activeRoomUrl) {
-    return <VideoRoomModal roomUrl={activeRoomUrl} onClose={handleCloseVideoRoom} />
+    return <VideoRoomModal roomUrl={activeRoomUrl} livekitRoomName={activeLivekitRoomName || undefined} onClose={handleCloseVideoRoom} />
   }
 
   return (

@@ -5,11 +5,10 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Video, Plus, Clock, Copy, Trash2, Info, ExternalLink } from "lucide-react"
+import { Video, Plus, Clock, Copy, Trash2, ExternalLink } from "lucide-react"
 import { UserMenu } from "@/components/user-menu"
 import { useToast } from "@/hooks/use-toast"
 import { BreadcrumbNav } from "@/components/breadcrumb-nav"
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { useHubModeGuard } from "@/hooks/use-hub-mode-guard"
 import { VideoInviteUserSearch } from "@/components/video/VideoInviteUserSearch"
 
@@ -185,15 +184,6 @@ export default function VideoPage() {
           <UserMenu />
         </div>
       </div>
-
-      <Alert className="mb-6 bg-blue-50 border-blue-200">
-        <Info className="h-4 w-4 text-blue-600" />
-        <AlertTitle className="text-blue-800">Transcription Feature</AlertTitle>
-        <AlertDescription className="text-blue-700">
-          For this to work in production, you will need to ensure that Transcription is enabled in your Daily.co domain
-          settings, as it is a paid/premium feature on their platform.
-        </AlertDescription>
-      </Alert>
 
       {/* Create Room Section */}
       <Card className="mb-6 border-blue-200">

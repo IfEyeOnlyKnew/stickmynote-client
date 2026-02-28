@@ -1,158 +1,96 @@
 "use client"
 
-import { useEffect, useRef, useState, useCallback } from "react"
+import { useEffect, useState } from "react"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Mic, MicOff, Video, VideoOff, PhoneOff, Monitor, MonitorOff, ExternalLink } from "lucide-react"
-import DailyIframe from "@daily-co/daily-js"
+import {
+  LiveKitRoom,
+  RoomAudioRenderer,
+  useLocalParticipant,
+  useRoomContext,
+} from "@livekit/components-react"
+import "@livekit/components-styles"
 
 interface VideoRoomModalProps {
+  /** The app's join URL (e.g., /video/join/<roomId>) for "Open in New Tab" */
   roomUrl: string
+  /** The LiveKit room name for connecting. If not provided, extracted from roomUrl. */
+  livekitRoomName?: string
   onClose: () => void
 }
 
-export function VideoRoomModal({ roomUrl, onClose }: VideoRoomModalProps) {
-  const callFrameRef = useRef<any>(null)
-  const [isMuted, setIsMuted] = useState(false)
-  const [isVideoOff, setIsVideoOff] = useState(false)
-  const [isScreenSharing, setIsScreenSharing] = useState(false)
+export function VideoRoomModal({ roomUrl, livekitRoomName, onClose }: VideoRoomModalProps) {
+  const [token, setToken] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [isJoining, setIsJoining] = useState(true)
-  const initializationAttempted = useRef(false)
-  const firstButtonRef = useRef<HTMLButtonElement>(null)
+  const [resolvedRoomName, setResolvedRoomName] = useState<string | null>(livekitRoomName || null)
 
-  const containerCallbackRef = useCallback(
-    (node: HTMLDivElement | null) => {
-      if (node && !initializationAttempted.current) {
-        initializationAttempted.current = true
+  const livekitUrl = process.env.NEXT_PUBLIC_LIVEKIT_URL
 
-        // Give the DOM a moment to fully render
-        setTimeout(() => {
-          initializeDaily(node)
-        }, 100)
-      }
-    },
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [roomUrl],
-  )
-
-  const initializeDaily = (container: HTMLDivElement) => {
-    if (!roomUrl || !roomUrl.includes("daily.co")) {
-      setError("Invalid room URL. Please check your Daily.co configuration.")
-      setIsJoining(false)
-      return
-    }
-
-    try {
-      const callFrame = DailyIframe.createFrame(container, {
-        showLeaveButton: false,
-        showFullscreenButton: true,
-        iframeStyle: {
-          width: "100%",
-          height: "600px",
-          border: "0",
-          borderRadius: "8px",
-        },
-      })
-
-      callFrameRef.current = callFrame
-
-      callFrame.on("joined-meeting", () => {
-        setIsJoining(false)
-        setError(null)
-      })
-
-      callFrame.on("error", (e) => {
-        const errorMsg = e?.errorMsg || e?.error?.msg || "Failed to join video room"
-        setError(errorMsg)
-        setIsJoining(false)
-      })
-
-      const joinTimeout = setTimeout(() => {
-        setError("Connection timeout. The room exists but couldn't connect. Try opening in a new tab instead.")
-        setIsJoining(false)
-      }, 30000)
-
-      callFrame
-        .join({ url: roomUrl })
-        .then(() => {
-          clearTimeout(joinTimeout)
-        })
-        .catch((err) => {
-          clearTimeout(joinTimeout)
-          setError(`Failed to join: ${err.message}`)
-          setIsJoining(false)
-        })
-    } catch (err: any) {
-      setError(`Failed to initialize: ${err.message}`)
-      setIsJoining(false)
-    }
-  }
-
+  // If no livekitRoomName provided, extract roomId from URL and fetch room info
   useEffect(() => {
-    const handleEscape = (e: KeyboardEvent) => {
-      if (e.key === "Escape") {
-        handleLeave()
+    async function resolveRoom() {
+      if (livekitRoomName) {
+        setResolvedRoomName(livekitRoomName)
+        return
       }
-    }
 
-    if (firstButtonRef.current) {
-      firstButtonRef.current.focus()
-    }
+      // Extract roomId from URL like /video/join/<roomId> or full URL
+      const urlPath = roomUrl.includes("/video/join/") ? roomUrl : ""
+      const roomId = urlPath.split("/video/join/").pop()?.split("?")[0]
 
-    window.addEventListener("keydown", handleEscape)
-    return () => window.removeEventListener("keydown", handleEscape)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
-
-  useEffect(() => {
-    return () => {
-      if (callFrameRef.current) {
-        try {
-          callFrameRef.current.destroy()
-        } catch (err) {}
+      if (!roomId) {
+        setError("Invalid room URL")
+        setIsJoining(false)
+        return
       }
-    }
-  }, [])
 
-  const toggleMute = () => {
-    if (callFrameRef.current) {
-      callFrameRef.current.setLocalAudio(!isMuted)
-      setIsMuted(!isMuted)
-    }
-  }
-
-  const toggleVideo = () => {
-    if (callFrameRef.current) {
-      callFrameRef.current.setLocalVideo(!isVideoOff)
-      setIsVideoOff(!isVideoOff)
-    }
-  }
-
-  const toggleScreenShare = async () => {
-    if (callFrameRef.current) {
-      if (isScreenSharing) {
-        await callFrameRef.current.stopScreenShare()
-        setIsScreenSharing(false)
-      } else {
-        await callFrameRef.current.startScreenShare()
-        setIsScreenSharing(true)
-      }
-    }
-  }
-
-  const handleLeave = () => {
-    if (callFrameRef.current) {
       try {
-        callFrameRef.current.leave()
-        callFrameRef.current.destroy()
-      } catch (err) {}
+        const res = await fetch(`/api/video/rooms`)
+        if (!res.ok) throw new Error("Failed to fetch rooms")
+        const data = await res.json()
+        const room = data.rooms?.find((r: any) => r.id === roomId)
+        if (room?.livekit_room_name) {
+          setResolvedRoomName(room.livekit_room_name)
+        } else {
+          setError("Room not found")
+          setIsJoining(false)
+        }
+      } catch {
+        setError("Failed to load room info")
+        setIsJoining(false)
+      }
     }
-    onClose()
-  }
+
+    resolveRoom()
+  }, [roomUrl, livekitRoomName])
+
+  // Fetch token once we have the room name
+  useEffect(() => {
+    if (!resolvedRoomName) return
+
+    async function fetchToken() {
+      try {
+        const res = await fetch(`/api/video/token?roomName=${encodeURIComponent(resolvedRoomName!)}`)
+        if (!res.ok) throw new Error("Failed to get token")
+        const data = await res.json()
+        setToken(data.token)
+      } catch (err) {
+        setError("Failed to connect to video service")
+        setIsJoining(false)
+      }
+    }
+
+    fetchToken()
+  }, [resolvedRoomName])
 
   const openInNewTab = () => {
     window.open(roomUrl, "_blank")
+    onClose()
+  }
+
+  const handleLeave = () => {
     onClose()
   }
 
@@ -200,7 +138,7 @@ export function VideoRoomModal({ roomUrl, onClose }: VideoRoomModalProps) {
         )}
 
         <div className="relative min-h-[600px]">
-          {isJoining && !error && (
+          {(isJoining || !token) && !error && (
             <div
               className="absolute inset-0 flex items-center justify-center bg-background/80 backdrop-blur-sm z-10"
               role="status"
@@ -212,7 +150,6 @@ export function VideoRoomModal({ roomUrl, onClose }: VideoRoomModalProps) {
                   aria-hidden="true"
                 ></div>
                 <p className="text-muted-foreground">Joining video room...</p>
-                <p className="text-xs text-muted-foreground mt-2">Connecting to {roomUrl}</p>
                 <Button
                   onClick={openInNewTab}
                   variant="outline"
@@ -227,70 +164,109 @@ export function VideoRoomModal({ roomUrl, onClose }: VideoRoomModalProps) {
             </div>
           )}
 
-          <div ref={containerCallbackRef} className="w-full min-h-[600px]" aria-label="Video conference container" />
-        </div>
-
-        <div className="flex justify-center gap-4 mt-4" role="group" aria-label="Video conference controls">
-          <Button
-            ref={firstButtonRef}
-            variant={isMuted ? "destructive" : "outline"}
-            size="icon"
-            onClick={toggleMute}
-            className="rounded-full h-12 w-12"
-            disabled={isJoining || !!error}
-            aria-label={isMuted ? "Unmute microphone" : "Mute microphone"}
-            aria-pressed={isMuted}
-          >
-            {isMuted ? (
-              <MicOff className="h-5 w-5" aria-hidden="true" />
-            ) : (
-              <Mic className="h-5 w-5" aria-hidden="true" />
-            )}
-          </Button>
-
-          <Button
-            variant={isVideoOff ? "destructive" : "outline"}
-            size="icon"
-            onClick={toggleVideo}
-            className="rounded-full h-12 w-12"
-            disabled={isJoining || !!error}
-            aria-label={isVideoOff ? "Turn on camera" : "Turn off camera"}
-            aria-pressed={isVideoOff}
-          >
-            {isVideoOff ? (
-              <VideoOff className="h-5 w-5" aria-hidden="true" />
-            ) : (
-              <Video className="h-5 w-5" aria-hidden="true" />
-            )}
-          </Button>
-
-          <Button
-            variant={isScreenSharing ? "default" : "outline"}
-            size="icon"
-            onClick={toggleScreenShare}
-            className="rounded-full h-12 w-12"
-            disabled={isJoining || !!error}
-            aria-label={isScreenSharing ? "Stop screen sharing" : "Start screen sharing"}
-            aria-pressed={isScreenSharing}
-          >
-            {isScreenSharing ? (
-              <MonitorOff className="h-5 w-5" aria-hidden="true" />
-            ) : (
-              <Monitor className="h-5 w-5" aria-hidden="true" />
-            )}
-          </Button>
-
-          <Button
-            variant="destructive"
-            size="icon"
-            onClick={handleLeave}
-            className="rounded-full h-12 w-12"
-            aria-label="Leave video conference"
-          >
-            <PhoneOff className="h-5 w-5" aria-hidden="true" />
-          </Button>
+          {token && livekitUrl && resolvedRoomName && (
+            <LiveKitRoom
+              serverUrl={livekitUrl}
+              token={token}
+              connect={true}
+              audio={true}
+              video={true}
+              onConnected={() => setIsJoining(false)}
+              onDisconnected={handleLeave}
+            >
+              <RoomAudioRenderer />
+              <ModalVideoContent onLeave={handleLeave} />
+            </LiveKitRoom>
+          )}
         </div>
       </DialogContent>
     </Dialog>
+  )
+}
+
+function ModalVideoContent({ onLeave }: { onLeave: () => void }) {
+  const room = useRoomContext()
+  const { localParticipant, isMicrophoneEnabled, isCameraEnabled, isScreenShareEnabled } = useLocalParticipant()
+
+  const toggleMute = async () => {
+    await localParticipant.setMicrophoneEnabled(!isMicrophoneEnabled)
+  }
+
+  const toggleVideo = async () => {
+    await localParticipant.setCameraEnabled(!isCameraEnabled)
+  }
+
+  const toggleScreenShare = async () => {
+    await localParticipant.setScreenShareEnabled(!isScreenShareEnabled)
+  }
+
+  const handleLeave = () => {
+    room.disconnect()
+    onLeave()
+  }
+
+  return (
+    <div className="flex flex-col gap-4">
+      <div className="w-full min-h-[600px] bg-slate-950 rounded-lg flex items-center justify-center text-white">
+        <p className="text-sm text-slate-400">Video conference active</p>
+      </div>
+
+      <div className="flex justify-center gap-4" role="group" aria-label="Video conference controls">
+        <Button
+          variant={!isMicrophoneEnabled ? "destructive" : "outline"}
+          size="icon"
+          onClick={toggleMute}
+          className="rounded-full h-12 w-12"
+          aria-label={!isMicrophoneEnabled ? "Unmute microphone" : "Mute microphone"}
+          aria-pressed={!isMicrophoneEnabled}
+        >
+          {!isMicrophoneEnabled ? (
+            <MicOff className="h-5 w-5" aria-hidden="true" />
+          ) : (
+            <Mic className="h-5 w-5" aria-hidden="true" />
+          )}
+        </Button>
+
+        <Button
+          variant={!isCameraEnabled ? "destructive" : "outline"}
+          size="icon"
+          onClick={toggleVideo}
+          className="rounded-full h-12 w-12"
+          aria-label={!isCameraEnabled ? "Turn on camera" : "Turn off camera"}
+          aria-pressed={!isCameraEnabled}
+        >
+          {!isCameraEnabled ? (
+            <VideoOff className="h-5 w-5" aria-hidden="true" />
+          ) : (
+            <Video className="h-5 w-5" aria-hidden="true" />
+          )}
+        </Button>
+
+        <Button
+          variant={isScreenShareEnabled ? "default" : "outline"}
+          size="icon"
+          onClick={toggleScreenShare}
+          className="rounded-full h-12 w-12"
+          aria-label={isScreenShareEnabled ? "Stop screen sharing" : "Start screen sharing"}
+          aria-pressed={isScreenShareEnabled}
+        >
+          {isScreenShareEnabled ? (
+            <MonitorOff className="h-5 w-5" aria-hidden="true" />
+          ) : (
+            <Monitor className="h-5 w-5" aria-hidden="true" />
+          )}
+        </Button>
+
+        <Button
+          variant="destructive"
+          size="icon"
+          onClick={handleLeave}
+          className="rounded-full h-12 w-12"
+          aria-label="Leave video conference"
+        >
+          <PhoneOff className="h-5 w-5" aria-hidden="true" />
+        </Button>
+      </div>
+    </div>
   )
 }

@@ -31,6 +31,34 @@ app.prepare().then(() => {
   // Attach WebSocket server to the main HTTP server
   createWebSocketServer(server)
 
+  // Refresh materialized views every 5 minutes using a lightweight pool
+  const MV_REFRESH_INTERVAL = 5 * 60 * 1000
+  /** @type {import('pg').Pool | null} */
+  let mvPool = null
+  function getMvPool() {
+    if (!mvPool) {
+      const { Pool } = require("pg")
+      mvPool = new Pool({
+        host: process.env.POSTGRES_HOST || "localhost",
+        port: Number(process.env.POSTGRES_PORT) || 5432,
+        database: process.env.POSTGRES_DATABASE || "stickmynote",
+        user: process.env.POSTGRES_USER || "stickmynote_user",
+        password: process.env.POSTGRES_PASSWORD,
+        ssl: process.env.POSTGRES_SSL === "true" ? { rejectUnauthorized: false } : false,
+        max: 1,
+      })
+    }
+    return mvPool
+  }
+  setInterval(async () => {
+    try {
+      await getMvPool().query("REFRESH MATERIALIZED VIEW social_kb_with_metrics")
+      console.log("[Server] Materialized view social_kb_with_metrics refreshed")
+    } catch {
+      // View may not exist or refresh failed — non-critical
+    }
+  }, MV_REFRESH_INTERVAL)
+
   server.listen(port, () => {
     console.log(`> Ready on http://${hostname}:${port}`)
   })

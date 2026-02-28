@@ -1,55 +1,59 @@
-"use client";
+"use client"
 
-import { useEffect, useRef } from "react";
-import {
-  useParticipant,
-  useVideoTrack,
-  useAudioTrack,
-} from "@daily-co/daily-react";
-import { Card } from "@/components/ui/card";
+import { useEffect, useRef } from "react"
+import type { Participant } from "livekit-client"
+import { Track, ConnectionQuality } from "livekit-client"
+import { Card } from "@/components/ui/card"
 import {
   MicOff,
-  VideoOff,
   SignalHigh,
   SignalMedium,
   SignalLow,
-} from "lucide-react";
+} from "lucide-react"
 
 interface VideoTileProps {
-  sessionId: string;
-  isLocal?: boolean;
-  isActiveSpeaker?: boolean;
+  participant: Participant
+  isLocal?: boolean
+  isActiveSpeaker?: boolean
 }
 
 export function VideoTile({
-  sessionId,
+  participant,
   isLocal = false,
   isActiveSpeaker = false,
 }: VideoTileProps) {
-  const videoRef = useRef<HTMLVideoElement>(null);
-  const audioRef = useRef<HTMLAudioElement>(null);
+  const videoRef = useRef<HTMLVideoElement>(null)
+  const audioRef = useRef<HTMLAudioElement>(null)
 
-  const participant = useParticipant(sessionId);
-  const videoState = useVideoTrack(sessionId);
-  const audioState = useAudioTrack(sessionId);
+  const cameraPublication = participant.getTrackPublication(Track.Source.Camera)
+  const micPublication = participant.getTrackPublication(Track.Source.Microphone)
+
+  const videoTrack = cameraPublication?.track
+  const audioTrack = micPublication?.track
+
+  const isVideoOff = !cameraPublication?.isSubscribed || cameraPublication?.isMuted || !videoTrack
+  const isAudioOff = !micPublication?.isSubscribed || micPublication?.isMuted || !audioTrack
 
   useEffect(() => {
-    if (videoState.track && videoRef.current) {
-      videoRef.current.srcObject = new MediaStream([videoState.track]);
+    if (videoTrack && videoRef.current) {
+      videoTrack.attach(videoRef.current)
+      return () => {
+        videoTrack.detach(videoRef.current!)
+      }
     }
-  }, [videoState.track]);
+  }, [videoTrack])
 
   useEffect(() => {
-    if (audioState.track && audioRef.current && !isLocal) {
-      audioRef.current.srcObject = new MediaStream([audioState.track]);
+    if (audioTrack && audioRef.current && !isLocal) {
+      audioTrack.attach(audioRef.current)
+      return () => {
+        audioTrack.detach(audioRef.current!)
+      }
     }
-  }, [audioState.track, isLocal]);
+  }, [audioTrack, isLocal])
 
-  if (!participant) return null;
-
-  const isVideoOff = videoState.isOff;
-  const isAudioOff = audioState.isOff;
-  const networkQuality = participant.networkThreshold || "good";
+  const connectionQuality = participant.connectionQuality
+  const displayName = participant.name || participant.identity || "Guest"
 
   return (
     <Card
@@ -61,7 +65,7 @@ export function VideoTile({
       <video
         ref={videoRef}
         autoPlay
-        muted={true} // Always mute video element to avoid echo, we handle audio separately or it's local
+        muted={true}
         playsInline
         className={`w-full h-full object-cover ${
           isLocal ? "scale-x-[-1]" : ""
@@ -81,7 +85,7 @@ export function VideoTile({
       {isVideoOff && (
         <div className="absolute inset-0 flex items-center justify-center bg-slate-900">
           <div className="h-20 w-20 rounded-full bg-slate-800 flex items-center justify-center text-2xl font-semibold text-white">
-            {participant.user_name?.slice(0, 2).toUpperCase() || "??"}
+            {displayName.slice(0, 2).toUpperCase()}
           </div>
         </div>
       )}
@@ -89,23 +93,23 @@ export function VideoTile({
       {/* Participant Name Label */}
       <div className="absolute bottom-2 left-2 bg-black/50 px-2 py-1 rounded text-xs text-white flex items-center gap-2 backdrop-blur-sm">
         <span>
-          {participant.user_name || "Guest"} {isLocal && "(You)"}
+          {displayName} {isLocal && "(You)"}
         </span>
         {isAudioOff && <MicOff className="h-3 w-3 text-red-400" />}
       </div>
 
       {/* Status Indicators */}
       <div className="absolute top-2 right-2 flex gap-1 p-1 bg-black/30 rounded backdrop-blur-sm">
-        {networkQuality === "good" && (
+        {(connectionQuality === ConnectionQuality.Excellent || connectionQuality === ConnectionQuality.Good) && (
           <SignalHigh className="h-4 w-4 text-green-500" />
         )}
-        {networkQuality === "low" && (
+        {connectionQuality === ConnectionQuality.Poor && (
           <SignalMedium className="h-4 w-4 text-yellow-500" />
         )}
-        {networkQuality === "very-low" && (
+        {connectionQuality === ConnectionQuality.Lost && (
           <SignalLow className="h-4 w-4 text-red-500" />
         )}
       </div>
     </Card>
-  );
+  )
 }

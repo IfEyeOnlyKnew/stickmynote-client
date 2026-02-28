@@ -13,9 +13,21 @@ interface DatabaseConfig {
   connectionTimeoutMillis?: number
 }
 
+interface QueryStat {
+  sql: string
+  duration: number
+  rowCount: number | null
+  timestamp: number
+  slow: boolean
+}
+
+const SLOW_QUERY_THRESHOLD = Number(process.env.POSTGRES_SLOW_QUERY_MS) || 500
+const MAX_QUERY_STATS = 100
+
 class PostgresDatabase {
   private pool: Pool | null = null
   private readonly config: DatabaseConfig
+  private readonly queryStats: QueryStat[] = []
 
   constructor() {
     // Configure SSL
@@ -25,6 +37,8 @@ class PostgresDatabase {
       sslConfig = { rejectUnauthorized: process.env.POSTGRES_SSL_REJECT_UNAUTHORIZED !== "false" }
     }
 
+    const maxPool = Number(process.env.POSTGRES_MAX_POOL) || 20
+
     this.config = {
       host: process.env.POSTGRES_HOST || "localhost",
       port: Number.parseInt(process.env.POSTGRES_PORT || "5432"),
@@ -32,7 +46,7 @@ class PostgresDatabase {
       user: process.env.POSTGRES_USER || "stickmynote_user",
       password: process.env.POSTGRES_PASSWORD || "",
       ssl: sslConfig,
-      max: 20, // Maximum pool size
+      max: maxPool,
       idleTimeoutMillis: 30000,
       connectionTimeoutMillis: 10000,
     }
@@ -59,7 +73,26 @@ class PostgresDatabase {
       const start = Date.now()
       const result = await pool.query<T>(text, params)
       const duration = Date.now() - start
-      console.log("[PostgreSQL] Query executed", { text: text.substring(0, 100), duration, rows: result.rowCount })
+      const slow = duration > SLOW_QUERY_THRESHOLD
+
+      if (slow) {
+        console.warn("[PostgreSQL] SLOW QUERY", { text, duration, rows: result.rowCount })
+      } else {
+        console.log("[PostgreSQL] Query executed", { text: text.substring(0, 100), duration, rows: result.rowCount })
+      }
+
+      // Record query stats
+      this.queryStats.push({
+        sql: text.substring(0, 200),
+        duration,
+        rowCount: result.rowCount,
+        timestamp: Date.now(),
+        slow,
+      })
+      if (this.queryStats.length > MAX_QUERY_STATS) {
+        this.queryStats.shift()
+      }
+
       return result
     } catch (error) {
       console.error("[PostgreSQL] Query error:", error)
@@ -98,6 +131,51 @@ class PostgresDatabase {
       return {
         healthy: false,
         message: error instanceof Error ? error.message : "Unknown database error",
+      }
+    }
+  }
+
+  /**
+   * Get pool connection metrics.
+   * Uses built-in pg Pool properties: totalCount, idleCount, waitingCount.
+   */
+  getPoolMetrics(): { totalCount: number; idleCount: number; waitingCount: number; maxPool: number } {
+    const pool = this.getPool()
+    return {
+      totalCount: pool.totalCount,
+      idleCount: pool.idleCount,
+      waitingCount: pool.waitingCount,
+      maxPool: this.config.max ?? 20,
+    }
+  }
+
+  /**
+   * Get recent query statistics (last 100 queries).
+   * Includes slow query detection based on POSTGRES_SLOW_QUERY_MS threshold.
+   */
+  getQueryStats(): { queries: readonly QueryStat[]; slowQueryThresholdMs: number; slowCount: number } {
+    return {
+      queries: this.queryStats,
+      slowQueryThresholdMs: SLOW_QUERY_THRESHOLD,
+      slowCount: this.queryStats.filter((q) => q.slow).length,
+    }
+  }
+
+  /**
+   * Refresh materialized views concurrently (non-blocking).
+   */
+  async refreshMaterializedViews(): Promise<void> {
+    try {
+      await this.query("REFRESH MATERIALIZED VIEW CONCURRENTLY social_kb_with_metrics")
+      console.log("[PostgreSQL] Materialized view social_kb_with_metrics refreshed")
+    } catch (error) {
+      // View may not exist or may not have a UNIQUE index for CONCURRENTLY
+      // Fall back to non-concurrent refresh
+      try {
+        await this.query("REFRESH MATERIALIZED VIEW social_kb_with_metrics")
+        console.log("[PostgreSQL] Materialized view social_kb_with_metrics refreshed (non-concurrent)")
+      } catch {
+        console.warn("[PostgreSQL] Could not refresh materialized view:", error instanceof Error ? error.message : error)
       }
     }
   }

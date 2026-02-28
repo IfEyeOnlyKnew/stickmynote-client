@@ -3,20 +3,19 @@
 import { useEffect, useState, useCallback } from "react"
 import Image from "next/image"
 import {
-  DailyProvider,
-  useParticipantIds,
-  useLocalSessionId,
-  useDaily,
-  useScreenShare,
+  LiveKitRoom,
+  RoomAudioRenderer,
   useLocalParticipant,
-  useActiveSpeakerId,
-  useParticipant,
-  useAppMessage,
-  useRecording,
-  useTranscription,
-  useDevices, // Import useDevices from @daily-co/daily-react instead of missing hook
-} from "@daily-co/daily-react"
-import DailyIframe, { type DailyCall } from "@daily-co/daily-js"
+  useParticipants,
+  useRoomContext,
+  useChat,
+  useDataChannel,
+  useMediaDeviceSelect,
+  useSpeakingParticipants,
+} from "@livekit/components-react"
+import "@livekit/components-styles"
+import { Track, type LocalVideoTrack, type DataPublishOptions } from "livekit-client"
+import { BackgroundProcessor, type BackgroundProcessorWrapper } from "@livekit/track-processors"
 import { VideoTile } from "./video-tile"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -33,7 +32,6 @@ import {
   Users,
   MessageSquare,
   Settings,
-  Disc,
   LayoutGrid,
   Maximize,
   Send,
@@ -41,7 +39,6 @@ import {
   Smile,
   ImageIcon,
   Wand2,
-  Captions,
 } from "lucide-react"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { ScrollArea } from "@/components/ui/scroll-area"
@@ -49,50 +46,79 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "./vi
 import { Badge } from "@/components/ui/badge"
 
 interface CustomVideoCallProps {
-  roomUrl: string
+  roomName: string
   onLeave: () => void
   userName?: string
   isMinimized?: boolean
 }
 
-export function CustomVideoCall({ roomUrl, onLeave, userName = "Guest", isMinimized = false }: CustomVideoCallProps) {
-  const [callObject, setCallObject] = useState<DailyCall | null>(null)
+export function CustomVideoCall({ roomName, onLeave, userName = "Guest", isMinimized = false }: CustomVideoCallProps) {
+  const [token, setToken] = useState<string | null>(null)
+  const [error, setError] = useState<string | null>(null)
+  const livekitUrl = process.env.NEXT_PUBLIC_LIVEKIT_URL
 
   useEffect(() => {
-    const newCallObject = DailyIframe.createCallObject()
-    setCallObject(newCallObject)
-
-    return () => {
-      newCallObject.destroy()
+    async function fetchToken() {
+      try {
+        const res = await fetch(`/api/video/token?roomName=${encodeURIComponent(roomName)}`)
+        if (!res.ok) throw new Error("Failed to get token")
+        const data = await res.json()
+        setToken(data.token)
+      } catch (err) {
+        console.error("Failed to fetch LiveKit token:", err)
+        setError("Failed to connect to video service")
+      }
     }
-  }, [])
+    fetchToken()
+  }, [roomName])
 
-  if (!callObject) return null
+  if (error) {
+    return (
+      <div className="flex items-center justify-center h-full bg-slate-950 text-white">
+        <div className="text-center">
+          <p className="text-red-400 mb-4">{error}</p>
+          <Button variant="outline" onClick={onLeave}>Leave</Button>
+        </div>
+      </div>
+    )
+  }
+
+  if (!token || !livekitUrl) {
+    return (
+      <div className="flex items-center justify-center h-full bg-slate-950 text-white">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-white mx-auto mb-4" />
+          <p className="text-slate-400">Connecting to video room...</p>
+        </div>
+      </div>
+    )
+  }
 
   return (
-    <DailyProvider callObject={callObject}>
-      <VideoCallContent roomUrl={roomUrl} onLeave={onLeave} userName={userName} isMinimized={isMinimized} />
-    </DailyProvider>
+    <LiveKitRoom
+      serverUrl={livekitUrl}
+      token={token}
+      connect={true}
+      audio={true}
+      video={true}
+      onDisconnected={onLeave}
+    >
+      <RoomAudioRenderer />
+      <VideoCallContent roomName={roomName} onLeave={onLeave} userName={userName} isMinimized={isMinimized} />
+    </LiveKitRoom>
   )
 }
 
-function VideoCallContent({ roomUrl, onLeave, userName, isMinimized }: CustomVideoCallProps) {
-  const call = useDaily()
-  const participantIds = useParticipantIds()
-  const localSessionId = useLocalSessionId()
-  const localParticipant = useLocalParticipant()
-  const activeSpeakerId = useActiveSpeakerId()
-  const { isSharingScreen, startScreenShare, stopScreenShare } = useScreenShare()
-  const { isRecording, startRecording, stopRecording } = useRecording()
-  const { isTranscribing, startTranscription, stopTranscription } = useTranscription()
-  const { cameras, microphones, speakers, setCamera, setMicrophone, setSpeaker, camState, micState } = useDevices()
+function VideoCallContent({ roomName, onLeave, userName, isMinimized }: CustomVideoCallProps) {
+  const room = useRoomContext()
+  const participants = useParticipants()
+  const { localParticipant, isMicrophoneEnabled, isCameraEnabled, isScreenShareEnabled } = useLocalParticipant()
+  const speakingParticipants = useSpeakingParticipants()
+  const { chatMessages, send: sendChatMessage } = useChat()
 
-  const [isMicMuted, setIsMicMuted] = useState(false)
-  const [isCamOff, setIsCamOff] = useState(false)
   const [showParticipants, setShowParticipants] = useState(false)
   const [showChat, setShowChat] = useState(false)
   const [showSettings, setShowSettings] = useState(false)
-  const [messages, setMessages] = useState<{ sender: string; text: string }[]>([])
   const [chatInput, setChatInput] = useState("")
   const [layout, setLayout] = useState<"grid" | "speaker">("grid")
   const [reactions, setReactions] = useState<{ id: string; emoji: string; x: number }[]>([])
@@ -100,44 +126,21 @@ function VideoCallContent({ roomUrl, onLeave, userName, isMinimized }: CustomVid
   const [backgroundImage, setBackgroundImage] = useState<string>(
     "https://images.unsplash.com/photo-1497366216548-37526070297c?w=800&q=80",
   )
-  const [caption, setCaption] = useState<{
-    text: string
-    speaker: string
-  } | null>(null)
+  const [bgProcessor, setBgProcessor] = useState<BackgroundProcessorWrapper | null>(null)
 
-  useEffect(() => {
-    if (!call) return
-
-    const handleTranscription = (evt: any) => {
-      // Only show final results or update in real-time?
-      // Let's show everything but maybe style it differently?
-      // For now, just show the text.
-      if (evt.text) {
-        // Try to find the participant name
-        const participants = call.participants()
-        const speaker = participants[evt.participantId]?.user_name || "Unknown"
-
-        setCaption({ text: evt.text, speaker })
-
-        // Clear caption after 5 seconds of no activity
-        const timer = setTimeout(() => setCaption(null), 5000)
-        return () => clearTimeout(timer)
+  // Reaction data channel
+  const { send: sendReactionData } = useDataChannel("reaction", (msg) => {
+    try {
+      const data = JSON.parse(new TextDecoder().decode(msg.payload))
+      if (data.emoji) {
+        addReaction(data.emoji)
       }
-    }
+    } catch {}
+  })
 
-    call.on("transcription-message", handleTranscription)
-    return () => {
-      call.off("transcription-message", handleTranscription)
-    }
-  }, [call])
-
-  const toggleTranscription = () => {
-    if (isTranscribing) {
-      stopTranscription()
-    } else {
-      startTranscription()
-    }
-  }
+  const activeSpeakerId = speakingParticipants.length > 0
+    ? speakingParticipants[0].identity
+    : null
 
   const PRESET_BACKGROUNDS = [
     {
@@ -158,20 +161,9 @@ function VideoCallContent({ roomUrl, onLeave, userName, isMinimized }: CustomVid
     },
   ]
 
-  const sendAppMessage = useAppMessage({
-    onAppMessage: (ev) => {
-      const name = ev.data.name || "Guest"
-      if (ev.data.type === "chat") {
-        setMessages((prev) => [...prev, { sender: name, text: ev.data.message }])
-      } else if (ev.data.type === "reaction") {
-        addReaction(ev.data.emoji)
-      }
-    },
-  })
-
   const addReaction = (emoji: string) => {
     const id = Math.random().toString(36).substring(7)
-    const x = Math.random() * 80 + 10 // Random position between 10% and 90%
+    const x = Math.random() * 80 + 10
     setReactions((prev) => [...prev, { id, emoji, x }])
     setTimeout(() => {
       setReactions((prev) => prev.filter((r) => r.id !== id))
@@ -179,77 +171,59 @@ function VideoCallContent({ roomUrl, onLeave, userName, isMinimized }: CustomVid
   }
 
   const sendReaction = (emoji: string) => {
-    sendAppMessage({ type: "reaction", emoji, name: userName })
+    const payload = new TextEncoder().encode(JSON.stringify({ emoji, name: userName }))
+    sendReactionData(payload, { topic: "reaction" } as DataPublishOptions)
     addReaction(emoji)
   }
 
-  const handleSendMessage = () => {
+  const handleSendMessage = async () => {
     if (!chatInput.trim()) return
-    sendAppMessage({
-      type: "chat",
-      message: chatInput,
-      name: userName || "Guest",
-    })
-    setMessages((prev) => [...prev, { sender: "You", text: chatInput }])
+    try {
+      await sendChatMessage(chatInput)
+    } catch (err) {
+      console.error("Failed to send message:", err)
+    }
     setChatInput("")
   }
 
-  const toggleRecording = () => {
-    if (isRecording) {
-      stopRecording()
-    } else {
-      startRecording()
-    }
-  }
+  const toggleMic = useCallback(async () => {
+    await localParticipant.setMicrophoneEnabled(!isMicrophoneEnabled)
+  }, [localParticipant, isMicrophoneEnabled])
 
-  useEffect(() => {
-    if (call && roomUrl) {
-      call.join({ url: roomUrl, userName }).catch((err) => console.error("Failed to join call:", err))
-    }
-  }, [call, roomUrl, userName])
+  const toggleCam = useCallback(async () => {
+    await localParticipant.setCameraEnabled(!isCameraEnabled)
+  }, [localParticipant, isCameraEnabled])
 
-  const toggleMic = useCallback(() => {
-    call?.setLocalAudio(isMicMuted)
-    setIsMicMuted(!isMicMuted)
-  }, [call, isMicMuted])
-
-  const toggleCam = useCallback(() => {
-    call?.setLocalVideo(isCamOff)
-    setIsCamOff(!isCamOff)
-  }, [call, isCamOff])
-
-  const toggleScreenShare = useCallback(() => {
-    if (isSharingScreen) {
-      stopScreenShare()
-    } else {
-      startScreenShare()
-    }
-  }, [isSharingScreen, startScreenShare, stopScreenShare])
+  const toggleScreenShare = useCallback(async () => {
+    await localParticipant.setScreenShareEnabled(!isScreenShareEnabled)
+  }, [localParticipant, isScreenShareEnabled])
 
   const handleLeave = useCallback(() => {
-    call?.leave()
+    room.disconnect()
     onLeave()
-  }, [call, onLeave])
+  }, [room, onLeave])
 
   const applyVideoEffect = useCallback(
     async (effect: "none" | "blur" | "image", imageUrl?: string) => {
-      if (!call) return
+      const camPub = localParticipant.getTrackPublication(Track.Source.Camera)
+      const camTrack = camPub?.track as LocalVideoTrack | undefined
+
+      if (!camTrack) return
 
       try {
-        const config: any = { video: { processor: { type: effect } } }
-
-        if (effect === "blur") {
-          config.video.processor.type = "background-blur"
-          config.video.processor.config = { strength: 0.7 }
+        if (effect === "none") {
+          await camTrack.stopProcessor()
+          setBgProcessor(null)
+        } else if (effect === "blur") {
+          const processor = BackgroundProcessor({ mode: "background-blur", blurRadius: 10 })
+          await camTrack.setProcessor(processor)
+          setBgProcessor(processor)
         } else if (effect === "image") {
-          config.video.processor.type = "background-image"
-          config.video.processor.config = {
-            source: imageUrl || backgroundImage,
-          }
+          const url = imageUrl || backgroundImage
+          const processor = BackgroundProcessor({ mode: "virtual-background", imagePath: url })
+          await camTrack.setProcessor(processor)
+          setBgProcessor(processor)
         }
-
-        // @ts-ignore - updateInputSettings is available but might not be in the type definition depending on version
-        await call.updateInputSettings(config)
 
         setVideoEffect(effect)
         if (imageUrl) setBackgroundImage(imageUrl)
@@ -257,35 +231,32 @@ function VideoCallContent({ roomUrl, onLeave, userName, isMinimized }: CustomVid
         console.error("Failed to apply video effect:", e)
       }
     },
-    [call, backgroundImage],
+    [localParticipant, backgroundImage],
   )
-
-  // Filter out screen shares from regular grid if needed, or handle them specially
-  // For now, we just render all participants
 
   const renderGrid = () => {
     if (isMinimized) {
-      const targetId = activeSpeakerId || participantIds[0] || localSessionId
+      const target = speakingParticipants[0] || participants[0] || localParticipant
       return (
         <div className="w-full h-full">
-          <VideoTile sessionId={targetId} isLocal={targetId === localSessionId} isActiveSpeaker={true} />
+          <VideoTile participant={target} isLocal={target.identity === localParticipant.identity} isActiveSpeaker={true} />
         </div>
       )
     }
 
-    if (layout === "speaker" && participantIds.length > 1) {
-      const speakerId = activeSpeakerId || participantIds[0]
-      const others = participantIds.filter((id) => id !== speakerId)
+    if (layout === "speaker" && participants.length > 1) {
+      const speaker = speakingParticipants[0] || participants[0]
+      const others = participants.filter((p) => p.identity !== speaker.identity)
 
       return (
         <div className="flex h-full gap-4">
           <div className="flex-1 relative">
-            <VideoTile sessionId={speakerId} isLocal={speakerId === localSessionId} isActiveSpeaker={true} />
+            <VideoTile participant={speaker} isLocal={speaker.identity === localParticipant.identity} isActiveSpeaker={true} />
           </div>
           <div className="w-64 flex flex-col gap-4 overflow-y-auto pr-2">
-            {others.map((id) => (
-              <div key={id} className="h-48 flex-shrink-0">
-                <VideoTile sessionId={id} isLocal={id === localSessionId} isActiveSpeaker={false} />
+            {others.map((p) => (
+              <div key={p.identity} className="h-48 flex-shrink-0">
+                <VideoTile participant={p} isLocal={p.identity === localParticipant.identity} isActiveSpeaker={false} />
               </div>
             ))}
           </div>
@@ -296,17 +267,22 @@ function VideoCallContent({ roomUrl, onLeave, userName, isMinimized }: CustomVid
     return (
       <div
         className={`grid gap-4 h-full ${
-          participantIds.length <= 1
+          participants.length <= 1
             ? "grid-cols-1"
-            : participantIds.length <= 4
+            : participants.length <= 4
               ? "grid-cols-2"
-              : participantIds.length <= 9
+              : participants.length <= 9
                 ? "grid-cols-3"
                 : "grid-cols-4"
         }`}
       >
-        {participantIds.map((id) => (
-          <VideoTile key={id} sessionId={id} isLocal={id === localSessionId} isActiveSpeaker={id === activeSpeakerId} />
+        {participants.map((p) => (
+          <VideoTile
+            key={p.identity}
+            participant={p}
+            isLocal={p.identity === localParticipant.identity}
+            isActiveSpeaker={p.identity === activeSpeakerId}
+          />
         ))}
       </div>
     )
@@ -338,13 +314,6 @@ function VideoCallContent({ roomUrl, onLeave, userName, isMinimized }: CustomVid
             </div>
           ))}
         </div>
-
-        {/* Transcription Caption */}
-        {caption && (
-          <div className="absolute bottom-4 left-1/2 -translate-x-1/2 bg-black/70 text-white text-sm rounded-md px-4 py-2 shadow-lg">
-            <strong>{caption.speaker}:</strong> {caption.text}
-          </div>
-        )}
       </div>
 
       {/* Chat Sidebar */}
@@ -358,18 +327,23 @@ function VideoCallContent({ roomUrl, onLeave, userName, isMinimized }: CustomVid
           </div>
           <ScrollArea className="flex-1 p-4">
             <div className="space-y-4">
-              {messages.map((msg, i) => (
-                <div key={i} className={`flex flex-col ${msg.sender === "You" ? "items-end" : "items-start"}`}>
-                  <span className="text-xs text-slate-400 mb-1">{msg.sender}</span>
-                  <div
-                    className={`px-3 py-2 rounded-lg max-w-[80%] ${
-                      msg.sender === "You" ? "bg-indigo-600 text-white" : "bg-slate-800 text-slate-200"
-                    }`}
-                  >
-                    {msg.text}
+              {chatMessages.map((msg, i) => {
+                const isMe = msg.from?.identity === localParticipant.identity
+                return (
+                  <div key={i} className={`flex flex-col ${isMe ? "items-end" : "items-start"}`}>
+                    <span className="text-xs text-slate-400 mb-1">
+                      {isMe ? "You" : msg.from?.name || msg.from?.identity || "Guest"}
+                    </span>
+                    <div
+                      className={`px-3 py-2 rounded-lg max-w-[80%] ${
+                        isMe ? "bg-indigo-600 text-white" : "bg-slate-800 text-slate-200"
+                      }`}
+                    >
+                      {msg.message}
+                    </div>
                   </div>
-                </div>
-              ))}
+                )
+              })}
             </div>
           </ScrollArea>
           <div className="p-4 border-t border-slate-800 flex gap-2">
@@ -387,34 +361,24 @@ function VideoCallContent({ roomUrl, onLeave, userName, isMinimized }: CustomVid
         </div>
       )}
 
-      {/* Caption Overlay */}
-      {caption && !isMinimized && (
-        <div className="absolute bottom-24 left-1/2 -translate-x-1/2 max-w-2xl w-full px-4 z-40 text-center">
-          <div className="bg-black/60 backdrop-blur-md p-4 rounded-lg text-white shadow-lg transition-all animate-in fade-in slide-in-from-bottom-4">
-            <p className="text-sm text-slate-300 mb-1 font-medium">{caption.speaker}</p>
-            <p className="text-lg font-medium leading-relaxed">{caption.text}</p>
-          </div>
-        </div>
-      )}
-
       {/* Controls Bar */}
       {isMinimized ? (
         <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex items-center gap-2 bg-slate-900/90 p-2 rounded-full border border-slate-800 z-50 backdrop-blur-sm">
           <Button
-            variant={isMicMuted ? "destructive" : "secondary"}
+            variant={!isMicrophoneEnabled ? "destructive" : "secondary"}
             size="icon"
             className="rounded-full h-8 w-8"
             onClick={toggleMic}
           >
-            {isMicMuted ? <MicOff className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
+            {!isMicrophoneEnabled ? <MicOff className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
           </Button>
           <Button
-            variant={isCamOff ? "destructive" : "secondary"}
+            variant={!isCameraEnabled ? "destructive" : "secondary"}
             size="icon"
             className="rounded-full h-8 w-8"
             onClick={toggleCam}
           >
-            {isCamOff ? <VideoOff className="h-4 w-4" /> : <Video className="h-4 w-4" />}
+            {!isCameraEnabled ? <VideoOff className="h-4 w-4" /> : <Video className="h-4 w-4" />}
           </Button>
           <Button variant="destructive" size="icon" className="rounded-full h-8 w-8" onClick={handleLeave}>
             <PhoneOff className="h-4 w-4" />
@@ -423,26 +387,6 @@ function VideoCallContent({ roomUrl, onLeave, userName, isMinimized }: CustomVid
       ) : (
         <div className="h-20 bg-slate-900 border-t border-slate-800 flex items-center justify-center gap-4 px-4 relative z-30">
           <div className="absolute left-4 flex gap-2">
-            <Button
-              variant={isRecording ? "destructive" : "secondary"}
-              size="icon"
-              className={`rounded-full h-10 w-10 ${isRecording ? "animate-pulse" : ""}`}
-              onClick={toggleRecording}
-              title={isRecording ? "Stop Recording" : "Start Recording"}
-            >
-              <Disc className="h-4 w-4" />
-            </Button>
-
-            <Button
-              variant={isTranscribing ? "default" : "secondary"}
-              size="icon"
-              className={`rounded-full h-10 w-10 ${isTranscribing ? "bg-indigo-600 hover:bg-indigo-700" : ""}`}
-              onClick={toggleTranscription}
-              title={isTranscribing ? "Stop Captions" : "Start Captions"}
-            >
-              <Captions className="h-4 w-4" />
-            </Button>
-
             <Button
               variant="secondary"
               size="icon"
@@ -455,30 +399,30 @@ function VideoCallContent({ roomUrl, onLeave, userName, isMinimized }: CustomVid
           </div>
 
           <Button
-            variant={isMicMuted ? "destructive" : "secondary"}
+            variant={!isMicrophoneEnabled ? "destructive" : "secondary"}
             size="icon"
             className="rounded-full h-12 w-12"
             onClick={toggleMic}
           >
-            {isMicMuted ? <MicOff /> : <Mic />}
+            {!isMicrophoneEnabled ? <MicOff /> : <Mic />}
           </Button>
 
           <Button
-            variant={isCamOff ? "destructive" : "secondary"}
+            variant={!isCameraEnabled ? "destructive" : "secondary"}
             size="icon"
             className="rounded-full h-12 w-12"
             onClick={toggleCam}
           >
-            {isCamOff ? <VideoOff /> : <Video />}
+            {!isCameraEnabled ? <VideoOff /> : <Video />}
           </Button>
 
           <Button
-            variant={isSharingScreen ? "default" : "secondary"}
+            variant={isScreenShareEnabled ? "default" : "secondary"}
             size="icon"
-            className={`rounded-full h-12 w-12 ${isSharingScreen ? "bg-green-600 hover:bg-green-700" : ""}`}
+            className={`rounded-full h-12 w-12 ${isScreenShareEnabled ? "bg-green-600 hover:bg-green-700" : ""}`}
             onClick={toggleScreenShare}
           >
-            {isSharingScreen ? <MonitorOff /> : <Monitor />}
+            {isScreenShareEnabled ? <MonitorOff /> : <Monitor />}
           </Button>
 
           <Button variant="destructive" size="icon" className="rounded-full h-12 w-12 ml-4" onClick={handleLeave}>
@@ -515,9 +459,9 @@ function VideoCallContent({ roomUrl, onLeave, userName, isMinimized }: CustomVid
             >
               <div className="relative">
                 <MessageSquare />
-                {messages.length > 0 && !showChat && (
+                {chatMessages.length > 0 && !showChat && (
                   <Badge className="absolute -top-2 -right-2 h-4 w-4 flex items-center justify-center p-0 text-[10px] bg-red-500">
-                    {messages.length}
+                    {chatMessages.length}
                   </Badge>
                 )}
               </div>
@@ -529,7 +473,7 @@ function VideoCallContent({ roomUrl, onLeave, userName, isMinimized }: CustomVid
                   <div className="relative">
                     <Users />
                     <Badge className="absolute -top-2 -right-2 h-5 w-5 flex items-center justify-center p-0 text-xs bg-slate-800 text-white">
-                      {participantIds.length}
+                      {participants.length}
                     </Badge>
                   </div>
                 </Button>
@@ -540,8 +484,12 @@ function VideoCallContent({ roomUrl, onLeave, userName, isMinimized }: CustomVid
                 </SheetHeader>
                 <ScrollArea className="h-[calc(100vh-100px)] mt-4">
                   <div className="space-y-4">
-                    {participantIds.map((id) => (
-                      <ParticipantListItem key={id} sessionId={id} isLocal={id === localSessionId} />
+                    {participants.map((p) => (
+                      <ParticipantListItem
+                        key={p.identity}
+                        participant={p}
+                        isLocal={p.identity === localParticipant.identity}
+                      />
                     ))}
                   </div>
                 </ScrollArea>
@@ -558,62 +506,9 @@ function VideoCallContent({ roomUrl, onLeave, userName, isMinimized }: CustomVid
                   <SheetTitle className="text-white">Settings</SheetTitle>
                 </SheetHeader>
                 <div className="mt-6 space-y-6">
-                  <div className="space-y-2">
-                    <Label>Camera</Label>
-                    <Select
-                      value={cameras.find((c) => c.selected)?.device.deviceId || ""}
-                      onValueChange={(val) => setCamera(val)}
-                    >
-                      <SelectTrigger className="bg-slate-800 border-slate-700 text-white">
-                        <SelectValue placeholder="Select camera" />
-                      </SelectTrigger>
-                      <SelectContent className="bg-slate-800 border-slate-700 text-white">
-                        {cameras.map((cam) => (
-                          <SelectItem key={cam.device.deviceId} value={cam.device.deviceId}>
-                            {cam.device.label}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label>Microphone</Label>
-                    <Select
-                      value={microphones.find((m) => m.selected)?.device.deviceId || ""}
-                      onValueChange={(val) => setMicrophone(val)}
-                    >
-                      <SelectTrigger className="bg-slate-800 border-slate-700 text-white">
-                        <SelectValue placeholder="Select microphone" />
-                      </SelectTrigger>
-                      <SelectContent className="bg-slate-800 border-slate-700 text-white">
-                        {microphones.map((mic) => (
-                          <SelectItem key={mic.device.deviceId} value={mic.device.deviceId}>
-                            {mic.device.label}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label>Speakers</Label>
-                    <Select
-                      value={speakers.find((s) => s.selected)?.device.deviceId || ""}
-                      onValueChange={(val) => setSpeaker(val)}
-                    >
-                      <SelectTrigger className="bg-slate-800 border-slate-700 text-white">
-                        <SelectValue placeholder="Select speakers" />
-                      </SelectTrigger>
-                      <SelectContent className="bg-slate-800 border-slate-700 text-white">
-                        {speakers.map((spk) => (
-                          <SelectItem key={spk.device.deviceId} value={spk.device.deviceId}>
-                            {spk.device.label}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
+                  <DeviceSettings kind="videoinput" label="Camera" />
+                  <DeviceSettings kind="audioinput" label="Microphone" />
+                  <DeviceSettings kind="audiooutput" label="Speakers" />
 
                   <div className="space-y-2">
                     <Label>Video Effects</Label>
@@ -678,29 +573,53 @@ function VideoCallContent({ roomUrl, onLeave, userName, isMinimized }: CustomVid
   )
 }
 
+function DeviceSettings({ kind, label }: { kind: MediaDeviceKind; label: string }) {
+  const { devices, activeDeviceId, setActiveMediaDevice } = useMediaDeviceSelect({ kind })
+
+  return (
+    <div className="space-y-2">
+      <Label>{label}</Label>
+      <Select
+        value={activeDeviceId || ""}
+        onValueChange={(val) => setActiveMediaDevice(val)}
+      >
+        <SelectTrigger className="bg-slate-800 border-slate-700 text-white">
+          <SelectValue placeholder={`Select ${label.toLowerCase()}`} />
+        </SelectTrigger>
+        <SelectContent className="bg-slate-800 border-slate-700 text-white">
+          {devices.map((device) => (
+            <SelectItem key={device.deviceId} value={device.deviceId}>
+              {device.label || `${label} ${device.deviceId.slice(0, 8)}`}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+    </div>
+  )
+}
+
 function ParticipantListItem({
-  sessionId,
+  participant,
   isLocal,
 }: {
-  sessionId: string
+  participant: { identity: string; name?: string; isMicrophoneEnabled?: boolean; isCameraEnabled?: boolean }
   isLocal: boolean
 }) {
-  const participant = useParticipant(sessionId)
-  if (!participant) return null
+  const displayName = participant.name || participant.identity || "Guest"
 
   return (
     <div className="flex items-center justify-between p-2 rounded hover:bg-slate-800">
       <div className="flex items-center gap-3">
         <div className="h-8 w-8 rounded-full bg-indigo-600 flex items-center justify-center text-xs font-bold">
-          {participant.user_name?.slice(0, 2).toUpperCase() || "??"}
+          {displayName.slice(0, 2).toUpperCase()}
         </div>
         <div className="text-sm font-medium">
-          {participant.user_name || "Guest"} {isLocal && "(You)"}
+          {displayName} {isLocal && "(You)"}
         </div>
       </div>
       <div className="flex gap-2 text-slate-400">
-        {!participant.audio && <MicOff className="h-4 w-4" />}
-        {!participant.video && <VideoOff className="h-4 w-4" />}
+        {!participant.isMicrophoneEnabled && <MicOff className="h-4 w-4" />}
+        {!participant.isCameraEnabled && <VideoOff className="h-4 w-4" />}
       </div>
     </div>
   )

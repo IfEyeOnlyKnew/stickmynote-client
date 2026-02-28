@@ -1,6 +1,7 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { getCachedAuthUser, createRateLimitResponse, createUnauthorizedResponse } from "@/lib/auth/cached-auth"
 import { db } from "@/lib/database/pg-client"
+import { createVideoRoom } from "@/lib/livekit/rooms"
 import type { CreateMeetingRequest } from "@/types/meeting"
 
 export const dynamic = "force-dynamic"
@@ -231,23 +232,9 @@ export async function POST(request: NextRequest) {
 
     if (create_video_room) {
       try {
-        const response = await fetch(
-          `${process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000"}/api/video/rooms`,
-          {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              name: title,
-              inviteEmails: [], // We'll send invites separately with meeting details
-            }),
-          }
-        )
-
-        if (response.ok) {
-          const { room } = await response.json()
-          videoRoomId = room.id
-          videoRoomUrl = room.room_url
-        }
+        const room = await createVideoRoom(title, user.id)
+        videoRoomId = room.id
+        videoRoomUrl = room.room_url
       } catch (error) {
         console.error("[Meetings API] Error creating video room:", error)
         // Continue without video room

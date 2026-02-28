@@ -666,27 +666,40 @@ Goal: Surpass Microsoft's suite by providing a unified, intelligent, and
      - Removed unused react-window package (~35KB bundle reduction)
      Status: DONE
 
-[  ] 9.3 SEARCH PERFORMANCE
-     - Full-text search index (Elasticsearch/Meilisearch)
-     - Search result caching
-     - Typeahead optimization
-     - Faceted search
-     Status: PARTIAL
+[OK] 9.3 SEARCH PERFORMANCE
+     - Trigram GIN indexes on social_sticks, social_stick_replies, paks_pad_sticks, social_pads
+     - SQL-level ILIKE text filtering (replaced O(n) JS filtering)
+     - Composite index on (org_id, social_pad_id, created_at DESC)
+     - In-memory caching with 1-minute TTL + Cache-Control headers
+     - SQL-level pagination with exact count (limit/offset, default 20, max 100)
+     - Skeleton loaders on search page + route-level loading.tsx
+     - "Load More" pagination UI with total result count
+     - Faceted metadata: authors, pads extracted from results
+     Status: DONE (migration 39-add-search-indexes.sql required)
 
-[  ] 9.4 REAL-TIME SCALABILITY
-     - WebSocket clustering
-     - Presence at scale
-     - Message queue (Redis Streams)
-     - Horizontal scaling support
-     Status: NEEDS ASSESSMENT
+[OK] 9.4 REAL-TIME SCALABILITY
+     - WebSocket clustering via PostgreSQL LISTEN/NOTIFY (pg-pubsub adapter)
+     - Cross-process broadcasting: all publish calls route through pg_notify
+     - Presence via Memcached: auto-expiring keys (60s TTL), 10x DB write reduction
+     - Per-user connection limit (max 5, oldest evicted with code 4000)
+     - WebSocket metrics: totalConnections, uniqueUsers, connectionsPerOrg, uptime
+     - Owner-only /api/admin/ws-metrics endpoint
+     - Graceful fallback: local-only broadcast when pg-pubsub unavailable
+     - Zero new dependencies, zero changes to publish-event.ts or client hooks
+     Status: DONE
 
-[  ] 9.5 DATABASE OPTIMIZATION
-     - Read replicas
-     - Connection pooling
-     - Query optimization
-     - Index analysis
-     - Slow query monitoring
-     Status: PARTIAL
+[OK] 9.5 DATABASE OPTIMIZATION
+     - Slow query monitoring: auto-detection at configurable threshold (POSTGRES_SLOW_QUERY_MS, default 500ms)
+     - Query stats ring buffer: last 100 queries with duration, rowCount, slow flag
+     - Pool metrics: totalCount, idleCount, waitingCount exposed via getPoolMetrics()
+     - Configurable pool size via POSTGRES_MAX_POOL env var (default 20)
+     - pg_stat_statements: migration 40 enables extension for query performance analysis
+     - Owner-only /api/admin/db-stats endpoint: pool metrics, slow queries, top queries,
+       index usage, unused indexes, sequential scan tables, table sizes, table bloat
+     - Index analysis: unused indexes (0 scans), seq-scan-heavy tables, index sizes
+     - Materialized view refresh: social_kb_with_metrics auto-refreshed every 5 minutes
+     - Read replicas: deferred (infrastructure change, not code)
+     Status: DONE (migration 40-enable-pg-stat-statements.sql optional)
 
 ================================================================================
                           CATEGORY 10: USER EXPERIENCE
@@ -868,11 +881,14 @@ By Category:
 ================================================================================
                               DOCUMENT VERSION
 ================================================================================
-Last Updated: 2026-02-20
+Last Updated: 2026-02-26
 Author: Claude Code Analysis
-Version: 1.5
+Version: 1.6
 
 Change Log:
+- 2026-02-27: Marked 9.5 Database Optimization as DONE (slow query monitoring, pool metrics, index analysis, MV refresh)
+- 2026-02-27: Marked 9.4 Real-Time Scalability as DONE (pg-pubsub, Memcached presence, connection limits, metrics)
+- 2026-02-26: Marked 9.3 Search Performance as DONE (trigram indexes, SQL filtering, pagination, caching, skeletons)
 - 2026-02-20: Marked 8.5 Compliance Certifications as MOSTLY COMPLETE
 - 2026-02-20: Updated Summary Statistics (10 implemented features)
 - 2026-02-19: Marked 8.4 Encryption at Rest as MOSTLY COMPLETE

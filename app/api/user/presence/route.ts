@@ -1,6 +1,7 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { getCachedAuthUser, createRateLimitResponse, createUnauthorizedResponse } from "@/lib/auth/cached-auth"
 import { db } from "@/lib/database/pg-client"
+import { cache } from "@/lib/cache/memcached-client"
 import { publishToOrg } from "@/lib/ws/publish-event"
 import { getOrgContext } from "@/lib/auth/get-org-context"
 
@@ -9,14 +10,23 @@ import { getOrgContext } from "@/lib/auth/get-org-context"
  *
  * Heartbeat endpoint to track online/offline status.
  * Clients should call this every 30-60 seconds while active.
+ *
+ * Presence state is stored in Memcached for fast reads with auto-expiry.
+ * PostgreSQL `last_seen_at` is synced every 5 minutes for persistence.
  */
 
-// Online threshold in minutes - users seen within this time are considered online
-const ONLINE_THRESHOLD_MINUTES = 5
+// Memcached TTL for presence key (seconds). If no heartbeat arrives
+// within this window, the key auto-expires and the user appears offline.
+const PRESENCE_TTL = 60
+
+// How often to sync presence to PostgreSQL (seconds).
+// Reduces DB writes from every 30s to every 5 minutes per user (~10x reduction).
+const DB_SYNC_INTERVAL = 300
 
 /**
  * POST /api/user/presence
- * Update the current user's last_seen_at timestamp (heartbeat)
+ * Update the current user's presence (heartbeat).
+ * Writes to Memcached (fast, auto-expiring) and periodically syncs to PostgreSQL.
  */
 export async function POST(request: NextRequest) {
   try {
@@ -30,11 +40,24 @@ export async function POST(request: NextRequest) {
       return createUnauthorizedResponse()
     }
 
-    // Update last_seen_at
-    await db.query(
-      `UPDATE users SET last_seen_at = NOW() WHERE id = $1`,
-      [user.id]
+    const now = new Date().toISOString()
+
+    // Write presence to Memcached with auto-expiry TTL
+    await cache.set(
+      `presence:${user.id}`,
+      JSON.stringify({ lastSeenAt: now }),
+      { ex: PRESENCE_TTL }
     )
+
+    // Periodic PostgreSQL sync: only update DB every DB_SYNC_INTERVAL
+    const lastDbSync = await cache.get(`presence_db_sync:${user.id}`)
+    if (!lastDbSync) {
+      await db.query(
+        `UPDATE users SET last_seen_at = NOW() WHERE id = $1`,
+        [user.id]
+      )
+      await cache.set(`presence_db_sync:${user.id}`, "1", { ex: DB_SYNC_INTERVAL })
+    }
 
     // Broadcast presence update to org members
     try {
@@ -42,7 +65,7 @@ export async function POST(request: NextRequest) {
       if (orgContext) {
         publishToOrg(orgContext.orgId, {
           type: "presence.update",
-          payload: { userId: user.id, isOnline: true, lastSeenAt: new Date().toISOString() },
+          payload: { userId: user.id, isOnline: true, lastSeenAt: now },
           timestamp: Date.now(),
         })
       }
@@ -59,9 +82,12 @@ export async function POST(request: NextRequest) {
 
 /**
  * GET /api/user/presence
- * Get online status for a list of user IDs
+ * Get online status for a list of user IDs.
+ * Reads from Memcached (fast): key exists = online, missing = offline.
+ * Falls back to PostgreSQL for last_seen_at of offline users.
+ *
  * Query params:
- *   - ids: comma-separated list of user IDs
+ *   - ids: comma-separated list of user IDs (max 100)
  */
 export async function GET(request: NextRequest) {
   try {
@@ -92,20 +118,35 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "Maximum 100 user IDs allowed" }, { status: 400 })
     }
 
-    // Get presence for the requested users
-    const result = await db.query(
-      `SELECT id, last_seen_at,
-              CASE WHEN last_seen_at > NOW() - INTERVAL '${ONLINE_THRESHOLD_MINUTES} minutes' THEN true ELSE false END as is_online
-       FROM users
-       WHERE id = ANY($1)`,
-      [userIds]
-    )
-
+    // Check Memcached for each user's presence
     const presence: Record<string, { isOnline: boolean; lastSeenAt: string | null }> = {}
-    for (const row of result.rows) {
-      presence[row.id] = {
-        isOnline: row.is_online,
-        lastSeenAt: row.last_seen_at,
+    const offlineIds: string[] = []
+
+    for (const userId of userIds) {
+      const cached = await cache.get(`presence:${userId}`)
+      if (cached) {
+        try {
+          const data = JSON.parse(cached)
+          presence[userId] = { isOnline: true, lastSeenAt: data.lastSeenAt }
+        } catch {
+          presence[userId] = { isOnline: true, lastSeenAt: null }
+        }
+      } else {
+        presence[userId] = { isOnline: false, lastSeenAt: null }
+        offlineIds.push(userId)
+      }
+    }
+
+    // Batch-fetch last_seen_at from PostgreSQL for offline users
+    if (offlineIds.length > 0) {
+      const result = await db.query(
+        `SELECT id, last_seen_at FROM users WHERE id = ANY($1)`,
+        [offlineIds]
+      )
+      for (const row of result.rows) {
+        if (presence[row.id]) {
+          presence[row.id].lastSeenAt = row.last_seen_at
+        }
       }
     }
 

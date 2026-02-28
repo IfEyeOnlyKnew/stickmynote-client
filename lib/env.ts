@@ -96,7 +96,11 @@ const serverSchema = z.object({
 
   // API Keys - OPTIONAL
   BRAVE_API_KEY: z.string().optional(),
-  DAILY_API_KEY: z.string().optional(),
+
+  // LiveKit (self-hosted video conferencing)
+  LIVEKIT_URL: z.string().optional(),
+  LIVEKIT_API_KEY: z.string().optional(),
+  LIVEKIT_API_SECRET: z.string().optional(),
 
   // Sentry (Error Tracking) - OPTIONAL
   SENTRY_DSN: z.string().url().optional(),
@@ -115,7 +119,7 @@ const serverSchema = z.object({
 
   // Public URLs - OPTIONAL but recommended
   NEXT_PUBLIC_SITE_URL: z.string().url().optional(),
-  NEXT_PUBLIC_DAILY_DOMAIN: z.string().optional(),
+  NEXT_PUBLIC_LIVEKIT_URL: z.string().optional(),
   NEXT_PUBLIC_SENTRY_DSN: z.string().url().optional(),
 
   NODE_ENV: z.enum(["development", "production", "test"]).optional(),

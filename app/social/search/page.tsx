@@ -2,12 +2,13 @@
 
 import type React from "react"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useCallback } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
+import { Skeleton } from "@/components/ui/skeleton"
 import { BreadcrumbNav } from "@/components/breadcrumb-nav"
 import { useUser } from "@/contexts/user-context"
 import {
@@ -21,6 +22,7 @@ import {
   SlidersHorizontal,
   TrendingUp,
   Clock,
+  Loader2,
 } from "lucide-react"
 import { formatDistanceToNow } from "date-fns"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
@@ -28,9 +30,13 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Checkbox } from "@/components/ui/checkbox"
 import { Label } from "@/components/ui/label"
 
+const PAGE_SIZE = 20
+
 interface SearchMetadata {
   totalSticks: number
   totalReplies: number
+  total: number
+  hasMore: boolean
   authors: Array<{ id: string; name: string; email: string }>
   pads: Array<{ id: string; name: string }>
 }
@@ -80,6 +86,53 @@ interface ReplyResult {
   }
 }
 
+function StickSkeleton() {
+  return (
+    <Card>
+      <CardHeader>
+        <div className="flex items-start justify-between gap-4">
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2 mb-2">
+              <Skeleton className="w-1 h-6 rounded" />
+              <Skeleton className="h-5 w-2/3" />
+            </div>
+            <Skeleton className="h-4 w-full mb-1" />
+            <Skeleton className="h-4 w-3/4" />
+          </div>
+          <Skeleton className="h-6 w-16 rounded-full" />
+        </div>
+      </CardHeader>
+      <CardContent>
+        <div className="flex flex-wrap items-center gap-4">
+          <Skeleton className="h-4 w-24" />
+          <Skeleton className="h-4 w-20" />
+          <Skeleton className="h-4 w-28" />
+          <Skeleton className="h-4 w-24" />
+        </div>
+      </CardContent>
+    </Card>
+  )
+}
+
+function ReplySkeleton() {
+  return (
+    <Card>
+      <CardHeader>
+        <Skeleton className="h-4 w-full mb-1" />
+        <Skeleton className="h-4 w-2/3 mb-2" />
+        <Skeleton className="h-5 w-16 rounded-full" />
+      </CardHeader>
+      <CardContent>
+        <div className="flex flex-wrap items-center gap-4">
+          <Skeleton className="h-3 w-20" />
+          <Skeleton className="h-3 w-24" />
+          <Skeleton className="h-3 w-28" />
+        </div>
+      </CardContent>
+    </Card>
+  )
+}
+
 export default function SocialSearchPage() {
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -89,6 +142,8 @@ export default function SocialSearchPage() {
   const [replyResults, setReplyResults] = useState<ReplyResult[]>([])
   const [metadata, setMetadata] = useState<SearchMetadata | null>(null)
   const [loading, setLoading] = useState(false)
+  const [loadingMore, setLoadingMore] = useState(false)
+  const [offset, setOffset] = useState(0)
   const [activeTab, setActiveTab] = useState<"sticks" | "replies">("sticks")
 
   // Filter states
@@ -110,13 +165,12 @@ export default function SocialSearchPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams])
 
-  const performSearch = async (searchQuery = query) => {
-    if (!searchQuery.trim() && !selectedAuthor && !selectedPad) return
-
-    setLoading(true)
-    try {
-      const params = new URLSearchParams({
+  const buildSearchParams = useCallback(
+    (searchQuery: string, searchOffset: number) => {
+      return new URLSearchParams({
         q: searchQuery,
+        limit: PAGE_SIZE.toString(),
+        offset: searchOffset.toString(),
         ...(dateFrom && { dateFrom }),
         ...(dateTo && { dateTo }),
         ...(visibility !== "all" && { visibility }),
@@ -126,18 +180,49 @@ export default function SocialSearchPage() {
         sortBy,
         sortOrder,
       })
+    },
+    [dateFrom, dateTo, visibility, selectedAuthor, selectedPad, includeReplies, sortBy, sortOrder],
+  )
 
+  const performSearch = async (searchQuery = query) => {
+    if (!searchQuery.trim() && !selectedAuthor && !selectedPad) return
+
+    setLoading(true)
+    setOffset(0)
+    try {
+      const params = buildSearchParams(searchQuery, 0)
       const response = await fetch(`/api/social-search?${params}`)
       if (response.ok) {
         const data = await response.json()
         setStickResults(data.sticks || [])
         setReplyResults(data.replies || [])
         setMetadata(data.metadata)
+        setOffset(PAGE_SIZE)
       }
     } catch (error) {
-      console.error("[v0] Error performing search:", error)
+      console.error("Error performing search:", error)
     } finally {
       setLoading(false)
+    }
+  }
+
+  const loadMore = async () => {
+    if (loadingMore || !metadata?.hasMore) return
+
+    setLoadingMore(true)
+    try {
+      const params = buildSearchParams(query, offset)
+      const response = await fetch(`/api/social-search?${params}`)
+      if (response.ok) {
+        const data = await response.json()
+        setStickResults((prev) => [...prev, ...(data.sticks || [])])
+        setMetadata(data.metadata)
+        setOffset((prev) => prev + PAGE_SIZE)
+      }
+    } catch (error) {
+      console.error("Error loading more results:", error)
+    } finally {
+      setLoadingMore(false)
     }
   }
 
@@ -177,69 +262,84 @@ export default function SocialSearchPage() {
 
   const renderStickResults = () => {
     if (loading) {
-      return (
-        <div className="flex items-center justify-center py-12">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600" />
-        </div>
-      )
+      return ["sk1", "sk2", "sk3", "sk4", "sk5", "sk6"].map((key) => <StickSkeleton key={key} />)
     }
 
     if (stickResults.length > 0) {
-      return stickResults.map((stick) => (
-        <Card
-          key={stick.id}
-          className="cursor-pointer hover:shadow-lg transition-shadow"
-          onClick={() => router.push(`/social/sticks/${stick.id}`)}
-        >
-          <CardHeader>
-            <div className="flex items-start justify-between gap-4">
-              <div className="flex-1 min-w-0">
-                <CardTitle className="text-lg mb-2 flex items-center gap-2">
-                  <div className="w-1 h-6 rounded" style={{ backgroundColor: stick.color }} />
-                  {stick.topic}
-                </CardTitle>
-                <p className="text-sm text-gray-600 line-clamp-2">{stick.content}</p>
-              </div>
-              <Badge
-                variant={stick.social_pads.is_public ? "default" : "secondary"}
-                className="flex-shrink-0"
-              >
-                {stick.social_pads.is_public ? (
+      return (
+        <>
+          {stickResults.map((stick) => (
+            <Card
+              key={stick.id}
+              className="cursor-pointer hover:shadow-lg transition-shadow"
+              onClick={() => router.push(`/social/sticks/${stick.id}`)}
+            >
+              <CardHeader>
+                <div className="flex items-start justify-between gap-4">
+                  <div className="flex-1 min-w-0">
+                    <CardTitle className="text-lg mb-2 flex items-center gap-2">
+                      <div className="w-1 h-6 rounded" style={{ backgroundColor: stick.color }} />
+                      {stick.topic}
+                    </CardTitle>
+                    <p className="text-sm text-gray-600 line-clamp-2">{stick.content}</p>
+                  </div>
+                  <Badge
+                    variant={stick.social_pads?.is_public ? "default" : "secondary"}
+                    className="flex-shrink-0"
+                  >
+                    {stick.social_pads?.is_public ? (
+                      <>
+                        <Globe className="h-3 w-3 mr-1" />
+                        Public
+                      </>
+                    ) : (
+                      <>
+                        <Lock className="h-3 w-3 mr-1" />
+                        Private
+                      </>
+                    )}
+                  </Badge>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <div className="flex flex-wrap items-center gap-4 text-sm text-gray-500">
+                  <div className="flex items-center gap-1">
+                    <User className="h-4 w-4" />
+                    {stick.users?.full_name || stick.users?.email}
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <MessageSquare className="h-4 w-4" />
+                    {stick.reply_count} {stick.reply_count === 1 ? "reply" : "replies"}
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <Calendar className="h-4 w-4" />
+                    {formatDistanceToNow(new Date(stick.created_at), { addSuffix: true })}
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <Folder className="h-4 w-4" />
+                    <span className="font-medium">{stick.social_pads?.name}</span>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+
+          {metadata?.hasMore && (
+            <div className="flex justify-center pt-2">
+              <Button variant="outline" onClick={loadMore} disabled={loadingMore}>
+                {loadingMore ? (
                   <>
-                    <Globe className="h-3 w-3 mr-1" />
-                    Public
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Loading...
                   </>
                 ) : (
-                  <>
-                    <Lock className="h-3 w-3 mr-1" />
-                    Private
-                  </>
+                  "Load More Results"
                 )}
-              </Badge>
+              </Button>
             </div>
-          </CardHeader>
-          <CardContent>
-            <div className="flex flex-wrap items-center gap-4 text-sm text-gray-500">
-              <div className="flex items-center gap-1">
-                <User className="h-4 w-4" />
-                {stick.users?.full_name || stick.users?.email}
-              </div>
-              <div className="flex items-center gap-1">
-                <MessageSquare className="h-4 w-4" />
-                {stick.reply_count} {stick.reply_count === 1 ? "reply" : "replies"}
-              </div>
-              <div className="flex items-center gap-1">
-                <Calendar className="h-4 w-4" />
-                {formatDistanceToNow(new Date(stick.created_at), { addSuffix: true })}
-              </div>
-              <div className="flex items-center gap-1">
-                <Folder className="h-4 w-4" />
-                <span className="font-medium">{stick.social_pads.name}</span>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      ))
+          )}
+        </>
+      )
     }
 
     if (query || hasActiveFilters) {
@@ -267,11 +367,7 @@ export default function SocialSearchPage() {
 
   const renderReplyResults = () => {
     if (loading) {
-      return (
-        <div className="flex items-center justify-center py-12">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600" />
-        </div>
-      )
+      return ["rk1", "rk2", "rk3", "rk4"].map((key) => <ReplySkeleton key={key} />)
     }
 
     if (replyResults.length > 0) {
@@ -303,11 +399,11 @@ export default function SocialSearchPage() {
               </div>
               <div className="flex items-center gap-1">
                 <MessageSquare className="h-3 w-3" />
-                On: <span className="font-medium">{reply.social_sticks.topic}</span>
+                On: <span className="font-medium">{reply.social_sticks?.topic}</span>
               </div>
               <div className="flex items-center gap-1">
                 <Folder className="h-3 w-3" />
-                <span className="font-medium">{reply.social_sticks.social_pads.name}</span>
+                <span className="font-medium">{reply.social_sticks?.social_pads?.name}</span>
               </div>
             </div>
           </CardContent>
@@ -513,8 +609,12 @@ export default function SocialSearchPage() {
                 </CardHeader>
                 <CardContent className="space-y-2 text-sm">
                   <div className="flex justify-between">
-                    <span className="text-gray-600">Sticks:</span>
-                    <span className="font-semibold">{metadata.totalSticks}</span>
+                    <span className="text-gray-600">Total Matches:</span>
+                    <span className="font-semibold">{metadata.total}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">Showing:</span>
+                    <span className="font-semibold">{stickResults.length} sticks</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-gray-600">Replies:</span>
@@ -558,7 +658,7 @@ export default function SocialSearchPage() {
               <TabsList className="grid w-full grid-cols-2 max-w-md">
                 <TabsTrigger value="sticks" className="flex items-center gap-2">
                   <MessageSquare className="h-4 w-4" />
-                  Sticks ({stickResults.length})
+                  Sticks ({metadata?.total ?? stickResults.length})
                 </TabsTrigger>
                 <TabsTrigger value="replies" className="flex items-center gap-2">
                   <MessageSquare className="h-4 w-4" />

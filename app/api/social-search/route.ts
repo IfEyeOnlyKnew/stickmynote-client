@@ -2,6 +2,7 @@ import { type NextRequest, NextResponse } from "next/server"
 import { createDatabaseClient, type DatabaseClient } from "@/lib/database/database-adapter"
 import { getOrgContext } from "@/lib/auth/get-org-context"
 import { getCachedAuthUser } from "@/lib/auth/cached-auth"
+import { cache } from "@/lib/cache"
 
 // Types
 interface UserData {
@@ -58,6 +59,8 @@ interface SearchParams {
   includeReplies: boolean
   sortBy: string
   sortOrder: string
+  limit: number
+  offset: number
 }
 
 interface AuthorInfo {
@@ -96,6 +99,9 @@ const Errors = {
 
 // Helper functions
 function parseSearchParams(searchParams: URLSearchParams): SearchParams {
+  const rawLimit = parseInt(searchParams.get("limit") || "20", 10)
+  const rawOffset = parseInt(searchParams.get("offset") || "0", 10)
+
   return {
     query: searchParams.get("q") || "",
     dateFrom: searchParams.get("dateFrom"),
@@ -106,6 +112,8 @@ function parseSearchParams(searchParams: URLSearchParams): SearchParams {
     includeReplies: searchParams.get("includeReplies") === "true",
     sortBy: searchParams.get("sortBy") || "created_at",
     sortOrder: searchParams.get("sortOrder") || "desc",
+    limit: Math.min(Math.max(rawLimit, 1), 100),
+    offset: Math.max(rawOffset, 0),
   }
 }
 
@@ -305,24 +313,61 @@ export async function GET(request: NextRequest) {
       accessiblePadIds.push(pad.id)
     }
 
+    const emptyResponse = {
+      sticks: [],
+      replies: [],
+      metadata: { totalSticks: 0, totalReplies: 0, total: 0, hasMore: false, authors: [], pads: [] },
+    }
+
     if (accessiblePadIds.length === 0) {
-      return NextResponse.json({
-        sticks: [],
-        replies: [],
-        metadata: { totalSticks: 0, totalReplies: 0, authors: [], pads: [] },
+      return NextResponse.json(emptyResponse)
+    }
+
+    // Check cache
+    const cacheKey = `social-search:${orgContext.orgId}:${user.id}:${JSON.stringify({
+      q: params.query, dateFrom: params.dateFrom, dateTo: params.dateTo,
+      visibility: params.visibility, authorId: params.authorId, padId: params.padId,
+      includeReplies: params.includeReplies, sortBy: params.sortBy, sortOrder: params.sortOrder,
+      limit: params.limit, offset: params.offset,
+    })}`
+    const cached = cache.get<typeof emptyResponse>(cacheKey)
+    if (cached) {
+      return NextResponse.json(cached, {
+        headers: { "Cache-Control": "private, max-age=30, stale-while-revalidate=60", "X-Cache": "HIT" },
       })
     }
 
-    // Build and execute sticks query
+    // Build sticks query with SQL-level text filter
     let sticksQuery = db
       .from("social_sticks")
-      .select(STICKS_SELECT)
+      .select(STICKS_SELECT, { count: "exact" })
       .eq("org_id", orgContext.orgId)
       .in("social_pad_id", accessiblePadIds)
 
+    // Apply text search in SQL (uses trigram indexes)
+    if (params.query) {
+      sticksQuery = sticksQuery.or(
+        `topic.ilike.%${params.query}%,content.ilike.%${params.query}%`
+      )
+    }
+
     sticksQuery = applyFilters(sticksQuery, params)
 
-    const { data: sticks, error: sticksError } = await sticksQuery
+    // Apply SQL-level sort for created_at / updated_at
+    const sortAscending = params.sortOrder === "asc"
+    if (params.sortBy === "updated_at") {
+      sticksQuery = sticksQuery.order("updated_at", { ascending: sortAscending, nullsFirst: false })
+    } else {
+      sticksQuery = sticksQuery.order("created_at", { ascending: sortAscending })
+    }
+
+    // Apply pagination (skip for "replies" sort — need all results for reply-count sorting)
+    const needsJsSort = params.sortBy === "replies"
+    if (!needsJsSort) {
+      sticksQuery = sticksQuery.range(params.offset, params.offset + params.limit - 1)
+    }
+
+    const { data: sticks, error: sticksError, count: totalCount } = await sticksQuery
 
     if (sticksError) {
       console.error("[SocialSearch] Error fetching sticks:", sticksError)
@@ -347,7 +392,7 @@ export async function GET(request: NextRequest) {
     const stickIds = sticks?.map((s: any) => s.id) || []
     const replyCountMap = await fetchReplyCounts(db, stickIds, orgContext.orgId)
 
-    // Normalize and process sticks - attach pad and user data
+    // Normalize and process sticks — attach pad and user data
     let processedSticks: StickData[] = (sticks || []).map((stick: any) => ({
       ...stick,
       social_pads: padMap[stick.social_pad_id] || null,
@@ -355,8 +400,13 @@ export async function GET(request: NextRequest) {
       reply_count: replyCountMap[stick.id] || 0,
     }))
 
-    // Apply text search filter
-    processedSticks = filterByQuery(processedSticks, params.query)
+    // For "replies" sort: sort in JS then slice for pagination
+    let total = totalCount || 0
+    if (needsJsSort) {
+      processedSticks = sortSticks(processedSticks, params.sortBy, params.sortOrder)
+      total = processedSticks.length
+      processedSticks = processedSticks.slice(params.offset, params.offset + params.limit)
+    }
 
     // Search replies if requested
     let replyResults: unknown[] = []
@@ -366,6 +416,7 @@ export async function GET(request: NextRequest) {
         .select(REPLIES_SELECT)
         .ilike("content", `%${params.query}%`)
         .eq("org_id", orgContext.orgId)
+        .limit(params.limit)
 
       // Fetch sticks for replies to check accessibility
       const replyStickIds = [...new Set((replies || []).map((r: any) => r.social_stick_id).filter(Boolean))]
@@ -407,22 +458,29 @@ export async function GET(request: NextRequest) {
         }))
     }
 
-    // Sort results
-    processedSticks = sortSticks(processedSticks, params.sortBy, params.sortOrder)
-
     // Extract metadata
     const authors = extractAuthors(processedSticks)
-    const pads = extractPads(processedSticks)
+    const padsInfo = extractPads(processedSticks)
+    const hasMore = total > params.offset + params.limit
 
-    return NextResponse.json({
+    const result = {
       sticks: processedSticks,
       replies: replyResults,
       metadata: {
         totalSticks: processedSticks.length,
         totalReplies: replyResults.length,
+        total,
+        hasMore,
         authors,
-        pads,
+        pads: padsInfo,
       },
+    }
+
+    // Cache for 1 minute
+    cache.set(cacheKey, result, 60_000)
+
+    return NextResponse.json(result, {
+      headers: { "Cache-Control": "private, max-age=30, stale-while-revalidate=60", "X-Cache": "MISS" },
     })
   } catch (error) {
     console.error("[SocialSearch] Search error:", error)
