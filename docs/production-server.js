@@ -1,4 +1,5 @@
-const { createServer } = require("node:http")
+const { createServer } = require("node:https")
+const { createServer: createHttpServer } = require("node:http")
 const next = require("next")
 const fs = require("node:fs")
 const pathModule = require("node:path")
@@ -6,14 +7,18 @@ const { createWebSocketServer } = require("./lib/ws/ws-server")
 
 const dev = process.env.NODE_ENV !== "production"
 const hostname = process.env.HOSTNAME || "localhost"
-const port = Number.parseInt(process.env.PORT || "80", 10)
+const port = 443
+const httpPort = 80
+
+// SSL certificates
+const httpsOptions = {
+  key: fs.readFileSync(pathModule.join(__dirname, "certs", "server.key")),
+  cert: fs.readFileSync(pathModule.join(__dirname, "certs", "server.crt")),
+}
 
 // Initialize Next.js app
 const app = next({ dev, hostname, port })
-// Prevent Next.js from registering its own upgrade handler on the server.
-// Next.js's setupWebSocketHandler() adds an upgrade listener that calls
-// handleRequestImpl with the socket as res, corrupting WebSocket connections.
-// We handle WebSocket upgrades ourselves in lib/ws/ws-server.js.
+// Prevent Next.js from registering its own upgrade handler
 app.didWebSocketSetup = true
 const handle = app.getRequestHandler()
 
@@ -27,8 +32,9 @@ app.prepare().then(() => {
     ".pdf": "application/pdf", ".docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
   }
 
-  const server = createServer(async (req, res) => {
-    // Skip WebSocket upgrade requests — handled by ws library via upgrade event
+  const server = createServer(httpsOptions, async (req, res) => {
+    // Node.js v24 fires request events for WebSocket upgrades.
+    // Neutralize the response so Next.js cannot corrupt the WebSocket socket.
     if (req.headers.upgrade) return
 
     // Serve dynamically uploaded files from public/uploads/
@@ -57,38 +63,18 @@ app.prepare().then(() => {
     }
   })
 
-  // Attach WebSocket server to the main HTTP server
+  // Attach WebSocket server to the main HTTPS server
   createWebSocketServer(server)
 
-  // Refresh materialized views every 5 minutes using a lightweight pool
-  const MV_REFRESH_INTERVAL = 5 * 60 * 1000
-  /** @type {import('pg').Pool | null} */
-  let mvPool = null
-  function getMvPool() {
-    if (!mvPool) {
-      const { Pool } = require("pg")
-      mvPool = new Pool({
-        host: process.env.POSTGRES_HOST || "localhost",
-        port: Number(process.env.POSTGRES_PORT) || 5432,
-        database: process.env.POSTGRES_DATABASE || "stickmynote",
-        user: process.env.POSTGRES_USER || "stickmynote_user",
-        password: process.env.POSTGRES_PASSWORD,
-        ssl: process.env.POSTGRES_SSL === "true" ? { rejectUnauthorized: false } : false,
-        max: 1,
-      })
-    }
-    return mvPool
-  }
-  setInterval(async () => {
-    try {
-      await getMvPool().query("REFRESH MATERIALIZED VIEW social_kb_with_metrics")
-      console.log("[Server] Materialized view social_kb_with_metrics refreshed")
-    } catch {
-      // View may not exist or refresh failed — non-critical
-    }
-  }, MV_REFRESH_INTERVAL)
-
   server.listen(port, () => {
-    console.log(`> Ready on http://${hostname}:${port}`)
+    console.log(`> Ready on https://${hostname}:${port}`)
+  })
+
+  // HTTP redirect to HTTPS on port 80
+  createHttpServer((req, res) => {
+    res.writeHead(301, { Location: `https://${req.headers.host}${req.url}` })
+    res.end()
+  }).listen(httpPort, () => {
+    console.log(`> HTTP redirect on port ${httpPort}`)
   })
 })

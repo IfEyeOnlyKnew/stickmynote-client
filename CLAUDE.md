@@ -23,6 +23,7 @@ See [docs/production-exclude-list.md](docs/production-exclude-list.md) for full 
 | `certs/` | SSL certificates for HTTPS |
 | `.next/` | Built files (rebuilt after update) |
 | `node_modules/` | Dependencies |
+| `public/uploads/` | **CRITICAL** - User-uploaded images and files (not in git) |
 
 ## Workflow: Update Production from Development
 
@@ -61,6 +62,9 @@ cp server.js server.js.backup
 cp .env .env.backup
 cp .env.production .env.production.backup
 
+# CRITICAL: Backup user-uploaded files before checkout (git checkout public/ wipes them)
+if (Test-Path "public\uploads") { Copy-Item -Recurse -Force "public\uploads" "uploads-backup" }
+
 # Fetch latest without merging
 git fetch origin main
 
@@ -77,6 +81,10 @@ git checkout origin/main -- pnpm-lock.yaml
 git checkout origin/main -- next.config.mjs
 git checkout origin/main -- tailwind.config.ts
 git checkout origin/main -- tsconfig.json
+git checkout origin/main -- docs/
+
+# Restore user-uploaded files after checkout
+if (Test-Path "uploads-backup") { Copy-Item -Recurse -Force "uploads-backup\*" "public\uploads\"; Remove-Item -Recurse -Force "uploads-backup" }
 
 
 ### Step 3: Install Dependencies (if package.json changed)
@@ -126,7 +134,11 @@ git add . && git commit -m "message" && git push origin main
 ```bash
 cd C:\stick-my-note-prod\stickmynote-client
 git fetch origin main
-git checkout origin/main -- app/ components/ lib/ hooks/ types/ public/
+# Backup uploads before checkout
+if (Test-Path "public\uploads") { Copy-Item -Recurse -Force "public\uploads" "uploads-backup" }
+git checkout origin/main -- app/ components/ lib/ hooks/ types/ public/ styles/
+# Restore uploads after checkout
+if (Test-Path "uploads-backup") { Copy-Item -Recurse -Force "uploads-backup\*" "public\uploads\"; Remove-Item -Recurse -Force "uploads-backup" }
 pnpm run build
 net stop StickyMyNote && net start StickyMyNote
 ```
@@ -138,7 +150,8 @@ net stop StickyMyNote && net start StickyMyNote
 | WIN-R0HEEUG88NH | 192.168.50.11 | Domain Controller, DNS Server |
 | HOL-DC2-IIS | 192.168.50.20 | Application Server (StickyMyNote) |
 | HOL-DC3-PGSQL | 192.168.50.30 | PostgreSQL Database Server |
-| HOL-DC5-REDIS | 192.168.50.50 | Redis Cache Server |
+| HOL-DC5-REDIS | 192.168.50.50 | Memcached Server |
+| HOL-DC6-LIVE | 192.168.50.80 | LiveKit Video Server (Caddy TLS on :7443) |
 | HOL-OLLAMA | 192.168.50.70 | Ollama AI Server |
 
 ## Troubleshooting
