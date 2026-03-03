@@ -31,7 +31,7 @@ export function getSecurityHeaders(): SecurityHeaders {
     // CDN-READY: Add CDN origin to img-src when deploying a CDN
     "img-src 'self' data: blob: https://i.ytimg.com https://img.youtube.com https://i.vimeocdn.com https://*.vimeo.com https://*.cloudfront.net https://*.canva.com https://*.imgur.com https://*.googleusercontent.com",
     "media-src 'self' blob: https://www.youtube.com https://player.vimeo.com https://rumble.com https://*.rumble.com https://www.loom.com https://*.loom.com",
-    `connect-src 'self' https://*.upstash.io https://www.youtube.com https://vimeo.com https://*.vimeo.com ${isDevelopment ? "http://localhost:* ws://localhost:* wss://localhost:* http://127.0.0.1:* ws://127.0.0.1:* wss://127.0.0.1:*" : "wss://stickmynote.com wss://livekit.stickmynote.com:7880 ws://livekit.stickmynote.com:7880 http://livekit.stickmynote.com:7880 https://livekit.stickmynote.com:7880"}`.trim(),
+    `connect-src 'self' https://*.upstash.io https://www.youtube.com https://vimeo.com https://*.vimeo.com ${isDevelopment ? "http://localhost:* ws://localhost:* wss://localhost:* http://127.0.0.1:* ws://127.0.0.1:* wss://127.0.0.1:*" : "wss://stickmynote.com wss://livekit.stickmynote.com:7443 https://livekit.stickmynote.com:7443"}`.trim(),
     "frame-src 'self' https://www.youtube.com https://www.youtube-nocookie.com https://youtube.com https://player.vimeo.com https://rumble.com https://*.rumble.com https://www.loom.com https://*.loom.com https://www.figma.com https://figma.com https://docs.google.com",
     "object-src 'none'",
     "base-uri 'self'",
