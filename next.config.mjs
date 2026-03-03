@@ -18,11 +18,11 @@ const nextConfig = {
   experimental: {
     instrumentationHook: true,
     // Prevent ldapjs from being bundled - will be loaded from node_modules at runtime only
-    serverComponentsExternalPackages: ["ldapjs", "openid-client"],
+    serverComponentsExternalPackages: ["ldapjs", "openid-client", "livekit-server-sdk"],
   },
 
   // Also add to top-level serverExternalPackages for Next.js 14.2+
-  serverExternalPackages: ["ldapjs", "openid-client"],
+  serverExternalPackages: ["ldapjs", "openid-client", "livekit-server-sdk"],
 
   // Production optimizations
   compress: true,
@@ -284,7 +284,9 @@ const nextConfig = {
         // Externalize ldapjs to prevent it from being bundled and attempting connections during build
         "ldapjs",
         // Externalize openid-client for SSO OIDC support
-        "openid-client"
+        "openid-client",
+        // Externalize livekit-server-sdk (server-only, has native Node.js deps)
+        "livekit-server-sdk"
       );
     }
 

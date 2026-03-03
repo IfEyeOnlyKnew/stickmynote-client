@@ -17,7 +17,7 @@
     "build:standalone": "BUILD_STANDALONE=true next build",
     "build:windows": "npm run type-check && npm run lint && npm run build",
     "clean": "rm -rf .next out",
-    "dev": "next dev",
+    "dev": "set NODE_OPTIONS=--max-old-space-size=4096 && next dev",
     "health-check": "curl -f http://localhost:3000/api/health || exit 1",
     "lint": "next lint",
     "lint:fix": "next lint --fix",
