@@ -37,6 +37,21 @@ app.prepare().then(() => {
     // Neutralize the response so Next.js cannot corrupt the WebSocket socket.
     if (req.headers.upgrade) return
 
+    // Proxy HTTP requests to LiveKit (for the /validate endpoint the SDK uses on error)
+    if (req.url && req.url.startsWith("/livekit-ws/")) {
+      const http = require("node:http")
+      const targetPath = req.url.replace(/^\/livekit-ws/, "") || "/"
+      const livekitHost = process.env.LIVEKIT_PROXY_HOST || "192.168.50.80"
+      const livekitPort = Number(process.env.LIVEKIT_PROXY_PORT) || 7880
+      const proxyReq = http.request(
+        { hostname: livekitHost, port: livekitPort, path: targetPath, method: req.method, headers: { ...req.headers, host: `${livekitHost}:${livekitPort}` } },
+        (proxyRes) => { res.writeHead(proxyRes.statusCode, proxyRes.headers); proxyRes.pipe(res) },
+      )
+      proxyReq.on("error", (err) => { console.error("[LiveKit HTTP Proxy] Error:", err.message); res.statusCode = 502; res.end("LiveKit proxy error") })
+      req.pipe(proxyReq)
+      return
+    }
+
     // Serve dynamically uploaded files from public/uploads/
     // Next.js production mode only serves files that existed at build time,
     // so we must handle uploads ourselves.
