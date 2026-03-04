@@ -5,12 +5,13 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Video, Plus, Clock, Copy, Trash2, ExternalLink } from "lucide-react"
+import { Video, Plus, Clock, Copy, Trash2, ExternalLink, Info } from "lucide-react"
 import { UserMenu } from "@/components/user-menu"
 import { useToast } from "@/hooks/use-toast"
 import { BreadcrumbNav } from "@/components/breadcrumb-nav"
 import { useHubModeGuard } from "@/hooks/use-hub-mode-guard"
 import { VideoInviteUserSearch } from "@/components/video/VideoInviteUserSearch"
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 
 interface VideoRoom {
   id: string
@@ -192,7 +193,23 @@ export default function VideoPage() {
             <Plus className="h-5 w-5" />
             Create New Video Room
           </CardTitle>
-          <CardDescription>Start a new video conference and invite participants</CardDescription>
+          <CardDescription className="flex items-center gap-1.5">
+            Start a new video conference and invite participants
+            <Popover>
+              <PopoverTrigger asChild>
+                <button type="button" className="inline-flex items-center text-gray-400 hover:text-blue-600 transition-colors" aria-label="Room capacity info">
+                  <Info className="h-4 w-4" />
+                </button>
+              </PopoverTrigger>
+              <PopoverContent className="w-80 text-sm" side="right">
+                <div className="space-y-2">
+                  <p className="font-semibold">Room Capacity</p>
+                  <p>Each video room supports up to <strong>10 participants</strong> at a time. For your internal organisation, the server can handle many rooms running simultaneously.</p>
+                  <p className="text-muted-foreground text-xs">Need more capacity? LiveKit supports horizontal scaling across multiple nodes for thousands of concurrent users.</p>
+                </div>
+              </PopoverContent>
+            </Popover>
+          </CardDescription>
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
