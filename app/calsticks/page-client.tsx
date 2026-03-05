@@ -48,6 +48,7 @@ import { useIsMobile } from "@/hooks/use-mobile"
 import { AgendaView } from "@/components/calsticks/AgendaView"
 import { CustomFieldsDialog } from "@/components/calsticks/CustomFieldsDialog"
 import { TaskSettings } from "@/components/calsticks/TaskSettings"
+import { TaskSummaryStats } from "@/components/calsticks/TaskSummaryStats"
 
 const GanttChart = dynamic(() => import("@/components/calsticks/GanttChart"), { ssr: false })
 const StoryMapView = dynamic(() => import("@/components/calsticks/StoryMap"), { ssr: false })
@@ -470,7 +471,15 @@ export default function CalSticksPageClient() {
           />
         )
       case "gantt":
-        return <GanttChart calsticks={calsticks} dependencies={dependencies} onTaskChange={handleTaskDateChange} />
+        return (
+          <GanttChart
+            calsticks={calsticks}
+            dependencies={dependencies}
+            onTaskChange={handleTaskDateChange}
+            onDependencyAdd={handleDependencyAdd}
+            onRefresh={fetchCalSticks}
+          />
+        )
       case "storymap":
         return <StoryMapView calsticks={calsticks} onTaskClick={handleStickClick} />
       case "sprint":
@@ -555,6 +564,40 @@ export default function CalSticksPageClient() {
       toast({
         title: "Error",
         description: "Failed to update task dates",
+        variant: "destructive",
+      })
+    }
+  }
+
+  const handleDependencyAdd = async (taskId: string, dependsOnId: string) => {
+    try {
+      const response = await fetch("/api/calsticks/dependencies", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          calstick_id: taskId,
+          depends_on_calstick_id: dependsOnId,
+          dependency_type: "FS",
+          lag_days: 0,
+        }),
+      })
+
+      if (!response.ok) {
+        const data = await response.json().catch(() => ({}))
+        throw new Error(data.error || "Failed to add dependency")
+      }
+
+      toast({
+        title: "Dependency Added",
+        description: "Task dependency has been created",
+      })
+
+      await fetchDependencies(calsticks.map((cs) => cs.id))
+    } catch (error) {
+      console.error("Error adding dependency:", error)
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : "Failed to add dependency",
         variant: "destructive",
       })
     }
@@ -740,6 +783,7 @@ export default function CalSticksPageClient() {
       </header>
 
       <main className="container mx-auto px-4 py-6">
+        {!loading && calsticks.length > 0 && <TaskSummaryStats calsticks={calsticks} />}
         {loading && (
           <div className="flex items-center justify-center py-12">
             <div className="text-center">
@@ -809,7 +853,7 @@ export default function CalSticksPageClient() {
               <DialogTitle>Gantt Chart</DialogTitle>
             </DialogHeader>
             <div className="overflow-auto">
-              <GanttChart calsticks={ganttCalSticks} dependencies={dependencies} onTaskChange={handleTaskDateChange} />
+              <GanttChart calsticks={ganttCalSticks} dependencies={dependencies} onTaskChange={handleTaskDateChange} onRefresh={fetchCalSticks} />
             </div>
           </DialogContent>
         </Dialog>

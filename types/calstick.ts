@@ -29,7 +29,8 @@ export interface CalStick {
   // Sprint/Agile fields
   sprint_id?: string | null
   story_points?: number | null
-  // Gantt baseline fields
+  // Gantt fields
+  calstick_is_milestone?: boolean
   baseline_start_date?: string | null
   baseline_end_date?: string | null
   baseline_set_at?: string | null
@@ -63,5 +64,7 @@ export interface Dependency {
   id: string
   calstick_id: string
   depends_on_calstick_id: string
+  dependency_type?: 'FS' | 'SS' | 'FF' | 'SF' | 'blocks' | 'relates_to' | 'duplicates'
+  lag_days?: number
   created_at: string
 }

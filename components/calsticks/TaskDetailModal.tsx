@@ -11,6 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Calendar } from "@/components/ui/calendar"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Switch } from "@/components/ui/switch"
 import {
   CalendarIcon,
   Tag,
@@ -21,6 +22,7 @@ import {
   Bell,
   User,
   Target,
+  Diamond,
 } from "lucide-react"
 
 // Dynamically import TiptapEditor with SSR disabled
@@ -92,6 +94,7 @@ export function TaskDetailModal({ task, isOpen, onClose, onSave }: TaskDetailMod
   const [sprintId, setSprintId] = useState<string | null>(null)
   const [storyPoints, setStoryPoints] = useState<string>("")
   const [sprints, setSprints] = useState<Sprint[]>([])
+  const [isMilestone, setIsMilestone] = useState(false)
 
   useEffect(() => {
     if (!task) return
@@ -117,6 +120,7 @@ export function TaskDetailModal({ task, isOpen, onClose, onSave }: TaskDetailMod
 
     setSprintId(task.sprint_id || null)
     setStoryPoints(task.story_points?.toString() || "")
+    setIsMilestone(task.calstick_is_milestone || false)
 
     if (task.stick?.pad_id) {
       fetchMembers(task.stick.pad_id)
@@ -182,6 +186,7 @@ export function TaskDetailModal({ task, isOpen, onClose, onSave }: TaskDetailMod
             calstick_labels: labels,
             calstick_description: editorContent,
             calstick_assignee_id: assigneeId,
+            calstick_is_milestone: isMilestone,
             sprint_id: sprintId,
             story_points: storyPoints ? Number.parseInt(storyPoints) : null,
           }),
@@ -203,6 +208,7 @@ export function TaskDetailModal({ task, isOpen, onClose, onSave }: TaskDetailMod
           calstick_labels: labels,
           calstick_description: editorContent,
           calstick_assignee_id: assigneeId,
+          calstick_is_milestone: isMilestone,
           sprint_id: sprintId,
           story_points: storyPoints ? Number.parseInt(storyPoints) : null,
         } as Partial<CalStick>)
@@ -402,6 +408,23 @@ export function TaskDetailModal({ task, isOpen, onClose, onSave }: TaskDetailMod
                     placeholder="e.g., 1, 2, 3, 5, 8, 13"
                   />
                 </div>
+              </div>
+
+              <div className="flex items-center justify-between rounded-lg border p-3">
+                <div className="flex items-center gap-2">
+                  <div className="rounded-md bg-purple-100 dark:bg-purple-950 p-1.5">
+                    <Diamond className="h-4 w-4 text-purple-600 dark:text-purple-400" />
+                  </div>
+                  <div>
+                    <Label htmlFor="milestone-toggle" className="text-sm font-medium cursor-pointer">Milestone</Label>
+                    <p className="text-xs text-muted-foreground">Mark as a key checkpoint with zero duration</p>
+                  </div>
+                </div>
+                <Switch
+                  id="milestone-toggle"
+                  checked={isMilestone}
+                  onCheckedChange={setIsMilestone}
+                />
               </div>
 
               <div className="space-y-2">

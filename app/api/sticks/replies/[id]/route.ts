@@ -21,6 +21,7 @@ const UPDATABLE_FIELDS = [
   "calstick_labels",
   "calstick_description",
   "calstick_progress",
+  "calstick_is_milestone",
 ] as const
 
 type AutomationEvent = "task_updated" | "task_completed" | "status_changed" | "priority_changed"
