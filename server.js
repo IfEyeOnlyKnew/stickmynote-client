@@ -46,14 +46,13 @@ app.prepare().then(() => {
       return
     }
 
-    // Serve dynamically uploaded files from public/uploads/
-    // Next.js production mode only serves files that existed at build time,
-    // so we must handle uploads ourselves.
+    // Serve dynamically uploaded files from UPLOAD_DIR (defaults to <cwd>/uploads).
+    // Stored outside public/ so git deploys never wipe user files.
     if (req.url && req.url.startsWith("/uploads/")) {
       const urlPath = req.url.split("?")[0]
+      const uploadsRoot = pathModule.resolve(process.env.UPLOAD_DIR || pathModule.join(process.cwd(), "uploads"))
       // Prevent directory traversal: resolve and verify path stays within uploads
-      const filePath = pathModule.resolve(process.cwd(), "public", urlPath.slice(1))
-      const uploadsRoot = pathModule.resolve(process.cwd(), "public", "uploads")
+      const filePath = pathModule.resolve(uploadsRoot, urlPath.slice("/uploads/".length))
       if (filePath.startsWith(uploadsRoot) && fs.existsSync(filePath)) {
         const ext = pathModule.extname(filePath).toLowerCase()
         res.setHeader("Content-Type", UPLOAD_MIME_TYPES[ext] || "application/octet-stream")

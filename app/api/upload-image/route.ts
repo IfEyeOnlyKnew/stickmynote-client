@@ -3,6 +3,7 @@ import { getCachedAuthUser } from "@/lib/auth/cached-auth"
 import { writeFile, mkdir } from "fs/promises"
 import { existsSync } from "fs"
 import path from "path"
+import { getUploadDir } from "@/lib/storage/upload-path"
 import { getOrgContext } from "@/lib/auth/get-org-context"
 import { encryptFileForOrg } from "@/lib/encryption"
 import { isOrgFileEncryptionEnabled } from "@/lib/encryption-settings"
@@ -68,8 +69,8 @@ function generateFilename(userId: string, originalName: string): string {
 }
 
 async function saveToLocalStorage(buffer: Buffer, userId: string, filename: string, contentType: string): Promise<{ url: string; pathname: string }> {
-  // Save to public/uploads/user-images/{userId}/
-  const uploadsDir = path.join(process.cwd(), "public", "uploads", "user-images", userId)
+  // Save to UPLOAD_DIR/user-images/{userId}/
+  const uploadsDir = path.join(getUploadDir(), "user-images", userId)
 
   // Create directory if it doesn't exist
   if (!existsSync(uploadsDir)) {

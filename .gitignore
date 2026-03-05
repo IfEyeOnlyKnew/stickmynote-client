@@ -54,3 +54,6 @@ schema.sql
 
 # Generated exports (DOCX files)
 /public/exports/
+
+# User uploads (stored outside public/ so deploys don't wipe them)
+/uploads/

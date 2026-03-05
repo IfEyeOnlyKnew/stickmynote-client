@@ -4,6 +4,7 @@ import { validateCSRFMiddleware } from "@/lib/csrf"
 import { getCachedAuthUser } from "@/lib/auth/cached-auth"
 import { writeFile, mkdir } from "node:fs/promises"
 import path from "node:path"
+import { getUploadDir } from "@/lib/storage/upload-path"
 
 let sharp: any
 
@@ -19,8 +20,8 @@ const initializeModules = async () => {
 
 // Helper to save avatar file locally
 async function saveAvatarFile(buffer: Buffer, filename: string, contentType: string): Promise<{ url: string; pathname: string }> {
-  // Use local file storage
-  const uploadDir = path.join(process.cwd(), "public", "uploads", "avatars")
+  // Use configurable upload directory
+  const uploadDir = path.join(getUploadDir(), "avatars")
   await mkdir(uploadDir, { recursive: true })
 
   const localFilename = filename.replaceAll("/", "-")

@@ -3,14 +3,15 @@ import { createServiceDatabaseClient } from "@/lib/database/database-adapter"
 import { getCachedAuthUser } from "@/lib/auth/cached-auth"
 import { writeFile, mkdir } from "fs/promises"
 import path from "path"
+import { getUploadDir } from "@/lib/storage/upload-path"
 
 const MAX_FILE_SIZE = 5 * 1024 * 1024 // 5MB
 const ALLOWED_TYPES = ["image/png", "image/jpeg", "image/jpg", "image/webp", "image/svg+xml"]
 
 // Helper to save file locally
 async function saveFile(file: File, filename: string): Promise<string> {
-  // Use local file storage
-  const uploadDir = path.join(process.cwd(), "public", "uploads", "branding")
+  // Use configurable upload directory
+  const uploadDir = path.join(getUploadDir(), "branding")
   await mkdir(uploadDir, { recursive: true })
 
   const localFilename = filename.replace(/\//g, "-")
