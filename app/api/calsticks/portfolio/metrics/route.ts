@@ -102,6 +102,64 @@ export async function GET() {
       { name: "Low", value: tasks?.filter((t) => t.calstick_priority === "low").length || 0 },
     ].filter((p) => p.value > 0)
 
+    // On-time delivery rate
+    const completedWithDates = tasks?.filter((t) => t.calstick_completed && t.calstick_date) || []
+    const onTimeCount = completedWithDates.filter((t) => {
+      const completed = new Date(t.updated_at)
+      const due = new Date(t.calstick_date)
+      return completed <= due
+    }).length
+    const onTimeRate = completedWithDates.length > 0
+      ? Math.round((onTimeCount / completedWithDates.length) * 100) : 100
+
+    // Budget adherence
+    const budgetAdherence = totalEstimatedHours > 0
+      ? Math.max(0, 100 - Math.abs(((totalActualHours - totalEstimatedHours) / totalEstimatedHours) * 100))
+      : 100
+
+    // Health score: completion(30%) + on-time(25%) + budget(20%) + utilization balance(25%)
+    const utilBalance = Math.max(0, 100 - Math.abs(teamUtilization - 75))
+    const healthScore = Math.round(
+      completionRate * 0.3 + onTimeRate * 0.25 + budgetAdherence * 0.2 + utilBalance * 0.25
+    )
+    const ragStatus = healthScore >= 75 ? "green" : healthScore >= 50 ? "amber" : "red"
+
+    // Auto-detected risks
+    const risks: Array<{ type: string; message: string; severity: string }> = []
+    if (overdueTasks > 0) {
+      risks.push({ type: "overdue", message: `${overdueTasks} task${overdueTasks > 1 ? "s" : ""} overdue`, severity: overdueTasks > 5 ? "high" : "medium" })
+    }
+    if (teamUtilization > 100) {
+      risks.push({ type: "overloaded", message: `Team utilization at ${teamUtilization}%`, severity: "high" })
+    }
+    if (onTimeRate < 70) {
+      risks.push({ type: "delivery", message: `Only ${onTimeRate}% tasks delivered on time`, severity: "high" })
+    }
+    if (completionRate < 30 && totalTasks > 5) {
+      risks.push({ type: "progress", message: `Low completion rate (${completionRate}%)`, severity: "medium" })
+    }
+
+    // Project breakdown — group by pad
+    const padMap = new Map<string, { name: string; total: number; completed: number; overdue: number }>()
+    for (const t of tasks || []) {
+      const padId = t.social_pad_id || "unassigned"
+      if (!padMap.has(padId)) {
+        padMap.set(padId, { name: padId === "unassigned" ? "Unassigned" : `Project ${padId.slice(0, 8)}`, total: 0, completed: 0, overdue: 0 })
+      }
+      const entry = padMap.get(padId)!
+      entry.total++
+      if (t.calstick_completed) entry.completed++
+      if (!t.calstick_completed && t.calstick_date && new Date(t.calstick_date) < now) entry.overdue++
+    }
+    const projectBreakdown = Array.from(padMap.values()).map((p) => {
+      const pctComplete = p.total > 0 ? Math.round((p.completed / p.total) * 100) : 0
+      return {
+        ...p,
+        completionRate: pctComplete,
+        ragStatus: p.overdue > 3 ? "red" : p.overdue > 0 ? "amber" : "green",
+      }
+    }).sort((a, b) => b.total - a.total)
+
     return NextResponse.json({
       totalTasks,
       completedTasks,
@@ -117,6 +175,11 @@ export async function GET() {
       velocityTrend,
       statusDistribution,
       priorityDistribution,
+      healthScore,
+      ragStatus,
+      onTimeRate,
+      risks,
+      projectBreakdown,
     })
   } catch (error) {
     console.error("Error fetching portfolio metrics:", error)

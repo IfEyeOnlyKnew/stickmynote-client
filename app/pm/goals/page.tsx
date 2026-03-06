@@ -44,6 +44,8 @@ interface Objective {
   start_date: string
   target_date: string
   progress?: number
+  parent_id?: string | null
+  visibility?: string
   key_results: KeyResult[]
 }
 
@@ -73,6 +75,7 @@ export default function GoalsPage() {
   const [editingObjective, setEditingObjective] = useState<Objective | null>(null)
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set())
   const [filterStatus, setFilterStatus] = useState<string>("all")
+  const [viewMode, setViewMode] = useState<"flat" | "tree">("flat")
 
   const fetchObjectives = useCallback(async () => {
     try {
@@ -136,7 +139,26 @@ export default function GoalsPage() {
     })
   }
 
-  const filtered = filterStatus === "all" ? objectives : objectives.filter((o) => o.status === filterStatus)
+  const statusFiltered = filterStatus === "all" ? objectives : objectives.filter((o) => o.status === filterStatus)
+
+  // Tree view: build nested structure
+  const buildTree = (items: Objective[]): (Objective & { depth: number })[] => {
+    const result: (Objective & { depth: number })[] = []
+    const roots = items.filter((o) => !o.parent_id || !items.find((p) => p.id === o.parent_id))
+    const addChildren = (parentId: string | undefined, depth: number) => {
+      items.filter((o) => o.parent_id === parentId).forEach((child) => {
+        result.push({ ...child, depth })
+        addChildren(child.id, depth + 1)
+      })
+    }
+    roots.forEach((root) => {
+      result.push({ ...root, depth: 0 })
+      addChildren(root.id, 1)
+    })
+    return result
+  }
+
+  const filtered = viewMode === "tree" ? buildTree(statusFiltered) : statusFiltered.map((o) => ({ ...o, depth: 0 }))
 
   // Summary stats
   const totalCount = objectives.length
@@ -165,6 +187,8 @@ export default function GoalsPage() {
                 status: "not_started",
                 start_date: new Date().toISOString().split("T")[0],
                 target_date: "",
+                parent_id: null,
+                visibility: "team",
                 key_results: [],
               })
               setShowForm(true)
@@ -205,22 +229,42 @@ export default function GoalsPage() {
         </Card>
       </div>
 
-      {/* Filter */}
-      <div className="flex items-center gap-2">
-        <span className="text-sm text-muted-foreground">Filter:</span>
-        <Select value={filterStatus} onValueChange={setFilterStatus}>
-          <SelectTrigger className="w-40">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Statuses</SelectItem>
-            <SelectItem value="not_started">Not Started</SelectItem>
-            <SelectItem value="on_track">On Track</SelectItem>
-            <SelectItem value="at_risk">At Risk</SelectItem>
-            <SelectItem value="behind">Behind</SelectItem>
-            <SelectItem value="completed">Completed</SelectItem>
-          </SelectContent>
-        </Select>
+      {/* Filter & View Toggle */}
+      <div className="flex items-center gap-4">
+        <div className="flex items-center gap-2">
+          <span className="text-sm text-muted-foreground">Filter:</span>
+          <Select value={filterStatus} onValueChange={setFilterStatus}>
+            <SelectTrigger className="w-40">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Statuses</SelectItem>
+              <SelectItem value="not_started">Not Started</SelectItem>
+              <SelectItem value="on_track">On Track</SelectItem>
+              <SelectItem value="at_risk">At Risk</SelectItem>
+              <SelectItem value="behind">Behind</SelectItem>
+              <SelectItem value="completed">Completed</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="flex items-center gap-1 border rounded-md p-0.5">
+          <Button
+            variant={viewMode === "flat" ? "secondary" : "ghost"}
+            size="sm"
+            onClick={() => setViewMode("flat")}
+            className="h-7 px-3 text-xs"
+          >
+            Flat
+          </Button>
+          <Button
+            variant={viewMode === "tree" ? "secondary" : "ghost"}
+            size="sm"
+            onClick={() => setViewMode("tree")}
+            className="h-7 px-3 text-xs"
+          >
+            Hierarchy
+          </Button>
+        </div>
       </div>
 
       {/* Objective Form */}
@@ -239,6 +283,7 @@ export default function GoalsPage() {
               objective={editingObjective}
               onSave={handleSave}
               onCancel={() => { setShowForm(false); setEditingObjective(null) }}
+              allObjectives={objectives}
             />
           </CardContent>
         </Card>
@@ -278,14 +323,22 @@ export default function GoalsPage() {
               ? Math.ceil((new Date(obj.target_date).getTime() - Date.now()) / (1000 * 60 * 60 * 24))
               : null
 
+            const parentObj = obj.parent_id ? objectives.find((o) => o.id === obj.parent_id) : null
+            const depth = (obj as any).depth || 0
+
             return (
-              <Card key={obj.id} className="overflow-hidden">
+              <Card key={obj.id} className="overflow-hidden" style={depth > 0 ? { marginLeft: depth * 24 } : undefined}>
                 <div
                   className="p-4 cursor-pointer hover:bg-muted/30 transition-colors"
                   onClick={() => toggleExpanded(obj.id!)}
                 >
                   <div className="flex items-start justify-between">
                     <div className="flex-1 min-w-0">
+                      {parentObj && (
+                        <div className="text-xs text-muted-foreground mb-1 flex items-center gap-1">
+                          <span className="opacity-50">↳</span> Aligned to: <span className="font-medium">{parentObj.title}</span>
+                        </div>
+                      )}
                       <div className="flex items-center gap-2 mb-1">
                         <h3 className="font-semibold truncate">{obj.title}</h3>
                         <Badge className={statusCfg.color} variant="outline">
@@ -378,10 +431,12 @@ function ObjectiveForm({
   objective,
   onSave,
   onCancel,
+  allObjectives,
 }: {
   readonly objective: Objective
   readonly onSave: (obj: Objective) => void
   readonly onCancel: () => void
+  readonly allObjectives: Objective[]
 }) {
   const [formData, setFormData] = useState<Objective>(objective)
 
@@ -446,6 +501,31 @@ function ObjectiveForm({
               <SelectItem value="at_risk">At Risk</SelectItem>
               <SelectItem value="behind">Behind</SelectItem>
               <SelectItem value="completed">Completed</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+        <div>
+          <Label>Align to Parent Objective</Label>
+          <Select value={formData.parent_id || "__none"} onValueChange={(value) => setFormData({ ...formData, parent_id: value === "__none" ? null : value })}>
+            <SelectTrigger><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="__none">None (Top-level)</SelectItem>
+              {allObjectives
+                .filter((o) => o.id !== formData.id)
+                .map((o) => (
+                  <SelectItem key={o.id} value={o.id!}>{o.title}</SelectItem>
+                ))}
+            </SelectContent>
+          </Select>
+        </div>
+        <div>
+          <Label>Visibility</Label>
+          <Select value={formData.visibility || "team"} onValueChange={(value) => setFormData({ ...formData, visibility: value })}>
+            <SelectTrigger><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="team">Team</SelectItem>
+              <SelectItem value="org">Organization</SelectItem>
+              <SelectItem value="private">Private</SelectItem>
             </SelectContent>
           </Select>
         </div>
