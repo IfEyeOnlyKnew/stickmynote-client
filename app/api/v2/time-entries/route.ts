@@ -31,7 +31,7 @@ export async function GET(request: NextRequest) {
         te.*,
         r.id as task_id, r.content as task_content,
         s.id as stick_id, s.topic as stick_topic, s.content as stick_content
-      FROM paks_time_entries te
+      FROM time_entries te
       LEFT JOIN paks_pad_stick_replies r ON r.id = te.task_id
       LEFT JOIN paks_pad_sticks s ON s.id = r.stick_id
       WHERE te.user_id = $1`
@@ -134,7 +134,7 @@ export async function POST(request: NextRequest) {
     }
 
     const result = await db.query(
-      `INSERT INTO paks_time_entries (task_id, user_id, started_at, ended_at, duration_seconds, note)
+      `INSERT INTO time_entries (task_id, user_id, started_at, ended_at, duration_seconds, note)
        VALUES ($1, $2, $3, $4, $5, $6)
        RETURNING *`,
       [taskId, user.id, startedAt, endedAt, durationSeconds, note]

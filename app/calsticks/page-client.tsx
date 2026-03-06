@@ -9,15 +9,13 @@ import {
   CalendarIcon,
   GanttChartIcon,
   Filter,
-  Target,
-  DollarSign,
-  Clock,
   FileText,
   Zap,
   Sparkles,
   Map,
   Download,
   Rocket,
+  BarChart3,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -755,24 +753,10 @@ export default function CalSticksPageClient() {
                 <span className="hidden md:inline">Auto Schedule</span>
               </Button>
 
-              <Link href="/calsticks/budget">
+              <Link href="/pm">
                 <Button variant="outline" size="sm">
-                  <DollarSign className="h-4 w-4 mr-2" />
-                  <span className="hidden md:inline">Budget</span>
-                </Button>
-              </Link>
-
-              <Link href="/calsticks/portfolio">
-                <Button variant="outline" size="sm">
-                  <Target className="h-4 w-4 mr-2" />
-                  <span className="hidden md:inline">Portfolio</span>
-                </Button>
-              </Link>
-
-              <Link href="/calsticks/timesheets">
-                <Button variant="outline" size="sm">
-                  <Clock className="h-4 w-4 mr-2" />
-                  <span className="hidden md:inline">Timesheets</span>
+                  <BarChart3 className="h-4 w-4 mr-2" />
+                  <span className="hidden md:inline">PM Hub</span>
                 </Button>
               </Link>
 

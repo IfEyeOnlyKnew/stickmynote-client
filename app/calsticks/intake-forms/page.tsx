@@ -1,11 +1,5 @@
-import type { Metadata } from "next"
-import IntakeFormsClient from "./page-client"
+import { redirect } from "next/navigation"
 
-export const metadata: Metadata = {
-  title: "Intake Forms | CalSticks",
-  description: "Manage public intake forms",
-}
-
-export default function IntakeFormsPage() {
-  return <IntakeFormsClient />
+export default function IntakeFormsRedirect() {
+  redirect("/pm/forms")
 }

@@ -21,12 +21,20 @@ export async function GET(request: NextRequest) {
     const start = searchParams.get("start")
     const end = searchParams.get("end")
     const taskId = searchParams.get("taskId")
+    const approvalStatus = searchParams.get("approvalStatus")
+    const userId = searchParams.get("userId")
 
     let query = db
-      .from("paks_time_entries")
+      .from("time_entries")
       .select("*")
-      .eq("user_id", user.id)
       .order("started_at", { ascending: false })
+
+    // Filter by user - default to current user, but allow viewing team entries
+    if (userId) {
+      query = query.eq("user_id", userId)
+    } else {
+      query = query.eq("user_id", user.id)
+    }
 
     if (start) {
       query = query.gte("started_at", start)
@@ -36,6 +44,9 @@ export async function GET(request: NextRequest) {
     }
     if (taskId) {
       query = query.eq("task_id", taskId)
+    }
+    if (approvalStatus) {
+      query = query.eq("approval_status", approvalStatus)
     }
 
     const { data: entries, error } = await query
@@ -115,7 +126,7 @@ export async function POST(request: NextRequest) {
     }
     const user = authResult.user
 
-    const { taskId, startedAt, endedAt, durationSeconds, note } = await request.json()
+    const { taskId, startedAt, endedAt, durationSeconds, note, isBillable } = await request.json()
 
     if (!taskId || !startedAt) {
       return NextResponse.json({ error: "Task ID and start time are required" }, { status: 400 })
@@ -132,16 +143,21 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Task not found" }, { status: 404 })
     }
 
+    const insertData: Record<string, unknown> = {
+      task_id: taskId,
+      user_id: user.id,
+      started_at: startedAt,
+      ended_at: endedAt,
+      duration_seconds: durationSeconds,
+      note,
+    }
+    if (isBillable !== undefined) {
+      insertData.is_billable = isBillable
+    }
+
     const { data: entry, error } = await db
-      .from("paks_time_entries")
-      .insert({
-        task_id: taskId,
-        user_id: user.id,
-        started_at: startedAt,
-        ended_at: endedAt,
-        duration_seconds: durationSeconds,
-        note,
-      })
+      .from("time_entries")
+      .insert(insertData)
       .select()
       .maybeSingle()
 

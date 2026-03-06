@@ -26,6 +26,7 @@ import {
   ShieldAlert,
   Lock,
   ClipboardCheck,
+  BarChart3,
 } from "lucide-react"
 import { useUser } from "@/contexts/user-context"
 import { useOrganization } from "@/contexts/organization-context"
@@ -48,6 +49,7 @@ import {
   DLPTab,
   EncryptionTab,
   ComplianceTab,
+  PMHubTab,
 } from "./_components"
 import { ComplianceDashboard } from "@/components/auth/ComplianceDashboard"
 
@@ -922,6 +924,12 @@ function OrganizationSettingsPage() {
                 Automation
               </TabsTrigger>
             )}
+            {isOwner && !isPersonalOrg && (
+              <TabsTrigger value="pm-hub" className="justify-start gap-2 px-3 py-2 text-sm rounded-md data-[state=active]:bg-gray-100 data-[state=active]:shadow-none">
+                <BarChart3 className="h-4 w-4" />
+                PM Hub
+              </TabsTrigger>
+            )}
 
             {/* Security section divider */}
             {!isPersonalOrg && (
@@ -1158,6 +1166,13 @@ function OrganizationSettingsPage() {
           {isOwner && !isPersonalOrg && currentOrg && (
             <TabsContent value="compliance">
               <ComplianceTab currentOrgId={currentOrg.id} />
+            </TabsContent>
+          )}
+
+          {/* PM Hub Tab */}
+          {isOwner && !isPersonalOrg && (
+            <TabsContent value="pm-hub">
+              <PMHubTab />
             </TabsContent>
           )}
           </div>

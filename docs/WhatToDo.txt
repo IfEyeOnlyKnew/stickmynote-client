@@ -81,14 +81,17 @@ Goal: Surpass Microsoft's suite by providing a unified, intelligent, and
                          (Compete with MS Project & Planner)
 --------------------------------------------------------------------------------
 
-[  ] 2.1 ADVANCED GANTT CHART
-     - Interactive Gantt with drag-drop scheduling
-     - Critical path highlighting
-     - Baseline comparison (planned vs actual)
-     - Resource leveling visualization
-     - Milestone markers with dependencies
-     - Print/export Gantt to PDF
-     Status: PARTIAL (basic Gantt exists)
+[✓ ] 2.1 ADVANCED GANTT CHART
+     - Interactive Gantt with drag-drop scheduling ✓
+     - Critical path highlighting ✓
+     - Baseline comparison (planned vs actual) ✓
+     - Resource leveling visualization ✓ (workload heatmap)
+     - Milestone markers with dependencies ✓ (diamond rendering, FS/SS/FF/SF types)
+     - Print/export Gantt to PDF ✓
+     - Task summary stats bar (total, completed, overdue, unassigned, priority) ✓
+     - Custom tooltips, today marker, 5-level zoom ✓
+     Status: IMPLEMENTED (GanttChart.tsx ~1,382 lines + TaskSummaryStats.tsx)
+     Updated: 2026-03-05
 
 [✓ ] 2.2 KANBAN BOARD VIEW
      - Customizable swim lanes ✓
@@ -109,14 +112,15 @@ Goal: Surpass Microsoft's suite by providing a unified, intelligent, and
      - Cost rate per resource
      Status: PARTIAL (basic workload exists)
 
-[  ] 2.4 ADVANCED DEPENDENCIES
-     - Finish-to-Start (FS)
-     - Start-to-Start (SS)
-     - Finish-to-Finish (FF)
-     - Start-to-Finish (SF)
-     - Lead and lag time
-     - Dependency conflict detection
-     Status: PARTIAL (basic dependencies exist)
+[✓ ] 2.4 ADVANCED DEPENDENCIES
+     - Finish-to-Start (FS) ✓
+     - Start-to-Start (SS) ✓
+     - Finish-to-Finish (FF) ✓
+     - Start-to-Finish (SF) ✓
+     - Lead and lag time ✓ (lag_days on calstick_dependencies)
+     - Dependency conflict detection ✓ (circular dependency check in critical path)
+     Status: IMPLEMENTED (dependencies API with CRUD + type validation)
+     Updated: 2026-03-05
 
 [✓ ] 2.5 SPRINTS & AGILE FEATURES
      - Sprint planning board ✓

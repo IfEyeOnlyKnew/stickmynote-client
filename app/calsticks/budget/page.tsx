@@ -1,11 +1,5 @@
-import type { Metadata } from "next"
-import BudgetClient from "./page-client"
+import { redirect } from "next/navigation"
 
-export const metadata: Metadata = {
-  title: "Budget & Cost Tracking | CalSticks",
-  description: "Track project budgets and costs",
-}
-
-export default function BudgetPage() {
-  return <BudgetClient />
+export default function BudgetRedirect() {
+  redirect("/pm/budget")
 }

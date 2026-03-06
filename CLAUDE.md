@@ -23,7 +23,7 @@ See [docs/production-exclude-list.md](docs/production-exclude-list.md) for full 
 | `certs/` | SSL certificates for HTTPS |
 | `.next/` | Built files (rebuilt after update) |
 | `node_modules/` | Dependencies |
-| `public/uploads/` | **CRITICAL** - User-uploaded images and files (not in git) |
+| `uploads/` | **CRITICAL** - User-uploaded images and files (outside git repo, never wiped by deploys) |
 
 ## Workflow: Update Production from Development
 
@@ -62,9 +62,6 @@ cp server.js server.js.backup
 cp .env .env.backup
 cp .env.production .env.production.backup
 
-# CRITICAL: Backup user-uploaded files before checkout (git checkout public/ wipes them)
-if (Test-Path "public\uploads") { Copy-Item -Recurse -Force "public\uploads" "uploads-backup" }
-
 # Fetch latest without merging
 git fetch origin main
 
@@ -82,9 +79,7 @@ git checkout origin/main -- next.config.mjs
 git checkout origin/main -- tailwind.config.ts
 git checkout origin/main -- tsconfig.json
 git checkout origin/main -- docs/
-
-# Restore user-uploaded files after checkout
-if (Test-Path "uploads-backup") { Copy-Item -Recurse -Force "uploads-backup\*" "public\uploads\"; Remove-Item -Recurse -Force "uploads-backup" }
+git checkout origin/main -- .gitignore
 
 
 ### Step 3: Install Dependencies (if package.json changed)
@@ -134,14 +129,12 @@ git add . && git commit -m "message" && git push origin main
 ```bash
 cd C:\stick-my-note-prod\stickmynote-client
 git fetch origin main
-# Backup uploads before checkout
-if (Test-Path "public\uploads") { Copy-Item -Recurse -Force "public\uploads" "uploads-backup" }
-git checkout origin/main -- app/ components/ lib/ hooks/ types/ public/ styles/
-# Restore uploads after checkout
-if (Test-Path "uploads-backup") { Copy-Item -Recurse -Force "uploads-backup\*" "public\uploads\"; Remove-Item -Recurse -Force "uploads-backup" }
+git checkout origin/main -- app/ components/ lib/ hooks/ types/ public/ styles/ .gitignore
 pnpm run build
 net stop StickyMyNote && net start StickyMyNote
 ```
+
+> **Note:** Uploads are stored in `uploads/` (outside `public/`), so `git checkout public/` no longer wipes user files.
 
 ## Network Architecture
 

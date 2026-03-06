@@ -1,11 +1,5 @@
-import type { Metadata } from "next"
-import PortfolioClient from "./page-client"
+import { redirect } from "next/navigation"
 
-export const metadata: Metadata = {
-  title: "Portfolio Dashboard | CalSticks",
-  description: "Portfolio overview and OKR tracking",
-}
-
-export default function PortfolioPage() {
-  return <PortfolioClient />
+export default function PortfolioRedirect() {
+  redirect("/pm/portfolio")
 }

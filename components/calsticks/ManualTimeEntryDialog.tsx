@@ -9,7 +9,8 @@ import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Calendar } from "@/components/ui/calendar"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
-import { CalendarIcon, Save } from "lucide-react"
+import { CalendarIcon, DollarSign, Save } from "lucide-react"
+import { Switch } from "@/components/ui/switch"
 import { format } from "date-fns"
 import type { CalStick } from "@/types/calstick"
 
@@ -26,6 +27,7 @@ export function ManualTimeEntryDialog({ isOpen, onClose, onSaved }: ManualTimeEn
   const [startTime, setStartTime] = useState("")
   const [endTime, setEndTime] = useState("")
   const [note, setNote] = useState("")
+  const [isBillable, setIsBillable] = useState(true)
   const [isSaving, setIsSaving] = useState(false)
 
   useEffect(() => {
@@ -86,6 +88,7 @@ export function ManualTimeEntryDialog({ isOpen, onClose, onSaved }: ManualTimeEn
           endedAt: endedAt.toISOString(),
           durationSeconds: duration,
           note,
+          isBillable,
         }),
       })
 
@@ -98,6 +101,7 @@ export function ManualTimeEntryDialog({ isOpen, onClose, onSaved }: ManualTimeEn
       setStartTime("")
       setEndTime("")
       setNote("")
+      setIsBillable(true)
     } catch (error) {
       console.error("Error saving time entry:", error)
       alert("Failed to save time entry")
@@ -163,6 +167,14 @@ export function ManualTimeEntryDialog({ isOpen, onClose, onSaved }: ManualTimeEn
               {Math.floor((calculateDuration(startTime, endTime) % 3600) / 60)}m
             </div>
           )}
+
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <DollarSign className="h-4 w-4 text-muted-foreground" />
+              <Label htmlFor="billable">Billable</Label>
+            </div>
+            <Switch id="billable" checked={isBillable} onCheckedChange={setIsBillable} />
+          </div>
 
           <div className="space-y-2">
             <Label htmlFor="note">Note (optional)</Label>

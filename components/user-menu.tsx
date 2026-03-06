@@ -16,7 +16,7 @@ import {
 import { useUser } from "@/contexts/user-context"
 import { useOrganization } from "@/contexts/organization-context"
 import { useRouter } from "next/navigation"
-import { User, Settings, LogOut, BarChart3, FolderKanban, Users, Building, StickyNote, MessageSquare, Video, Circle } from "lucide-react"
+import { User, Settings, LogOut, BarChart3, FolderKanban, Users, Building, StickyNote, MessageSquare, Video, Circle, ListChecks } from "lucide-react"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { useUserStatus } from "@/hooks/useUserStatus"
 import { UserStatusIndicator, StatusIcon } from "@/components/user-status"
@@ -215,6 +215,14 @@ export function UserMenu({
         <DropdownMenuItem onClick={() => router.push("/video")}>
           <Video className="mr-2 h-4 w-4" />
           <span>Video Hub</span>
+        </DropdownMenuItem>
+        <DropdownMenuItem onClick={() => router.push("/calsticks")}>
+          <ListChecks className="mr-2 h-4 w-4" />
+          <span>CalSticks</span>
+        </DropdownMenuItem>
+        <DropdownMenuItem onClick={() => router.push("/pm")}>
+          <BarChart3 className="mr-2 h-4 w-4" />
+          <span>PM Hub</span>
         </DropdownMenuItem>
         <DropdownMenuSeparator />
         <DropdownMenuItem onClick={() => router.push("/profile")}>
