@@ -39,8 +39,10 @@ import {
   Smile,
   ImageIcon,
   Wand2,
+  PenTool,
 } from "lucide-react"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
+import { Whiteboard } from "@/components/video/Whiteboard"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "./video-sheet"
 import { Badge } from "@/components/ui/badge"
@@ -122,6 +124,7 @@ function VideoCallContent({ roomName, onLeave, userName, isMinimized }: CustomVi
   const [chatInput, setChatInput] = useState("")
   const [layout, setLayout] = useState<"grid" | "speaker">("grid")
   const [reactions, setReactions] = useState<{ id: string; emoji: string; x: number }[]>([])
+  const [showWhiteboard, setShowWhiteboard] = useState(false)
   const [videoEffect, setVideoEffect] = useState<"none" | "blur" | "image">("none")
   const [backgroundImage, setBackgroundImage] = useState<string>(
     "https://images.unsplash.com/photo-1497366216548-37526070297c?w=800&q=80",
@@ -300,7 +303,13 @@ function VideoCallContent({ roomName, onLeave, userName, isMinimized }: CustomVi
           </div>
         )}
 
-        {renderGrid()}
+        {showWhiteboard ? (
+          <div className="h-full rounded-lg overflow-hidden border border-slate-800">
+            <Whiteboard />
+          </div>
+        ) : (
+          renderGrid()
+        )}
 
         {/* Reactions Overlay */}
         <div className="absolute inset-0 pointer-events-none overflow-hidden">
@@ -430,6 +439,16 @@ function VideoCallContent({ roomName, onLeave, userName, isMinimized }: CustomVi
           </Button>
 
           <div className="absolute right-4 flex gap-2">
+            <Button
+              variant={showWhiteboard ? "default" : "ghost"}
+              size="icon"
+              className={`text-slate-400 hover:text-white ${showWhiteboard ? "bg-indigo-600 text-white" : ""}`}
+              onClick={() => setShowWhiteboard(!showWhiteboard)}
+              title={showWhiteboard ? "Hide Whiteboard" : "Show Whiteboard"}
+            >
+              <PenTool />
+            </Button>
+
             <Popover>
               <PopoverTrigger asChild>
                 <Button variant="ghost" size="icon" className="text-slate-400 hover:text-white">

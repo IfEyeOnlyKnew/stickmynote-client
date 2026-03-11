@@ -5,10 +5,13 @@ import { validateCSRFMiddleware } from "@/lib/csrf"
 import {
   getChatMessages,
   sendMessage,
+  editMessage,
   isChatMember,
   markChatAsRead,
+  getChatMemberUserIds,
 } from "@/lib/database/stick-chat-queries"
-import type { SendMessageRequest } from "@/types/stick-chat"
+import { publishToUsers } from "@/lib/ws/publish-event"
+import type { SendMessageRequest, EditMessageRequest } from "@/types/stick-chat"
 
 /**
  * STICK CHAT MESSAGES API
@@ -104,7 +107,7 @@ export async function GET(
     const limit = parseInt(searchParams.get("limit") || "50", 10)
     const cursor = searchParams.get("cursor") || undefined
 
-    const { messages, hasMore } = await getChatMessages(chatId, { limit, cursor })
+    const { messages, hasMore } = await getChatMessages(chatId, { limit, cursor, currentUserId: user.id })
 
     // Mark chat as read
     await markChatAsRead(chatId, user.id)
@@ -166,7 +169,12 @@ export async function POST(
       return Errors.contentRequired()
     }
 
-    const message = await sendMessage(chatId, user.id, content.trim())
+    const message = await sendMessage(chatId, user.id, content.trim(), {
+      parent_message_id: body.parent_message_id,
+      quoted_message_id: body.quoted_message_id,
+      message_type: body.message_type,
+      metadata: body.metadata,
+    })
     if (!message) {
       return Errors.sendFailed()
     }
@@ -174,12 +182,88 @@ export async function POST(
     // Mark as read since we just sent a message
     await markChatAsRead(chatId, user.id)
 
+    // Broadcast to all chat members via WebSocket
+    const memberIds = await getChatMemberUserIds(chatId)
+    const otherMembers = memberIds.filter((id) => id !== user.id)
+    if (otherMembers.length > 0) {
+      const eventType = message.parent_message_id ? "chat.thread_reply" : "chat.message"
+      await publishToUsers(otherMembers, {
+        type: eventType,
+        payload: { chatId, message },
+        timestamp: Date.now(),
+      })
+    }
+
     return NextResponse.json({ message }, { status: 201 })
   } catch (error) {
     const rateLimitResponse = handleRateLimitError(error)
     if (rateLimitResponse) return rateLimitResponse
 
     console.error("[StickChatMessages] POST error:", error)
+    return Errors.internal()
+  }
+}
+
+/**
+ * PATCH /api/stick-chats/[chatId]/messages
+ * Edit a message (only by the message author)
+ * Body: { messageId: string, content: string }
+ */
+export async function PATCH(
+  request: NextRequest,
+  { params }: { params: Promise<{ chatId: string }> }
+) {
+  const isCSRFValid = await validateCSRFMiddleware(request)
+  if (!isCSRFValid) {
+    return Errors.csrf()
+  }
+
+  try {
+    const { chatId } = await params
+    const { user, error: authError } = await getCachedAuthUser()
+
+    if (authError === "rate_limited") {
+      return createRateLimitResponse()
+    }
+
+    if (!user) {
+      return createUnauthorizedResponse()
+    }
+
+    const isMember = await isChatMember(chatId, user.id)
+    if (!isMember) {
+      return Errors.notMember()
+    }
+
+    const body: EditMessageRequest & { messageId: string } = await request.json()
+    const { messageId, content } = body
+
+    if (!messageId || !content?.trim()) {
+      return NextResponse.json({ error: "messageId and content are required" }, { status: 400 })
+    }
+
+    const updated = await editMessage(messageId, user.id, content.trim())
+    if (!updated) {
+      return NextResponse.json({ error: "Message not found or not yours" }, { status: 404 })
+    }
+
+    // Broadcast edit to all members
+    const memberIds = await getChatMemberUserIds(chatId)
+    const otherMembers = memberIds.filter((id) => id !== user.id)
+    if (otherMembers.length > 0) {
+      await publishToUsers(otherMembers, {
+        type: "chat.message_edited",
+        payload: { chatId, message: updated },
+        timestamp: Date.now(),
+      })
+    }
+
+    return NextResponse.json({ message: updated })
+  } catch (error) {
+    const rateLimitResponse = handleRateLimitError(error)
+    if (rateLimitResponse) return rateLimitResponse
+
+    console.error("[StickChatMessages] PATCH error:", error)
     return Errors.internal()
   }
 }

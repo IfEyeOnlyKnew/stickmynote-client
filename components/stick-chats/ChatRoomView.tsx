@@ -20,6 +20,7 @@ import {
 } from "lucide-react"
 import { formatDistanceToNow } from "date-fns"
 import { useCSRF } from "@/hooks/useCSRF"
+import { useWebSocket } from "@/hooks/useWebSocket"
 import { useUserPresence } from "@/hooks/usePresence"
 import type {
   StickChatWithDetails,
@@ -48,6 +49,7 @@ export const ChatRoomView: React.FC<ChatRoomViewProps> = ({
   onSettings,
 }) => {
   const { csrfToken } = useCSRF()
+  const { subscribe } = useWebSocket()
   const [messages, setMessages] = useState<StickChatMessageWithUser[]>([])
   const [newMessage, setNewMessage] = useState("")
   const [isLoading, setIsLoading] = useState(true)
@@ -58,7 +60,6 @@ export const ChatRoomView: React.FC<ChatRoomViewProps> = ({
   const [showMembersPanel, setShowMembersPanel] = useState(true)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const messagesContainerRef = useRef<HTMLDivElement>(null)
-  const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null)
 
   // Get member IDs for presence tracking
   const memberIds = useMemo(() => {
@@ -99,19 +100,27 @@ export const ChatRoomView: React.FC<ChatRoomViewProps> = ({
     [chat.id, cursor]
   )
 
-  // Initial fetch and polling
+  // Initial fetch + WebSocket for real-time updates
   useEffect(() => {
     fetchMessages()
 
-    // Poll for new messages every 5 seconds
-    pollingIntervalRef.current = setInterval(() => {
-      fetchMessages()
-    }, 5000)
+    // Subscribe to real-time messages via WebSocket
+    const unsubMessage = subscribe("chat.message", (payload: any) => {
+      if (payload.chatId === chat.id) {
+        setMessages((prev) => [...prev, payload.message])
+      }
+    })
+    const unsubEdit = subscribe("chat.message_edited", (payload: any) => {
+      if (payload.chatId === chat.id) {
+        setMessages((prev) =>
+          prev.map((m) => (m.id === payload.message.id ? payload.message : m))
+        )
+      }
+    })
 
     return () => {
-      if (pollingIntervalRef.current) {
-        clearInterval(pollingIntervalRef.current)
-      }
+      unsubMessage()
+      unsubEdit()
     }
   }, [chat.id]) // eslint-disable-line react-hooks/exhaustive-deps
 
