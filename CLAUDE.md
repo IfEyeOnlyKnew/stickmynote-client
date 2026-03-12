@@ -54,8 +54,9 @@ cd C:\stick-my-note-prod\stickmynote-client
 net stop StickyMyNote
 taskkill /F /IM node.exe
 
-# Delete old build folder
-Remove-Item -Recurse -Force .next -ErrorAction SilentlyContinue
+# Backup old build folder (safer than deleting - allows rollback if build fails)
+Remove-Item -Recurse -Force .next-old -ErrorAction SilentlyContinue
+Rename-Item .next .next-old -ErrorAction SilentlyContinue
 
 # Backup protected files
 cp server.js server.js.backup
@@ -96,6 +97,9 @@ cp .env.local.build-only .env.local
 
 # Build
 pnpm run build
+
+# If build succeeds, clean up old build backup
+Remove-Item -Recurse -Force .next-old -ErrorAction SilentlyContinue
 
 # CRITICAL: Remove build-only env after build (prevents empty POSTGRES_PASSWORD)
 rm .env.local
@@ -156,6 +160,12 @@ net stop StickyMyNote && net start StickyMyNote
 ### Build Fails with ECONNRESET
 - Ensure ldapjs is externalized in `next.config.mjs`
 - Use `.env.local.build-only` with `BUILDING=true` during build
+
+### Build Fails - Rollback to Previous Build
+- If the build fails, restore the backup: `Remove-Item -Recurse -Force .next; Rename-Item .next-old .next`
+- Restart service: `net start StickyMyNote`
+- Investigate the build failure before retrying (check Node.js version, corrupted node_modules, etc.)
+- If node_modules is suspected: `Remove-Item -Recurse -Force node_modules; pnpm install`
 
 ### Site Down After Update
 - Verify `server.js` wasn't overwritten: check for `require("https")`
