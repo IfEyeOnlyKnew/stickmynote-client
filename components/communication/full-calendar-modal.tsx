@@ -44,9 +44,12 @@ import {
   subMonths,
 } from "date-fns"
 import { cn } from "@/lib/utils"
-import type { MeetingWithDetails } from "@/types/meeting"
-import { MEETING_STATUS_COLORS } from "@/types/meeting"
+import type { MeetingWithDetails, AttendeeStatus } from "@/types/meeting"
+import { MEETING_STATUS_COLORS, ATTENDEE_STATUS_COLORS } from "@/types/meeting"
 import { VideoInviteUserSearch } from "@/components/video/VideoInviteUserSearch"
+import { useCSRF } from "@/hooks/useCSRF"
+import { useUser } from "@/contexts/user-context"
+import { toast } from "sonner"
 
 // Type for other users' busy times
 interface BusyTime {
@@ -515,10 +518,43 @@ export function FullCalendarModal({
 function MeetingCard({ meeting }: { meeting: MeetingWithDetails }) {
   const startTime = new Date(meeting.start_time)
   const endTime = new Date(meeting.end_time)
+  const { user } = useUser()
+  const { csrfToken } = useCSRF()
+
+  // Find current user's attendee record
+  const myAttendee = meeting.attendees?.find(
+    (a) => a.user_id === user?.id || (user?.email && a.email?.toLowerCase() === user.email.toLowerCase())
+  )
+
+  const handleRsvp = async (status: AttendeeStatus) => {
+    try {
+      const res = await fetch("/api/meetings/rsvp", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(csrfToken ? { "X-CSRF-Token": csrfToken } : {}),
+        },
+        body: JSON.stringify({ meeting_id: meeting.id, status }),
+      })
+      if (!res.ok) throw new Error("Failed")
+      toast.success(`RSVP updated: ${status}`)
+    } catch {
+      toast.error("Failed to update RSVP")
+    }
+  }
+
+  const isRecurring = meeting.recurrence_type && meeting.recurrence_type !== "none"
 
   return (
     <div className="p-3 bg-background border rounded-lg hover:shadow-sm transition-shadow">
-      <h4 className="font-medium text-sm truncate">{meeting.title}</h4>
+      <div className="flex items-center gap-1.5">
+        <h4 className="font-medium text-sm truncate flex-1">{meeting.title}</h4>
+        {isRecurring && (
+          <Badge variant="outline" className="text-[10px] shrink-0">
+            Recurring
+          </Badge>
+        )}
+      </div>
 
       <div className="mt-2 space-y-1">
         <div className="flex items-center gap-2 text-xs text-muted-foreground">
@@ -563,6 +599,24 @@ function MeetingCard({ meeting }: { meeting: MeetingWithDetails }) {
           </Button>
         )}
       </div>
+
+      {/* RSVP buttons for non-organizer attendees */}
+      {myAttendee && !myAttendee.is_organizer && (
+        <div className="mt-2 pt-2 border-t flex items-center gap-1.5">
+          <span className="text-[10px] text-muted-foreground mr-1">RSVP:</span>
+          {(["accepted", "tentative", "declined"] as AttendeeStatus[]).map((s) => (
+            <Button
+              key={s}
+              variant={myAttendee.status === s ? "default" : "outline"}
+              size="sm"
+              className={cn("h-5 px-1.5 text-[10px]", myAttendee.status === s && ATTENDEE_STATUS_COLORS[s])}
+              onClick={() => handleRsvp(s)}
+            >
+              {s === "accepted" ? "Accept" : s === "tentative" ? "Maybe" : "Decline"}
+            </Button>
+          ))}
+        </div>
+      )}
     </div>
   )
 }

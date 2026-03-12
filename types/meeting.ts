@@ -10,6 +10,17 @@ export type MeetingStatus = "scheduled" | "in_progress" | "completed" | "cancell
 
 export type AttendeeStatus = "pending" | "accepted" | "declined" | "tentative"
 
+export type RecurrenceType = "none" | "daily" | "weekly" | "monthly" | "yearly"
+
+export interface RecurrenceConfig {
+  type: RecurrenceType
+  interval: number // e.g., every 2 weeks
+  days_of_week?: number[] // 0=Sun, 1=Mon, ..., 6=Sat (for weekly)
+  day_of_month?: number // 1-31 (for monthly)
+  end_date?: string // ISO date
+  count?: number // max occurrences
+}
+
 export interface Meeting {
   id: string
   title: string
@@ -25,6 +36,16 @@ export interface Meeting {
   pad_id: string | null
   stick_id: string | null
   personal_stick_id: string | null
+  // Recurrence
+  recurrence_type: RecurrenceType | null
+  recurrence_interval: number | null
+  recurrence_days_of_week: number[] | null
+  recurrence_day_of_month: number | null
+  recurrence_end_date: string | null
+  recurrence_count: number | null
+  parent_meeting_id: string | null
+  instance_date: string | null
+  is_exception: boolean
   created_at: string
   updated_at: string
 }
@@ -98,6 +119,8 @@ export interface CreateMeetingRequest {
   pad_id?: string
   stick_id?: string
   personal_stick_id?: string
+  // Recurrence
+  recurrence?: RecurrenceConfig
 }
 
 export interface UpdateMeetingRequest {
@@ -233,6 +256,25 @@ export const ATTENDEE_STATUS_COLORS: Record<AttendeeStatus, string> = {
   declined: "bg-red-100 text-red-800",
   tentative: "bg-orange-100 text-orange-800",
 }
+
+// Recurrence labels
+export const RECURRENCE_TYPE_LABELS: Record<RecurrenceType, string> = {
+  none: "Does not repeat",
+  daily: "Daily",
+  weekly: "Weekly",
+  monthly: "Monthly",
+  yearly: "Yearly",
+}
+
+export const DAY_OF_WEEK_LABELS = [
+  { value: 0, label: "Sun", full: "Sunday" },
+  { value: 1, label: "Mon", full: "Monday" },
+  { value: 2, label: "Tue", full: "Tuesday" },
+  { value: 3, label: "Wed", full: "Wednesday" },
+  { value: 4, label: "Thu", full: "Thursday" },
+  { value: 5, label: "Fri", full: "Friday" },
+  { value: 6, label: "Sat", full: "Saturday" },
+] as const
 
 // Default meeting duration in minutes
 export const DEFAULT_MEETING_DURATION = 30

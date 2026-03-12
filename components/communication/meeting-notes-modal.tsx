@@ -26,6 +26,7 @@ import {
 import { toast } from "sonner"
 import { format } from "date-fns"
 import { useCommunicationPaletteContext } from "./communication-palette-provider"
+import { useCSRF } from "@/hooks/useCSRF"
 import type { MeetingWithDetails } from "@/types/meeting"
 
 // ----------------------------------------------------------------------------
@@ -42,7 +43,7 @@ interface MeetingNotesModalProps {
 // ----------------------------------------------------------------------------
 
 export function MeetingNotesModal({ open, onOpenChange }: MeetingNotesModalProps) {
-  const { context } = useCommunicationPaletteContext()
+  const { csrfToken } = useCSRF()
 
   // State
   const [mode, setMode] = useState<"list" | "create">("list")
@@ -99,8 +100,24 @@ export function MeetingNotesModal({ open, onOpenChange }: MeetingNotesModalProps
     setIsSaving(true)
 
     try {
-      // For now, create as a regular stick/note
-      // In the future, this would save to meeting_notes table
+      const response = await fetch("/api/meetings/notes", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(csrfToken ? { "X-CSRF-Token": csrfToken } : {}),
+        },
+        body: JSON.stringify({
+          title: noteTitle.trim(),
+          content: noteContent.trim() || undefined,
+          meeting_id: selectedMeeting?.id || undefined,
+        }),
+      })
+
+      if (!response.ok) {
+        const err = await response.json()
+        throw new Error(err.error || "Failed to save")
+      }
+
       toast.success("Meeting notes saved")
       onOpenChange(false)
 
@@ -111,7 +128,7 @@ export function MeetingNotesModal({ open, onOpenChange }: MeetingNotesModalProps
       setMode("list")
     } catch (error) {
       console.error("Error saving note:", error)
-      toast.error("Failed to save note")
+      toast.error(error instanceof Error ? error.message : "Failed to save note")
     } finally {
       setIsSaving(false)
     }

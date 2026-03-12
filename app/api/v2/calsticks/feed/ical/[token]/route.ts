@@ -59,10 +59,10 @@ export async function GET(
     const icsContent: string[] = [
       'BEGIN:VCALENDAR',
       'VERSION:2.0',
-      'PRODID:-//StickMyNote//CalSticks//EN',
+      'PRODID:-//StickMyNote//CalSticks+Meetings//EN',
       'CALSCALE:GREGORIAN',
       'METHOD:PUBLISH',
-      'X-WR-CALNAME:My CalSticks',
+      'X-WR-CALNAME:StickMyNote Calendar',
       'X-WR-TIMEZONE:UTC',
     ]
 
@@ -112,6 +112,65 @@ export async function GET(
       )
     })
 
+    // 3b. Fetch Meetings for User
+    const meetingsResult = await db.query(
+      `SELECT m.id, m.title, m.description, m.start_time, m.end_time,
+              m.location, m.status, m.video_room_url,
+              m.updated_at, m.created_at
+       FROM meetings m
+       LEFT JOIN meeting_attendees ma ON m.id = ma.meeting_id
+       WHERE (m.organizer_id = $1 OR ma.user_id = $1)
+         AND m.status != 'cancelled'
+         AND m.parent_meeting_id IS NULL
+       GROUP BY m.id
+       ORDER BY m.start_time ASC`,
+      [feed.user_id]
+    )
+
+    meetingsResult.rows.forEach((meeting: any) => {
+      const startDate = new Date(meeting.start_time)
+      const endDate = new Date(meeting.end_time)
+
+      const startStr = startDate.toISOString().replace(/[-:.]/g, '').slice(0, 15) + 'Z'
+      const endStr = endDate.toISOString().replace(/[-:.]/g, '').slice(0, 15) + 'Z'
+      const dtStamp =
+        new Date(meeting.updated_at || meeting.created_at)
+          .toISOString()
+          .replace(/[-:.]/g, '')
+          .slice(0, 15) + 'Z'
+
+      const summary = (meeting.title || 'Untitled Meeting').replace(/,/g, '\\,')
+      const desc = (meeting.description || '').replace(/\n/g, '\\n').replace(/,/g, '\\,')
+      const location = (meeting.location || '').replace(/,/g, '\\,')
+
+      const lines = [
+        'BEGIN:VEVENT',
+        `UID:meeting-${meeting.id}`,
+        `DTSTAMP:${dtStamp}`,
+        `DTSTART:${startStr}`,
+        `DTEND:${endStr}`,
+        `SUMMARY:${summary}`,
+      ]
+
+      if (desc) lines.push(`DESCRIPTION:${desc}`)
+      if (location) lines.push(`LOCATION:${location}`)
+
+      const statusMap: Record<string, string> = {
+        scheduled: 'CONFIRMED',
+        in_progress: 'CONFIRMED',
+        completed: 'CONFIRMED',
+        cancelled: 'CANCELLED',
+      }
+      lines.push(`STATUS:${statusMap[meeting.status] || 'CONFIRMED'}`)
+
+      if (meeting.video_room_url) {
+        lines.push(`URL:${meeting.video_room_url}`)
+      }
+
+      lines.push('END:VEVENT')
+      icsContent.push(...lines)
+    })
+
     icsContent.push('END:VCALENDAR')
 
     // 4. Update access stats
@@ -123,7 +182,7 @@ export async function GET(
     return new Response(icsContent.join('\r\n'), {
       headers: {
         'Content-Type': 'text/calendar; charset=utf-8',
-        'Content-Disposition': 'attachment; filename="calsticks.ics"',
+        'Content-Disposition': 'attachment; filename="stickmynote-calendar.ics"',
       },
     })
   } catch (error) {

@@ -21,11 +21,18 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import { Calendar, Loader2, Video, MapPin, Users, Clock } from "lucide-react"
+import { Calendar, Loader2, Video, MapPin, Users, Clock, Repeat } from "lucide-react"
 import { toast } from "sonner"
-import { format, addMinutes, setHours, setMinutes, startOfDay } from "date-fns"
+import { format, addMinutes, setHours, setMinutes, startOfDay, addMonths } from "date-fns"
 import { useCommunicationPaletteContext } from "./communication-palette-provider"
-import { MEETING_DURATION_PRESETS, DEFAULT_MEETING_DURATION } from "@/types/meeting"
+import {
+  MEETING_DURATION_PRESETS,
+  DEFAULT_MEETING_DURATION,
+  RECURRENCE_TYPE_LABELS,
+  DAY_OF_WEEK_LABELS,
+  type RecurrenceType,
+  type RecurrenceConfig,
+} from "@/types/meeting"
 import { VideoInviteUserSearch } from "@/components/video/VideoInviteUserSearch"
 
 // ----------------------------------------------------------------------------
@@ -103,6 +110,15 @@ export function ScheduleMeetingModal({
   const [createVideoRoom, setCreateVideoRoom] = useState(true)
   const [isSubmitting, setIsSubmitting] = useState(false)
 
+  // Recurrence state
+  const [recurrenceType, setRecurrenceType] = useState<RecurrenceType>("none")
+  const [recurrenceInterval, setRecurrenceInterval] = useState(1)
+  const [recurrenceDays, setRecurrenceDays] = useState<number[]>([])
+  const [recurrenceDayOfMonth, setRecurrenceDayOfMonth] = useState<number>(1)
+  const [recurrenceEndType, setRecurrenceEndType] = useState<"never" | "date" | "count">("never")
+  const [recurrenceEndDate, setRecurrenceEndDate] = useState(format(addMonths(new Date(), 3), "yyyy-MM-dd"))
+  const [recurrenceCount, setRecurrenceCount] = useState(10)
+
   // Generate time slots
   const timeSlots = useMemo(() => generateTimeSlots(), [])
 
@@ -160,6 +176,26 @@ export function ScheduleMeetingModal({
         endDateTime.setDate(endDateTime.getDate() + 1)
       }
 
+      // Build recurrence config
+      let recurrence: RecurrenceConfig | undefined
+      if (recurrenceType !== "none") {
+        recurrence = {
+          type: recurrenceType,
+          interval: recurrenceInterval,
+        }
+        if (recurrenceType === "weekly" && recurrenceDays.length > 0) {
+          recurrence.days_of_week = recurrenceDays
+        }
+        if (recurrenceType === "monthly") {
+          recurrence.day_of_month = recurrenceDayOfMonth
+        }
+        if (recurrenceEndType === "date") {
+          recurrence.end_date = new Date(recurrenceEndDate).toISOString()
+        } else if (recurrenceEndType === "count") {
+          recurrence.count = recurrenceCount
+        }
+      }
+
       const response = await fetch("/api/meetings", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -173,6 +209,7 @@ export function ScheduleMeetingModal({
           create_video_room: createVideoRoom,
           pad_id: context.padId || undefined,
           stick_id: context.stickId || undefined,
+          recurrence,
         }),
       })
 
@@ -342,6 +379,140 @@ export function ScheduleMeetingModal({
                 onEmailsChange={setSelectedEmails}
               />
             </div>
+          </div>
+
+          {/* Recurrence */}
+          <div className="space-y-3">
+            <div className="space-y-2">
+              <Label className="flex items-center gap-2">
+                <Repeat className="h-4 w-4" />
+                Repeat
+              </Label>
+              <Select
+                value={recurrenceType}
+                onValueChange={(v) => setRecurrenceType(v as RecurrenceType)}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {(Object.entries(RECURRENCE_TYPE_LABELS) as [RecurrenceType, string][]).map(
+                    ([value, label]) => (
+                      <SelectItem key={value} value={value}>
+                        {label}
+                      </SelectItem>
+                    )
+                  )}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {recurrenceType !== "none" && (
+              <div className="space-y-3 pl-2 border-l-2 border-purple-200 ml-2">
+                {/* Interval */}
+                <div className="flex items-center gap-2">
+                  <Label className="text-sm whitespace-nowrap">Every</Label>
+                  <Input
+                    type="number"
+                    min={1}
+                    max={99}
+                    value={recurrenceInterval}
+                    onChange={(e) => setRecurrenceInterval(Math.max(1, Number.parseInt(e.target.value, 10) || 1))}
+                    className="w-16 h-8"
+                  />
+                  <span className="text-sm text-muted-foreground">
+                    {recurrenceType === "daily" && (recurrenceInterval === 1 ? "day" : "days")}
+                    {recurrenceType === "weekly" && (recurrenceInterval === 1 ? "week" : "weeks")}
+                    {recurrenceType === "monthly" && (recurrenceInterval === 1 ? "month" : "months")}
+                    {recurrenceType === "yearly" && (recurrenceInterval === 1 ? "year" : "years")}
+                  </span>
+                </div>
+
+                {/* Weekly: day picker */}
+                {recurrenceType === "weekly" && (
+                  <div className="space-y-1">
+                    <Label className="text-sm">On days</Label>
+                    <div className="flex gap-1">
+                      {DAY_OF_WEEK_LABELS.map((day) => (
+                        <button
+                          key={day.value}
+                          type="button"
+                          onClick={() => {
+                            setRecurrenceDays((prev) =>
+                              prev.includes(day.value)
+                                ? prev.filter((d) => d !== day.value)
+                                : [...prev, day.value].sort((a, b) => a - b)
+                            )
+                          }}
+                          className={`w-9 h-8 rounded text-xs font-medium transition-colors ${
+                            recurrenceDays.includes(day.value)
+                              ? "bg-purple-600 text-white"
+                              : "bg-muted hover:bg-muted/80 text-muted-foreground"
+                          }`}
+                        >
+                          {day.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Monthly: day of month */}
+                {recurrenceType === "monthly" && (
+                  <div className="flex items-center gap-2">
+                    <Label className="text-sm whitespace-nowrap">On day</Label>
+                    <Input
+                      type="number"
+                      min={1}
+                      max={31}
+                      value={recurrenceDayOfMonth}
+                      onChange={(e) => setRecurrenceDayOfMonth(Math.min(31, Math.max(1, Number.parseInt(e.target.value, 10) || 1)))}
+                      className="w-16 h-8"
+                    />
+                    <span className="text-sm text-muted-foreground">of the month</span>
+                  </div>
+                )}
+
+                {/* End condition */}
+                <div className="space-y-2">
+                  <Label className="text-sm">Ends</Label>
+                  <Select value={recurrenceEndType} onValueChange={(v) => setRecurrenceEndType(v as "never" | "date" | "count")}>
+                    <SelectTrigger className="h-8">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="never">Never</SelectItem>
+                      <SelectItem value="date">On date</SelectItem>
+                      <SelectItem value="count">After occurrences</SelectItem>
+                    </SelectContent>
+                  </Select>
+
+                  {recurrenceEndType === "date" && (
+                    <Input
+                      type="date"
+                      value={recurrenceEndDate}
+                      onChange={(e) => setRecurrenceEndDate(e.target.value)}
+                      min={date}
+                      className="h-8"
+                    />
+                  )}
+
+                  {recurrenceEndType === "count" && (
+                    <div className="flex items-center gap-2">
+                      <Input
+                        type="number"
+                        min={2}
+                        max={365}
+                        value={recurrenceCount}
+                        onChange={(e) => setRecurrenceCount(Math.max(2, Number.parseInt(e.target.value, 10) || 2))}
+                        className="w-20 h-8"
+                      />
+                      <span className="text-sm text-muted-foreground">occurrences</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Create Video Room */}
