@@ -601,7 +601,7 @@ function MeetingCard({ meeting }: { meeting: MeetingWithDetails }) {
       </div>
 
       {/* RSVP buttons for non-organizer attendees */}
-      {myAttendee && !myAttendee.is_organizer && (
+      {myAttendee && meeting.organizer_id !== user?.id && (
         <div className="mt-2 pt-2 border-t flex items-center gap-1.5">
           <span className="text-[10px] text-muted-foreground mr-1">RSVP:</span>
           {(["accepted", "tentative", "declined"] as AttendeeStatus[]).map((s) => (
