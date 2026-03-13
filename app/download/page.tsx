@@ -40,7 +40,7 @@ interface DownloadInfo {
   description: string
 }
 
-const GITHUB_RELEASES_BASE = "https://github.com/stickmynote/stickmynote-desktop/releases/latest/download"
+const GITHUB_RELEASES_BASE = "https://github.com/IfEyeOnlyKnew/stickmynote-desktop/releases/latest/download"
 
 const downloads: Record<string, DownloadInfo> = {
   windows: {
