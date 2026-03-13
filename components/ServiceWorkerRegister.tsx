@@ -11,7 +11,6 @@ export function ServiceWorkerRegister() {
         navigator.serviceWorker.getRegistrations().then((registrations) => {
           for (const registration of registrations) {
             registration.unregister()
-            console.log("ServiceWorker unregistered for development")
           }
         })
       }
@@ -22,12 +21,28 @@ export function ServiceWorkerRegister() {
       window.addEventListener("load", () => {
         navigator.serviceWorker.register("/sw.js").then(
           (registration) => {
-            console.log("ServiceWorker registration successful with scope: ", registration.scope)
+            console.log("ServiceWorker registration successful with scope:", registration.scope)
+
+            // Check for updates on page focus
+            document.addEventListener("visibilitychange", () => {
+              if (document.visibilityState === "visible") {
+                registration.update()
+              }
+            })
           },
           (err) => {
-            console.log("ServiceWorker registration failed: ", err)
+            console.log("ServiceWorker registration failed:", err)
           },
         )
+      })
+
+      // Handle controller change (new SW activated) by reloading
+      let refreshing = false
+      navigator.serviceWorker.addEventListener("controllerchange", () => {
+        if (!refreshing) {
+          refreshing = true
+          // Don't auto-reload; the SWUpdateNotification component handles this
+        }
       })
     }
   }, [])

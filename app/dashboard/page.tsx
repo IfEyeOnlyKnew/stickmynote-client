@@ -5,13 +5,14 @@ import { useState, useEffect } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { StickyNote, Users, FileText, ArrowRight, Share2, MessagesSquare, Video, CalendarCheck } from "lucide-react"
+import { StickyNote, Users, FileText, ArrowRight, Share2, MessagesSquare, Video, CalendarCheck, Download } from "lucide-react"
 import { UserMenu } from "@/components/user-menu"
 import { useUser } from "@/contexts/user-context"
 import { useOrganization } from "@/contexts/organization-context"
 import { HubSetupModal } from "@/components/social/hub-setup-modal"
 import { BreadcrumbNav } from "@/components/breadcrumb-nav"
 import { OrgBrandedHeader } from "@/components/organization/org-branded-header"
+import Link from "next/link"
 
 export default function DashboardPage() {
   const router = useRouter()
@@ -94,7 +95,13 @@ export default function DashboardPage() {
               <OrgBrandedHeader showLogo={true} showName={true} />
             </div>
           </div>
-          <div className="flex items-center">
+          <div className="flex items-center gap-2">
+            <Button asChild variant="outline" size="sm" className="hidden sm:inline-flex">
+              <Link href="/download">
+                <Download className="h-4 w-4 mr-1.5" />
+                Install App
+              </Link>
+            </Button>
             <UserMenu />
           </div>
         </div>

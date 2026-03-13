@@ -1,0 +1,59 @@
+"use client"
+
+import { usePathname } from "next/navigation"
+import Link from "next/link"
+import { cn } from "@/lib/utils"
+import { Home, StickyNote, MessageSquare, FolderKanban, User } from "lucide-react"
+import { useIsMobile } from "@/hooks/use-mobile"
+
+interface NavItem {
+  href: string
+  icon: React.ElementType
+  label: string
+  /** Match path prefix for active state */
+  matchPrefix?: string
+}
+
+const navItems: NavItem[] = [
+  { href: "/social", icon: Home, label: "Home", matchPrefix: "/social" },
+  { href: "/social/my-sticks", icon: StickyNote, label: "Notes", matchPrefix: "/social/my-sticks" },
+  { href: "/channels", icon: MessageSquare, label: "Chat", matchPrefix: "/channels" },
+  { href: "/pm", icon: FolderKanban, label: "Projects", matchPrefix: "/pm" },
+  { href: "/profile", icon: User, label: "Profile", matchPrefix: "/profile" },
+]
+
+export function MobileBottomNav() {
+  const pathname = usePathname()
+  const isMobile = useIsMobile()
+
+  if (!isMobile) return null
+
+  return (
+    <nav
+      className="fixed bottom-0 left-0 right-0 z-50 border-t bg-background/95 backdrop-blur-sm"
+      style={{ paddingBottom: "var(--safe-area-bottom, 0px)" }}
+    >
+      <div className="flex items-center justify-around">
+        {navItems.map((item) => {
+          const isActive = item.matchPrefix
+            ? pathname === item.href || (pathname.startsWith(item.matchPrefix) && item.href !== "/social")
+            : pathname === item.href
+
+          return (
+            <Link
+              key={item.href}
+              href={item.href}
+              className={cn(
+                "flex flex-col items-center gap-0.5 py-2 px-3 text-xs transition-colors min-w-[64px]",
+                isActive ? "text-primary" : "text-muted-foreground",
+              )}
+            >
+              <item.icon className={cn("h-5 w-5", isActive && "text-primary")} />
+              <span className="truncate">{item.label}</span>
+            </Link>
+          )
+        })}
+      </div>
+    </nav>
+  )
+}

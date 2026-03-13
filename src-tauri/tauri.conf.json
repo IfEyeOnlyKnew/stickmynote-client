@@ -1,0 +1,94 @@
+{
+  "$schema": "https://raw.githubusercontent.com/nicholastay/tauri-v2-docs/main/schema/config.schema.json",
+  "productName": "Stick My Note",
+  "version": "1.0.0",
+  "identifier": "com.stickmynote.desktop",
+  "build": {
+    "frontendDist": "../out",
+    "devUrl": "http://localhost:3000",
+    "beforeDevCommand": "pnpm dev",
+    "beforeBuildCommand": "pnpm build"
+  },
+  "app": {
+    "title": "Stick My Note",
+    "windows": [
+      {
+        "title": "Stick My Note",
+        "width": 1280,
+        "height": 800,
+        "minWidth": 800,
+        "minHeight": 600,
+        "resizable": true,
+        "fullscreen": false,
+        "decorations": true,
+        "transparent": false,
+        "center": true
+      }
+    ],
+    "security": {
+      "csp": "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; connect-src 'self' https://stickmynote.com wss://stickmynote.com; font-src 'self' data:;"
+    },
+    "trayIcon": {
+      "iconPath": "icons/icon.png",
+      "iconAsTemplate": true,
+      "tooltip": "Stick My Note"
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": "all",
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.ico"
+    ],
+    "windows": {
+      "wix": {
+        "language": "en-US"
+      },
+      "nsis": {
+        "displayLanguageSelector": false,
+        "installerIcon": "icons/icon.ico",
+        "sidebarImage": null
+      }
+    },
+    "macOS": {
+      "minimumSystemVersion": "10.15",
+      "signingIdentity": null,
+      "frameworks": []
+    },
+    "linux": {
+      "deb": {
+        "depends": []
+      },
+      "appimage": {
+        "bundleMediaFramework": false
+      }
+    },
+    "shortDescription": "Digital Sticky Notes & Collaboration",
+    "longDescription": "Organize your thoughts with beautiful, interactive sticky notes. Collaborate in real-time with your team.",
+    "category": "Productivity",
+    "copyright": "Copyright 2026 Stick My Note"
+  },
+  "plugins": {
+    "notification": {
+      "all": true
+    },
+    "shell": {
+      "open": true
+    },
+    "autostart": {
+      "all": true
+    },
+    "global-shortcut": {
+      "all": true
+    },
+    "deep-link": {
+      "desktop": {
+        "schemes": ["stickmynote"]
+      }
+    }
+  }
+}

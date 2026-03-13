@@ -12,6 +12,12 @@ import { CookieConsentBanner } from "@/components/cookie-consent-banner"
 import { ServiceWorkerRegister } from "@/components/ServiceWorkerRegister"
 import { ChatRequestNotifications } from "@/components/chat/ChatRequestNotifications"
 import { PresenceTracker } from "@/components/PresenceTracker"
+import { PWAInstallPrompt } from "@/components/pwa/PWAInstallPrompt"
+import { OfflineIndicator } from "@/components/pwa/OfflineIndicator"
+import { SWUpdateNotification } from "@/components/pwa/SWUpdateNotification"
+import { MobileBottomNav } from "@/components/responsive/MobileBottomNav"
+import { AccessibilityProvider } from "@/contexts/accessibility-context"
+import { KeyboardDetector } from "@/components/KeyboardDetector"
 
 const inter = Inter({ subsets: ["latin"] })
 
@@ -80,7 +86,13 @@ export const metadata: Metadata = {
 export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
-  themeColor: "#2563eb",
+  maximumScale: 5,
+  userScalable: true,
+  viewportFit: "cover",
+  themeColor: [
+    { media: "(prefers-color-scheme: light)", color: "#2563eb" },
+    { media: "(prefers-color-scheme: dark)", color: "#1e1b4b" },
+  ],
 }
 
 export default function RootLayout({
@@ -100,17 +112,24 @@ export default function RootLayout({
         </a>
         <ErrorBoundary>
           <ThemeProvider attribute="class" defaultTheme="light" enableSystem>
+            <AccessibilityProvider>
             <UserProvider>
               <OrganizationProvider>
                 <OrgThemeProvider>
+                  <KeyboardDetector />
                   <PresenceTracker />
-                  <main id="main-content">{children}</main>
+                  <main id="main-content" className="pb-[env(safe-area-inset-bottom)]">{children}</main>
+                  <MobileBottomNav />
                   <Toaster />
                   <ChatRequestNotifications />
                   <CookieConsentBanner />
+                  <OfflineIndicator />
+                  <PWAInstallPrompt />
+                  <SWUpdateNotification />
                 </OrgThemeProvider>
               </OrganizationProvider>
             </UserProvider>
+          </AccessibilityProvider>
           </ThemeProvider>
         </ErrorBoundary>
       </body>

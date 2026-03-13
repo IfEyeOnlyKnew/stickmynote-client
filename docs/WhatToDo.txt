@@ -456,46 +456,70 @@ Goal: Surpass Microsoft's suite by providing a unified, intelligent, and
                             (Critical for Adoption)
 --------------------------------------------------------------------------------
 
-[  ] 6.1 NATIVE MOBILE APPS
-     - iOS app (App Store)
-     - Android app (Play Store)
-     - Push notifications
-     - Offline access
-     - Biometric login
-     - Quick capture widget
-     Status: MISSING (web only)
+[✓ ] 6.1 NATIVE MOBILE APPS
+     - iOS app (App Store) ✓ (Capacitor config)
+     - Android app (Play Store) ✓ (Capacitor config)
+     - Push notifications ✓ (native + web Push API bridge)
+     - Offline access ✓ (PWA service worker)
+     - Biometric login ✓ (Capacitor biometric bridge)
+     - Quick capture widget (deferred)
+     Status: MOSTLY IMPLEMENTED (Capacitor config + native bridge ready)
+     Updated: 2026-03-13
+     Note: capacitor.config.ts, lib/native/capacitor-bridge.ts, hooks/use-native-app.ts.
+           Run `npx cap add ios` / `npx cap add android` to generate native projects.
+           See docs/mobile-desktop-apps.md for full setup guide.
 
-[  ] 6.2 PROGRESSIVE WEB APP (PWA)
-     - Installable from browser
-     - Offline capability
-     - Background sync
-     - Push notifications
-     - Home screen icon
-     Status: PARTIAL (needs full PWA)
+[✓ ] 6.2 PROGRESSIVE WEB APP (PWA)
+     - Installable from browser ✓ (install prompt + manifest with shortcuts)
+     - Offline capability ✓ (service worker v4 with offline page fallback)
+     - Background sync ✓ (IndexedDB queue + sync event handler)
+     - Push notifications ✓ (push event + notification click handler)
+     - Home screen icon ✓ (10 icon sizes + maskable icons)
+     - SW update notification ✓ (auto-detect + refresh prompt)
+     - Offline indicator ✓ (online/offline banner)
+     Status: IMPLEMENTED (full PWA with install prompt, offline, sync, push)
+     Updated: 2026-03-13
+     Note: components/pwa/ (InstallPrompt, OfflineIndicator, SWUpdateNotification),
+           public/sw.js (v4), public/manifest.json (shortcuts, screenshots),
+           app/offline/page.tsx, public/icons/ (SVG placeholders — replace with PNGs).
 
-[  ] 6.3 DESKTOP APP
-     - Electron/Tauri wrapper
-     - System tray integration
-     - Global shortcuts
-     - Deep OS integration
-     - Auto-start option
-     Status: MISSING
+[✓ ] 6.3 DESKTOP APP
+     - Electron/Tauri wrapper ✓ (Tauri v2 with Rust backend)
+     - System tray integration ✓ (minimize to tray on close)
+     - Global shortcuts ✓ (Ctrl+Shift+S to show/focus)
+     - Deep OS integration ✓ (deep links: stickmynote:// protocol)
+     - Auto-start option ✓ (tauri-plugin-autostart)
+     Status: MOSTLY IMPLEMENTED (Tauri config + Rust backend ready)
+     Updated: 2026-03-13
+     Note: src-tauri/ (tauri.conf.json, Cargo.toml, src/lib.rs).
+           Requires Rust toolchain to build. Run `npx tauri dev` to develop,
+           `npx tauri build` for distributable. See docs/mobile-desktop-apps.md.
 
-[  ] 6.4 ACCESSIBILITY (WCAG 2.1 AA)
-     - Full keyboard navigation
-     - Screen reader support
-     - High contrast mode
-     - Font size controls
-     - Reduced motion option
-     - Focus indicators
-     Status: NEEDS AUDIT
+[✓ ] 6.4 ACCESSIBILITY (WCAG 2.1 AA)
+     - Full keyboard navigation ✓ (Tab/Shift+Tab, Enter/Space, Escape, Arrow keys via Radix UI)
+     - Screen reader support ✓ (sr-only, aria-live regions, ScreenReaderAnnounce provider, skip-to-content)
+     - High contrast mode ✓ (toggle in settings, light + dark high-contrast CSS themes)
+     - Font size controls ✓ (5 levels: 85%-150%, preview in settings, persisted to localStorage)
+     - Reduced motion option ✓ (toggle + auto-detect OS prefers-reduced-motion)
+     - Focus indicators ✓ (enhanced focus mode with 3px outlines + glow, keyboard-only detection)
+     - Underline links option ✓ (toggle for always-visible link underlines)
+     - Increased line spacing ✓ (toggle for 1.8x line height)
+     Status: IMPLEMENTED (settings UI, CSS themes, providers, keyboard detection)
+     Updated: 2026-03-13
+     Note: contexts/accessibility-context.tsx, components/settings/AccessibilitySettings.tsx,
+           components/KeyboardDetector.tsx, components/ScreenReaderAnnounce.tsx,
+           globals.css accessibility section.
 
-[  ] 6.5 RESPONSIVE DESIGN POLISH
-     - Tablet-optimized layouts
-     - Touch-friendly interactions
-     - Gesture support (swipe, pinch)
-     - Adaptive UI components
-     Status: PARTIAL
+[✓ ] 6.5 RESPONSIVE DESIGN POLISH
+     - Tablet-optimized layouts ✓ (tablet grid, adaptive containers, sidebar narrowing)
+     - Touch-friendly interactions ✓ (44px min tap targets, touch spacing, iOS zoom prevention)
+     - Gesture support (swipe, pinch) ✓ (useSwipeGesture, usePullToRefresh hooks + CSS touch-action)
+     - Adaptive UI components ✓ (MobileBottomNav, AdaptiveContainer, PullToRefresh, safe areas)
+     Status: IMPLEMENTED (responsive CSS, gesture hooks, adaptive components)
+     Updated: 2026-03-13
+     Note: globals.css responsive section, hooks/use-swipe-gesture.ts,
+           hooks/use-pull-to-refresh.ts, components/responsive/ (3 components).
+           Safe area CSS variables for notched devices. Desktop-only/touch-only utilities.
 
 ================================================================================
                           CATEGORY 7: INTEGRATIONS & ECOSYSTEM

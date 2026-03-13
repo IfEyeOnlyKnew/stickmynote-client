@@ -1766,3 +1766,443 @@ body.fullscreen-modal-open .fixed:not([style*="z-index: 2147483647"]) {
   outline: 2px solid #667eea;
   outline-offset: 2px;
 }
+
+/* ============================================================
+   RESPONSIVE DESIGN POLISH (6.5)
+   Tablet layouts, touch-friendly, gestures, adaptive UI
+   ============================================================ */
+
+/* Safe area support for notched devices (iPhone X+, etc.) */
+:root {
+  --safe-area-top: env(safe-area-inset-top, 0px);
+  --safe-area-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-area-left: env(safe-area-inset-left, 0px);
+  --safe-area-right: env(safe-area-inset-right, 0px);
+}
+
+/* Apply safe areas to body for standalone PWA / native apps */
+@supports (padding: env(safe-area-inset-top)) {
+  body {
+    padding-top: var(--safe-area-top);
+    padding-bottom: var(--safe-area-bottom);
+    padding-left: var(--safe-area-left);
+    padding-right: var(--safe-area-right);
+  }
+}
+
+/* Touch-friendly: ensure minimum 44x44px tap targets (WCAG 2.5.5) */
+@media (pointer: coarse) {
+  button,
+  [role="button"],
+  a,
+  input[type="checkbox"],
+  input[type="radio"],
+  select,
+  .touch-target {
+    min-height: 44px;
+    min-width: 44px;
+  }
+
+  /* Larger touch targets for icon-only buttons */
+  button:has(> svg:only-child),
+  [role="button"]:has(> svg:only-child) {
+    min-height: 44px;
+    min-width: 44px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  /* Remove hover effects on touch — they cause sticky hover on mobile */
+  .hover-only:hover {
+    background-color: unset;
+  }
+
+  /* Increase spacing between interactive elements */
+  .touch-spacing > * + * {
+    margin-top: 8px;
+  }
+}
+
+/* Prevent text selection on interactive elements (mobile UX) */
+@media (pointer: coarse) {
+  button,
+  [role="button"],
+  .no-select {
+    -webkit-user-select: none;
+    user-select: none;
+  }
+}
+
+/* Smooth momentum scrolling for touch */
+.scroll-touch {
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+}
+
+/* Pull-to-refresh prevention on PWA (handled by app, not browser) */
+@media (display-mode: standalone) {
+  body {
+    overscroll-behavior-y: contain;
+  }
+}
+
+/* ---- Tablet-Optimized Layouts (768px - 1024px) ---- */
+@media (min-width: 768px) and (max-width: 1024px) {
+  /* Two-column layout for tablet landscape */
+  .tablet-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+  }
+
+  /* Sidebar on tablet: narrower */
+  [data-sidebar="sidebar"] {
+    --sidebar-width: 14rem;
+  }
+
+  /* Card grid for tablet */
+  .panel-grid-container {
+    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+    gap: 16px;
+    padding: 16px;
+  }
+
+  /* Dialogs fill more of the screen on tablet */
+  [role="dialog"] {
+    max-width: 90vw;
+  }
+
+  /* Form layouts: 2 columns on tablet */
+  .form-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+  }
+}
+
+/* ---- Mobile-Specific Enhancements (< 768px) ---- */
+@media (max-width: 767px) {
+  /* Full-width cards on mobile */
+  .card,
+  [data-slot="card"] {
+    border-radius: 12px;
+  }
+
+  /* Bottom sheet style dialogs on mobile */
+  .mobile-bottom-sheet {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    border-radius: 16px 16px 0 0;
+    max-height: 85vh;
+    overflow-y: auto;
+    animation: slideUp 0.3s ease-out;
+  }
+
+  @keyframes slideUp {
+    from {
+      transform: translateY(100%);
+    }
+    to {
+      transform: translateY(0);
+    }
+  }
+
+  /* Floating action button positioning */
+  .fab {
+    position: fixed;
+    bottom: calc(16px + var(--safe-area-bottom));
+    right: 16px;
+    z-index: 50;
+    width: 56px;
+    height: 56px;
+    border-radius: 16px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  /* Stack nav items vertically */
+  .mobile-stack {
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  /* Full-width inputs on mobile */
+  input,
+  select,
+  textarea {
+    font-size: 16px; /* Prevents iOS zoom on focus */
+  }
+}
+
+/* ---- Gesture Support ---- */
+
+/* Swipeable container */
+.swipeable {
+  touch-action: pan-x;
+  overflow-x: hidden;
+}
+
+.swipeable-vertical {
+  touch-action: pan-y;
+  overflow-y: hidden;
+}
+
+/* Pinch-to-zoom container */
+.pinch-zoom {
+  touch-action: pinch-zoom;
+  overflow: hidden;
+}
+
+/* Disable default touch behaviors where custom gestures are used */
+.gesture-area {
+  touch-action: none;
+  -webkit-touch-callout: none;
+}
+
+/* ---- Adaptive UI Components ---- */
+
+/* Responsive text that scales with viewport */
+.text-adaptive {
+  font-size: clamp(0.875rem, 2vw, 1rem);
+  line-height: 1.5;
+}
+
+.heading-adaptive {
+  font-size: clamp(1.25rem, 4vw, 2rem);
+  line-height: 1.2;
+}
+
+/* Responsive spacing */
+.spacing-adaptive {
+  padding: clamp(12px, 3vw, 24px);
+}
+
+/* Responsive container */
+.container-adaptive {
+  width: 100%;
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 0 clamp(16px, 4vw, 32px);
+}
+
+/* Hide/show based on device */
+@media (pointer: coarse) {
+  .desktop-only {
+    display: none !important;
+  }
+}
+
+@media (pointer: fine) {
+  .touch-only {
+    display: none !important;
+  }
+}
+
+/* Responsive table: horizontal scroll on mobile */
+@media (max-width: 767px) {
+  .table-responsive {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .table-responsive table {
+    min-width: 600px;
+  }
+}
+
+/* Landscape-specific adjustments */
+@media (max-height: 500px) and (orientation: landscape) {
+  .landscape-compact {
+    padding-top: 4px;
+    padding-bottom: 4px;
+  }
+
+  .landscape-compact .fab {
+    bottom: 8px;
+    width: 48px;
+    height: 48px;
+  }
+}
+
+/* Large desktop (> 1440px) */
+@media (min-width: 1440px) {
+  .container-adaptive {
+    max-width: 1600px;
+  }
+
+  .panel-grid-container {
+    grid-template-columns: repeat(auto-fill, minmax(600px, 1fr));
+  }
+}
+
+/* ============================================================
+   ACCESSIBILITY (6.4 - WCAG 2.1 AA)
+   High contrast, enhanced focus, font scaling, reduced motion,
+   link underlines, line height, screen reader utilities
+   ============================================================ */
+
+/* ---- High Contrast Mode ---- */
+/* Activated by .high-contrast class on <html> */
+.high-contrast {
+  --background: 0 0% 100%;
+  --foreground: 0 0% 0%;
+  --card: 0 0% 100%;
+  --card-foreground: 0 0% 0%;
+  --popover: 0 0% 100%;
+  --popover-foreground: 0 0% 0%;
+  --primary: 220 90% 30%;
+  --primary-foreground: 0 0% 100%;
+  --secondary: 0 0% 93%;
+  --secondary-foreground: 0 0% 0%;
+  --muted: 0 0% 93%;
+  --muted-foreground: 0 0% 25%;
+  --accent: 0 0% 93%;
+  --accent-foreground: 0 0% 0%;
+  --destructive: 0 100% 40%;
+  --destructive-foreground: 0 0% 100%;
+  --border: 0 0% 0%;
+  --input: 0 0% 0%;
+  --ring: 220 90% 30%;
+}
+
+.high-contrast.dark {
+  --background: 0 0% 0%;
+  --foreground: 0 0% 100%;
+  --card: 0 0% 5%;
+  --card-foreground: 0 0% 100%;
+  --popover: 0 0% 5%;
+  --popover-foreground: 0 0% 100%;
+  --primary: 210 100% 60%;
+  --primary-foreground: 0 0% 0%;
+  --secondary: 0 0% 15%;
+  --secondary-foreground: 0 0% 100%;
+  --muted: 0 0% 15%;
+  --muted-foreground: 0 0% 75%;
+  --accent: 0 0% 15%;
+  --accent-foreground: 0 0% 100%;
+  --destructive: 0 100% 55%;
+  --destructive-foreground: 0 0% 100%;
+  --border: 0 0% 100%;
+  --input: 0 0% 100%;
+  --ring: 210 100% 60%;
+}
+
+.high-contrast *,
+.high-contrast *::before,
+.high-contrast *::after {
+  border-color: hsl(var(--border)) !important;
+}
+
+.high-contrast img {
+  filter: contrast(1.2);
+}
+
+.high-contrast button,
+.high-contrast [role="button"],
+.high-contrast a {
+  text-decoration-thickness: 2px;
+}
+
+/* ---- Enhanced Focus Indicators ---- */
+/* Activated by .enhanced-focus class on <html> */
+.enhanced-focus *:focus-visible {
+  outline: 3px solid hsl(var(--ring)) !important;
+  outline-offset: 3px !important;
+  box-shadow: 0 0 0 6px hsla(var(--ring) / 0.25) !important;
+  border-radius: 2px;
+}
+
+.enhanced-focus button:focus-visible,
+.enhanced-focus [role="button"]:focus-visible,
+.enhanced-focus a:focus-visible {
+  outline: 3px solid hsl(var(--ring)) !important;
+  outline-offset: 2px !important;
+  box-shadow: 0 0 0 6px hsla(var(--ring) / 0.3) !important;
+}
+
+/* Standard focus-visible (always on, for keyboard users) */
+:focus-visible {
+  outline: 2px solid hsl(var(--ring));
+  outline-offset: 2px;
+}
+
+/* Remove focus outline for mouse clicks (keep for keyboard) */
+:focus:not(:focus-visible) {
+  outline: none;
+}
+
+/* ---- Reduced Motion (class-based toggle) ---- */
+/* Complements the @media (prefers-reduced-motion: reduce) rule above */
+.reduce-motion *,
+.reduce-motion *::before,
+.reduce-motion *::after {
+  animation-duration: 0.01ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.01ms !important;
+  scroll-behavior: auto !important;
+}
+
+/* ---- Underline Links ---- */
+.underline-links a:not([role="button"]):not(.no-underline) {
+  text-decoration: underline !important;
+  text-underline-offset: 2px;
+}
+
+/* ---- Large Line Height ---- */
+.large-line-height {
+  line-height: 1.8 !important;
+}
+
+.large-line-height p,
+.large-line-height li,
+.large-line-height td,
+.large-line-height th,
+.large-line-height label,
+.large-line-height span {
+  line-height: 1.8 !important;
+}
+
+/* ---- Screen Reader Utilities ---- */
+/* visually-hidden: hides visually but remains accessible to screen readers */
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border-width: 0;
+}
+
+/* Announce dynamic content changes */
+.sr-announce {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border-width: 0;
+}
+
+/* ---- Keyboard Navigation Indicators ---- */
+/* Show keyboard hints when tab is being used */
+body.using-keyboard *:focus-visible {
+  outline: 2px solid hsl(var(--ring));
+  outline-offset: 2px;
+}
+
+/* Hide keyboard hints when using mouse */
+body:not(.using-keyboard) *:focus:not(:focus-visible) {
+  outline: none;
+  box-shadow: none;
+}

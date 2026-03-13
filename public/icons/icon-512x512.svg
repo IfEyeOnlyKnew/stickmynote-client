@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
+  <rect width="512" height="512" fill="transparent" rx="77"/>
+  <rect x="0" y="0" width="512" height="512" fill="#2563eb" rx="77"/>
+  <text x="256" y="256" font-family="Arial, sans-serif" font-size="230" font-weight="bold" fill="#ffffff" text-anchor="middle" dominant-baseline="central">S</text>
+  <text x="256" y="382.5" font-family="Arial, sans-serif" font-size="81" fill="#ffffff" text-anchor="middle" dominant-baseline="central" opacity="0.8">Stick My Note</text>
+</svg>

@@ -7,6 +7,7 @@ import { PreferencesSettings } from "@/components/settings/PreferencesSettings"
 import { NotificationSettings } from "@/components/settings/NotificationSettings"
 import { PrivacySettings } from "@/components/settings/PrivacySettings"
 import { DataManagementSettings } from "@/components/settings/DataManagementSettings"
+import { AccessibilitySettings } from "@/components/settings/AccessibilitySettings"
 
 export function SettingsPanel() {
   const { settings, isLoading, updateSetting, handleSave, handleExportData, handleDeleteAccount } = useSettings()
@@ -26,6 +27,8 @@ export function SettingsPanel() {
       />
 
       <PrivacySettings privacy={settings.privacy} onUpdate={(field, value) => updateSetting("privacy", field, value)} />
+
+      <AccessibilitySettings />
 
       <DataManagementSettings onExportData={handleExportData} onDeleteAccount={handleDeleteAccount} />
 
