@@ -419,6 +419,103 @@ export function useNotesData(userId: string | null, shouldLoad = true): UseNotes
     hasInitialLoadedRef.current = true
   }, [])
 
+  // ---- Delta sync on visibility change ----
+  // When the user switches back to this tab/app, fetch only changes since last sync
+  const lastSyncRef = useRef<string>(new Date().toISOString())
+
+  // Update lastSync timestamp whenever notes change (from any source)
+  useEffect(() => {
+    lastSyncRef.current = new Date().toISOString()
+  }, [allNotes])
+
+  useEffect(() => {
+    if (!userId) return
+
+    const handleVisibilityChange = async () => {
+      if (document.visibilityState !== "visible") return
+      if (!hasInitialLoadedRef.current) return
+
+      try {
+        const res = await fetch(`/api/v2/notes/changes?since=${encodeURIComponent(lastSyncRef.current)}`)
+        if (!res.ok) return
+
+        const { updated, deleted, serverTime } = await res.json()
+
+        if (updated?.length > 0 || deleted?.length > 0) {
+          setAllNotes((prev) => {
+            let next = prev
+
+            // Remove deleted notes
+            if (deleted?.length > 0) {
+              const deletedSet = new Set(deleted)
+              next = next.filter((n) => !deletedSet.has(n.id))
+            }
+
+            // Apply updates and inserts
+            if (updated?.length > 0) {
+              const existingIds = new Set(next.map((n) => n.id))
+              for (const raw of updated) {
+                if (existingIds.has(raw.id)) {
+                  // Update existing note
+                  next = next.map((n) =>
+                    n.id === raw.id
+                      ? {
+                          ...n,
+                          topic: raw.topic || "",
+                          title: raw.topic || "",
+                          content: raw.content || "",
+                          color: raw.color || n.color,
+                          position_x: raw.position_x ?? n.position_x,
+                          position_y: raw.position_y ?? n.position_y,
+                          is_shared: Boolean(raw.is_shared),
+                          updated_at: raw.updated_at || n.updated_at,
+                        }
+                      : n
+                  )
+                } else {
+                  // New note created while away
+                  next = [
+                    {
+                      id: raw.id,
+                      topic: raw.topic || "",
+                      title: raw.topic || "",
+                      content: raw.content || "",
+                      color: raw.color || "#fef3c7",
+                      position_x: raw.position_x || 0,
+                      position_y: raw.position_y || 0,
+                      is_shared: Boolean(raw.is_shared),
+                      hyperlinks: [],
+                      tags: [],
+                      videos: [],
+                      images: [],
+                      created_at: raw.created_at || new Date().toISOString(),
+                      updated_at: raw.updated_at || new Date().toISOString(),
+                      user_id: raw.user_id,
+                      replies: [],
+                      z_index: 1,
+                    },
+                    ...next,
+                  ]
+                }
+              }
+            }
+
+            return next
+          })
+        }
+
+        if (serverTime) {
+          lastSyncRef.current = serverTime
+        }
+      } catch (err) {
+        console.error("[useNotesData] Delta sync failed:", err)
+      }
+    }
+
+    document.addEventListener("visibilitychange", handleVisibilityChange)
+    return () => document.removeEventListener("visibilitychange", handleVisibilityChange)
+  }, [userId])
+
   // ---- Real-time sync via WebSocket ----
   const { subscribe } = useWebSocket()
 

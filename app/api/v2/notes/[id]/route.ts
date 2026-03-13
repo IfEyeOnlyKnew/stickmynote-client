@@ -302,6 +302,16 @@ export async function DELETE(
       return new Response(JSON.stringify({ error: 'Note not found' }), { status: 404 })
     }
 
+    // Record deletion for delta sync (so offline clients can catch up)
+    try {
+      await db.query(
+        `INSERT INTO note_deletions (note_id, user_id) VALUES ($1, $2)`,
+        [result.rows[0].id, user.id]
+      )
+    } catch {
+      // Table may not exist yet — non-critical, skip gracefully
+    }
+
     // Broadcast deletion to user's other sessions
     const broadcast = (globalThis as any).__wsBroadcast
     broadcast?.sendToUser(user.id, {

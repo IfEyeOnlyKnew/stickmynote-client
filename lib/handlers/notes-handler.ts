@@ -150,6 +150,15 @@ export async function deleteNote(session: NotesSession, noteId: string) {
     if (!deleted) {
       return { status: 404, body: { error: 'Note not found or not owned by user' } }
     }
+    // Record deletion for delta sync (so offline clients can catch up)
+    try {
+      await query(
+        'INSERT INTO note_deletions (note_id, user_id) VALUES ($1, $2)',
+        [validatedId, session.user.id]
+      )
+    } catch {
+      // Table may not exist yet — non-critical, skip gracefully
+    }
     return { status: 200, body: { success: true } }
   } catch (error: any) {
     console.error('[notes-handler] deleteNote error:', error)
