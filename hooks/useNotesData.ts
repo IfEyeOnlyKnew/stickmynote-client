@@ -1,8 +1,9 @@
 "use client"
 
 import type React from "react"
-import { useRef, useState, useCallback } from "react"
+import { useRef, useState, useCallback, useEffect } from "react"
 import type { Note } from "@/types/note"
+import { useWebSocket } from "@/hooks/useWebSocket"
 
 interface PersonalStick {
   id: string
@@ -417,6 +418,74 @@ export function useNotesData(userId: string | null, shouldLoad = true): UseNotes
   const markInitialized = useCallback(() => {
     hasInitialLoadedRef.current = true
   }, [])
+
+  // ---- Real-time sync via WebSocket ----
+  const { subscribe } = useWebSocket()
+
+  useEffect(() => {
+    if (!userId) return
+
+    // Listen for notes created in other sessions
+    const unsubCreated = subscribe("note.created", (note: any) => {
+      if (!note?.id) return
+      setAllNotes((prev) => {
+        // Avoid duplicates (the session that created it already has it)
+        if (prev.some((n) => n.id === note.id)) return prev
+        const newNote: Note = {
+          id: note.id,
+          topic: note.topic || "",
+          title: note.topic || "",
+          content: note.content || "",
+          color: note.color || "#fef3c7",
+          position_x: note.position_x || 0,
+          position_y: note.position_y || 0,
+          is_shared: Boolean(note.is_shared),
+          hyperlinks: [],
+          tags: [],
+          videos: [],
+          images: [],
+          created_at: note.created_at || new Date().toISOString(),
+          updated_at: note.updated_at || new Date().toISOString(),
+          user_id: note.user_id,
+          replies: [],
+          z_index: 1,
+        }
+        return [newNote, ...prev]
+      })
+    })
+
+    // Listen for notes updated in other sessions
+    const unsubUpdated = subscribe("note.updated", (data: any) => {
+      if (!data?.id) return
+      setAllNotes((prev) =>
+        prev.map((n) => {
+          if (n.id !== data.id) return n
+          return {
+            ...n,
+            ...(data.topic !== undefined && { topic: data.topic, title: data.topic }),
+            ...(data.content !== undefined && { content: data.content }),
+            ...(data.color !== undefined && { color: data.color }),
+            ...(data.position_x !== undefined && { position_x: data.position_x }),
+            ...(data.position_y !== undefined && { position_y: data.position_y }),
+            ...(data.is_shared !== undefined && { is_shared: Boolean(data.is_shared) }),
+            updated_at: data.updated_at || new Date().toISOString(),
+          }
+        })
+      )
+    })
+
+    // Listen for notes deleted in other sessions
+    const unsubDeleted = subscribe("note.deleted", (data: any) => {
+      if (!data?.id) return
+      setAllNotes((prev) => prev.filter((n) => n.id !== data.id))
+    })
+
+    return () => {
+      unsubCreated()
+      unsubUpdated()
+      unsubDeleted()
+    }
+  }, [userId, subscribe])
 
   return {
     allNotes,

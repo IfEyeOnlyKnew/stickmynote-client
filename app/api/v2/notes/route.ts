@@ -24,6 +24,17 @@ export async function POST(request: NextRequest) {
     const session = await requireADSession(request)
     const body = await request.json()
     const result = await createNote(session, body)
+
+    // Broadcast to user's other sessions (PWA, browser tabs, etc.)
+    if (result.status === 201 && result.body?.note) {
+      const broadcast = (globalThis as any).__wsBroadcast
+      broadcast?.sendToUser(session.user.id, {
+        type: "note.created",
+        payload: result.body.note,
+        timestamp: Date.now(),
+      })
+    }
+
     return new Response(JSON.stringify(result.body), { status: result.status })
   } catch (error) {
     return handleApiError(error)
@@ -38,6 +49,17 @@ export async function PUT(request: NextRequest) {
     const noteId = url.searchParams.get('id') || ''
     const body = await request.json()
     const result = await updateNote(session, noteId, body)
+
+    // Broadcast update to user's other sessions
+    if (result.status === 200 && result.body) {
+      const broadcast = (globalThis as any).__wsBroadcast
+      broadcast?.sendToUser(session.user.id, {
+        type: "note.updated",
+        payload: { id: noteId, ...result.body },
+        timestamp: Date.now(),
+      })
+    }
+
     return new Response(JSON.stringify(result.body), { status: result.status })
   } catch (error) {
     return handleApiError(error)
@@ -51,6 +73,17 @@ export async function DELETE(request: NextRequest) {
     const url = new URL(request.url)
     const noteId = url.searchParams.get('id') || ''
     const result = await deleteNote(session, noteId)
+
+    // Broadcast deletion to user's other sessions
+    if (result.status === 200) {
+      const broadcast = (globalThis as any).__wsBroadcast
+      broadcast?.sendToUser(session.user.id, {
+        type: "note.deleted",
+        payload: { id: noteId },
+        timestamp: Date.now(),
+      })
+    }
+
     return new Response(JSON.stringify(result.body), { status: result.status })
   } catch (error) {
     return handleApiError(error)

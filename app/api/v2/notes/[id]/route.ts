@@ -169,6 +169,14 @@ export async function PUT(
       return new Response(JSON.stringify({ error: 'Note not found' }), { status: 404 })
     }
 
+    // Broadcast update to user's other sessions
+    const broadcast = (globalThis as any).__wsBroadcast
+    broadcast?.sendToUser(user.id, {
+      type: "note.updated",
+      payload: result.rows[0],
+      timestamp: Date.now(),
+    })
+
     return new Response(JSON.stringify(result.rows[0]), { status: 200 })
   } catch (error) {
     return handleApiError(error)
@@ -247,6 +255,14 @@ export async function PATCH(
       return new Response(JSON.stringify({ error: 'Note not found' }), { status: 404 })
     }
 
+    // Broadcast update to user's other sessions
+    const broadcast = (globalThis as any).__wsBroadcast
+    broadcast?.sendToUser(user.id, {
+      type: "note.updated",
+      payload: result.rows[0],
+      timestamp: Date.now(),
+    })
+
     return new Response(JSON.stringify(result.rows[0]), { status: 200 })
   } catch (error) {
     return handleApiError(error)
@@ -285,6 +301,14 @@ export async function DELETE(
     if (result.rows.length === 0) {
       return new Response(JSON.stringify({ error: 'Note not found' }), { status: 404 })
     }
+
+    // Broadcast deletion to user's other sessions
+    const broadcast = (globalThis as any).__wsBroadcast
+    broadcast?.sendToUser(user.id, {
+      type: "note.deleted",
+      payload: { id: result.rows[0].id },
+      timestamp: Date.now(),
+    })
 
     return new Response(JSON.stringify({ message: 'Note deleted successfully' }), { status: 200 })
   } catch (error) {
