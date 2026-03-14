@@ -1,4 +1,4 @@
-const CACHE_VERSION = 4
+const CACHE_VERSION = 5
 const CACHE_NAME = `stickmynote-v${CACHE_VERSION}`
 const API_CACHE_NAME = `stickmynote-api-v${CACHE_VERSION}`
 const OFFLINE_PAGE = "/offline"

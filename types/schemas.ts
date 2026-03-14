@@ -370,6 +370,75 @@ export const updateStickSchema = z.object({
 export type UpdateStickData = z.infer<typeof updateStickSchema>
 
 // ============================================================================
+// NOTED SCHEMAS (OneNote replacement)
+// ============================================================================
+
+export const notedPageSchema = z.object({
+  id: uuidSchema,
+  stick_id: uuidSchema.nullable(),
+  personal_stick_id: uuidSchema.nullable(),
+  user_id: uuidSchema,
+  org_id: uuidSchema,
+  title: z.string(),
+  content: z.string(),
+  group_id: uuidSchema.nullable(),
+  is_personal: z.boolean(),
+  source_content: z.string(),
+  created_at: timestampSchema,
+  updated_at: timestampSchema,
+})
+
+export type NotedPage = z.infer<typeof notedPageSchema>
+
+export const createNotedPageSchema = z.object({
+  stick_id: uuidSchema.nullable().optional(),
+  personal_stick_id: uuidSchema.nullable().optional(),
+  title: z.string().max(200, "Title must be 200 characters or less"),
+  content: z.string().optional().default(""),
+  group_id: uuidSchema.nullable().optional(),
+  is_personal: z.boolean().optional().default(false),
+  source_content: z.string().optional().default(""),
+})
+
+export type CreateNotedPageData = z.infer<typeof createNotedPageSchema>
+
+export const updateNotedPageSchema = z.object({
+  title: z.string().max(200, "Title must be 200 characters or less").optional(),
+  content: z.string().optional(),
+  group_id: uuidSchema.nullable().optional(),
+})
+
+export type UpdateNotedPageData = z.infer<typeof updateNotedPageSchema>
+
+export const notedGroupSchema = z.object({
+  id: uuidSchema,
+  user_id: uuidSchema,
+  org_id: uuidSchema,
+  name: z.string(),
+  color: z.string(),
+  sort_order: z.number().int(),
+  created_at: timestampSchema,
+  updated_at: timestampSchema,
+})
+
+export type NotedGroup = z.infer<typeof notedGroupSchema>
+
+export const createNotedGroupSchema = z.object({
+  name: z.string().min(1, "Name is required").max(50, "Name must be 50 characters or less"),
+  color: z.string().optional().default("#6366f1"),
+})
+
+export type CreateNotedGroupData = z.infer<typeof createNotedGroupSchema>
+
+export const updateNotedGroupSchema = z.object({
+  name: z.string().min(1).max(50).optional(),
+  color: z.string().optional(),
+  sort_order: z.number().int().optional(),
+})
+
+export type UpdateNotedGroupData = z.infer<typeof updateNotedGroupSchema>
+
+// ============================================================================
 // RATE LIMIT SCHEMA
 // ============================================================================
 

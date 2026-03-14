@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Users, Plus, UserPlus, BarChart3, CheckCircle2, Circle, Settings, Sparkles } from "lucide-react"
+import { NotedIcon } from "@/components/noted/NotedIcon"
 import { CreateStickModal } from "@/components/create-stick-modal"
 import { BreadcrumbNav } from "@/components/breadcrumb-nav"
 import { PermissionBasedStickFullscreen } from "@/components/permission-based/PermissionBasedStickFullscreen"
@@ -238,6 +239,13 @@ function StickCard({ stick, counts, canEdit, onClick, onOpenGantt, onColorChange
             {new Date(stick.created_at).toLocaleDateString()}
           </div>
           <div className="flex items-center gap-2">
+            <div role="none" onClick={handleStopPropagation} onKeyDown={(e) => e.stopPropagation()}>
+              <NotedIcon
+                stickId={stick.id}
+                stickTopic={stick.topic}
+                stickContent={stick.content}
+              />
+            </div>
             {hasTasks && (
               <Button
                 variant="ghost"

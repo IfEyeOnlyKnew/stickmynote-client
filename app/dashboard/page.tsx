@@ -5,7 +5,7 @@ import { useState, useEffect } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { StickyNote, Users, FileText, ArrowRight, Share2, MessagesSquare, Video, CalendarCheck, Download } from "lucide-react"
+import { StickyNote, Users, FileText, ArrowRight, Share2, MessagesSquare, Video, CalendarCheck, Download, BookOpen } from "lucide-react"
 import { UserMenu } from "@/components/user-menu"
 import { useUser } from "@/contexts/user-context"
 import { useOrganization } from "@/contexts/organization-context"
@@ -359,6 +359,47 @@ export default function DashboardPage() {
                 size="lg"
               >
                 Go to CalSticks
+                <ArrowRight className="h-5 w-5 ml-2" />
+              </Button>
+            </CardContent>
+          </Card>
+
+          {/* Noted Hub Section */}
+          <Card className="hover:shadow-xl transition-all duration-300 hover:scale-105 border-2 hover:border-indigo-300">
+            <CardHeader className="text-center pb-4">
+              <div className="mx-auto w-16 h-16 bg-indigo-100 rounded-full flex items-center justify-center mb-4">
+                <BookOpen className="h-8 w-8 text-indigo-600" />
+              </div>
+              <CardTitle className="text-2xl text-gray-900">Noted</CardTitle>
+              <CardDescription className="text-base">
+                Your notebook — turn any Stick into a rich, organized page with full formatting
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-3">
+                <div className="flex items-center text-sm text-gray-600">
+                  <div className="w-2 h-2 bg-indigo-500 rounded-full mr-2"></div>
+                  Rich text editor with formatting
+                </div>
+                <div className="flex items-center text-sm text-gray-600">
+                  <div className="w-2 h-2 bg-indigo-500 rounded-full mr-2"></div>
+                  Organize pages into groups
+                </div>
+                <div className="flex items-center text-sm text-gray-600">
+                  <div className="w-2 h-2 bg-indigo-500 rounded-full mr-2"></div>
+                  Task lists, headings, and code blocks
+                </div>
+                <div className="flex items-center text-sm text-gray-600">
+                  <div className="w-2 h-2 bg-indigo-500 rounded-full mr-2"></div>
+                  Permission-aware — respects Stick sharing
+                </div>
+              </div>
+              <Button
+                onClick={() => router.push("/noted")}
+                className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-3 text-lg"
+                size="lg"
+              >
+                Go to Noted
                 <ArrowRight className="h-5 w-5 ml-2" />
               </Button>
             </CardContent>

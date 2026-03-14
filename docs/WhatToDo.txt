@@ -213,13 +213,22 @@ Goal: Surpass Microsoft's suite by providing a unified, intelligent, and
                               (Compete with MS OneNote)
 --------------------------------------------------------------------------------
 
-[  ] 3.1 NOTEBOOK/SECTION/PAGE HIERARCHY
-     - Notebook containers for grouped content
-     - Collapsible section groups
-     - Page templates per section
-     - Section-level permissions
-     - Quick navigation sidebar
-     Status: PARTIAL (tabs exist, needs hierarchy)
+[✓ ] 3.1 NOTED - NOTEBOOK/SECTION/PAGE HIERARCHY (OneNote Replacement)
+     - "Noted" app: 3-panel layout (group tabs, page list sidebar, rich editor) ✓
+     - Noted icon on every Stick card (Pads + Personal) — one click to create a page ✓
+     - Group tabs across the top for organizing pages (create/rename/recolor/delete) ✓
+     - Left sidebar with search, newest-first page list, move-to-group actions ✓
+     - Tiptap rich text editor: bold, italic, underline, strikethrough, H1-H3,
+       bullet/numbered/task lists, blockquote, code block, highlight, links, undo/redo ✓
+     - Permission-aware: personal sticks → creator only, shared sticks → pad members ✓
+     - Auto-save with debounce (1s), saving/saved indicator ✓
+     - Dashboard card + mobile bottom nav integration ✓
+     - Database: noted_pages + noted_groups tables (migration 49) ✓
+     - API: full CRUD for pages & groups, by-stick lookup, bulk group reorder ✓
+     Status: IMPLEMENTED (app/noted/, components/noted/, hooks/useNoted.ts)
+     Updated: 2026-03-13
+     Note: Replaces need for Microsoft OneNote. Future: sub-pages, templates,
+           export, collaborative editing, versioning, attachments.
 
 [  ] 3.2 HANDWRITING & DRAWING
      - Freeform drawing canvas

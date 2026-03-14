@@ -3,7 +3,7 @@
 import { usePathname } from "next/navigation"
 import Link from "next/link"
 import { cn } from "@/lib/utils"
-import { Home, StickyNote, MessageSquare, FolderKanban, User } from "lucide-react"
+import { Home, StickyNote, MessageSquare, FolderKanban, User, BookOpen } from "lucide-react"
 import { useIsMobile } from "@/hooks/use-mobile"
 
 interface NavItem {
@@ -18,6 +18,7 @@ const navItems: NavItem[] = [
   { href: "/social", icon: Home, label: "Home", matchPrefix: "/social" },
   { href: "/social/my-sticks", icon: StickyNote, label: "Notes", matchPrefix: "/social/my-sticks" },
   { href: "/channels", icon: MessageSquare, label: "Chat", matchPrefix: "/channels" },
+  { href: "/noted", icon: BookOpen, label: "Noted", matchPrefix: "/noted" },
   { href: "/pm", icon: FolderKanban, label: "Projects", matchPrefix: "/pm" },
   { href: "/profile", icon: User, label: "Profile", matchPrefix: "/profile" },
 ]
