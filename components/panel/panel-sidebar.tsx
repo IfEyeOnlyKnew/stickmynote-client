@@ -4,7 +4,7 @@ import { useState, useEffect } from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { cn } from "@/lib/utils"
-import { Globe, Users, ChevronLeft, ChevronRight } from "lucide-react"
+import { Globe, ShieldCheck, MessageCircle, ChevronLeft, ChevronRight } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import {
   Tooltip,
@@ -15,24 +15,58 @@ import {
 
 const STORAGE_KEY = "panel-sidebar-collapsed"
 
-const navItems = [
-  { href: "/panel", label: "Shared Sticks", icon: Globe, exact: true },
-  { href: "/concur", label: "Concur", icon: Users },
-]
+interface NavItem {
+  href: string
+  label: string
+  icon: React.ComponentType<{ className?: string }>
+  exact?: boolean
+}
 
 export function PanelSidebar() {
   const pathname = usePathname()
   const [collapsed, setCollapsed] = useState(false)
+  const [isConcurAdmin, setIsConcurAdmin] = useState(false)
+  const [isConcurMember, setIsConcurMember] = useState(false)
 
   useEffect(() => {
     const stored = localStorage.getItem(STORAGE_KEY)
     if (stored === "true") setCollapsed(true)
   }, [])
 
+  // Fetch Concur status to determine which nav items to show
+  useEffect(() => {
+    const fetchConcurStatus = async () => {
+      try {
+        const res = await fetch("/api/concur/groups")
+        if (res.ok) {
+          const data = await res.json()
+          setIsConcurAdmin(data.isConcurAdmin || false)
+          setIsConcurMember((data.groups?.length || 0) > 0)
+        }
+      } catch {
+        // Silent fail
+      }
+    }
+    fetchConcurStatus()
+  }, [])
+
   const toggleCollapsed = () => {
     const next = !collapsed
     setCollapsed(next)
     localStorage.setItem(STORAGE_KEY, String(next))
+  }
+
+  // Build nav items dynamically based on user's Concur status
+  const navItems: NavItem[] = [
+    { href: "/panel", label: "Shared Sticks", icon: Globe, exact: true },
+  ]
+
+  if (isConcurAdmin) {
+    navItems.push({ href: "/concur", label: "Concur Admin", icon: ShieldCheck, exact: true })
+  }
+
+  if (isConcurAdmin || isConcurMember) {
+    navItems.push({ href: "/concur", label: "Concur Sticks", icon: MessageCircle })
   }
 
   return (
@@ -67,7 +101,7 @@ export function PanelSidebar() {
               : pathname.startsWith(item.href)
 
             const linkContent = (
-              <Link key={item.href} href={item.href}>
+              <Link key={item.label} href={item.href}>
                 <div
                   className={cn(
                     "flex items-center gap-3 rounded-md text-sm font-medium transition-colors",
@@ -85,7 +119,7 @@ export function PanelSidebar() {
 
             if (collapsed) {
               return (
-                <Tooltip key={item.href}>
+                <Tooltip key={item.label}>
                   <TooltipTrigger asChild>{linkContent}</TooltipTrigger>
                   <TooltipContent side="right">
                     <p>{item.label}</p>
@@ -94,7 +128,7 @@ export function PanelSidebar() {
               )
             }
 
-            return linkContent
+            return <div key={item.label}>{linkContent}</div>
           })}
         </nav>
       </aside>
