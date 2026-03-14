@@ -13,6 +13,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { PermissionBasedStickFullscreen } from "@/components/permission-based/PermissionBasedStickFullscreen"
 import { CreateChatModal } from "@/components/stick-chats/CreateChatModal"
 import { Button } from "@/components/ui/button"
+import { NotedIcon } from "@/components/noted/NotedIcon"
 import type { Stick } from "@/types/pad"
 import {
   CommunicationPaletteProvider,
@@ -223,6 +224,15 @@ export function MySticksClient({ initialSticks }: MySticksClientProps) {
                     <CardTitle className="flex items-center justify-between gap-2">
                       <span className="flex-1 truncate text-base">{stick.topic || "Untitled Stick"}</span>
                       <div className="flex items-center gap-1">
+                        <span onClick={(e) => e.stopPropagation()} onKeyDown={(e) => e.stopPropagation()} role="none">
+                          <NotedIcon
+                            stickId={stick.id}
+                            stickTopic={stick.topic}
+                            stickContent={stick.content}
+                            isPersonal={!stick.pad_id}
+                            size="sm"
+                          />
+                        </span>
                         <Button
                           variant="ghost"
                           size="sm"
