@@ -15,6 +15,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { Label } from "@/components/ui/label"
 import { Loader2 } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
+import { LdapUserSearchInput } from "@/components/concur/ldap-user-search-input"
 
 interface CreateConcurGroupDialogProps {
   onClose: () => void
@@ -102,24 +103,24 @@ export function CreateConcurGroupDialog({ onClose, onCreated }: CreateConcurGrou
           </div>
 
           <div>
-            <Label htmlFor="owner1-email">Owner 1 Email</Label>
-            <Input
-              id="owner1-email"
-              type="email"
-              placeholder="owner1@company.com"
+            <Label>Owner 1</Label>
+            <LdapUserSearchInput
               value={owner1Email}
-              onChange={(e) => setOwner1Email(e.target.value)}
+              placeholder="Search for first owner..."
+              onSelect={(user) => setOwner1Email(user.email)}
+              onChange={() => setOwner1Email("")}
+              excludeEmails={owner2Email ? [owner2Email] : []}
             />
           </div>
 
           <div>
-            <Label htmlFor="owner2-email">Owner 2 Email</Label>
-            <Input
-              id="owner2-email"
-              type="email"
-              placeholder="owner2@company.com"
+            <Label>Owner 2</Label>
+            <LdapUserSearchInput
               value={owner2Email}
-              onChange={(e) => setOwner2Email(e.target.value)}
+              placeholder="Search for second owner..."
+              onSelect={(user) => setOwner2Email(user.email)}
+              onChange={() => setOwner2Email("")}
+              excludeEmails={owner1Email ? [owner1Email] : []}
             />
           </div>
         </div>

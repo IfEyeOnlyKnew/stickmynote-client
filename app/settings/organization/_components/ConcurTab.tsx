@@ -3,8 +3,8 @@
 import { useState, useEffect, useCallback } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Loader2, Users, Trash2, Plus, Copy, Check, Terminal } from "lucide-react"
+import { Loader2, Users, Trash2, Copy, Check, Terminal } from "lucide-react"
+import { LdapUserSearchInput } from "@/components/concur/ldap-user-search-input"
 import { useOrganization } from "@/contexts/organization-context"
 import { useToast } from "@/hooks/use-toast"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
@@ -51,14 +51,14 @@ export function ConcurTab() {
     fetchAdministrators()
   }, [fetchAdministrators])
 
-  const handleAddAdministrator = async () => {
-    if (!addingEmail.trim()) return
+  const handleAddAdministratorByEmail = async (email: string) => {
+    if (!email.trim()) return
     setAdding(true)
     try {
       const res = await fetch("/api/concur/administrators", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: addingEmail.trim() }),
+        body: JSON.stringify({ email: email.trim() }),
       })
       const data = await res.json()
       if (!res.ok) {
@@ -218,18 +218,23 @@ try {
         </CardHeader>
         <CardContent className="space-y-4">
           {/* Add administrator */}
-          <div className="flex gap-2">
-            <Input
-              placeholder="Enter email address..."
+          <div className="relative">
+            {adding && (
+              <div className="absolute inset-0 bg-white/50 z-10 flex items-center justify-center rounded">
+                <Loader2 className="h-4 w-4 animate-spin" />
+              </div>
+            )}
+            <LdapUserSearchInput
               value={addingEmail}
-              onChange={(e) => setAddingEmail(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && handleAddAdministrator()}
+              placeholder="Search for a user to add as administrator..."
+              onSelect={(user) => {
+                setAddingEmail(user.email)
+                handleAddAdministratorByEmail(user.email)
+              }}
+              onChange={() => setAddingEmail("")}
+              excludeEmails={administrators.map((a) => a.user?.email || "").filter(Boolean)}
               disabled={adding}
             />
-            <Button onClick={handleAddAdministrator} disabled={adding || !addingEmail.trim()}>
-              {adding ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
-              <span className="ml-1">Add</span>
-            </Button>
           </div>
 
           {/* Administrators list */}

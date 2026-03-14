@@ -9,10 +9,10 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { Loader2, Plus, Trash2, Upload, Crown, User } from "lucide-react"
+import { Loader2, Trash2, Upload, Crown, User } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
+import { LdapUserSearchInput } from "@/components/concur/ldap-user-search-input"
 
 interface GroupMember {
   id: string
@@ -60,14 +60,14 @@ export function ConcurMembersDialog({ groupId, onClose }: ConcurMembersDialogPro
     fetchMembers()
   }, [fetchMembers])
 
-  const handleAddMember = async () => {
-    if (!addEmail.trim()) return
+  const handleAddMemberByEmail = async (email: string) => {
+    if (!email.trim()) return
     setAdding(true)
     try {
       const res = await fetch(`/api/concur/groups/${groupId}/members`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: addEmail.trim() }),
+        body: JSON.stringify({ email: email.trim() }),
       })
       const data = await res.json()
       if (!res.ok) {
@@ -170,17 +170,27 @@ export function ConcurMembersDialog({ groupId, onClose }: ConcurMembersDialogPro
 
         {/* Add Member */}
         <div className="space-y-3">
-          <div className="flex gap-2">
-            <Input
-              placeholder="Enter email address..."
+          <div className="relative">
+            {adding && (
+              <div className="absolute inset-0 bg-white/50 z-10 flex items-center justify-center rounded">
+                <Loader2 className="h-4 w-4 animate-spin" />
+              </div>
+            )}
+            <LdapUserSearchInput
               value={addEmail}
-              onChange={(e) => setAddEmail(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && handleAddMember()}
+              placeholder="Search for a member to add..."
+              onSelect={(user) => {
+                setAddEmail(user.email)
+                // Auto-submit when user is selected
+                setTimeout(() => {
+                  setAddEmail(user.email)
+                  handleAddMemberByEmail(user.email)
+                }, 0)
+              }}
+              onChange={() => setAddEmail("")}
+              excludeEmails={members.map((m) => m.user?.email || "").filter(Boolean)}
               disabled={adding}
             />
-            <Button onClick={handleAddMember} disabled={adding || !addEmail.trim()} size="sm">
-              {adding ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
-            </Button>
           </div>
 
           {/* CSV Import */}
