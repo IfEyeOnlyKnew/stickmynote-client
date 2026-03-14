@@ -22,7 +22,7 @@ interface CreateStickModalProps {
   context?: "paks" | "social"
 }
 
-export function CreateStickModal({ isOpen, onClose, padId, context = "social" }: CreateStickModalProps) {
+export function CreateStickModal({ isOpen, onClose, padId, context = "paks" }: CreateStickModalProps) {
   const { form, updateForm, resetForm, createStick, isLoading, isValid } = useCreateStick(padId, context)
 
   const { lastSaved, isSaving, deleteDraft } = useAutoSaveDraft({

@@ -686,7 +686,7 @@ export default function SocialPadPage({ params }: Readonly<{ params: { padId: st
         />
       )}
 
-      <CreateStickModal isOpen={createStickOpen} onClose={handleStickCreated} padId={padId} />
+      <CreateStickModal isOpen={createStickOpen} onClose={handleStickCreated} padId={padId} context="social" />
 
       {/* Chat Modal */}
       <CreateChatModal
