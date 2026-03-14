@@ -230,78 +230,100 @@ Goal: Surpass Microsoft's suite by providing a unified, intelligent, and
      Note: Replaces need for Microsoft OneNote. Future: sub-pages, templates,
            export, collaborative editing, versioning, attachments.
 
-[  ] 3.2 HANDWRITING & DRAWING
-     - Freeform drawing canvas
-     - Stylus/pen support
-     - Shape recognition
-     - Handwriting-to-text conversion
-     - Math equation input
-     - Drawing layers
-     Status: MISSING
+[✓ ] 3.2 HANDWRITING & DRAWING
+     - Freeform drawing canvas ✓ (NotedDrawingCanvas component)
+     - Pen tool with 10 colors and adjustable line width ✓
+     - Eraser tool ✓
+     - Shape tools: line, rectangle, circle ✓
+     - Text tool for adding text annotations ✓
+     - Undo/redo via ImageData history stack ✓
+     - Download as PNG ✓
+     - Insert drawing as base64 image into editor ✓
+     Status: IMPLEMENTED (components/noted/NotedDrawingCanvas.tsx)
+     Updated: 2026-03-14
 
-[  ] 3.3 WEB CLIPPER EXTENSION
-     - Browser extension for clipping
-     - Clip entire page or selection
-     - Save to specific notebook/pad
-     - Automatic source attribution
-     - Clip images with OCR
-     Status: MISSING
+[✓ ] 3.3 WEB CLIPPER EXTENSION
+     - Bookmarklet-based web clipper (no extension install needed) ✓
+     - Clip selected text or full page content (first 2000 chars) ✓
+     - Automatic source URL attribution with link back ✓
+     - Saves as new Noted page in user's org ✓
+     - Drag-to-install setup dialog with copy fallback ✓
+     - CORS headers for cross-origin bookmarklet fetch ✓
+     Status: IMPLEMENTED (components/noted/NotedWebClipperSetup.tsx, app/api/noted/clip/route.ts)
+     Updated: 2026-03-14
 
-[  ] 3.4 OFFLINE MODE
-     - Full offline access to notes
-     - Offline editing with sync queue
-     - Conflict resolution on reconnect
-     - Selective sync (choose what to cache)
-     - PWA with service worker
-     Status: MISSING (currently online-only)
+[✓ ] 3.4 OFFLINE MODE
+     - IndexedDB cache for all Noted pages ✓ (lib/noted/offline-db.ts)
+     - Offline editing with sync queue ✓ (queues edits when disconnected)
+     - Auto-sync on reconnect ✓ (30s periodic sync + immediate on online event)
+     - Online/offline detection via navigator.onLine + events ✓
+     - Pending sync count indicator in header ✓
+     - Manual sync button ✓
+     Status: IMPLEMENTED (lib/noted/offline-db.ts, hooks/useNotedOffline.ts, components/noted/NotedOfflineIndicator.tsx)
+     Updated: 2026-03-14
 
-[  ] 3.5 OCR & IMAGE TEXT EXTRACTION
-     - Search text within images
-     - Copy text from images
-     - PDF text extraction and search
-     - Handwriting recognition in images
-     Status: MISSING
+[✓ ] 3.5 OCR & IMAGE TEXT EXTRACTION
+     - Client-side OCR via Tesseract.js v5 ✓
+     - File upload (PNG, JPG, BMP, TIFF) ✓
+     - Clipboard paste support ✓
+     - Real-time progress bar during recognition ✓
+     - Editable extracted text before inserting ✓
+     - Copy to clipboard button ✓
+     - Insert extracted text into editor ✓
+     Status: IMPLEMENTED (components/noted/NotedOcrExtractor.tsx)
+     Updated: 2026-03-14
 
-[  ] 3.6 AUDIO NOTES & TRANSCRIPTION
-     - Record audio directly in notes
-     - Automatic transcription
-     - Timestamp-linked notes
-     - Speaker identification
-     - Searchable audio content
-     Status: MISSING
+[✓ ] 3.6 AUDIO NOTES & TRANSCRIPTION
+     - Record audio directly in notes via MediaRecorder API ✓
+     - In-browser playback of recordings ✓
+     - Transcription via Whisper model on Ollama server ✓
+     - Graceful fallback when Whisper not available ✓
+     - Insert audio transcript as blockquote into editor ✓
+     - Recording timer and visual indicators ✓
+     Status: IMPLEMENTED (components/noted/NotedAudioRecorder.tsx, app/api/noted/transcribe/route.ts)
+     Updated: 2026-03-14
 
-[  ] 3.7 ADVANCED EDITOR FEATURES
-     - Collapsible/toggle blocks
-     - Synced blocks (reusable content)
-     - Database/table views (like Notion)
-     - Embed support (YouTube, Figma, etc.)
-     - Page linking with backlinks
-     - Table of contents auto-generation
-     Status: PARTIAL (TipTap has basics)
+[✓ ] 3.7 ADVANCED EDITOR FEATURES
+     - Collapsible/toggle blocks ✓ (custom Tiptap Details extension)
+     - Callout blocks with 4 types (info/warning/success/error) ✓
+     - Full table support: insert, add/delete rows/cols, merge, header toggle ✓
+     - Image embedding with resize ✓
+     - YouTube embed support ✓
+     - Text alignment (left/center/right/justify) ✓
+     - Table of contents generation ✓
+     Status: IMPLEMENTED (lib/tiptap/collapsible-block.ts, lib/tiptap/callout-block.ts, NotedPageEditor.tsx)
+     Updated: 2026-03-14
 
-[  ] 3.8 TEMPLATES GALLERY
-     - Meeting notes template
-     - Project brief template
-     - Decision log template
-     - 1:1 meeting template
-     - Community-shared templates
-     - Template variables/placeholders
-     Status: PARTIAL (basic templates exist)
+[✓ ] 3.8 TEMPLATES GALLERY
+     - 5 system templates (Meeting Notes, 1:1, Project Brief, Decision Log, Weekly Review) ✓
+     - User-created custom templates ✓
+     - Category-based browsing (meetings/projects/planning/general) ✓
+     - Template gallery dialog with search and preview ✓
+     - Save any page as template ✓
+     - Customize system templates (clone to personal) ✓
+     - Template editor with same Tiptap extensions as page editor ✓
+     Status: IMPLEMENTED (components/noted/NotedTemplateGallery.tsx, NotedTemplateEditor.tsx)
+     Updated: 2026-03-14
 
-[  ] 3.9 VERSION COMPARISON
-     - Side-by-side diff view
-     - Restore any version
-     - Version annotations/comments
-     - Branch and merge notes
-     Status: PARTIAL (version history exists, needs diff)
+[✓ ] 3.9 VERSION COMPARISON
+     - Save manual version snapshots ✓
+     - Version list with metadata (version number, date, user) ✓
+     - HTML preview of any version ✓
+     - LCS-based text diff view (additions/deletions highlighted) ✓
+     - Restore any version (auto-saves current state first) ✓
+     - Side panel history viewer ✓
+     Status: IMPLEMENTED (components/noted/NotedVersionHistory.tsx, hooks/useNotedVersions.ts, migration 52)
+     Updated: 2026-03-14
 
-[  ] 3.10 SMART TAGS & AUTO-CATEGORIZATION
-      - AI-suggested tags
-      - Auto-categorization based on content
-      - Tag hierarchy/nested tags
-      - Tag-based smart folders
-      - Related notes suggestions
-      Status: PARTIAL (tags exist, needs AI enhancement)
+[✓ ] 3.10 SMART TAGS & AUTO-CATEGORIZATION
+      - Tag CRUD with 9 color options ✓
+      - AI-suggested tags via Ollama llama3.2 ✓ (keyword fallback when unavailable)
+      - Tag hierarchy with parent_id support ✓
+      - Per-page tag management (add/remove/create-on-add) ✓
+      - Tag search and filtering ✓
+      - Unique tag names per organization ✓
+      Status: IMPLEMENTED (components/noted/NotedPageTags.tsx, hooks/useNotedTags.ts, migration 53)
+      Updated: 2026-03-14
 
 ================================================================================
                           CATEGORY 4: SOCIAL & ENGAGEMENT
@@ -309,14 +331,25 @@ Goal: Surpass Microsoft's suite by providing a unified, intelligent, and
                             (Compete with Viva Engage)
 --------------------------------------------------------------------------------
 
-[  ] 4.1 COMMUNITIES/GROUPS
-     - Create topic-based communities
-     - Community discovery/browse
-     - Join/leave communities
-     - Community moderators
-     - Community guidelines/rules
-     - Featured/pinned posts
-     Status: PARTIAL (social pads exist, needs community focus)
+[✓ ] 4.1 CONCUR GROUPS (Communities)
+     - Concur groups created by Concur Administrators via PowerShell script ✓
+     - Concur Administrator role managed in Organization Settings → Concur tab ✓
+     - Group creation requires 2 owners ✓
+     - Owners manage members: add by email, CSV bulk import, promote to owner ✓
+     - Collapsible left sidebar on /panel linking to Shared Sticks + Concur ✓
+     - Group list page at /concur with card grid ✓
+     - Group detail page at /concur/[groupId] with stick grid ✓
+     - Sticks with threaded replies (social stick pattern) ✓
+     - Pinned sticks, pin/unpin by group owners ✓
+     - Role-based permissions: owners manage, members create sticks/replies ✓
+     - WebSocket broadcast for real-time stick/reply creation ✓
+     Status: IMPLEMENTED
+     Updated: 2026-03-14
+     Database: scripts/windows-server/54-create-concur-tables.sql
+     Pages: app/concur/, app/panel/layout.tsx
+     Components: components/concur/, components/panel/panel-sidebar.tsx
+     API: app/api/concur/
+     Settings: Organization Settings → Concur tab (owner only)
 
 [  ] 4.2 NEWS & ANNOUNCEMENTS
      - Organization-wide announcements

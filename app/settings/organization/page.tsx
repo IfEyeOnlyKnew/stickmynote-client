@@ -27,6 +27,7 @@ import {
   Lock,
   ClipboardCheck,
   BarChart3,
+  MessageCircle,
 } from "lucide-react"
 import { useUser } from "@/contexts/user-context"
 import { useOrganization } from "@/contexts/organization-context"
@@ -50,6 +51,7 @@ import {
   EncryptionTab,
   ComplianceTab,
   PMHubTab,
+  ConcurTab,
 } from "./_components"
 import { ComplianceDashboard } from "@/components/auth/ComplianceDashboard"
 
@@ -930,6 +932,12 @@ function OrganizationSettingsPage() {
                 PM Hub
               </TabsTrigger>
             )}
+            {isOwner && !isPersonalOrg && (
+              <TabsTrigger value="concur" className="justify-start gap-2 px-3 py-2 text-sm rounded-md data-[state=active]:bg-gray-100 data-[state=active]:shadow-none">
+                <MessageCircle className="h-4 w-4" />
+                Concur
+              </TabsTrigger>
+            )}
 
             {/* Security section divider */}
             {!isPersonalOrg && (
@@ -1173,6 +1181,12 @@ function OrganizationSettingsPage() {
           {isOwner && !isPersonalOrg && (
             <TabsContent value="pm-hub">
               <PMHubTab />
+            </TabsContent>
+          )}
+          {/* Concur Tab */}
+          {isOwner && !isPersonalOrg && (
+            <TabsContent value="concur">
+              <ConcurTab />
             </TabsContent>
           )}
           </div>

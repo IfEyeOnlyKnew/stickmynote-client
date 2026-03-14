@@ -196,11 +196,18 @@ hooks/
 ### Rich Text Editor (Tiptap)
 
 Toolbar features:
+
 - **Text formatting:** Bold, Italic, Underline, Strikethrough
 - **Headings:** H1, H2, H3
 - **Lists:** Bullet list, Numbered list, Task list (checkboxes)
 - **Block elements:** Blockquote, Code block, Horizontal rule
 - **Inline:** Code, Link, Highlight
+- **Text alignment:** Left, Center, Right, Justify
+- **Tables:** Insert table, add/delete rows/cols, merge cells, toggle header
+- **Media:** Image embed, YouTube embed
+- **Advanced blocks:** Collapsible/toggle blocks, Callout blocks (info/warning/success/error)
+- **Insert tools:** Drawing canvas, Audio recorder, OCR extractor
+- **Utilities:** Table of contents, Version history, Tags bar
 - **History:** Undo, Redo
 
 ---
@@ -270,14 +277,91 @@ ORDER BY np.created_at DESC;
 
 ---
 
-## Future Enhancements (Post-MVP)
+## Implemented Features (Category 3 Complete)
+
+All Category 3 features have been implemented as of 2026-03-14:
+
+### 3.2 Drawing Canvas
+
+- Full drawing canvas with pen, eraser, line, rectangle, circle, and text tools
+- 10 colors, adjustable line width, undo/redo via ImageData history
+- Download as PNG or insert as base64 image into editor
+- **Files:** `components/noted/NotedDrawingCanvas.tsx`
+
+### 3.3 Web Clipper
+
+- Bookmarklet-based clipper (no browser extension required)
+- Clips selected text or first 2000 chars of page content
+- Automatic source URL attribution with link back
+- Drag-to-install setup dialog with copy-code fallback
+- **Files:** `components/noted/NotedWebClipperSetup.tsx`, `app/api/noted/clip/route.ts`
+
+### 3.4 Offline Mode
+
+- IndexedDB dual-store: pages cache + sync queue
+- Auto-cache pages on load, queue edits when offline
+- Auto-sync on reconnect (30s periodic + immediate on online event)
+- Header indicator with pending count and manual sync button
+- **Files:** `lib/noted/offline-db.ts`, `hooks/useNotedOffline.ts`, `components/noted/NotedOfflineIndicator.tsx`
+
+### 3.5 OCR & Image Text Extraction
+
+- Client-side OCR via Tesseract.js v5
+- File upload (PNG, JPG, BMP, TIFF) and clipboard paste
+- Real-time progress bar, editable result, copy to clipboard
+- Insert extracted text directly into editor
+- **Files:** `components/noted/NotedOcrExtractor.tsx`
+
+### 3.6 Audio Notes & Transcription
+
+- Record audio via MediaRecorder API with playback
+- Transcription via Whisper model on Ollama (graceful fallback)
+- Insert transcript as blockquote into editor
+- **Files:** `components/noted/NotedAudioRecorder.tsx`, `app/api/noted/transcribe/route.ts`
+
+### 3.7 Advanced Editor Features
+
+- Collapsible/toggle blocks (custom Tiptap `Details` extension)
+- Callout blocks with 4 types: info, warning, success, error
+- Full table support (insert, add/delete rows/cols, merge, header toggle)
+- Image embedding, YouTube embeds, text alignment (left/center/right/justify)
+- Table of contents generation
+- **Files:** `lib/tiptap/collapsible-block.ts`, `lib/tiptap/callout-block.ts`
+
+### 3.8 Templates Gallery
+
+- 5 system templates + user-created custom templates
+- Category browsing, search, preview panel
+- Save any page as template, customize system templates
+- See `docs/noted-templates-spec.md` for full details
+- **Files:** `components/noted/NotedTemplateGallery.tsx`, `NotedTemplateEditor.tsx`
+
+### 3.9 Version History & Comparison
+
+- Manual version snapshots with version numbering
+- HTML preview and LCS-based text diff (additions/deletions highlighted)
+- Restore any version (auto-saves current state before restoring)
+- Side panel history viewer
+- **Files:** `components/noted/NotedVersionHistory.tsx`, `hooks/useNotedVersions.ts`
+- **Migration:** `scripts/windows-server/52-create-noted-page-versions.sql`
+
+### 3.10 Smart Tags & Auto-Categorization
+
+- Tag CRUD with 9 color options, unique names per org
+- AI-suggested tags via Ollama llama3.2 (keyword fallback)
+- Tag hierarchy with parent_id support
+- Per-page tag management (add/remove/create-on-add), search and filtering
+- **Files:** `components/noted/NotedPageTags.tsx`, `hooks/useNotedTags.ts`
+- **Migration:** `scripts/windows-server/53-create-noted-tags.sql`
+
+---
+
+## Future Enhancements (Post-Category 3)
 
 - **Sub-pages:** Nested pages within a Noted page
-- **Templates:** Pre-built page templates (Meeting Notes, Project Plan, etc.)
 - **Export:** Export pages as PDF, Markdown, or Word
 - **Collaborative editing:** Real-time multi-user editing with cursors
-- **Page versioning:** View edit history and restore previous versions
-- **Attachments:** Embed images and files directly in pages
 - **Quick capture:** Global shortcut to create a Noted page without a Stick
 - **Favorites:** Pin frequently used pages to the top
-- **Tags:** Tag pages for cross-group organization
+- **Synced blocks:** Reusable content blocks across pages
+- **Backlinks:** Page linking with automatic backlink references

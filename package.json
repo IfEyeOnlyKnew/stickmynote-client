@@ -11,7 +11,7 @@
   "author": "Stick My Note Team",
   "scripts": {
     "analyze": "ANALYZE=true npm run build",
-    "build": "next build",
+    "build": "set NODE_OPTIONS=--max-old-space-size=16384 && next build",
     "postbuild": "echo 'Build completed successfully'",
     "build:analyze": "ANALYZE=true next build",
     "build:standalone": "BUILD_STANDALONE=true next build",

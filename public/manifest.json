@@ -90,56 +90,7 @@
       "label": "Stick My Note Mobile View"
     }
   ],
-  "shortcuts": [
-    {
-      "name": "Dashboard",
-      "short_name": "Dashboard",
-      "url": "/dashboard",
-      "icons": [{ "src": "/icons/icon-96x96.svg", "sizes": "96x96" }]
-    },
-    {
-      "name": "Personal Hub",
-      "short_name": "Personal",
-      "url": "/personal",
-      "icons": [{ "src": "/icons/icon-96x96.svg", "sizes": "96x96" }]
-    },
-    {
-      "name": "Paks Hub",
-      "short_name": "Paks",
-      "url": "/pads",
-      "icons": [{ "src": "/icons/icon-96x96.svg", "sizes": "96x96" }]
-    },
-    {
-      "name": "Social Hub",
-      "short_name": "Social",
-      "url": "/social",
-      "icons": [{ "src": "/icons/icon-96x96.svg", "sizes": "96x96" }]
-    },
-    {
-      "name": "Chats Hub",
-      "short_name": "Chats",
-      "url": "/channels",
-      "icons": [{ "src": "/icons/icon-96x96.svg", "sizes": "96x96" }]
-    },
-    {
-      "name": "Video Hub",
-      "short_name": "Video",
-      "url": "/video",
-      "icons": [{ "src": "/icons/icon-96x96.svg", "sizes": "96x96" }]
-    },
-    {
-      "name": "CalSticks",
-      "short_name": "CalSticks",
-      "url": "/calsticks",
-      "icons": [{ "src": "/icons/icon-96x96.svg", "sizes": "96x96" }]
-    },
-    {
-      "name": "PM Hub",
-      "short_name": "PM",
-      "url": "/pm",
-      "icons": [{ "src": "/icons/icon-96x96.svg", "sizes": "96x96" }]
-    }
-  ],
+  "shortcuts": [],
   "related_applications": [],
   "prefer_related_applications": false,
   "handle_links": "preferred",
