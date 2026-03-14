@@ -199,29 +199,31 @@ export async function POST(request: Request) {
       .select()
       .single()
 
+    console.log(`${LOG_PREFIX} POST: group=`, group, "groupError=", groupError)
     if (groupError || !group) {
-      console.error(`${LOG_PREFIX} Error creating group:`, groupError)
       return Errors.createFailed()
     }
 
-    // Add both owners as members with 'owner' role
-    const ownerMembers = [
-      { group_id: group.id, user_id: owner1.id, org_id: orgContext.orgId, role: "owner", added_by: user.id },
-      { group_id: group.id, user_id: owner2.id, org_id: orgContext.orgId, role: "owner", added_by: user.id },
-    ]
-
-    // Deduplicate if both owners are the same person
-    const uniqueOwners = owner1.id === owner2.id ? [ownerMembers[0]] : ownerMembers
-
-    const { error: membersError } = await db
+    // Add both owners as members with 'owner' role (insert one at a time - adapter doesn't support array inserts)
+    const { error: owner1MemberError } = await db
       .from("concur_group_members")
-      .insert(uniqueOwners)
+      .insert({ group_id: group.id, user_id: owner1.id, org_id: orgContext.orgId, role: "owner", added_by: user.id })
 
-    if (membersError) {
-      console.error(`${LOG_PREFIX} Error adding owners:`, membersError)
-      // Group was created but owners failed - clean up
+    if (owner1MemberError) {
       await db.from("concur_groups").delete().eq("id", group.id)
       return Errors.createFailed()
+    }
+
+    // Add second owner (skip if same person)
+    if (owner1.id !== owner2.id) {
+      const { error: owner2MemberError } = await db
+        .from("concur_group_members")
+        .insert({ group_id: group.id, user_id: owner2.id, org_id: orgContext.orgId, role: "owner", added_by: user.id })
+
+      if (owner2MemberError) {
+        await db.from("concur_groups").delete().eq("id", group.id)
+        return Errors.createFailed()
+      }
     }
 
     // Broadcast event
@@ -239,7 +241,6 @@ export async function POST(request: Request) {
     })
   } catch (error) {
     console.error(`${LOG_PREFIX} POST error:`, error)
-    const message = error instanceof Error ? error.message : "Unknown error"
-    return NextResponse.json({ error: "Failed to create group", details: message }, { status: 500 })
+    return Errors.createFailed()
   }
 }

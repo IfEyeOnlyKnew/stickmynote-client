@@ -101,22 +101,27 @@ export async function POST(request: Request) {
       return Errors.createFailed()
     }
 
-    // Add owners
-    const ownerMembers = [
-      { group_id: group.id, user_id: owner1.id, org_id: orgContext.orgId, role: "owner", added_by: user.id },
-      { group_id: group.id, user_id: owner2.id, org_id: orgContext.orgId, role: "owner", added_by: user.id },
-    ]
-
-    const uniqueOwners = owner1.id === owner2.id ? [ownerMembers[0]] : ownerMembers
-
-    const { error: membersError } = await db
+    // Add owners (insert one at a time - adapter doesn't support array inserts)
+    const { error: owner1Error } = await db
       .from("concur_group_members")
-      .insert(uniqueOwners)
+      .insert({ group_id: group.id, user_id: owner1.id, org_id: orgContext.orgId, role: "owner", added_by: user.id })
 
-    if (membersError) {
-      console.error(`${LOG_PREFIX} Error adding owners:`, membersError)
+    if (owner1Error) {
+      console.error(`${LOG_PREFIX} Error adding owner1:`, owner1Error)
       await db.from("concur_groups").delete().eq("id", group.id)
       return Errors.createFailed()
+    }
+
+    if (owner1.id !== owner2.id) {
+      const { error: owner2Error } = await db
+        .from("concur_group_members")
+        .insert({ group_id: group.id, user_id: owner2.id, org_id: orgContext.orgId, role: "owner", added_by: user.id })
+
+      if (owner2Error) {
+        console.error(`${LOG_PREFIX} Error adding owner2:`, owner2Error)
+        await db.from("concur_groups").delete().eq("id", group.id)
+        return Errors.createFailed()
+      }
     }
 
     // Broadcast
