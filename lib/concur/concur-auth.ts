@@ -1,4 +1,4 @@
-import { queryOne } from "@/lib/database/pg-client"
+import { createDatabaseClient } from "@/lib/database/database-adapter"
 
 /**
  * Check if a user is a Concur Administrator for the given organization.
@@ -9,17 +9,26 @@ export async function isConcurAdmin(
   userId: string,
   orgId: string
 ): Promise<boolean> {
+  const db = await createDatabaseClient()
+
   // Check explicit concur_administrators entry
-  const admin = await queryOne<{ id: string }>(
-    `SELECT id FROM concur_administrators WHERE user_id = $1 AND org_id = $2 LIMIT 1`,
-    [userId, orgId]
-  )
+  const { data: admin } = await db
+    .from("concur_administrators")
+    .select("id")
+    .eq("user_id", userId)
+    .eq("org_id", orgId)
+    .maybeSingle()
+
   if (admin) return true
 
   // Check if user is an organization owner (implicit Concur admin)
-  const owner = await queryOne<{ role: string }>(
-    `SELECT role FROM organization_members WHERE user_id = $1 AND org_id = $2 AND role = 'owner' LIMIT 1`,
-    [userId, orgId]
-  )
-  return !!owner
+  const { data: membership } = await db
+    .from("organization_members")
+    .select("role")
+    .eq("user_id", userId)
+    .eq("org_id", orgId)
+    .eq("role", "owner")
+    .maybeSingle()
+
+  return !!membership
 }

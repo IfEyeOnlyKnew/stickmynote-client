@@ -239,6 +239,7 @@ export async function POST(request: Request) {
     })
   } catch (error) {
     console.error(`${LOG_PREFIX} POST error:`, error)
-    return Errors.createFailed()
+    const message = error instanceof Error ? error.message : "Unknown error"
+    return NextResponse.json({ error: "Failed to create group", details: message }, { status: 500 })
   }
 }
