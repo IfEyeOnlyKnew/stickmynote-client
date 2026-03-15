@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useCallback, useRef } from "react"
+import { useState, useEffect, useCallback, useRef, useMemo } from "react"
 import {
   Dialog,
   DialogContent,
@@ -19,14 +19,18 @@ import {
   MessageCircle,
   CornerDownRight,
   X,
-  Pencil,
   Trash2,
-  ChevronDown,
-  ChevronRight,
 } from "lucide-react"
 import { formatDistanceToNow } from "date-fns"
 import { useToast } from "@/hooks/use-toast"
 import { useUser } from "@/contexts/user-context"
+import { GenericStickTabs } from "@/components/GenericStickTabs"
+import {
+  getConcurStickTabs,
+  saveConcurStickTab,
+  deleteConcurStickTabItem,
+} from "@/lib/concur-stick-tabs"
+import type { StickTabsConfig } from "@/types/stick-tabs-config"
 
 // ============================================================================
 // Types
@@ -110,7 +114,21 @@ export function ConcurStickDetailModal({
   const [replyingTo, setReplyingTo] = useState<Reply | null>(null)
   const [submitting, setSubmitting] = useState(false)
   const [pinning, setPinning] = useState(false)
+  const [topic, setTopic] = useState(stick.topic || "")
+  const [content, setContent] = useState(stick.content)
   const replyInputRef = useRef<HTMLTextAreaElement>(null)
+
+  // Create a StickTabsConfig that curries the groupId into the concur API calls
+  const tabsConfig: StickTabsConfig = useMemo(() => ({
+    getStickTabs: (stickId: string) => getConcurStickTabs(groupId, stickId),
+    saveStickTab: (stickId: string, tabType: "video" | "videos" | "images", data: any) =>
+      saveConcurStickTab(groupId, stickId, tabType, data),
+    deleteStickTabItem: (stickId: string, tabType: "video" | "videos" | "images", itemId: string) =>
+      deleteConcurStickTabItem(groupId, stickId, tabType, itemId),
+    idFieldName: "stick_id",
+    supportsExportDeletion: false,
+    isStick: true,
+  }), [groupId])
 
   const fetchReplies = useCallback(async () => {
     try {
@@ -238,26 +256,34 @@ export function ConcurStickDetailModal({
         </DialogHeader>
 
         <ScrollArea className="flex-1 px-6">
-          {/* Stick Content */}
-          <div
-            className="p-4 rounded-lg border mb-4"
-            style={{ backgroundColor: stick.color + "40" }}
-          >
-            <p className="text-sm whitespace-pre-wrap">{stick.content}</p>
-            <div className="flex items-center gap-2 mt-3 pt-3 border-t border-black/10">
-              <Avatar className="h-6 w-6">
-                <AvatarImage src={stick.user?.avatar_url || undefined} />
-                <AvatarFallback className="text-[10px]">
-                  {stick.user?.full_name?.[0] || "?"}
-                </AvatarFallback>
-              </Avatar>
-              <span className="text-xs text-muted-foreground">
-                {stick.user?.full_name || "Unknown"}
-              </span>
-              <span className="text-xs text-muted-foreground">
-                {formatDistanceToNow(new Date(stick.created_at), { addSuffix: true })}
-              </span>
-            </div>
+          {/* Stick Tabs (Main, Videos, Images, Details) */}
+          <div className="mb-4">
+            <GenericStickTabs
+              stickId={stick.id}
+              initialTopic={stick.topic || ""}
+              initialContent={stick.content}
+              onTopicChange={setTopic}
+              onContentChange={setContent}
+              readOnly={true}
+              showMedia={true}
+              config={tabsConfig}
+            />
+          </div>
+
+          {/* Stick metadata */}
+          <div className="flex items-center gap-2 mb-4 px-1">
+            <Avatar className="h-6 w-6">
+              <AvatarImage src={stick.user?.avatar_url || undefined} />
+              <AvatarFallback className="text-[10px]">
+                {stick.user?.full_name?.[0] || "?"}
+              </AvatarFallback>
+            </Avatar>
+            <span className="text-xs text-muted-foreground">
+              {stick.user?.full_name || "Unknown"}
+            </span>
+            <span className="text-xs text-muted-foreground">
+              {formatDistanceToNow(new Date(stick.created_at), { addSuffix: true })}
+            </span>
           </div>
 
           {/* Replies */}
@@ -383,7 +409,6 @@ function renderReply(
 ): React.ReactNode {
   const depthColor = DEPTH_COLORS[depth % DEPTH_COLORS.length]
   const canDelete = reply.user_id === currentUserId || isOwner
-  const isAuthor = reply.user_id === currentUserId
 
   return (
     <div key={reply.id} style={{ marginLeft: Math.min(depth * 16, 80) }}>
