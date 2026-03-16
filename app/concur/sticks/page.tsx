@@ -1,7 +1,6 @@
 "use client"
 
-import { useState, useEffect, useCallback, useRef } from "react"
-import { useRouter } from "next/navigation"
+import { useState, useEffect, useCallback, useRef, useMemo } from "react"
 import { BreadcrumbNav } from "@/components/breadcrumb-nav"
 import { UserMenu } from "@/components/user-menu"
 import { Card, CardContent } from "@/components/ui/card"
@@ -10,8 +9,9 @@ import {
   Loader2,
   MessageCircle,
   Pin,
+  Calendar,
 } from "lucide-react"
-import { formatDistanceToNow } from "date-fns"
+import { format, isToday, isYesterday, formatDistanceToNow } from "date-fns"
 import { ConcurStickDetailModal } from "@/components/concur/concur-stick-detail-modal"
 
 // ============================================================================
@@ -44,11 +44,54 @@ interface FeedStick {
 const PAGE_SIZE = 12
 
 // ============================================================================
+// Helpers
+// ============================================================================
+
+function getDateKey(dateStr: string): string {
+  const date = new Date(dateStr)
+  // Use local date as the key (YYYY-MM-DD)
+  return format(date, "yyyy-MM-dd")
+}
+
+function getDateLabel(dateStr: string): string {
+  const date = new Date(dateStr)
+  if (isToday(date)) return "Today"
+  if (isYesterday(date)) return "Yesterday"
+  return format(date, "EEEE, MMMM d, yyyy")
+}
+
+interface DateGroup {
+  dateKey: string
+  label: string
+  sticks: FeedStick[]
+}
+
+function groupSticksByDate(sticks: FeedStick[]): DateGroup[] {
+  const groups: DateGroup[] = []
+  const map = new Map<string, DateGroup>()
+
+  for (const stick of sticks) {
+    const key = getDateKey(stick.created_at)
+    if (!map.has(key)) {
+      const group: DateGroup = {
+        dateKey: key,
+        label: getDateLabel(stick.created_at),
+        sticks: [],
+      }
+      map.set(key, group)
+      groups.push(group)
+    }
+    map.get(key)!.sticks.push(stick)
+  }
+
+  return groups
+}
+
+// ============================================================================
 // Page
 // ============================================================================
 
 export default function ConcurSticksPage() {
-  const router = useRouter()
   const [sticks, setSticks] = useState<FeedStick[]>([])
   const [loading, setLoading] = useState(true)
   const [loadingMore, setLoadingMore] = useState(false)
@@ -112,6 +155,9 @@ export default function ConcurSticksPage() {
     return () => observerRef.current?.disconnect()
   }, [hasMore, loadingMore, nextCursor, fetchSticks])
 
+  // Group sticks by date for rendering
+  const dateGroups = useMemo(() => groupSticksByDate(sticks), [sticks])
+
   const handleStickUpdated = () => {
     // Refresh from the beginning to get updated data
     fetchSticks()
@@ -159,13 +205,31 @@ export default function ConcurSticksPage() {
           </div>
         ) : (
           <>
-            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-              {sticks.map((stick) => (
-                <FeedStickCard
-                  key={stick.id}
-                  stick={stick}
-                  onClick={() => setSelectedStick(stick)}
-                />
+            <div className="space-y-6">
+              {dateGroups.map((group) => (
+                <section key={group.dateKey}>
+                  {/* Sticky date header */}
+                  <div className="sticky top-[73px] z-40 -mx-4 sm:-mx-6 px-4 sm:px-6 py-2 bg-slate-50/90 backdrop-blur-sm border-b">
+                    <h2 className="text-sm font-semibold text-muted-foreground flex items-center gap-2">
+                      <Calendar className="h-4 w-4" />
+                      {group.label}
+                      <span className="text-xs font-normal">
+                        ({group.sticks.length} stick{group.sticks.length !== 1 ? "s" : ""})
+                      </span>
+                    </h2>
+                  </div>
+
+                  {/* Sticks grid for this date */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 mt-3">
+                    {group.sticks.map((stick) => (
+                      <FeedStickCard
+                        key={stick.id}
+                        stick={stick}
+                        onClick={() => setSelectedStick(stick)}
+                      />
+                    ))}
+                  </div>
+                </section>
               ))}
             </div>
 
