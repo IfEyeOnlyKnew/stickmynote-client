@@ -264,7 +264,7 @@ export function ConcurStickDetailModal({
               initialContent={stick.content}
               onTopicChange={setTopic}
               onContentChange={setContent}
-              readOnly={true}
+              readOnly={false}
               showMedia={true}
               config={tabsConfig}
             />
