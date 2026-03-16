@@ -14,9 +14,12 @@ import {
   Plus,
   Pin,
   Settings,
+  Eye,
+  TrendingUp,
 } from "lucide-react"
 import { formatDistanceToNow } from "date-fns"
 import { ConcurStickDetailModal } from "@/components/concur/concur-stick-detail-modal"
+import { ConcurGroupStatsDialog } from "@/components/concur/concur-group-stats-dialog"
 import { CreateConcurStickDialog } from "@/components/concur/create-concur-stick-dialog"
 import { ConcurMembersDialog } from "@/components/concur/concur-members-dialog"
 
@@ -43,6 +46,7 @@ interface ConcurStick {
     avatar_url: string | null
   } | null
   reply_count: number
+  view_count: number
 }
 
 export default function ConcurGroupPage() {
@@ -56,6 +60,7 @@ export default function ConcurGroupPage() {
   const [selectedStick, setSelectedStick] = useState<ConcurStick | null>(null)
   const [showCreateDialog, setShowCreateDialog] = useState(false)
   const [showMembersDialog, setShowMembersDialog] = useState(false)
+  const [showStatsDialog, setShowStatsDialog] = useState(false)
 
   const isOwner = group?.user_role === "owner"
 
@@ -94,6 +99,14 @@ export default function ConcurGroupPage() {
   const handleStickCreated = () => {
     setShowCreateDialog(false)
     fetchSticks()
+  }
+
+  const handleSelectStick = (stick: ConcurStick) => {
+    setSelectedStick(stick)
+    // Record view (fire-and-forget)
+    fetch(`/api/concur/groups/${groupId}/sticks/${stick.id}/view`, {
+      method: "POST",
+    }).catch(() => {})
   }
 
   const handleStickUpdated = () => {
@@ -143,15 +156,26 @@ export default function ConcurGroupPage() {
             </div>
             <div className="flex items-center gap-2">
               {isOwner && (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setShowMembersDialog(true)}
-                  className="gap-1"
-                >
-                  <Users className="h-4 w-4" />
-                  <span className="hidden sm:inline">Members ({group.member_count})</span>
-                </Button>
+                <>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setShowStatsDialog(true)}
+                    className="gap-1"
+                  >
+                    <TrendingUp className="h-4 w-4" />
+                    <span className="hidden sm:inline">Stats</span>
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setShowMembersDialog(true)}
+                    className="gap-1"
+                  >
+                    <Users className="h-4 w-4" />
+                    <span className="hidden sm:inline">Members ({group.member_count})</span>
+                  </Button>
+                </>
               )}
               <Button
                 size="sm"
@@ -202,7 +226,7 @@ export default function ConcurGroupPage() {
                     <StickCard
                       key={stick.id}
                       stick={stick}
-                      onClick={() => setSelectedStick(stick)}
+                      onClick={() => handleSelectStick(stick)}
                     />
                   ))}
                 </div>
@@ -219,7 +243,7 @@ export default function ConcurGroupPage() {
                   <StickCard
                     key={stick.id}
                     stick={stick}
-                    onClick={() => setSelectedStick(stick)}
+                    onClick={() => handleSelectStick(stick)}
                   />
                 ))}
               </div>
@@ -253,6 +277,15 @@ export default function ConcurGroupPage() {
         <ConcurMembersDialog
           groupId={groupId}
           onClose={() => setShowMembersDialog(false)}
+        />
+      )}
+
+      {/* Stats Dialog */}
+      {showStatsDialog && group && (
+        <ConcurGroupStatsDialog
+          groupId={groupId}
+          groupName={group.name}
+          onClose={() => setShowStatsDialog(false)}
         />
       )}
     </div>
@@ -295,6 +328,10 @@ function StickCard({ stick, onClick }: { stick: ConcurStick; onClick: () => void
             </span>
           </div>
           <div className="flex items-center gap-3 text-xs text-muted-foreground">
+            <span className="flex items-center gap-1">
+              <Eye className="h-3 w-3" />
+              {stick.view_count}
+            </span>
             <span className="flex items-center gap-1">
               <MessageCircle className="h-3 w-3" />
               {stick.reply_count}

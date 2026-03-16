@@ -106,12 +106,15 @@ export async function GET(request: Request, { params }: { params: Promise<{ grou
     const userIds = [...new Set(pageSticks.map((s: any) => s.user_id).filter(Boolean))]
     const stickIds = pageSticks.map((s: any) => s.id)
 
-    const [usersResult, repliesResult] = await Promise.all([
+    const [usersResult, repliesResult, viewsResult] = await Promise.all([
       userIds.length > 0
         ? serviceDb.from("users").select("id, full_name, email, avatar_url").in("id", userIds)
         : { data: [] },
       stickIds.length > 0
         ? db.from("concur_stick_replies").select("stick_id").in("stick_id", stickIds)
+        : { data: [] },
+      stickIds.length > 0
+        ? db.from("concur_stick_views").select("stick_id").in("stick_id", stickIds)
         : { data: [] },
     ])
 
@@ -122,10 +125,16 @@ export async function GET(request: Request, { params }: { params: Promise<{ grou
       replyCountMap.set(reply.stick_id, (replyCountMap.get(reply.stick_id) || 0) + 1)
     }
 
+    const viewCountMap = new Map<string, number>()
+    for (const view of (viewsResult.data || [])) {
+      viewCountMap.set(view.stick_id, (viewCountMap.get(view.stick_id) || 0) + 1)
+    }
+
     const enrichedSticks = pageSticks.map((stick: any) => ({
       ...stick,
       user: stick.user_id ? userMap.get(stick.user_id) || null : null,
       reply_count: replyCountMap.get(stick.id) || 0,
+      view_count: viewCountMap.get(stick.id) || 0,
     }))
 
     return NextResponse.json({ sticks: enrichedSticks, hasMore })

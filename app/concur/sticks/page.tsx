@@ -10,6 +10,7 @@ import {
   MessageCircle,
   Pin,
   Calendar,
+  Eye,
 } from "lucide-react"
 import { format, isToday, isYesterday, formatDistanceToNow } from "date-fns"
 import { ConcurStickDetailModal } from "@/components/concur/concur-stick-detail-modal"
@@ -29,6 +30,7 @@ interface FeedStick {
   created_at: string
   updated_at: string
   reply_count: number
+  view_count: number
   user: {
     id: string
     full_name: string | null
@@ -158,6 +160,14 @@ export default function ConcurSticksPage() {
   // Group sticks by date for rendering
   const dateGroups = useMemo(() => groupSticksByDate(sticks), [sticks])
 
+  const handleSelectStick = (stick: FeedStick) => {
+    setSelectedStick(stick)
+    // Record view (fire-and-forget)
+    fetch(`/api/concur/groups/${stick.group_id}/sticks/${stick.id}/view`, {
+      method: "POST",
+    }).catch(() => {})
+  }
+
   const handleStickUpdated = () => {
     // Refresh from the beginning to get updated data
     fetchSticks()
@@ -225,7 +235,7 @@ export default function ConcurSticksPage() {
                       <FeedStickCard
                         key={stick.id}
                         stick={stick}
-                        onClick={() => setSelectedStick(stick)}
+                        onClick={() => handleSelectStick(stick)}
                       />
                     ))}
                   </div>
@@ -306,6 +316,10 @@ function FeedStickCard({ stick, onClick }: { stick: FeedStick; onClick: () => vo
             </span>
           </div>
           <div className="flex items-center gap-3 text-xs text-muted-foreground">
+            <span className="flex items-center gap-1">
+              <Eye className="h-3 w-3" />
+              {stick.view_count}
+            </span>
             <span className="flex items-center gap-1">
               <MessageCircle className="h-3 w-3" />
               {stick.reply_count}

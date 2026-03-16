@@ -48,7 +48,8 @@ export async function GET(request: Request) {
         u.full_name AS author_name,
         u.email AS author_email,
         u.avatar_url AS author_avatar_url,
-        (SELECT COUNT(*)::int FROM concur_stick_replies csr WHERE csr.stick_id = cs.id) AS reply_count
+        (SELECT COUNT(*)::int FROM concur_stick_replies csr WHERE csr.stick_id = cs.id) AS reply_count,
+        (SELECT COUNT(*)::int FROM concur_stick_views csv WHERE csv.stick_id = cs.id) AS view_count
       FROM concur_sticks cs
       JOIN concur_group_members cgm ON cgm.group_id = cs.group_id
         AND cgm.user_id = $1
@@ -77,6 +78,7 @@ export async function GET(request: Request) {
       created_at: row.created_at,
       updated_at: row.updated_at,
       reply_count: row.reply_count,
+      view_count: row.view_count,
       user: {
         id: row.author_id,
         full_name: row.author_name,
