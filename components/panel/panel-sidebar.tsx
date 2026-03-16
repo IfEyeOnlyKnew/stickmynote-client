@@ -66,7 +66,7 @@ export function PanelSidebar() {
   }
 
   if (isConcurAdmin || isConcurMember) {
-    navItems.push({ href: "/concur", label: "Concur Sticks", icon: MessageCircle })
+    navItems.push({ href: "/concur/sticks", label: "Concur Sticks", icon: MessageCircle })
   }
 
   return (
