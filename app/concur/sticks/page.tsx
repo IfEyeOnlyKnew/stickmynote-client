@@ -260,6 +260,7 @@ export default function ConcurSticksPage() {
       {selectedStick && (
         <ConcurStickDetailModal
           groupId={selectedStick.group_id}
+          groupName={selectedStick.group_name}
           stick={{
             ...selectedStick,
             user_id: selectedStick.user?.id || "",

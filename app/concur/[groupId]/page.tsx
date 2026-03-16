@@ -256,6 +256,7 @@ export default function ConcurGroupPage() {
       {selectedStick && (
         <ConcurStickDetailModal
           groupId={groupId}
+          groupName={group?.name || "Concur Group"}
           stick={selectedStick}
           isOwner={isOwner}
           onClose={() => setSelectedStick(null)}

@@ -75,6 +75,7 @@ interface Reply {
 
 interface ConcurStickDetailModalProps {
   groupId: string
+  groupName: string
   stick: ConcurStick
   isOwner: boolean
   onClose: () => void
@@ -101,6 +102,7 @@ const DEPTH_COLORS = [
 
 export function ConcurStickDetailModal({
   groupId,
+  groupName,
   stick,
   isOwner,
   onClose,
@@ -233,7 +235,7 @@ export function ConcurStickDetailModal({
         <DialogHeader className="p-6 pb-0">
           <div className="flex items-start justify-between">
             <DialogTitle className="text-lg">
-              {stick.topic || "Untitled Stick"}
+              {groupName}
             </DialogTitle>
             {isOwner && (
               <Button
