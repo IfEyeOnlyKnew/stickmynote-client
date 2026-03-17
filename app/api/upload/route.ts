@@ -39,6 +39,7 @@ export async function POST(request: NextRequest) {
     const formData = await request.formData()
     const file = formData.get("file") as File
     formData.get("type") // "avatar", "attachment", "media"
+    const noEncrypt = formData.get("noEncrypt") === "true"
 
     if (!file) {
       return NextResponse.json({ error: "No file provided" }, { status: 400 })
@@ -69,7 +70,7 @@ export async function POST(request: NextRequest) {
     let uploadData: ArrayBuffer
     let contentType = file.type
 
-    if (isEncryptionEnabled()) {
+    if (isEncryptionEnabled() && !noEncrypt) {
       const fileBuffer = await file.arrayBuffer()
       uploadData = await encryptFileForOrg(fileBuffer, orgContext.orgId)
       // Mark as encrypted in content type for later decryption
@@ -93,7 +94,7 @@ export async function POST(request: NextRequest) {
       pathname: blob.pathname,
       contentType: file.type,
       size: file.size,
-      encrypted: isEncryptionEnabled(),
+      encrypted: isEncryptionEnabled() && !noEncrypt,
     })
   } catch (error) {
     console.error("[Upload] Error:", error)
