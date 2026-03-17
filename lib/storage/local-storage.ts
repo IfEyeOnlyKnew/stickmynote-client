@@ -55,7 +55,7 @@ class LocalFileStorage {
 
       const stat = await fs.stat(filePath)
       const relativePath = path.relative(this.baseDir, filePath).replace(/\\/g, "/")
-      const url = `${this.baseUrl}/uploads/${relativePath}`
+      const url = `/uploads/${relativePath}`
 
       console.log(`[Storage] File uploaded: ${filePath}`)
 

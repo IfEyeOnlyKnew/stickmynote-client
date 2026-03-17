@@ -124,55 +124,63 @@ export default function Verify2FAPage() {
             </Alert>
           )}
 
-          <div className="space-y-2">
-            <div className="flex justify-center">
-              {showBackupInput ? (
-                <Input
-                  type="text"
-                  value={code}
-                  onChange={(e) => setCode(e.target.value.toUpperCase())}
-                  placeholder="XXXX-XXXX"
-                  className="w-full max-w-xs text-center text-lg font-mono"
-                  maxLength={9}
-                />
-              ) : (
-                <InputOTP maxLength={6} value={code} onChange={setCode}>
-                  <InputOTPGroup>
-                    <InputOTPSlot index={0} className="w-12 h-12 text-lg" />
-                    <InputOTPSlot index={1} className="w-12 h-12 text-lg" />
-                    <InputOTPSlot index={2} className="w-12 h-12 text-lg" />
-                  </InputOTPGroup>
-                  <InputOTPSeparator />
-                  <InputOTPGroup>
-                    <InputOTPSlot index={3} className="w-12 h-12 text-lg" />
-                    <InputOTPSlot index={4} className="w-12 h-12 text-lg" />
-                    <InputOTPSlot index={5} className="w-12 h-12 text-lg" />
-                  </InputOTPGroup>
-                </InputOTP>
-              )}
-            </div>
-          </div>
-
-          {error && (
-            <Alert variant="destructive">
-              <AlertDescription>
-                {error}
-                {attemptsRemaining > 0 && (
-                  <span className="block mt-1 text-sm">
-                    {attemptsRemaining} attempt{attemptsRemaining !== 1 ? "s" : ""} remaining
-                  </span>
-                )}
-              </AlertDescription>
-            </Alert>
-          )}
-
-          <Button
-            onClick={handleVerify}
-            disabled={loading || (showBackupInput ? code.length !== 9 : code.length !== 6)}
-            className="w-full"
+          <form
+            onSubmit={(e) => {
+              e.preventDefault()
+              handleVerify()
+            }}
+            className="space-y-4"
           >
-            {loading ? "Verifying..." : "Verify"}
-          </Button>
+            <div className="space-y-2">
+              <div className="flex justify-center">
+                {showBackupInput ? (
+                  <Input
+                    type="text"
+                    value={code}
+                    onChange={(e) => setCode(e.target.value.toUpperCase())}
+                    placeholder="XXXX-XXXX"
+                    className="w-full max-w-xs text-center text-lg font-mono"
+                    maxLength={9}
+                  />
+                ) : (
+                  <InputOTP maxLength={6} value={code} onChange={setCode}>
+                    <InputOTPGroup>
+                      <InputOTPSlot index={0} className="w-12 h-12 text-lg" />
+                      <InputOTPSlot index={1} className="w-12 h-12 text-lg" />
+                      <InputOTPSlot index={2} className="w-12 h-12 text-lg" />
+                    </InputOTPGroup>
+                    <InputOTPSeparator />
+                    <InputOTPGroup>
+                      <InputOTPSlot index={3} className="w-12 h-12 text-lg" />
+                      <InputOTPSlot index={4} className="w-12 h-12 text-lg" />
+                      <InputOTPSlot index={5} className="w-12 h-12 text-lg" />
+                    </InputOTPGroup>
+                  </InputOTP>
+                )}
+              </div>
+            </div>
+
+            {error && (
+              <Alert variant="destructive">
+                <AlertDescription>
+                  {error}
+                  {attemptsRemaining > 0 && (
+                    <span className="block mt-1 text-sm">
+                      {attemptsRemaining} attempt{attemptsRemaining !== 1 ? "s" : ""} remaining
+                    </span>
+                  )}
+                </AlertDescription>
+              </Alert>
+            )}
+
+            <Button
+              type="submit"
+              disabled={loading || (showBackupInput ? code.length !== 9 : code.length !== 6)}
+              className="w-full"
+            >
+              {loading ? "Verifying..." : "Verify"}
+            </Button>
+          </form>
 
           <div className="text-center">
             <Button

@@ -117,11 +117,27 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ gr
     const membership = await checkGroupMembership(db, groupId, user.id, orgContext.orgId)
     if (!membership || membership.role !== "owner") return Errors.ownersOnly()
 
-    const { name, description } = await request.json()
+    const { name, description, logo_url, header_image_url } = await request.json()
 
     const updates: Record<string, any> = { updated_at: new Date().toISOString() }
     if (name !== undefined) updates.name = name.trim()
     if (description !== undefined) updates.description = description?.trim() || null
+
+    // Merge image URLs into settings JSONB
+    if (logo_url !== undefined || header_image_url !== undefined) {
+      // Fetch current settings first to merge
+      const { data: current } = await db
+        .from("concur_groups")
+        .select("settings")
+        .eq("id", groupId)
+        .single()
+
+      const currentSettings = current?.settings || {}
+      const newSettings = { ...currentSettings }
+      if (logo_url !== undefined) newSettings.logo_url = logo_url || null
+      if (header_image_url !== undefined) newSettings.header_image_url = header_image_url || null
+      updates.settings = newSettings
+    }
 
     const { data: group, error } = await db
       .from("concur_groups")

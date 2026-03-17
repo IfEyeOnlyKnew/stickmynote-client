@@ -23,6 +23,7 @@ interface FeedStick {
   id: string
   group_id: string
   group_name: string
+  group_logo_url: string | null
   topic: string | null
   content: string
   color: string
@@ -261,6 +262,7 @@ export default function ConcurSticksPage() {
         <ConcurStickDetailModal
           groupId={selectedStick.group_id}
           groupName={selectedStick.group_name}
+          groupLogoUrl={selectedStick.group_logo_url}
           stick={{
             ...selectedStick,
             user_id: selectedStick.user?.id || "",
@@ -287,7 +289,14 @@ function FeedStickCard({ stick, onClick }: { stick: FeedStick; onClick: () => vo
       <CardContent className="p-4">
         {/* Group badge */}
         <div className="flex items-center justify-between mb-2">
-          <span className="text-xs font-medium text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-full truncate max-w-[200px]">
+          <span className="text-xs font-medium text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-full truncate max-w-[200px] flex items-center gap-1">
+            {stick.group_logo_url && (
+              <img
+                src={stick.group_logo_url}
+                alt=""
+                className="h-4 w-4 rounded object-cover inline-block"
+              />
+            )}
             {stick.group_name}
           </span>
           {stick.is_pinned && <Pin className="h-3 w-3 text-indigo-500 shrink-0" />}

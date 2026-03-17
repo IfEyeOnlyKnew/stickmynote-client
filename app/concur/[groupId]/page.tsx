@@ -22,6 +22,7 @@ import { ConcurStickDetailModal } from "@/components/concur/concur-stick-detail-
 import { ConcurGroupStatsDialog } from "@/components/concur/concur-group-stats-dialog"
 import { CreateConcurStickDialog } from "@/components/concur/create-concur-stick-dialog"
 import { ConcurMembersDialog } from "@/components/concur/concur-members-dialog"
+import { ConcurGroupSettingsDialog } from "@/components/concur/concur-group-settings-dialog"
 
 interface ConcurGroup {
   id: string
@@ -29,6 +30,10 @@ interface ConcurGroup {
   description: string | null
   user_role: string
   member_count: number
+  settings: {
+    logo_url?: string | null
+    header_image_url?: string | null
+  } | null
 }
 
 interface ConcurStick {
@@ -61,6 +66,7 @@ export default function ConcurGroupPage() {
   const [showCreateDialog, setShowCreateDialog] = useState(false)
   const [showMembersDialog, setShowMembersDialog] = useState(false)
   const [showStatsDialog, setShowStatsDialog] = useState(false)
+  const [showSettingsDialog, setShowSettingsDialog] = useState(false)
 
   const isOwner = group?.user_role === "owner"
 
@@ -147,7 +153,15 @@ export default function ConcurGroupPage() {
                 ]}
               />
               <h1 className="text-2xl font-bold mt-1 flex items-center gap-2">
-                <MessageCircle className="h-6 w-6 text-indigo-600" />
+                {group.settings?.logo_url ? (
+                  <img
+                    src={group.settings.logo_url}
+                    alt={`${group.name} logo`}
+                    className="h-7 w-7 rounded object-cover"
+                  />
+                ) : (
+                  <MessageCircle className="h-6 w-6 text-indigo-600" />
+                )}
                 {group.name}
               </h1>
               {group.description && (
@@ -157,6 +171,15 @@ export default function ConcurGroupPage() {
             <div className="flex items-center gap-2">
               {isOwner && (
                 <>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setShowSettingsDialog(true)}
+                    className="gap-1"
+                  >
+                    <Settings className="h-4 w-4" />
+                    <span className="hidden sm:inline">Settings</span>
+                  </Button>
                   <Button
                     variant="outline"
                     size="sm"
@@ -190,6 +213,17 @@ export default function ConcurGroupPage() {
           </div>
         </div>
       </div>
+
+      {/* Header Image Banner */}
+      {group.settings?.header_image_url && (
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 mt-4">
+          <img
+            src={group.settings.header_image_url}
+            alt={`${group.name} header`}
+            className="w-full h-36 rounded-lg object-cover"
+          />
+        </div>
+      )}
 
       {/* Content */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6">
@@ -257,6 +291,7 @@ export default function ConcurGroupPage() {
         <ConcurStickDetailModal
           groupId={groupId}
           groupName={group?.name || "Concur Group"}
+          groupLogoUrl={group?.settings?.logo_url}
           stick={selectedStick}
           isOwner={isOwner}
           onClose={() => setSelectedStick(null)}
@@ -287,6 +322,18 @@ export default function ConcurGroupPage() {
           groupId={groupId}
           groupName={group.name}
           onClose={() => setShowStatsDialog(false)}
+        />
+      )}
+
+      {/* Settings Dialog */}
+      {showSettingsDialog && group && (
+        <ConcurGroupSettingsDialog
+          groupId={groupId}
+          groupName={group.name}
+          currentLogoUrl={group.settings?.logo_url || null}
+          currentHeaderImageUrl={group.settings?.header_image_url || null}
+          onClose={() => setShowSettingsDialog(false)}
+          onUpdated={fetchGroup}
         />
       )}
     </div>
