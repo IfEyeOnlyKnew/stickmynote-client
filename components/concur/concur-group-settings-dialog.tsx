@@ -48,19 +48,8 @@ export function ConcurGroupSettingsDialog({
   const [saving, setSaving] = useState(false)
   const logoInputRef = useRef<HTMLInputElement>(null)
   const headerInputRef = useRef<HTMLInputElement>(null)
-
-  const deleteOldFile = async (url: string) => {
-    if (!url) return
-    try {
-      await fetch("/api/upload", {
-        method: "DELETE",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ url }),
-      })
-    } catch {
-      // Best-effort cleanup
-    }
-  }
+  // Track old URLs to delete only on save (not during upload)
+  const urlsToDelete = useRef<string[]>([])
 
   const handleUpload = async (
     file: File,
@@ -79,9 +68,6 @@ export function ConcurGroupSettingsDialog({
 
     setUploading(true)
     try {
-      // Delete old file before uploading replacement
-      if (currentUrl) await deleteOldFile(currentUrl)
-
       const formData = new FormData()
       formData.append("file", file)
       formData.append("type", "media")
@@ -89,6 +75,9 @@ export function ConcurGroupSettingsDialog({
       const res = await fetch("/api/upload", { method: "POST", body: formData })
       if (!res.ok) throw new Error("Upload failed")
       const data = await res.json()
+
+      // Queue old file for deletion on save
+      if (currentUrl) urlsToDelete.current.push(currentUrl)
       setUrl(data.url)
     } catch {
       toast({ title: "Failed to upload image", variant: "destructive" })
@@ -97,8 +86,8 @@ export function ConcurGroupSettingsDialog({
     }
   }
 
-  const handleRemove = async (currentUrl: string, setUrl: (url: string) => void) => {
-    if (currentUrl) await deleteOldFile(currentUrl)
+  const handleRemove = (currentUrl: string, setUrl: (url: string) => void) => {
+    if (currentUrl) urlsToDelete.current.push(currentUrl)
     setUrl("")
   }
 
@@ -114,6 +103,17 @@ export function ConcurGroupSettingsDialog({
         }),
       })
       if (!res.ok) throw new Error("Failed to save")
+
+      // Delete old files only after successful save
+      for (const url of urlsToDelete.current) {
+        fetch("/api/upload", {
+          method: "DELETE",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ url }),
+        }).catch(() => {})
+      }
+      urlsToDelete.current = []
+
       toast({ title: "Group settings updated" })
       onUpdated()
       onClose()
