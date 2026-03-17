@@ -264,6 +264,7 @@ export default function ConcurSticksPage() {
           groupId={selectedStick.group_id}
           groupName={selectedStick.group_name}
           groupLogoUrl={selectedStick.group_logo_url}
+          groupHeaderImageUrl={selectedStick.group_header_image_url}
           stick={{
             ...selectedStick,
             user_id: selectedStick.user?.id || "",

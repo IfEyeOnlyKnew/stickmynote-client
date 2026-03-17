@@ -77,6 +77,7 @@ interface ConcurStickDetailModalProps {
   groupId: string
   groupName: string
   groupLogoUrl?: string | null
+  groupHeaderImageUrl?: string | null
   stick: ConcurStick
   isOwner: boolean
   onClose: () => void
@@ -105,6 +106,7 @@ export function ConcurStickDetailModal({
   groupId,
   groupName,
   groupLogoUrl,
+  groupHeaderImageUrl,
   stick,
   isOwner,
   onClose,
@@ -233,26 +235,34 @@ export function ConcurStickDetailModal({
   return (
     <Dialog open onOpenChange={(open) => !open && onClose()}>
       <DialogContent className="sm:max-w-2xl max-h-[90vh] flex flex-col p-0">
-        {/* Header */}
-        <DialogHeader className="p-6 pb-0">
-          <div className="flex items-start justify-between">
-            <DialogTitle className="text-lg flex items-center gap-2">
+        {/* Header image banner */}
+        {groupHeaderImageUrl && (
+          <div className="relative h-32 shrink-0">
+            <img
+              src={groupHeaderImageUrl}
+              alt=""
+              className="w-full h-full object-cover rounded-t-lg"
+            />
+            <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent rounded-t-lg" />
+            <div className="absolute bottom-2.5 left-3 flex items-center gap-2">
               {groupLogoUrl && (
                 <img
                   src={groupLogoUrl}
                   alt=""
-                  className="h-6 w-6 rounded object-cover"
+                  className="h-7 w-7 rounded object-cover border border-white/30 shadow-sm"
                 />
               )}
-              {groupName}
-            </DialogTitle>
+              <span className="text-sm font-semibold text-white drop-shadow-sm">
+                {groupName}
+              </span>
+            </div>
             {isOwner && (
               <Button
                 variant="ghost"
                 size="sm"
                 onClick={handleTogglePin}
                 disabled={pinning}
-                className="shrink-0"
+                className="absolute top-2 right-2 text-white hover:bg-white/20"
               >
                 {pinning ? (
                   <Loader2 className="h-4 w-4 animate-spin" />
@@ -264,7 +274,42 @@ export function ConcurStickDetailModal({
               </Button>
             )}
           </div>
-        </DialogHeader>
+        )}
+
+        {/* Header (fallback when no header image) */}
+        {!groupHeaderImageUrl && (
+          <DialogHeader className="p-6 pb-0">
+            <div className="flex items-start justify-between">
+              <DialogTitle className="text-lg flex items-center gap-2">
+                {groupLogoUrl && (
+                  <img
+                    src={groupLogoUrl}
+                    alt=""
+                    className="h-6 w-6 rounded object-cover"
+                  />
+                )}
+                {groupName}
+              </DialogTitle>
+              {isOwner && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={handleTogglePin}
+                  disabled={pinning}
+                  className="shrink-0"
+                >
+                  {pinning ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : stick.is_pinned ? (
+                    <PinOff className="h-4 w-4" />
+                  ) : (
+                    <Pin className="h-4 w-4" />
+                  )}
+                </Button>
+              )}
+            </div>
+          </DialogHeader>
+        )}
 
         <ScrollArea className="flex-1 px-6">
           {/* Stick Tabs (Main, Videos, Images, Details) */}

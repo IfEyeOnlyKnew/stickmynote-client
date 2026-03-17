@@ -298,6 +298,7 @@ export default function ConcurGroupPage() {
           groupId={groupId}
           groupName={group?.name || "Concur Group"}
           groupLogoUrl={group?.settings?.logo_url}
+          groupHeaderImageUrl={group?.settings?.header_image_url}
           stick={selectedStick}
           isOwner={isOwner}
           onClose={() => setSelectedStick(null)}
