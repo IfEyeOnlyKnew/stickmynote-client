@@ -24,6 +24,7 @@ interface FeedStick {
   group_id: string
   group_name: string
   group_logo_url: string | null
+  group_header_image_url: string | null
   topic: string | null
   content: string
   color: string
@@ -283,12 +284,38 @@ export default function ConcurSticksPage() {
 function FeedStickCard({ stick, onClick }: { stick: FeedStick; onClick: () => void }) {
   return (
     <Card
-      className="cursor-pointer hover:shadow-md hover:border-indigo-200 transition-all duration-200"
+      className="cursor-pointer hover:shadow-md hover:border-indigo-200 transition-all duration-200 overflow-hidden"
       onClick={onClick}
     >
-      <CardContent className="p-4">
-        {/* Group badge */}
-        <div className="flex items-center justify-between mb-2">
+      {/* Header image with logo + group name overlay */}
+      {stick.group_header_image_url ? (
+        <div className="relative h-28">
+          <img
+            src={stick.group_header_image_url}
+            alt=""
+            className="w-full h-full object-cover"
+          />
+          <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
+          <div className="absolute bottom-2 left-2.5 flex items-center gap-1.5">
+            {stick.group_logo_url && (
+              <img
+                src={stick.group_logo_url}
+                alt=""
+                className="h-6 w-6 rounded object-cover border border-white/30 shadow-sm"
+              />
+            )}
+            <span className="text-xs font-semibold text-white drop-shadow-sm truncate max-w-[180px]">
+              {stick.group_name}
+            </span>
+          </div>
+          {stick.is_pinned && (
+            <div className="absolute top-2 right-2">
+              <Pin className="h-3.5 w-3.5 text-white drop-shadow-sm" />
+            </div>
+          )}
+        </div>
+      ) : (
+        <div className="px-4 pt-4 flex items-center justify-between">
           <span className="text-xs font-medium text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-full truncate max-w-[200px] flex items-center gap-1">
             {stick.group_logo_url && (
               <img
@@ -301,7 +328,9 @@ function FeedStickCard({ stick, onClick }: { stick: FeedStick; onClick: () => vo
           </span>
           {stick.is_pinned && <Pin className="h-3 w-3 text-indigo-500 shrink-0" />}
         </div>
+      )}
 
+      <CardContent className="p-4">
         {/* Topic & content */}
         <div className="min-w-0">
           {stick.topic && (

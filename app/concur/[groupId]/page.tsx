@@ -260,6 +260,9 @@ export default function ConcurGroupPage() {
                     <StickCard
                       key={stick.id}
                       stick={stick}
+                      groupName={group.name}
+                      groupLogoUrl={group.settings?.logo_url}
+                      groupHeaderImageUrl={group.settings?.header_image_url}
                       onClick={() => handleSelectStick(stick)}
                     />
                   ))}
@@ -277,6 +280,9 @@ export default function ConcurGroupPage() {
                   <StickCard
                     key={stick.id}
                     stick={stick}
+                    groupName={group.name}
+                    groupLogoUrl={group.settings?.logo_url}
+                    groupHeaderImageUrl={group.settings?.header_image_url}
                     onClick={() => handleSelectStick(stick)}
                   />
                 ))}
@@ -344,12 +350,53 @@ export default function ConcurGroupPage() {
 // Stick Card Component
 // ============================================================================
 
-function StickCard({ stick, onClick }: { stick: ConcurStick; onClick: () => void }) {
+function StickCard({
+  stick,
+  groupName,
+  groupLogoUrl,
+  groupHeaderImageUrl,
+  onClick,
+}: {
+  stick: ConcurStick
+  groupName: string
+  groupLogoUrl?: string | null
+  groupHeaderImageUrl?: string | null
+  onClick: () => void
+}) {
   return (
     <Card
-      className="cursor-pointer hover:shadow-md hover:border-indigo-200 transition-all duration-200"
+      className="cursor-pointer hover:shadow-md hover:border-indigo-200 transition-all duration-200 overflow-hidden"
       onClick={onClick}
     >
+      {/* Header image with logo + group name overlay */}
+      {groupHeaderImageUrl && (
+        <div className="relative h-28">
+          <img
+            src={groupHeaderImageUrl}
+            alt=""
+            className="w-full h-full object-cover"
+          />
+          <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
+          <div className="absolute bottom-2 left-2.5 flex items-center gap-1.5">
+            {groupLogoUrl && (
+              <img
+                src={groupLogoUrl}
+                alt=""
+                className="h-6 w-6 rounded object-cover border border-white/30 shadow-sm"
+              />
+            )}
+            <span className="text-xs font-semibold text-white drop-shadow-sm truncate max-w-[180px]">
+              {groupName}
+            </span>
+          </div>
+          {stick.is_pinned && (
+            <div className="absolute top-2 right-2">
+              <Pin className="h-3.5 w-3.5 text-white drop-shadow-sm" />
+            </div>
+          )}
+        </div>
+      )}
+
       <CardContent className="p-4">
         <div className="flex items-start justify-between gap-2">
           <div className="flex-1 min-w-0">
@@ -360,7 +407,9 @@ function StickCard({ stick, onClick }: { stick: ConcurStick; onClick: () => void
               {stick.content}
             </p>
           </div>
-          {stick.is_pinned && <Pin className="h-4 w-4 text-indigo-500 shrink-0" />}
+          {stick.is_pinned && !groupHeaderImageUrl && (
+            <Pin className="h-4 w-4 text-indigo-500 shrink-0" />
+          )}
         </div>
 
         <div className="flex items-center justify-between mt-3 pt-3 border-t">

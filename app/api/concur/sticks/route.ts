@@ -73,6 +73,7 @@ export async function GET(request: Request) {
       group_id: row.group_id,
       group_name: row.group_name,
       group_logo_url: row.group_settings?.logo_url || null,
+      group_header_image_url: row.group_settings?.header_image_url || null,
       topic: row.topic,
       content: row.content,
       color: row.color,
