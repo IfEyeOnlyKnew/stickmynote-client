@@ -19,7 +19,7 @@ interface CreateStickModalProps {
   isOpen: boolean
   onClose: () => void
   padId: string
-  context?: "paks" | "social"
+  context?: "paks" | "inference"
 }
 
 export function CreateStickModal({ isOpen, onClose, padId, context = "paks" }: CreateStickModalProps) {
