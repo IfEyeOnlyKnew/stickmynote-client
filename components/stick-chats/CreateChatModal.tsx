@@ -23,6 +23,10 @@ interface CreateChatModalProps {
   defaultName?: string
   /** Automatically create the chat when modal opens (skips the form) */
   autoSubmit?: boolean
+  /** Link chat to a specific stick */
+  stickId?: string
+  /** Type of stick being linked */
+  stickType?: "personal" | "social" | "pad"
 }
 
 /**
@@ -33,6 +37,8 @@ export const CreateChatModal: React.FC<CreateChatModalProps> = ({
   onOpenChange,
   defaultName = "",
   autoSubmit = false,
+  stickId,
+  stickType,
 }) => {
   const router = useRouter()
   const { csrfToken } = useCSRF()
@@ -80,6 +86,7 @@ export const CreateChatModal: React.FC<CreateChatModalProps> = ({
         body: JSON.stringify({
           name: name.trim() || undefined,
           is_group: isGroup,
+          ...(stickId ? { stick_id: stickId, stick_type: stickType } : {}),
         }),
       })
 

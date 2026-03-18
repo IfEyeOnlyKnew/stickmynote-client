@@ -98,7 +98,7 @@ export async function GET(request: NextRequest) {
     }
     if (searchParams.has("stick_type")) {
       const stickType = searchParams.get("stick_type")
-      if (stickType === "personal" || stickType === "social") {
+      if (stickType === "personal" || stickType === "social" || stickType === "pad") {
         filters.stick_type = stickType
       }
     }

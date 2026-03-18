@@ -18,7 +18,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     }
 
     // Run all count queries in parallel
-    const [calsticks, replies, notedPages, chats, videoRooms, tabs] = await Promise.all([
+    const [calsticks, notedPages, chats, videoRooms] = await Promise.all([
       // CalSticks count
       db.query(
         `SELECT
@@ -29,36 +29,26 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
         WHERE stick_id = $1 AND is_calstick = true`,
         [stickId]
       ),
-      // Replies count (non-calstick)
-      db.query(
-        `SELECT COUNT(*) AS total
-        FROM paks_pad_stick_replies
-        WHERE stick_id = $1 AND (is_calstick = false OR is_calstick IS NULL)`,
-        [stickId]
-      ),
       // Noted pages count
       db.query(
         `SELECT COUNT(*) AS total FROM noted_pages WHERE stick_id = $1 OR personal_stick_id = $1`,
         [stickId]
       ),
-      // Stick chats count
+      // Stick chats - get ID and count
       db.query(
-        `SELECT COUNT(*) AS total FROM stick_chats WHERE stick_id = $1`,
+        `SELECT id, COUNT(*) OVER() AS total FROM stick_chats WHERE stick_id = $1 ORDER BY created_at DESC LIMIT 1`,
         [stickId]
       ),
-      // Video rooms / meetings count
+      // Video rooms / meetings - get ID and count
       db.query(
-        `SELECT COUNT(*) AS total FROM meetings WHERE stick_id = $1`,
-        [stickId]
-      ),
-      // Stick tabs count
-      db.query(
-        `SELECT COUNT(*) AS total FROM paks_pad_stick_tabs WHERE stick_id = $1`,
+        `SELECT id, COUNT(*) OVER() AS total FROM meetings WHERE stick_id = $1 ORDER BY start_time DESC LIMIT 1`,
         [stickId]
       ),
     ])
 
     const calstickRow = calsticks.rows[0] || { completed: 0, not_completed: 0, total: 0 }
+    const chatRow = chats.rows[0]
+    const videoRow = videoRooms.rows[0]
 
     return NextResponse.json({
       components: {
@@ -67,20 +57,16 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
           completed: Number(calstickRow.completed),
           notCompleted: Number(calstickRow.not_completed),
         },
-        replies: {
-          total: Number(replies.rows[0]?.total || 0),
-        },
         noted: {
           total: Number(notedPages.rows[0]?.total || 0),
         },
         chats: {
-          total: Number(chats.rows[0]?.total || 0),
+          total: Number(chatRow?.total || 0),
+          chatId: chatRow?.id || null,
         },
         videoRooms: {
-          total: Number(videoRooms.rows[0]?.total || 0),
-        },
-        tabs: {
-          total: Number(tabs.rows[0]?.total || 0),
+          total: Number(videoRow?.total || 0),
+          meetingId: videoRow?.id || null,
         },
       },
     })

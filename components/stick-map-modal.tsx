@@ -9,8 +9,6 @@ import {
   Video,
   CalendarCheck,
   BookOpen,
-  MessageCircle,
-  Layout,
   StickyNote,
 } from "lucide-react"
 
@@ -25,16 +23,14 @@ interface StickMapModalProps {
   stickTopic?: string
   stickContent?: string
   stickColor?: string
-  onNodeClick?: (nodeId: string) => void
+  onNodeClick?: (nodeId: string, data?: { chatId?: string; meetingId?: string }) => void
 }
 
 interface ComponentCounts {
   calsticks: { total: number; completed: number; notCompleted: number }
-  replies: { total: number }
   noted: { total: number }
-  chats: { total: number }
-  videoRooms: { total: number }
-  tabs: { total: number }
+  chats: { total: number; chatId?: string | null }
+  videoRooms: { total: number; meetingId?: string | null }
 }
 
 interface MapNode {
@@ -46,6 +42,7 @@ interface MapNode {
   color: string
   bgColor: string
   borderColor: string
+  data?: { chatId?: string; meetingId?: string }
 }
 
 // ============================================================================
@@ -75,15 +72,6 @@ function buildNodes(counts: ComponentCounts): MapNode[] {
       borderColor: "border-orange-300",
     },
     {
-      id: "replies",
-      label: "Replies",
-      icon: <MessageCircle className="h-5 w-5" />,
-      count: counts.replies.total,
-      color: "text-blue-700",
-      bgColor: "bg-blue-50",
-      borderColor: "border-blue-300",
-    },
-    {
       id: "noted",
       label: "Noted",
       icon: <BookOpen className="h-5 w-5" />,
@@ -100,6 +88,7 @@ function buildNodes(counts: ComponentCounts): MapNode[] {
       color: "text-green-700",
       bgColor: "bg-green-50",
       borderColor: "border-green-300",
+      data: counts.chats.chatId ? { chatId: counts.chats.chatId } : undefined,
     },
     {
       id: "videoRooms",
@@ -109,15 +98,7 @@ function buildNodes(counts: ComponentCounts): MapNode[] {
       color: "text-red-700",
       bgColor: "bg-red-50",
       borderColor: "border-red-300",
-    },
-    {
-      id: "tabs",
-      label: "Tabs",
-      icon: <Layout className="h-5 w-5" />,
-      count: counts.tabs.total,
-      color: "text-teal-700",
-      bgColor: "bg-teal-50",
-      borderColor: "border-teal-300",
+      data: counts.videoRooms.meetingId ? { meetingId: counts.videoRooms.meetingId } : undefined,
     },
   ]
 }
@@ -172,7 +153,7 @@ function CenterNode({ topic, color }: { topic: string; color: string }) {
   )
 }
 
-function OrbitNode({ node, position, index, onClick }: { node: MapNode; position: { x: number; y: number }; index: number; onClick?: (nodeId: string) => void }) {
+function OrbitNode({ node, position, index, onClick }: { node: MapNode; position: { x: number; y: number }; index: number; onClick?: (nodeId: string, data?: { chatId?: string; meetingId?: string }) => void }) {
   const hasData = node.count > 0
 
   return (
@@ -180,7 +161,7 @@ function OrbitNode({ node, position, index, onClick }: { node: MapNode; position
       <Tooltip>
         <TooltipTrigger asChild>
           <div
-            onClick={hasData && onClick ? () => onClick(node.id) : undefined}
+            onClick={hasData && onClick ? () => onClick(node.id, node.data) : undefined}
             className={`absolute flex flex-col items-center justify-center rounded-full border-2
               transition-all duration-300 hover:scale-110 hover:shadow-lg z-10
               ${hasData ? "cursor-pointer" : "cursor-default"}

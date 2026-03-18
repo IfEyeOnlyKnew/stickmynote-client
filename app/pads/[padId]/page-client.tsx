@@ -447,17 +447,45 @@ export function PadPageClient({ pad, sticks, userRole }: Readonly<PadPageClientP
     setMapState((prev) => ({ ...prev, open }))
   }, [])
 
-  const handleMapNodeClick = useCallback((nodeId: string) => {
+  const handleMapNodeClick = useCallback(async (nodeId: string, data?: { chatId?: string; meetingId?: string }) => {
     // Close the map modal
     setMapState((prev) => ({ ...prev, open: false }))
 
-    // Find the stick and open it in fullscreen
-    const stick = localSticks.find((s) => s.id === mapState.stickId)
+    const stickId = mapState.stickId
+
+    // Noted: look up the noted page for this stick, then navigate
+    if (nodeId === "noted") {
+      try {
+        const res = await fetch(`/api/noted/pages/by-stick/${stickId}`)
+        const json = await res.json()
+        if (json.exists && json.data?.id) {
+          router.push(`/noted?page=${json.data.id}`)
+        }
+      } catch (err) {
+        console.error("Error navigating to noted page:", err)
+      }
+      return
+    }
+
+    // Chat: navigate to the chat room
+    if (nodeId === "chats" && data?.chatId) {
+      router.push(`/chats/${data.chatId}`)
+      return
+    }
+
+    // Video: navigate to video page
+    if (nodeId === "videoRooms") {
+      router.push("/video")
+      return
+    }
+
+    // Default: open the stick in fullscreen (e.g. CalSticks)
+    const stick = localSticks.find((s) => s.id === stickId)
     if (stick) {
       setSelectedStick(stick)
       setIsFullscreenOpen(true)
     }
-  }, [localSticks, mapState.stickId])
+  }, [localSticks, mapState.stickId, router])
 
   const handleOpenCreateModal = useCallback(() => {
     setIsCreateModalOpen(true)

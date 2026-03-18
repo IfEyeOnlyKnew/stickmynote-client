@@ -3,7 +3,7 @@
  * Types for the chat system - channels, DMs, threads, reactions, voice
  */
 
-export type StickType = "personal" | "social"
+export type StickType = "personal" | "social" | "pad"
 export type ChatType = "chat" | "channel" | "voice"
 export type ChatVisibility = "public" | "private"
 export type MemberRole = "admin" | "member" | "readonly"

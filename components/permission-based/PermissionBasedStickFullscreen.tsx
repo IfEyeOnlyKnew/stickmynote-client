@@ -784,6 +784,8 @@ export function PermissionBasedStickFullscreen({
         onOpenChange={setChatModalOpen}
         defaultName={editedStick.topic || "Untitled Stick"}
         autoSubmit
+        stickId={stick.id}
+        stickType="pad"
       />
     </div>
   )
