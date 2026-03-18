@@ -27,7 +27,7 @@
 
 import { useState, useEffect, useMemo, useCallback, useRef } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
-import { Loader2, Plus, Search, Undo2, X, Settings, BarChart3, ChevronLeft } from "lucide-react"
+import { Loader2, Plus, Search, Undo2, X, BarChart3, ChevronLeft } from "lucide-react"
 import type { Note } from "@/types/note"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -497,7 +497,7 @@ export function NotesClient({ initialNotes, userId, stats }: Readonly<NotesClien
           <BreadcrumbNav
             items={[
               { label: "Dashboard", href: "/dashboard" },
-              { label: "Personal Hub", current: true },
+              { label: "Personal Sticks", current: true },
             ]}
           />
 
@@ -505,7 +505,7 @@ export function NotesClient({ initialNotes, userId, stats }: Readonly<NotesClien
             {/* Left section: Title and Search */}
             <div className="flex items-center gap-2 lg:gap-3 flex-1 w-full sm:w-auto">
               <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold whitespace-nowrap flex-shrink-0 bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
-                Personal Hub
+                Personal Sticks
               </h1>
 
               <div className="relative flex-1 min-w-[120px] sm:min-w-[150px] max-w-full sm:max-w-[250px] lg:max-w-[400px]">
@@ -541,17 +541,6 @@ export function NotesClient({ initialNotes, userId, stats }: Readonly<NotesClien
               >
                 <Plus className="h-5 w-5" />
                 <span className="hidden md:inline font-medium">Stick</span>
-              </Button>
-
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => router.push("/panel")}
-                className="flex items-center gap-1.5 bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white border-0 shadow-md hover:shadow-lg transition-all whitespace-nowrap flex-shrink-0"
-                size="default"
-              >
-                <Settings className="h-5 w-5" />
-                <span className="hidden md:inline font-medium">ComSticks</span>
               </Button>
 
               <div className="flex-shrink-0">

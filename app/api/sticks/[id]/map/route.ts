@@ -43,7 +43,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       ),
       // Stick chats count
       db.query(
-        `SELECT COUNT(*) AS total FROM stick_chat WHERE stick_id = $1`,
+        `SELECT COUNT(*) AS total FROM stick_chats WHERE stick_id = $1`,
         [stickId]
       ),
       // Video rooms / meetings count
@@ -53,7 +53,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       ),
       // Stick tabs count
       db.query(
-        `SELECT COUNT(*) AS total FROM stick_tabs WHERE stick_id = $1`,
+        `SELECT COUNT(*) AS total FROM paks_pad_stick_tabs WHERE stick_id = $1`,
         [stickId]
       ),
     ])

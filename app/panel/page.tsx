@@ -671,8 +671,7 @@ export default function CommunityPanelPage() {
             <BreadcrumbNav
               items={[
                 { label: "Dashboard", href: "/dashboard" },
-                { label: "Personal Hub", href: "/personal" },
-                { label: "ComSticks", current: true },
+                { label: "Comm Sticks", current: true },
               ]}
             />
           </div>

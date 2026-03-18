@@ -55,12 +55,45 @@
       "Bash(pnpm add:*)",
       "WebFetch(domain:github.com)",
       "Bash(npx next build)",
-      "Bash(NODE_OPTIONS=\"--max-old-space-size=4096\" pnpm run build)"
+      "Bash(NODE_OPTIONS=\"--max-old-space-size=4096\" pnpm run build)",
+      "Bash(find c:stick-my-note-devstickmynote-client-installpublic -type f \\\\\\(-name manifest.json -o -name *.json -o -name *.xml \\\\\\))",
+      "Bash(2)",
+      "Bash(mkdir -p \"app/api/noted/pages/[id]/versions\")",
+      "Bash(mkdir -p \"app/api/noted/pages/[id]/versions/[versionId]\")",
+      "Bash(export NODE_OPTIONS=\"--max-old-space-size=16384\")",
+      "Bash(echo \"fetch\\(''/api/concur/groups'', { method: ''POST'', headers: {''Content-Type'':''application/json''}, body: JSON.stringify\\({name:''Test Group'', description:''test'', owner1Email:''chris.doran@stickmynote.com'', owner2Email:''chris.doran@stickmynote.com''}\\) }\\).then\\(r => r.json\\(\\)\\).then\\(d => console.log\\(''RESPONSE:'', JSON.stringify\\(d\\)\\)\\)\")",
+      "Bash(mkdir -p \"c:/stick-my-note-dev/stickmynote-client-install/app/api/concur/groups/[groupId]/sticks/[stickId]/view\")",
+      "Bash(mkdir -p \"c:/stick-my-note-dev/stickmynote-client-install/app/api/concur/groups/[groupId]/stats\")",
+      "Read(//c/stick-my-note-prod/stickmynote-client/**)",
+      "Bash(node -e \":*)",
+      "Bash(cp -r components/social components/inference)",
+      "Bash(rm -rf components/social)",
+      "Bash(cp -r app/api/social app/api/inference)",
+      "Bash(rm -rf app/api/social)",
+      "Bash(for f:*)",
+      "Bash(do sed:*)",
+      "Bash(done)",
+      "Bash(cp hooks/use-social-activity-feed.ts hooks/use-inference-activity-feed.ts)",
+      "Bash(cp hooks/use-social-notifications.ts hooks/use-inference-notifications.ts)",
+      "Bash(rm hooks/use-social-activity-feed.ts hooks/use-social-notifications.ts)",
+      "Bash(cp lib/social-stick-tabs.ts lib/inference-stick-tabs.ts)",
+      "Bash(rm lib/social-stick-tabs.ts)",
+      "Bash(cp types/social-workflow.ts types/inference-workflow.ts)",
+      "Bash(rm types/social-workflow.ts)",
+      "Bash(cp -r app/api/cron/cleanup-social-sticks app/api/cron/cleanup-inference-sticks)",
+      "Bash(rm -rf app/api/cron/cleanup-social-sticks)",
+      "Bash(sed -i 's/social-gradient/inference-gradient/g' app/globals.css)",
+      "Bash(sed -i 's/\\\\r$//' app/globals.css)"
     ],
     "additionalDirectories": [
       "C:\\stick-my-note-ubuntu\\stickmynote-client\\scripts",
       "C:\\stick-my-note-ubuntu\\stickmynote-client\\config",
-      "C:\\stick-my-note-ubuntu\\stickmynote-client\\docs"
+      "C:\\stick-my-note-ubuntu\\stickmynote-client\\docs",
+      "c:\\stick-my-note-dev\\stickmynote-client-install\\app\\api\\calsticks\\intake-forms\\[id]",
+      "c:\\stick-my-note-dev\\stickmynote-client-install\\app\\api\\noted\\pages",
+      "C:\\stick-my-note-dev\\stickmynote-client-install\\app\\api\\noted\\tags",
+      "C:\\stick-my-note-dev\\stickmynote-client-install\\app\\api\\noted\\pages\\[id]",
+      "c:\\stick-my-note-dev\\stickmynote-client-install\\app\\api\\sticks\\[id]"
     ]
   }
 }
