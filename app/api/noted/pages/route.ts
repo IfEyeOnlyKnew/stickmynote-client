@@ -33,7 +33,8 @@ export async function GET(request: NextRequest) {
     // shared pad pages only for pad members
     let query = `
       SELECT np.*,
-        COALESCE(np.title, s.topic, ps.topic, 'Untitled') as display_title
+        COALESCE(np.title, s.topic, ps.topic, 'Untitled') as display_title,
+        s.pad_id as pad_id
       FROM noted_pages np
       LEFT JOIN paks_pad_sticks s ON s.id = np.stick_id
       LEFT JOIN personal_sticks ps ON ps.id = np.personal_stick_id

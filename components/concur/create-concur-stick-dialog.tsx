@@ -111,6 +111,7 @@ export function CreateConcurStickDialog({ groupId, onClose, onCreated }: CreateC
                 <button
                   key={c}
                   type="button"
+                  title={`Select color ${c}`}
                   className={`h-7 w-7 rounded-full border-2 transition-all ${
                     color === c ? "border-gray-800 scale-110" : "border-gray-200"
                   }`}

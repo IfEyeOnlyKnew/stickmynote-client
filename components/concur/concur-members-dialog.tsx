@@ -10,7 +10,7 @@ import {
 } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { Loader2, Trash2, Upload, Crown, User } from "lucide-react"
+import { Loader2, Trash2, Upload, Crown } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import { LdapUserSearchInput } from "@/components/concur/ldap-user-search-input"
 
@@ -200,6 +200,7 @@ export function ConcurMembersDialog({ groupId, onClose }: ConcurMembersDialogPro
               type="file"
               accept=".csv,text/csv"
               className="hidden"
+              aria-label="Upload CSV file"
               onChange={(e) => {
                 const file = e.target.files?.[0]
                 if (file) setCsvFile(file)

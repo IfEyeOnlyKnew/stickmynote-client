@@ -10,7 +10,6 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Loader2, Upload, X, Image as ImageIcon } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
@@ -224,11 +223,12 @@ export function ConcurGroupSettingsDialog({
               <div className="relative">
                 <img
                   src={headerImageUrl}
-                  alt="Header image"
+                  alt="Group header banner"
                   className="w-full h-36 rounded-lg object-cover border"
                 />
                 <button
                   type="button"
+                  title="Remove header image"
                   onClick={() => handleRemove(headerImageUrl, setHeaderImageUrl)}
                   className="absolute top-1.5 right-1.5 bg-red-500 text-white rounded-full p-0.5 hover:bg-red-600"
                 >
@@ -248,6 +248,7 @@ export function ConcurGroupSettingsDialog({
               type="file"
               accept="image/jpeg,image/png,image/gif,image/webp"
               className="hidden"
+              aria-label="Upload header image"
               onChange={(e) => {
                 const file = e.target.files?.[0]
                 if (file) handleUpload(file, headerImageUrl, setHeaderImageUrl, setUploadingHeader)

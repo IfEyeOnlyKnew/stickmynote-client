@@ -4,7 +4,7 @@ import { useState, useEffect } from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { cn } from "@/lib/utils"
-import { Globe, ShieldCheck, MessageCircle, ChevronLeft, ChevronRight } from "lucide-react"
+import { Globe, ShieldCheck, MessageCircle, StickyNote, ChevronLeft, ChevronRight } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import {
   Tooltip,
@@ -58,7 +58,8 @@ export function PanelSidebar() {
 
   // Build nav items dynamically based on user's Concur status
   const navItems: NavItem[] = [
-    { href: "/panel", label: "Shared Sticks", icon: Globe, exact: true },
+    { href: "/personal", label: "Personal Sticks", icon: StickyNote, exact: true },
+    { href: "/panel", label: "Comm Sticks", icon: Globe, exact: true },
   ]
 
   if (isConcurAdmin) {

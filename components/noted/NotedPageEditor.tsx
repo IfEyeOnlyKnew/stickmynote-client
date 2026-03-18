@@ -285,10 +285,10 @@ export function NotedPageEditor({ page, groups, saving, onSave, onCancel, onGrou
     editor.chain().focus().insertContent(content).run()
   }, [editor])
 
-  // Build the source stick URL
+  // Build the source stick URL — link to the specific stick
   const sourceStickUrl = page.is_personal
-    ? (page.personal_stick_id ? `/personal` : null)
-    : (page.stick_id ? `/pads` : null)
+    ? (page.personal_stick_id ? `/personal?stick=${page.personal_stick_id}` : null)
+    : (page.stick_id && page.pad_id ? `/pads/${page.pad_id}?stick=${page.stick_id}` : null)
 
   if (!editor) return null
 

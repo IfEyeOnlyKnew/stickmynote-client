@@ -5,16 +5,17 @@ import { useState, useEffect, useCallback } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { Users, Plus, UserPlus, BarChart3, CheckCircle2, Circle, Settings, Sparkles } from "lucide-react"
+import { Users, Plus, UserPlus, BarChart3, CheckCircle2, Circle, Settings, Sparkles, Network } from "lucide-react"
 import { NotedIcon } from "@/components/noted/NotedIcon"
 import { CreateStickModal } from "@/components/create-stick-modal"
 import { BreadcrumbNav } from "@/components/breadcrumb-nav"
 import { PermissionBasedStickFullscreen } from "@/components/permission-based/PermissionBasedStickFullscreen"
 import { PadInviteModal } from "@/components/pad-invite-modal"
 import { UserMenu } from "@/components/user-menu"
-import { useRouter } from "next/navigation"
+import { useRouter, useSearchParams } from "next/navigation"
 import { ColorPalette } from "@/components/ColorPalette"
 import { StickGanttModal } from "@/components/stick-gantt-modal"
+import { StickMapModal } from "@/components/stick-map-modal"
 import { PadSettingsDialog } from "@/components/pad-settings-dialog"
 import { PadSummaryModal } from "@/components/ai/PadSummaryModal"
 import type { Pad, Stick } from "@/types/pad"
@@ -53,6 +54,14 @@ interface GanttState {
   open: boolean
   stickId: string
   stickTopic: string
+}
+
+interface MapState {
+  open: boolean
+  stickId: string
+  stickTopic: string
+  stickContent: string
+  stickColor: string
 }
 
 // ============================================================================
@@ -183,10 +192,11 @@ interface StickCardProps {
   canEdit: boolean
   onClick: (stick: Stick) => void
   onOpenGantt: (e: React.MouseEvent, stick: Stick) => void
+  onOpenMap: (e: React.MouseEvent, stick: Stick) => void
   onColorChange: (stickId: string, color: string) => void
 }
 
-function StickCard({ stick, counts, canEdit, onClick, onOpenGantt, onColorChange }: Readonly<StickCardProps>) {
+function StickCard({ stick, counts, canEdit, onClick, onOpenGantt, onOpenMap, onColorChange }: Readonly<StickCardProps>) {
   const hasTasks = counts && counts.total > 0
 
   const handleClick = useCallback(() => {
@@ -196,6 +206,10 @@ function StickCard({ stick, counts, canEdit, onClick, onOpenGantt, onColorChange
   const handleGanttClick = useCallback((e: React.MouseEvent) => {
     onOpenGantt(e, stick)
   }, [onOpenGantt, stick])
+
+  const handleMapClick = useCallback((e: React.MouseEvent) => {
+    onOpenMap(e, stick)
+  }, [onOpenMap, stick])
 
   const handleColorChange = useCallback((color: string) => {
     onColorChange(stick.id, color)
@@ -246,6 +260,15 @@ function StickCard({ stick, counts, canEdit, onClick, onOpenGantt, onColorChange
                 stickContent={stick.content}
               />
             </div>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={handleMapClick}
+              className="h-8 px-2"
+              title="Stick Map"
+            >
+              <Network className="h-4 w-4" />
+            </Button>
             {hasTasks && (
               <Button
                 variant="ghost"
@@ -277,6 +300,8 @@ function StickCard({ stick, counts, canEdit, onClick, onOpenGantt, onColorChange
 
 export function PadPageClient({ pad, sticks, userRole }: Readonly<PadPageClientProps>) {
   const router = useRouter()
+  const searchParams = useSearchParams()
+  const stickParam = searchParams.get("stick")
 
   // Modal states
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false)
@@ -294,6 +319,15 @@ export function PadPageClient({ pad, sticks, userRole }: Readonly<PadPageClientP
     open: false,
     stickId: "",
     stickTopic: "",
+  })
+
+  // Map modal state
+  const [mapState, setMapState] = useState<MapState>({
+    open: false,
+    stickId: "",
+    stickTopic: "",
+    stickContent: "",
+    stickColor: "",
   })
 
   // Permissions
@@ -369,6 +403,16 @@ export function PadPageClient({ pad, sticks, userRole }: Readonly<PadPageClientP
     processInvitations()
   }, [processInvitations])
 
+  // Auto-open a stick from ?stick= URL param (e.g. linked from Noted "Go to Stick")
+  useEffect(() => {
+    if (!stickParam || localSticks.length === 0) return
+    const stick = localSticks.find((s) => s.id === stickParam)
+    if (stick && !isFullscreenOpen) {
+      setSelectedStick(stick)
+      setIsFullscreenOpen(true)
+    }
+  }, [stickParam, localSticks]) // eslint-disable-line react-hooks/exhaustive-deps
+
   // Handlers
   const handleStickClick = useCallback((stick: Stick) => {
     setSelectedStick(stick)
@@ -386,6 +430,21 @@ export function PadPageClient({ pad, sticks, userRole }: Readonly<PadPageClientP
 
   const handleCloseGantt = useCallback((open: boolean) => {
     setGanttState((prev) => ({ ...prev, open }))
+  }, [])
+
+  const handleOpenMap = useCallback((e: React.MouseEvent, stick: Stick) => {
+    e.stopPropagation()
+    setMapState({
+      open: true,
+      stickId: stick.id,
+      stickTopic: stick.topic || "",
+      stickContent: stick.content || "",
+      stickColor: stick.color || "",
+    })
+  }, [])
+
+  const handleCloseMap = useCallback((open: boolean) => {
+    setMapState((prev) => ({ ...prev, open }))
   }, [])
 
   const handleOpenCreateModal = useCallback(() => {
@@ -569,6 +628,7 @@ export function PadPageClient({ pad, sticks, userRole }: Readonly<PadPageClientP
                   canEdit={canCreateSticks}
                   onClick={handleStickClick}
                   onOpenGantt={handleOpenGantt}
+                  onOpenMap={handleOpenMap}
                   onColorChange={handleStickColorChange}
                 />
               ))}
@@ -591,6 +651,15 @@ export function PadPageClient({ pad, sticks, userRole }: Readonly<PadPageClientP
           onOpenChange={handleCloseGantt}
           stickId={ganttState.stickId}
           stickTopic={ganttState.stickTopic}
+        />
+
+        <StickMapModal
+          open={mapState.open}
+          onOpenChange={handleCloseMap}
+          stickId={mapState.stickId}
+          stickTopic={mapState.stickTopic}
+          stickContent={mapState.stickContent}
+          stickColor={mapState.stickColor}
         />
 
         <PadSettingsDialog

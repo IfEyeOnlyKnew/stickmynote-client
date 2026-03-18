@@ -12,18 +12,18 @@ interface ColorOption {
 }
 
 const colorOptions: ColorOption[] = [
-  { value: "#fbbf24", label: "Yellow", className: "bg-yellow-300" },
-  { value: "#f472b6", label: "Pink", className: "bg-pink-400" },
-  { value: "#60a5fa", label: "Blue", className: "bg-blue-400" },
-  { value: "#34d399", label: "Green", className: "bg-green-400" },
-  { value: "#a78bfa", label: "Purple", className: "bg-purple-400" },
-  { value: "#fb923c", label: "Orange", className: "bg-orange-400" },
-  { value: "#f87171", label: "Red", className: "bg-red-400" },
-  { value: "#9ca3af", label: "Gray", className: "bg-gray-400" },
+  { value: "#eab308", label: "Yellow", className: "bg-yellow-500" },
+  { value: "#ec4899", label: "Pink", className: "bg-pink-500" },
+  { value: "#3b82f6", label: "Blue", className: "bg-blue-500" },
+  { value: "#22c55e", label: "Green", className: "bg-green-500" },
+  { value: "#8b5cf6", label: "Purple", className: "bg-purple-500" },
+  { value: "#f97316", label: "Orange", className: "bg-orange-500" },
+  { value: "#ef4444", label: "Red", className: "bg-red-500" },
+  { value: "#6b7280", label: "Gray", className: "bg-gray-500" },
   { value: "#ffffff", label: "White", className: "bg-white border border-gray-300" },
-  { value: "#22d3ee", label: "Cyan", className: "bg-cyan-400" },
-  { value: "#818cf8", label: "Indigo", className: "bg-indigo-400" },
-  { value: "#84cc16", label: "Lime", className: "bg-lime-400" },
+  { value: "#06b6d4", label: "Cyan", className: "bg-cyan-500" },
+  { value: "#6366f1", label: "Indigo", className: "bg-indigo-500" },
+  { value: "#65a30d", label: "Lime", className: "bg-lime-600" },
 ]
 
 interface ColorPaletteProps {
@@ -52,7 +52,7 @@ export const ColorPalette: React.FC<ColorPaletteProps> = ({
           className={`${buttonSize} p-0`}
           title="Change border color"
         >
-          <Palette className={iconSize} />
+          <Palette className={`${iconSize} text-black`} />
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="z-[9999] bg-white border shadow-lg p-2">

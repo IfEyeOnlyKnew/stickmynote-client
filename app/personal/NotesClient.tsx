@@ -26,7 +26,7 @@
  */
 
 import { useState, useEffect, useMemo, useCallback, useRef } from "react"
-import { useRouter } from "next/navigation"
+import { useRouter, useSearchParams } from "next/navigation"
 import { Loader2, Plus, Search, Undo2, X, Settings, BarChart3, ChevronLeft } from "lucide-react"
 import type { Note } from "@/types/note"
 import { Button } from "@/components/ui/button"
@@ -61,6 +61,8 @@ interface NotesClientProps {
 
 export function NotesClient({ initialNotes, userId, stats }: Readonly<NotesClientProps>) {
   const router = useRouter()
+  const searchParams = useSearchParams()
+  const stickParam = searchParams.get("stick")
   const windowSize = useWindowSize()
   const { userProfile } = useUserProfile(userId)
   const { csrfToken } = useCSRF()
@@ -418,6 +420,17 @@ export function NotesClient({ initialNotes, userId, stats }: Readonly<NotesClien
       setShouldLoad(true)
     }
   }, [userId, shouldLoad, initialNotes, setAllNotes, markInitialized])
+
+  // Auto-open a stick from ?stick= URL param (e.g. linked from Noted "Go to Stick")
+  const stickParamHandledRef = useRef(false)
+  useEffect(() => {
+    if (stickParamHandledRef.current || !stickParam || allNotes.length === 0) return
+    const note = allNotes.find((n) => n.id === stickParam)
+    if (note) {
+      stickParamHandledRef.current = true
+      fullscreenHook.openFullscreen(note.id)
+    }
+  }, [stickParam, allNotes, fullscreenHook])
 
   // Click-outside handler for stats sidebar
   useEffect(() => {

@@ -2,7 +2,7 @@
 
 import { useEffect, useCallback, useState } from "react"
 import { useSearchParams } from "next/navigation"
-import { BookOpen, Loader2, Scissors } from "lucide-react"
+import { BookOpen, Loader2, Scissors, PanelLeftClose, PanelLeftOpen, ArrowLeft, FolderOpen } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { useNoted } from "@/hooks/useNoted"
 import { NotedGroupTabs } from "@/components/noted/NotedGroupTabs"
@@ -54,6 +54,11 @@ export function NotedClient({ userId }: NotedClientProps) {
   const [showTemplateGallery, setShowTemplateGallery] = useState(false)
   const [showWebClipper, setShowWebClipper] = useState(false)
   const [saveAsTemplateData, setSaveAsTemplateData] = useState<{ title: string; content: string } | null>(null)
+
+  // Mobile view: which panel is showing (groups, list, editor)
+  const [mobilePanel, setMobilePanel] = useState<"groups" | "list" | "editor">("list")
+  // Desktop: toggle the page list (search) column
+  const [showPageList, setShowPageList] = useState(true)
 
   // Auto-select page from URL param
   useEffect(() => {
@@ -192,10 +197,107 @@ export function NotedClient({ userId }: NotedClientProps) {
         </div>
       </div>
 
-      {/* Main content - 3-column layout: groups | page list | editor */}
+      {/* Main content */}
       <div className="flex flex-1 overflow-hidden">
-        {/* Left sidebar - groups & sub-groups */}
-        <div className="w-56 shrink-0">
+
+        {/* ── MOBILE LAYOUT (< md) ── show one panel at a time, full width */}
+
+        {/* Mobile: groups panel */}
+        {mobilePanel === "groups" && (
+          <div className="w-full md:hidden">
+            <NotedGroupTabs
+              groups={groups}
+              activeGroupId={activeGroupId}
+              onSelectGroup={(id) => {
+                setActiveGroupId(id)
+                setMobilePanel("list")
+              }}
+              onCreateGroup={createGroup}
+              onUpdateGroup={updateGroup}
+              onDeleteGroup={deleteGroup}
+            />
+          </div>
+        )}
+
+        {/* Mobile: page list panel */}
+        {mobilePanel === "list" && (
+          <div className="w-full flex flex-col md:hidden">
+            <div className="flex items-center gap-2 px-3 py-2 border-b">
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-7 w-7 p-0"
+                onClick={() => setMobilePanel("groups")}
+                title="Groups"
+              >
+                <FolderOpen className="h-4 w-4" />
+              </Button>
+              <span className="text-sm font-medium">Pages</span>
+            </div>
+            <div className="flex-1 overflow-hidden">
+              <NotedPageList
+                pages={pages}
+                groups={groups}
+                selectedPageId={selectedPage?.id || null}
+                searchQuery={searchQuery}
+                onSearchChange={setSearchQuery}
+                onSelectPage={(page) => {
+                  selectPage(page)
+                  setMobilePanel("editor")
+                }}
+                onDeletePage={deletePage}
+                onMoveToGroup={handleMoveToGroup}
+                hasMore={hasMore}
+                loadingMore={loadingMore}
+                onLoadMore={loadMorePages}
+                onNewPage={() => setShowTemplateGallery(true)}
+              />
+            </div>
+          </div>
+        )}
+
+        {/* Mobile: editor panel */}
+        {mobilePanel === "editor" && (
+          <div className="w-full flex flex-col md:hidden">
+            <div className="flex items-center gap-1 px-2 py-1 border-b">
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-7 w-7 p-0"
+                onClick={() => setMobilePanel("list")}
+                title="Back to page list"
+              >
+                <ArrowLeft className="h-4 w-4" />
+              </Button>
+              <span className="text-xs text-muted-foreground truncate">
+                {selectedPage?.display_title || selectedPage?.title || "Untitled"}
+              </span>
+            </div>
+            <div className="flex-1 min-h-0">
+              {selectedPage ? (
+                <NotedPageEditor
+                  page={selectedPage}
+                  groups={groups}
+                  saving={saving}
+                  onSave={handleSave}
+                  onCancel={handleCancel}
+                  onGroupChange={handleGroupChange}
+                  onSaveAsTemplate={handleSaveAsTemplate}
+                />
+              ) : (
+                <div className="flex flex-col items-center justify-center h-full text-center px-8">
+                  <BookOpen className="h-12 w-12 text-muted-foreground/30 mb-3" />
+                  <p className="text-sm text-muted-foreground">Select a page to edit</p>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* ── DESKTOP LAYOUT (≥ md) ── 3-column side-by-side */}
+
+        {/* Desktop: groups sidebar */}
+        <div className="hidden md:block w-56 shrink-0">
           <NotedGroupTabs
             groups={groups}
             activeGroupId={activeGroupId}
@@ -206,26 +308,45 @@ export function NotedClient({ userId }: NotedClientProps) {
           />
         </div>
 
-        {/* Middle sidebar - page list */}
-        <div className="w-72 shrink-0">
-          <NotedPageList
-            pages={pages}
-            groups={groups}
-            selectedPageId={selectedPage?.id || null}
-            searchQuery={searchQuery}
-            onSearchChange={setSearchQuery}
-            onSelectPage={selectPage}
-            onDeletePage={deletePage}
-            onMoveToGroup={handleMoveToGroup}
-            hasMore={hasMore}
-            loadingMore={loadingMore}
-            onLoadMore={loadMorePages}
-            onNewPage={() => setShowTemplateGallery(true)}
-          />
-        </div>
+        {/* Desktop: page list (toggleable) */}
+        {showPageList && (
+          <div className="hidden md:block w-72 shrink-0">
+            <NotedPageList
+              pages={pages}
+              groups={groups}
+              selectedPageId={selectedPage?.id || null}
+              searchQuery={searchQuery}
+              onSearchChange={setSearchQuery}
+              onSelectPage={selectPage}
+              onDeletePage={deletePage}
+              onMoveToGroup={handleMoveToGroup}
+              hasMore={hasMore}
+              loadingMore={loadingMore}
+              onLoadMore={loadMorePages}
+              onNewPage={() => setShowTemplateGallery(true)}
+            />
+          </div>
+        )}
 
-        {/* Right panel - editor */}
-        <div className="flex-1 min-w-0">
+        {/* Desktop: editor */}
+        <div className="hidden md:flex md:flex-col flex-1 min-w-0">
+          {/* Page list toggle bar */}
+          <div className="flex items-center px-2 py-1 border-b">
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-7 gap-1 text-xs"
+              onClick={() => setShowPageList((v) => !v)}
+              title={showPageList ? "Hide page list" : "Show page list"}
+            >
+              {showPageList ? (
+                <PanelLeftClose className="h-3.5 w-3.5" />
+              ) : (
+                <PanelLeftOpen className="h-3.5 w-3.5" />
+              )}
+              {showPageList ? "Hide pages" : "Show pages"}
+            </Button>
+          </div>
           {selectedPage ? (
             <NotedPageEditor
               page={selectedPage}

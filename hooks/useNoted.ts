@@ -7,6 +7,7 @@ export interface NotedPage {
   id: string
   stick_id: string | null
   personal_stick_id: string | null
+  pad_id: string | null
   user_id: string
   org_id: string
   title: string

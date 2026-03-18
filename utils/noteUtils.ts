@@ -1,17 +1,17 @@
 // Color palette for notes
 export const COLORS = [
-  { name: "Yellow", value: "#fef3c7", class: "bg-yellow-100" },
-  { name: "Pink", value: "#fce7f3", class: "bg-pink-100" },
-  { name: "Blue", value: "#dbeafe", class: "bg-blue-100" },
-  { name: "Green", value: "#d1fae5", class: "bg-green-100" },
-  { name: "Purple", value: "#e9d5ff", class: "bg-purple-100" },
-  { name: "Orange", value: "#fed7aa", class: "bg-orange-100" },
-  { name: "Red", value: "#fee2e2", class: "bg-red-100" },
-  { name: "Gray", value: "#f3f4f6", class: "bg-gray-100" },
+  { name: "Yellow", value: "#fde047", class: "bg-yellow-300" },
+  { name: "Pink", value: "#f9a8d4", class: "bg-pink-300" },
+  { name: "Blue", value: "#93c5fd", class: "bg-blue-300" },
+  { name: "Green", value: "#86efac", class: "bg-green-300" },
+  { name: "Purple", value: "#c4b5fd", class: "bg-purple-300" },
+  { name: "Orange", value: "#fdba74", class: "bg-orange-300" },
+  { name: "Red", value: "#fca5a5", class: "bg-red-300" },
+  { name: "Gray", value: "#d1d5db", class: "bg-gray-300" },
   { name: "White", value: "#ffffff", class: "bg-white" },
-  { name: "Cyan", value: "#cffafe", class: "bg-cyan-100" },
-  { name: "Indigo", value: "#e0e7ff", class: "bg-indigo-100" },
-  { name: "Lime", value: "#ecfccb", class: "bg-lime-100" },
+  { name: "Cyan", value: "#67e8f9", class: "bg-cyan-300" },
+  { name: "Indigo", value: "#a5b4fc", class: "bg-indigo-300" },
+  { name: "Lime", value: "#bef264", class: "bg-lime-300" },
 ] as const
 
 // Helper function to format relative time display

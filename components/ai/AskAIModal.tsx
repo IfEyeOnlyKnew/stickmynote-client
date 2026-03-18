@@ -125,10 +125,18 @@ export function AskAIModal({ open, onOpenChange, stickId, stickType, onAnswerKep
 
       toast.success("Answer saved to Details tab")
 
+      // Small delay to ensure the DB write is committed before refreshing
+      await new Promise((resolve) => setTimeout(resolve, 300))
+
       // Refresh note tabs to show the saved answer in Details tab
+      // Dispatch both personal and stick tab refresh events
       if (typeof window !== "undefined") {
         window.dispatchEvent(new CustomEvent("refreshNoteTabs"))
+        window.dispatchEvent(new CustomEvent("refreshStickTabs"))
       }
+
+      // Wait for the refresh to propagate before closing
+      await new Promise((resolve) => setTimeout(resolve, 200))
 
       onAnswerKept?.()
       handleClose()

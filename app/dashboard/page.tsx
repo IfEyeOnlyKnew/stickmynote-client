@@ -114,7 +114,7 @@ export default function DashboardPage() {
               <div className="mx-auto w-16 h-16 bg-yellow-100 rounded-full flex items-center justify-center mb-4">
                 <StickyNote className="h-8 w-8 text-yellow-600" />
               </div>
-              <CardTitle className="text-2xl text-gray-900">Personal Hub</CardTitle>
+              <CardTitle className="text-2xl text-gray-900">Concur Hub</CardTitle>
               <CardDescription className="text-base">
                 Create and manage your personal sticks with full control over sharing and organization
               </CardDescription>
@@ -139,11 +139,11 @@ export default function DashboardPage() {
                 </div>
               </div>
               <Button
-                onClick={() => router.push("/personal")}
+                onClick={() => router.push("/concur/sticks")}
                 className="w-full bg-yellow-600 hover:bg-yellow-700 text-white font-semibold py-3 text-lg"
                 size="lg"
               >
-                Go to Personal Hub
+                Go to Concur Hub
                 <ArrowRight className="h-5 w-5 ml-2" />
               </Button>
             </CardContent>
