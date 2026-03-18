@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button"
 import { GenerateTagsButton } from "@/components/ui/generate-tags-button"
 import { SummarizeLinksButton } from "@/components/ui/summarize-links-button"
 import { ExternalLink, ChevronDown, ChevronUp } from "lucide-react"
-import { useState } from "react"
+import { useState, useRef, useEffect } from "react"
 import type { VideoItem, ImageItem } from "@/types/pad"
 import { VideoCard, ImageCard } from "@/components/MediaComponents"
 import { SafeHtmlRenderer } from "@/components/safe-html-renderer"
@@ -69,6 +69,19 @@ export function StickContentEditor({
   const isEditing = isEditingTopic || isEditingContent
 
   const [isContentExpanded, setIsContentExpanded] = useState(false)
+  const contentRef = useRef<HTMLTextAreaElement>(null)
+
+  // Auto-resize textarea to fit all content when expanded
+  useEffect(() => {
+    const textarea = contentRef.current
+    if (!textarea) return
+    if (isContentExpanded) {
+      textarea.style.height = "auto"
+      textarea.style.height = `${textarea.scrollHeight}px`
+    } else {
+      textarea.style.height = ""
+    }
+  }, [isContentExpanded, content])
 
   return (
     <div className="space-y-4 !w-full !min-w-0 !max-w-full !overflow-hidden">
@@ -97,13 +110,14 @@ export function StickContentEditor({
           <span className="text-xs text-gray-500">{contentLength}/25000</span>
         </div>
         <textarea
+          ref={contentRef}
           value={content || ""}
           onChange={(e) => onContentChange(e.target.value)}
           onFocus={onContentFocus}
           placeholder="Enter content (max 25000 characters)"
           maxLength={25000}
           className="!w-full !min-w-0 !max-w-full p-2 border rounded-md resize-none !box-border"
-          rows={isContentExpanded ? 20 : 8}
+          rows={isContentExpanded ? undefined : 8}
           disabled={readOnly}
         />
         {!readOnly && (

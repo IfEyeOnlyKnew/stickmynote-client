@@ -311,7 +311,7 @@ export function ConcurStickDetailModal({
           </DialogHeader>
         )}
 
-        <ScrollArea className="flex-1 px-6">
+        <ScrollArea className="flex-1 min-h-0 px-6">
           {/* Stick Tabs (Main, Videos, Images, Details) */}
           <div className="mb-4">
             <GenericStickTabs
