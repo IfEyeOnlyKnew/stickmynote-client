@@ -25,6 +25,7 @@ interface StickMapModalProps {
   stickTopic?: string
   stickContent?: string
   stickColor?: string
+  onNodeClick?: (nodeId: string) => void
 }
 
 interface ComponentCounts {
@@ -171,7 +172,7 @@ function CenterNode({ topic, color }: { topic: string; color: string }) {
   )
 }
 
-function OrbitNode({ node, position, index }: { node: MapNode; position: { x: number; y: number }; index: number }) {
+function OrbitNode({ node, position, index, onClick }: { node: MapNode; position: { x: number; y: number }; index: number; onClick?: (nodeId: string) => void }) {
   const hasData = node.count > 0
 
   return (
@@ -179,8 +180,10 @@ function OrbitNode({ node, position, index }: { node: MapNode; position: { x: nu
       <Tooltip>
         <TooltipTrigger asChild>
           <div
-            className={`absolute flex flex-col items-center justify-center rounded-full border-2 cursor-pointer
+            onClick={hasData && onClick ? () => onClick(node.id) : undefined}
+            className={`absolute flex flex-col items-center justify-center rounded-full border-2
               transition-all duration-300 hover:scale-110 hover:shadow-lg z-10
+              ${hasData ? "cursor-pointer" : "cursor-default"}
               ${hasData ? node.bgColor : "bg-gray-50"}
               ${hasData ? node.borderColor : "border-gray-200 border-dashed"}
               ${hasData ? "" : "opacity-50"}`}
@@ -239,6 +242,7 @@ export function StickMapModal({
   stickTopic,
   stickContent,
   stickColor,
+  onNodeClick,
 }: StickMapModalProps) {
   const [loading, setLoading] = useState(false)
   const [counts, setCounts] = useState<ComponentCounts | null>(null)
@@ -318,7 +322,7 @@ export function StickMapModal({
               {nodes.map((node, i) => {
                 const pos = getNodePosition(i, nodes.length, ORBIT_RADIUS)
                 return (
-                  <OrbitNode key={node.id} node={node} position={pos} index={i} />
+                  <OrbitNode key={node.id} node={node} position={pos} index={i} onClick={onNodeClick} />
                 )
               })}
             </div>

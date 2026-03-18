@@ -447,6 +447,18 @@ export function PadPageClient({ pad, sticks, userRole }: Readonly<PadPageClientP
     setMapState((prev) => ({ ...prev, open }))
   }, [])
 
+  const handleMapNodeClick = useCallback((nodeId: string) => {
+    // Close the map modal
+    setMapState((prev) => ({ ...prev, open: false }))
+
+    // Find the stick and open it in fullscreen
+    const stick = localSticks.find((s) => s.id === mapState.stickId)
+    if (stick) {
+      setSelectedStick(stick)
+      setIsFullscreenOpen(true)
+    }
+  }, [localSticks, mapState.stickId])
+
   const handleOpenCreateModal = useCallback(() => {
     setIsCreateModalOpen(true)
   }, [])
@@ -660,6 +672,7 @@ export function PadPageClient({ pad, sticks, userRole }: Readonly<PadPageClientP
           stickTopic={mapState.stickTopic}
           stickContent={mapState.stickContent}
           stickColor={mapState.stickColor}
+          onNodeClick={handleMapNodeClick}
         />
 
         <PadSettingsDialog
