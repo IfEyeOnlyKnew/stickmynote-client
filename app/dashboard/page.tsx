@@ -9,7 +9,7 @@ import { StickyNote, Users, FileText, ArrowRight, Share2, MessagesSquare, Video,
 import { UserMenu } from "@/components/user-menu"
 import { useUser } from "@/contexts/user-context"
 import { useOrganization } from "@/contexts/organization-context"
-import { HubSetupModal } from "@/components/social/hub-setup-modal"
+import { HubSetupModal } from "@/components/inference/hub-setup-modal"
 import { BreadcrumbNav } from "@/components/breadcrumb-nav"
 import { OrgBrandedHeader } from "@/components/organization/org-branded-header"
 import Link from "next/link"
@@ -190,13 +190,13 @@ export default function DashboardPage() {
             </CardContent>
           </Card>
 
-          {/* Social Hub Section */}
+          {/* Inference Hub Section */}
           <Card className="hover:shadow-xl transition-all duration-300 hover:scale-105 border-2 hover:border-purple-300">
             <CardHeader className="text-center pb-4">
               <div className="mx-auto w-16 h-16 bg-purple-100 rounded-full flex items-center justify-center mb-4">
                 <Share2 className="h-8 w-8 text-purple-600" />
               </div>
-              <CardTitle className="text-2xl text-gray-900">Social Hub</CardTitle>
+              <CardTitle className="text-2xl text-gray-900">Inference Hub</CardTitle>
               <CardDescription className="text-base">
                 Collaborate with teams through Social Pads and Sticks with enterprise-grade social features
               </CardDescription>
@@ -221,11 +221,11 @@ export default function DashboardPage() {
                 </div>
               </div>
               <Button
-                onClick={() => router.push("/social")}
+                onClick={() => router.push("/inference")}
                 className="w-full bg-purple-600 hover:bg-purple-700 text-white font-semibold py-3 text-lg"
                 size="lg"
               >
-                Go to Social Hub
+                Go to Inference Hub
                 <ArrowRight className="h-5 w-5 ml-2" />
               </Button>
             </CardContent>
@@ -419,7 +419,7 @@ export default function DashboardPage() {
             </Badge>
             <Badge variant="secondary" className="px-4 py-2">
               <Share2 className="h-4 w-4 mr-2" />
-              Social Hub: Enterprise Collaboration
+              Inference Hub: Enterprise Collaboration
             </Badge>
             <Badge variant="secondary" className="px-4 py-2">
               <MessagesSquare className="h-4 w-4 mr-2" />
@@ -435,7 +435,7 @@ export default function DashboardPage() {
             </Badge>
           </div>
           <p className="text-gray-500 text-sm max-w-3xl mx-auto">
-            You can switch between Notes, Paks, Social Hub, and CalSticks anytime. Each section offers powerful features for
+            You can switch between Notes, Paks, Inference Hub, and CalSticks anytime. Each section offers powerful features for
             organizing, collaborating, and engaging with your content and teams.
           </p>
         </div>

@@ -43,7 +43,7 @@ export function useCreateStick(padId: string, context: StickContext = "paks") {
 
     try {
       // Use different API endpoints based on context
-      const endpoint = context === "social" ? "/api/social-sticks" : "/api/sticks"
+      const endpoint = context === "social" ? "/api/inference-sticks" : "/api/sticks"
       const padIdField = context === "social" ? "social_pad_id" : "pad_id"
 
       const response = await fetch(endpoint, {

@@ -243,7 +243,7 @@ export function HubModeSelector({ open, onComplete, userId, userEmail }: HubMode
                     className={`w-2 h-2 ${isPersonalEmail ? "bg-gray-400" : "bg-blue-500"} rounded-full mr-2 mt-1.5 flex-shrink-0`}
                   ></div>
                   <span className={isPersonalEmail ? "text-gray-400" : ""}>
-                    <strong>Social Hub</strong> - Enterprise collaboration
+                    <strong>Inference Hub</strong> - Enterprise collaboration
                   </span>
                 </div>
                 <div className="flex items-start text-sm">

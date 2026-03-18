@@ -24,7 +24,7 @@ export function useMemberPermissions(padId: string, userId?: string) {
       setLoading(true)
 
       // Get pad owner
-      const padResponse = await fetch(`/api/social-pads/${padId}`)
+      const padResponse = await fetch(`/api/inference-pads/${padId}`)
       if (padResponse.ok) {
         const padData = await padResponse.json()
         setIsOwner(padData.pad.owner_id === userId)
@@ -45,7 +45,7 @@ export function useMemberPermissions(padId: string, userId?: string) {
       }
 
       // Get member permissions
-      const response = await fetch(`/api/social-pads/${padId}/members`)
+      const response = await fetch(`/api/inference-pads/${padId}/members`)
       if (response.ok) {
         const data = await response.json()
         const member = data.members?.find((m: any) => m.user_id === userId)

@@ -204,9 +204,9 @@ export function UserMenu({
           <FolderKanban className="mr-2 h-4 w-4" />
           <span>Paks Hub</span>
         </DropdownMenuItem>
-        <DropdownMenuItem onClick={() => router.push("/social")}>
+        <DropdownMenuItem onClick={() => router.push("/inference")}>
           <Users className="mr-2 h-4 w-4" />
-          <span>Social Hub</span>
+          <span>Inference Hub</span>
         </DropdownMenuItem>
         <DropdownMenuItem onClick={() => router.push("/chats")}>
           <MessageSquare className="mr-2 h-4 w-4" />
@@ -236,9 +236,9 @@ export function UserMenu({
           </DropdownMenuItem>
         )}
         {isAdmin && (
-          <DropdownMenuItem onClick={() => router.push("/social/admin")}>
+          <DropdownMenuItem onClick={() => router.push("/inference/admin")}>
             <Settings className="mr-2 h-4 w-4" />
-            <span>Social Hub Admin</span>
+            <span>Inference Hub Admin</span>
           </DropdownMenuItem>
         )}
         <DropdownMenuSeparator />

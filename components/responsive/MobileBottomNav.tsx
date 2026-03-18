@@ -15,8 +15,8 @@ interface NavItem {
 }
 
 const navItems: NavItem[] = [
-  { href: "/social", icon: Home, label: "Home", matchPrefix: "/social" },
-  { href: "/social/my-sticks", icon: StickyNote, label: "Notes", matchPrefix: "/social/my-sticks" },
+  { href: "/inference", icon: Home, label: "Home", matchPrefix: "/inference" },
+  { href: "/inference/my-sticks", icon: StickyNote, label: "Notes", matchPrefix: "/inference/my-sticks" },
   { href: "/channels", icon: MessageSquare, label: "Chat", matchPrefix: "/channels" },
   { href: "/noted", icon: BookOpen, label: "Noted", matchPrefix: "/noted" },
   { href: "/pm", icon: FolderKanban, label: "Projects", matchPrefix: "/pm" },
@@ -37,7 +37,7 @@ export function MobileBottomNav() {
       <div className="flex items-center justify-around">
         {navItems.map((item) => {
           const isActive = item.matchPrefix
-            ? pathname === item.href || (pathname.startsWith(item.matchPrefix) && item.href !== "/social")
+            ? pathname === item.href || (pathname.startsWith(item.matchPrefix) && item.href !== "/inference")
             : pathname === item.href
 
           return (

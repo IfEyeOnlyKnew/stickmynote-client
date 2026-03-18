@@ -4,7 +4,7 @@ import { getSecurityHeaders } from "@/lib/security-headers"
 const PROTECTED_ROUTES = [
   "/control-panel",
   "/panel",
-  "/social",
+  "/inference",
   "/dashboard",
   "/tags",
   "/mysticks",

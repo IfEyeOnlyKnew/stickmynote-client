@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation"
 
 const FULL_ACCESS_ROUTES = [
   "/dashboard",
-  "/social",
+  "/inference",
   "/control-panel",
   "/tags",
   "/mysticks",

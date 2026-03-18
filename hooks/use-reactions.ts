@@ -72,8 +72,8 @@ export function useReactions(targetId: string, targetType: "stick" | "reply" = "
     try {
       const endpoint =
         targetType === "stick"
-          ? `/api/social-sticks/${targetId}/reactions`
-          : `/api/social-stick-replies/${targetId}/reactions`
+          ? `/api/inference-sticks/${targetId}/reactions`
+          : `/api/inference-stick-replies/${targetId}/reactions`
 
       const response = await fetch(endpoint)
       if (response.ok) {
@@ -100,8 +100,8 @@ export function useReactions(targetId: string, targetType: "stick" | "reply" = "
     try {
       const endpoint =
         targetType === "stick"
-          ? `/api/social-sticks/${targetId}/reactions`
-          : `/api/social-stick-replies/${targetId}/reactions`
+          ? `/api/inference-sticks/${targetId}/reactions`
+          : `/api/inference-stick-replies/${targetId}/reactions`
 
       const response = await fetch(endpoint, {
         method: "POST",

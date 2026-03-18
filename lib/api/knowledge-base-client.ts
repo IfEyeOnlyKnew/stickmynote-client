@@ -13,7 +13,7 @@ export class KnowledgeBaseAPI {
    * Fetch all KB articles for a pad
    */
   static async getArticles(padId: string): Promise<KnowledgeBaseArticle[]> {
-    const response = await fetch(`/api/social-pads/${padId}/knowledge-base`)
+    const response = await fetch(`/api/inference-pads/${padId}/knowledge-base`)
     if (!response.ok) {
       throw new Error("Failed to fetch KB articles")
     }
@@ -24,7 +24,7 @@ export class KnowledgeBaseAPI {
    * Get a single KB article by ID
    */
   static async getArticle(padId: string, articleId: string): Promise<KnowledgeBaseArticle> {
-    const response = await fetch(`/api/social-pads/${padId}/knowledge-base/${articleId}`)
+    const response = await fetch(`/api/inference-pads/${padId}/knowledge-base/${articleId}`)
     if (!response.ok) {
       throw new Error("Failed to fetch KB article")
     }
@@ -35,7 +35,7 @@ export class KnowledgeBaseAPI {
    * Create a new KB article
    */
   static async createArticle(data: CreateKBArticleRequest): Promise<KnowledgeBaseArticle> {
-    const response = await fetch(`/api/social-pads/${data.pad_id}/knowledge-base`, {
+    const response = await fetch(`/api/inference-pads/${data.pad_id}/knowledge-base`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(data),
@@ -54,7 +54,7 @@ export class KnowledgeBaseAPI {
     articleId: string,
     data: UpdateKBArticleRequest,
   ): Promise<KnowledgeBaseArticle> {
-    const response = await fetch(`/api/social-pads/${padId}/knowledge-base/${articleId}`, {
+    const response = await fetch(`/api/inference-pads/${padId}/knowledge-base/${articleId}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(data),
@@ -69,7 +69,7 @@ export class KnowledgeBaseAPI {
    * Delete a KB article
    */
   static async deleteArticle(padId: string, articleId: string): Promise<void> {
-    const response = await fetch(`/api/social-pads/${padId}/knowledge-base/${articleId}`, {
+    const response = await fetch(`/api/inference-pads/${padId}/knowledge-base/${articleId}`, {
       method: "DELETE",
     })
     if (!response.ok) {
@@ -87,7 +87,7 @@ export class KnowledgeBaseAPI {
     if (params.tags) queryParams.set("tags", params.tags.join(","))
     if (params.limit) queryParams.set("limit", params.limit.toString())
 
-    const response = await fetch(`/api/social-pads/${params.pad_id}/knowledge-base/search?${queryParams}`)
+    const response = await fetch(`/api/inference-pads/${params.pad_id}/knowledge-base/search?${queryParams}`)
     if (!response.ok) {
       throw new Error("Failed to search KB articles")
     }
@@ -98,7 +98,7 @@ export class KnowledgeBaseAPI {
    * Get version history for an article
    */
   static async getHistory(padId: string, articleId: string): Promise<KBHistoryVersion[]> {
-    const response = await fetch(`/api/social-pads/${padId}/knowledge-base/${articleId}/history`)
+    const response = await fetch(`/api/inference-pads/${padId}/knowledge-base/${articleId}/history`)
     if (!response.ok) {
       throw new Error("Failed to fetch KB history")
     }
@@ -109,7 +109,7 @@ export class KnowledgeBaseAPI {
    * Vote on article helpfulness
    */
   static async voteHelpful(padId: string, articleId: string, isHelpful: boolean): Promise<void> {
-    const response = await fetch(`/api/social-pads/${padId}/knowledge-base/${articleId}/helpful`, {
+    const response = await fetch(`/api/inference-pads/${padId}/knowledge-base/${articleId}/helpful`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ is_helpful: isHelpful }),
@@ -123,7 +123,7 @@ export class KnowledgeBaseAPI {
    * Increment view count
    */
   static async incrementView(padId: string, articleId: string): Promise<void> {
-    await fetch(`/api/social-pads/${padId}/knowledge-base/${articleId}/view`, {
+    await fetch(`/api/inference-pads/${padId}/knowledge-base/${articleId}/view`, {
       method: "POST",
     })
   }

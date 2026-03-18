@@ -13,7 +13,7 @@ export class AISummarizationAPI {
    * Generate AI summary for a stick
    */
   static async generateSummary(request: GenerateSummaryRequest): Promise<GenerateSummaryResponse> {
-    const response = await fetch(`/api/social-sticks/${request.stick_id}/summarize`, {
+    const response = await fetch(`/api/inference-sticks/${request.stick_id}/summarize`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(request),
@@ -28,7 +28,7 @@ export class AISummarizationAPI {
    * Get AI summary changelog for a stick
    */
   static async getSummaryHistory(stickId: string): Promise<AIChangelogEntry[]> {
-    const response = await fetch(`/api/social-sticks/${stickId}/summary-history`)
+    const response = await fetch(`/api/inference-sticks/${stickId}/summary-history`)
     if (!response.ok) {
       throw new Error("Failed to fetch summary history")
     }
@@ -39,7 +39,7 @@ export class AISummarizationAPI {
    * Ask a question about pad content
    */
   static async askPadQuestion(request: AskPadQuestionRequest): Promise<AskPadQuestionResponse> {
-    const response = await fetch(`/api/social-pads/${request.pad_id}/ask`, {
+    const response = await fetch(`/api/inference-pads/${request.pad_id}/ask`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(request),
@@ -54,7 +54,7 @@ export class AISummarizationAPI {
    * Get Q&A history for a pad
    */
   static async getQAHistory(padId: string, limit = 20) {
-    const response = await fetch(`/api/social-pads/${padId}/qa-history?limit=${limit}`)
+    const response = await fetch(`/api/inference-pads/${padId}/qa-history?limit=${limit}`)
     if (!response.ok) {
       throw new Error("Failed to fetch Q&A history")
     }
@@ -65,7 +65,7 @@ export class AISummarizationAPI {
    * Provide feedback on Q&A answer
    */
   static async submitQAFeedback(qaId: string, wasHelpful: boolean, feedbackText?: string): Promise<void> {
-    const response = await fetch(`/api/social-pads/qa/${qaId}/feedback`, {
+    const response = await fetch(`/api/inference-pads/qa/${qaId}/feedback`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ was_helpful: wasHelpful, feedback_text: feedbackText }),

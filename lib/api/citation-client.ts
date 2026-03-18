@@ -7,7 +7,7 @@ export class CitationAPI {
    * Get all citations for a stick
    */
   static async getCitations(stickId: string): Promise<StickCitation[]> {
-    const response = await fetch(`/api/social-sticks/${stickId}/citations`)
+    const response = await fetch(`/api/inference-sticks/${stickId}/citations`)
     if (!response.ok) {
       throw new Error("Failed to fetch citations")
     }
@@ -18,7 +18,7 @@ export class CitationAPI {
    * Create a new citation
    */
   static async createCitation(data: CreateCitationRequest): Promise<StickCitation> {
-    const response = await fetch(`/api/social-sticks/${data.stick_id}/citations`, {
+    const response = await fetch(`/api/inference-sticks/${data.stick_id}/citations`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(data),
@@ -33,7 +33,7 @@ export class CitationAPI {
    * Delete a citation
    */
   static async deleteCitation(stickId: string, citationId: string): Promise<void> {
-    const response = await fetch(`/api/social-sticks/${stickId}/citations/${citationId}`, {
+    const response = await fetch(`/api/inference-sticks/${stickId}/citations/${citationId}`, {
       method: "DELETE",
     })
     if (!response.ok) {
@@ -45,7 +45,7 @@ export class CitationAPI {
    * Get related sticks based on citations
    */
   static async getRelatedSticks(stickId: string): Promise<any[]> {
-    const response = await fetch(`/api/social-sticks/${stickId}/related`)
+    const response = await fetch(`/api/inference-sticks/${stickId}/related`)
     if (!response.ok) {
       throw new Error("Failed to fetch related sticks")
     }

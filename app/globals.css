@@ -30,12 +30,12 @@
     --chart-5: 27 87% 67%;
     --radius: 0.5rem;
 
-    /* Adding vibrant Social Hub theme colors */
+    /* Adding vibrant Inference Hub theme colors */
     --social-primary: 262 83% 58%;
     --social-secondary: 217 91% 60%;
     --social-accent: 330 81% 60%;
-    --social-gradient-start: 262 83% 58%;
-    --social-gradient-end: 217 91% 60%;
+    --inference-gradient-start: 262 83% 58%;
+    --inference-gradient-end: 217 91% 60%;
 
     /* Organization branding variables - dynamically updated by useOrgTheme hook */
     --brand-primary: #4f46e5;
@@ -1039,9 +1039,9 @@ body.fullscreen-modal-open .fixed:not([style*="z-index: 2147483647"]) {
   flex: 1;
 }
 
-/* Adding vibrant Social Hub styles */
-.social-gradient {
-  background: linear-gradient(135deg, hsl(var(--social-gradient-start)) 0%, hsl(var(--social-gradient-end)) 100%);
+/* Adding vibrant Inference Hub styles */
+.inference-gradient {
+  background: linear-gradient(135deg, hsl(var(--inference-gradient-start)) 0%, hsl(var(--inference-gradient-end)) 100%);
 }
 
 .social-card-hover {
