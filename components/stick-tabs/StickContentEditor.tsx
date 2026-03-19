@@ -78,8 +78,10 @@ export function StickContentEditor({
     if (isContentExpanded) {
       textarea.style.height = "auto"
       textarea.style.height = `${textarea.scrollHeight}px`
+      textarea.style.overflow = "hidden"
     } else {
       textarea.style.height = ""
+      textarea.style.overflow = ""
     }
   }, [isContentExpanded, content])
 
@@ -117,7 +119,7 @@ export function StickContentEditor({
           placeholder="Enter content (max 25000 characters)"
           maxLength={25000}
           className="!w-full !min-w-0 !max-w-full p-2 border rounded-md resize-none !box-border"
-          rows={isContentExpanded ? undefined : 8}
+          rows={8}
           disabled={readOnly}
         />
         {!readOnly && (
