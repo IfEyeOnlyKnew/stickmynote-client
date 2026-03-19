@@ -76,7 +76,7 @@ export function StickContentEditor({
     const textarea = contentRef.current
     if (!textarea) return
     if (isContentExpanded) {
-      textarea.style.height = "auto"
+      textarea.style.height = "1px"
       textarea.style.height = `${textarea.scrollHeight}px`
       textarea.style.overflow = "hidden"
     } else {
