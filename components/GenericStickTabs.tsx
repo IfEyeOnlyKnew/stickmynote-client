@@ -165,7 +165,7 @@ export function GenericStickTabs({
   }
 
   return (
-    <div className="!w-full !min-w-0 !max-w-full !overflow-hidden">
+    <div className="!w-full !min-w-0 !max-w-full">
       <Tabs
         value={activeTab}
         onValueChange={(v) => {
@@ -208,7 +208,7 @@ export function GenericStickTabs({
           </TabsTrigger>
         </TabsList>
 
-        <TabsContent value="main" className="space-y-4 !w-full !min-w-0 !max-w-full !overflow-hidden">
+        <TabsContent value="main" className="space-y-4 !w-full !min-w-0 !max-w-full">
           <StickContentEditor
             topic={topic}
             content={content}

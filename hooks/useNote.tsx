@@ -162,6 +162,7 @@ export const useNote = (note: Note, options: UseNoteOptions = {}) => {
         setEditedTopic(trimmedTopic)
         setEditedContent(trimmedContent)
         setIsEditing(false)
+        setResetKey((k) => k + 1)
 
         if (onNoteUpdate) {
           console.log("[v0] Calling onNoteUpdate callback")

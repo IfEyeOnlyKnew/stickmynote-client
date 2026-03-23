@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useRef } from "react"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { VideoCard, ImageCard } from "@/components/MediaComponents"
@@ -44,7 +44,7 @@ export function NoteContentEditor({
   onStick,
   isSaving,
 }: NoteContentEditorProps) {
-  const [isContentExpanded, setIsContentExpanded] = useState(false)
+  const expandDialogRef = useRef<HTMLDialogElement>(null)
 
   const safeTopic = topic || ""
   const safeContent = content || ""
@@ -78,10 +78,6 @@ export function NoteContentEditor({
     return safeContent.length > 200 || safeContent.split("\n").length > 3
   }
 
-  const toggleContentExpansion = () => {
-    setIsContentExpanded(!isContentExpanded)
-  }
-
   return (
     <div className="space-y-4 !w-full !max-w-full !overflow-hidden">
       <div className="!w-full !max-w-full !min-w-0 !overflow-hidden">
@@ -107,22 +103,67 @@ export function NoteContentEditor({
           placeholder="Enter content (max 1000 characters)"
           maxLength={1000}
           disabled={readOnly}
-          rows={isContentExpanded ? 12 : 7}
+          rows={7}
           className="!w-full !min-w-0 !max-w-full resize-y text-gray-900 disabled:text-gray-900 disabled:bg-gray-50 disabled:border-gray-300 !box-border"
         />
         <div className="flex items-center justify-between mt-1">
           {shouldShowExpandLink() && (
             <button
               type="button"
-              onClick={toggleContentExpansion}
+              onClick={() => expandDialogRef.current?.showModal()}
               className="text-xs text-blue-600 hover:text-blue-800 underline cursor-pointer"
             >
-              {isContentExpanded ? "Collapse" : "Expand"}
+              Expand
             </button>
           )}
           <div className="text-xs text-gray-500">{safeContent.length}/1000 characters</div>
         </div>
       </div>
+
+      {/* Native <dialog> with showModal() — renders in browser top layer, above ALL stacking contexts */}
+      <dialog
+        ref={expandDialogRef}
+        onClick={(e) => { if (e.target === expandDialogRef.current) expandDialogRef.current?.close() }}
+        className="backdrop:bg-black/50 bg-transparent p-0 border-none w-[calc(50%-1.5rem)] h-[75vh] rounded-lg ml-4 mr-auto mt-4"
+      >
+        <div className="bg-white rounded-lg shadow-2xl flex flex-col h-full">
+          <div className="flex items-center justify-between px-5 py-3 border-b flex-shrink-0">
+            <span className="font-semibold text-sm">Content</span>
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-gray-500">{safeContent.length}/1000</span>
+              <button
+                type="button"
+                onClick={() => expandDialogRef.current?.close()}
+                className="text-gray-500 hover:text-gray-700 text-xl leading-none px-1"
+                aria-label="Close"
+              >
+                ×
+              </button>
+            </div>
+          </div>
+          <div className="flex-1 p-4 min-h-0 flex flex-col">
+            <Textarea
+              value={safeContent}
+              onChange={(e) => handleContentChange(e.target.value)}
+              onFocus={handleContentFocus}
+              placeholder="Enter content (max 1000 characters)"
+              maxLength={1000}
+              disabled={readOnly}
+              className="flex-1 resize-none text-sm leading-relaxed text-gray-900 disabled:text-gray-900 disabled:bg-gray-50"
+            />
+          </div>
+          {!readOnly && onCancel && onStick && (
+            <div className="flex gap-2 justify-end px-5 py-3 border-t flex-shrink-0">
+              <Button variant="outline" size="sm" onClick={() => { onCancel(); expandDialogRef.current?.close() }} disabled={isSaving}>
+                Cancel
+              </Button>
+              <Button variant="default" size="sm" onClick={() => { onStick(); expandDialogRef.current?.close() }} disabled={isSaving}>
+                {isSaving ? "Saving..." : "Stick"}
+              </Button>
+            </div>
+          )}
+        </div>
+      </dialog>
 
       {isEditing && !readOnly && onCancel && onStick && (
         <div className="flex gap-2 justify-end pt-2 border-t mt-4">

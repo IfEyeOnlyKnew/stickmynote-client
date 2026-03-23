@@ -635,13 +635,12 @@ export function PermissionBasedStickFullscreen({
 
   return (
     <div
-      className="fixed inset-0 bg-black/50 flex items-start justify-center z-50 overflow-y-auto overflow-x-hidden"
+      className="fixed inset-0 bg-black/50 z-50 overflow-hidden"
       role="dialog"
       aria-modal="true"
-      style={{ WebkitOverflowScrolling: 'touch' }}
     >
-      <div className="w-full max-w-full min-w-0 min-h-[100dvh] lg:h-[calc(100vh-4rem)] flex flex-col lg:flex-row lg:gap-6 lg:items-start pb-6 lg:pb-0 px-2 sm:px-4 lg:px-0 overflow-hidden">
-        <div className="w-full min-w-0 lg:w-1/2 lg:flex-shrink-0 rounded-lg shadow-md border overflow-hidden mt-4 lg:mt-0 lg:h-full lg:flex lg:flex-col bg-white">
+      <div className="h-full w-full flex flex-col lg:flex-row lg:gap-4 lg:p-4 overflow-hidden p-2 gap-2">
+        <div className="w-full min-w-0 lg:w-1/2 rounded-lg shadow-md border overflow-hidden flex-1 lg:flex-none lg:h-full flex flex-col bg-white min-h-0">
           <div className="flex items-center justify-between px-2 sm:px-4 py-2 sm:py-3 bg-white/80 border-b flex-shrink-0 overflow-hidden min-w-0">
             <div className="flex items-center gap-1 sm:gap-2 min-w-0 flex-shrink">
               <Badge variant="outline" className="text-xs flex-shrink-0">
@@ -716,7 +715,7 @@ export function PermissionBasedStickFullscreen({
             </div>
           </div>
 
-          <div className="p-2 sm:p-4 md:p-6 bg-white text-gray-900 flex-1 overflow-y-auto overflow-x-hidden w-full min-w-0">
+          <div className="p-2 sm:p-4 md:p-6 bg-white text-gray-900 flex-1 min-h-0 overflow-y-auto overflow-x-hidden w-full min-w-0">
             <GenericStickTabs
               stickId={editedStick.id}
               initialTopic={editedStick.topic}
@@ -747,7 +746,7 @@ export function PermissionBasedStickFullscreen({
         </div>
 
         {permissions.canView && (
-          <div className="w-full lg:w-1/2 lg:flex-shrink-0 mt-4 lg:mt-0 lg:h-full">
+          <div className="w-full lg:w-1/2 lg:mb-0 flex-1 lg:flex-none lg:h-full overflow-hidden min-h-0">
             <ThreadedReplies
               noteId={editedStick.id}
               context="stick"

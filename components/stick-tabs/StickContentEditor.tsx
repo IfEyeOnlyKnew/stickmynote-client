@@ -1,10 +1,10 @@
 "use client"
 
+import { useRef } from "react"
 import { Button } from "@/components/ui/button"
 import { GenerateTagsButton } from "@/components/ui/generate-tags-button"
 import { SummarizeLinksButton } from "@/components/ui/summarize-links-button"
-import { ExternalLink, ChevronDown, ChevronUp } from "lucide-react"
-import { useState, useRef, useEffect } from "react"
+import { ExternalLink, ChevronDown } from "lucide-react"
 import type { VideoItem, ImageItem } from "@/types/pad"
 import { VideoCard, ImageCard } from "@/components/MediaComponents"
 import { SafeHtmlRenderer } from "@/components/safe-html-renderer"
@@ -68,25 +68,10 @@ export function StickContentEditor({
   const contentLength = (content || "").length
   const isEditing = isEditingTopic || isEditingContent
 
-  const [isContentExpanded, setIsContentExpanded] = useState(false)
-  const contentRef = useRef<HTMLTextAreaElement>(null)
-
-  // Auto-resize textarea to fit all content when expanded
-  useEffect(() => {
-    const textarea = contentRef.current
-    if (!textarea) return
-    if (isContentExpanded) {
-      textarea.style.height = "1px"
-      textarea.style.height = `${textarea.scrollHeight}px`
-      textarea.style.overflow = "hidden"
-    } else {
-      textarea.style.height = ""
-      textarea.style.overflow = ""
-    }
-  }, [isContentExpanded, content])
+  const expandDialogRef = useRef<HTMLDialogElement>(null)
 
   return (
-    <div className="space-y-4 !w-full !min-w-0 !max-w-full !overflow-hidden">
+    <div className="space-y-4 !w-full !min-w-0 !max-w-full">
       {/* Topic Field */}
       <div className="!w-full !min-w-0 !max-w-full !overflow-hidden">
         <div className="flex justify-between items-center mb-1">
@@ -112,7 +97,6 @@ export function StickContentEditor({
           <span className="text-xs text-gray-500">{contentLength}/25000</span>
         </div>
         <textarea
-          ref={contentRef}
           value={content || ""}
           onChange={(e) => onContentChange(e.target.value)}
           onFocus={onContentFocus}
@@ -127,23 +111,15 @@ export function StickContentEditor({
             <Button
               variant="ghost"
               size="sm"
-              onClick={() => setIsContentExpanded(!isContentExpanded)}
               className="text-xs h-6 p-1 text-gray-500 hover:text-gray-700"
+              onClick={() => expandDialogRef.current?.showModal()}
             >
-              {isContentExpanded ? (
-                <>
-                  <ChevronUp className="h-3 w-3 mr-1" />
-                  Collapse
-                </>
-              ) : (
-                <>
-                  <ChevronDown className="h-3 w-3 mr-1" />
-                  Expand
-                </>
-              )}
+              <ChevronDown className="h-3 w-3 mr-1" />
+              Expand
             </Button>
           </div>
         )}
+
         {isEditing && !readOnly && onCancelTopic && onStickTopic && onCancelContent && onStickContent && (
           <div className="flex gap-2 mt-2 justify-end">
             <Button
@@ -171,6 +147,40 @@ export function StickContentEditor({
           </div>
         )}
       </div>
+
+      {/* Native <dialog> with showModal() — renders in browser top layer, above ALL stacking contexts */}
+      <dialog
+        ref={expandDialogRef}
+        onClick={(e) => { if (e.target === expandDialogRef.current) expandDialogRef.current?.close() }}
+        className="backdrop:bg-black/50 bg-transparent p-0 border-none max-w-[700px] w-[90vw] max-h-[85vh] rounded-lg"
+      >
+        <div className="bg-white rounded-lg shadow-2xl flex flex-col max-h-[85vh]">
+          <div className="flex items-center justify-between px-5 py-4 border-b flex-shrink-0">
+            <span className="font-semibold text-sm">Content</span>
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-gray-500">{contentLength}/25000</span>
+              <button
+                type="button"
+                onClick={() => expandDialogRef.current?.close()}
+                className="text-gray-500 hover:text-gray-700 text-xl leading-none px-1"
+                aria-label="Close"
+              >
+                ×
+              </button>
+            </div>
+          </div>
+          <div className="flex-1 p-5 min-h-0 flex flex-col">
+            <textarea
+              value={content || ""}
+              onChange={(e) => onContentChange(e.target.value)}
+              placeholder="Enter content (max 25000 characters)"
+              maxLength={25000}
+              disabled={readOnly}
+              className="flex-1 min-h-[300px] w-full p-2 border rounded-md resize-none text-sm leading-relaxed"
+            />
+          </div>
+        </div>
+      </dialog>
 
       {showMedia && (
         <>

@@ -10,7 +10,6 @@ import {
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { ScrollArea } from "@/components/ui/scroll-area"
 import {
   Loader2,
   Pin,
@@ -122,7 +121,37 @@ export function ConcurStickDetailModal({
   const [pinning, setPinning] = useState(false)
   const [topic, setTopic] = useState(stick.topic || "")
   const [content, setContent] = useState(stick.content)
+  const [isEditingTopic, setIsEditingTopic] = useState(false)
+  const [isEditingContent, setIsEditingContent] = useState(false)
+  const [saving, setSaving] = useState(false)
   const replyInputRef = useRef<HTMLTextAreaElement>(null)
+
+  const handleSaveStick = async () => {
+    setSaving(true)
+    try {
+      const res = await fetch(`/api/concur/groups/${groupId}/sticks/${stick.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ topic, content }),
+      })
+      if (!res.ok) throw new Error("Failed")
+      setIsEditingTopic(false)
+      setIsEditingContent(false)
+      onStickUpdated()
+      toast({ title: "Stick updated" })
+    } catch {
+      toast({ title: "Failed to save stick", variant: "destructive" })
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const handleCancelEdit = () => {
+    setTopic(stick.topic || "")
+    setContent(stick.content)
+    setIsEditingTopic(false)
+    setIsEditingContent(false)
+  }
 
   // Create a StickTabsConfig that curries the groupId into the concur API calls
   const tabsConfig: StickTabsConfig = useMemo(() => ({
@@ -311,18 +340,24 @@ export function ConcurStickDetailModal({
           </DialogHeader>
         )}
 
-        <ScrollArea className="flex-1 min-h-0 px-6">
+        <div className="flex-1 min-h-0 overflow-y-auto px-6">
           {/* Stick Tabs (Main, Videos, Images, Details) */}
           <div className="mb-4">
             <GenericStickTabs
               stickId={stick.id}
               initialTopic={stick.topic || ""}
               initialContent={stick.content}
-              onTopicChange={setTopic}
-              onContentChange={setContent}
+              onTopicChange={(v) => { setTopic(v); setIsEditingTopic(true) }}
+              onContentChange={(v) => { setContent(v); setIsEditingContent(true) }}
               readOnly={false}
               showMedia={true}
               config={tabsConfig}
+              isEditingTopic={isEditingTopic}
+              isEditingContent={isEditingContent}
+              onCancelTopic={handleCancelEdit}
+              onCancelContent={handleCancelEdit}
+              onStickTopic={handleSaveStick}
+              onStickContent={handleSaveStick}
             />
           </div>
 
@@ -365,7 +400,7 @@ export function ConcurStickDetailModal({
               </div>
             )}
           </div>
-        </ScrollArea>
+        </div>
 
         {/* Reply Input */}
         <div className="p-4 border-t bg-gray-50/80">

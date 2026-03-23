@@ -39,6 +39,150 @@ const MEETING_SELECT = `
   LEFT JOIN social_sticks ss ON m.stick_id = ss.id
 `
 
+// ---- Query-building helpers for GET ----
+
+interface QueryParams {
+  conditions: string[]
+  values: any[]
+  paramIndex: number
+}
+
+function addDateRangeConditions(qp: QueryParams, start: string | null, end: string | null) {
+  if (start && end) {
+    qp.conditions.push(`(
+      (COALESCE(m.recurrence_type, 'none') = 'none' AND m.start_time < $${qp.paramIndex} AND m.end_time > $${qp.paramIndex + 1})
+      OR (m.recurrence_type IS NOT NULL AND m.recurrence_type != 'none')
+    )`)
+    qp.values.push(end, start)
+    qp.paramIndex += 2
+  } else if (start) {
+    qp.conditions.push(`(m.end_time >= $${qp.paramIndex} OR (m.recurrence_type IS NOT NULL AND m.recurrence_type != 'none'))`)
+    qp.values.push(start)
+    qp.paramIndex++
+  } else if (end) {
+    qp.conditions.push(`m.start_time <= $${qp.paramIndex}`)
+    qp.values.push(end)
+    qp.paramIndex++
+  }
+}
+
+function addOptionalFilter(qp: QueryParams, column: string, value: string | null) {
+  if (!value) return
+  qp.conditions.push(`${column} = $${qp.paramIndex}`)
+  qp.values.push(value)
+  qp.paramIndex++
+}
+
+function isRecurring(meeting: any): boolean {
+  return meeting.recurrence_type && meeting.recurrence_type !== "none"
+}
+
+async function fetchExceptionDates(parentIds: string[]): Promise<string[]> {
+  if (parentIds.length === 0) return []
+  const excResult = await db.query(
+    `SELECT instance_date FROM meetings
+     WHERE parent_meeting_id = ANY($1) AND is_exception = true`,
+    [parentIds]
+  )
+  return excResult.rows.map((r: any) => r.instance_date)
+}
+
+function expandMeetingsInRange(dbMeetings: any[], rangeStart: Date, rangeEnd: Date, exceptions: string[]): any[] {
+  const expanded: any[] = []
+
+  for (const meeting of dbMeetings) {
+    if (!isRecurring(meeting)) {
+      expanded.push(meeting)
+      continue
+    }
+
+    const occurrences = expandRecurrence(meeting, rangeStart, rangeEnd)
+    for (const occ of occurrences) {
+      if (exceptions.includes(occ.instanceDate)) continue
+      expanded.push({
+        ...meeting,
+        start_time: occ.start.toISOString(),
+        end_time: occ.end.toISOString(),
+        instance_date: occ.instanceDate,
+        _is_virtual_instance: true,
+      })
+    }
+  }
+
+  expanded.sort((a: any, b: any) =>
+    new Date(a.start_time).getTime() - new Date(b.start_time).getTime()
+  )
+  return expanded
+}
+
+// ---- POST helpers ----
+
+async function insertAttendees(meetingId: string, emails: string[]) {
+  const attendeeValues: any[] = []
+  const attendeePlaceholders: string[] = []
+  let paramIdx = 1
+
+  for (const email of emails) {
+    attendeePlaceholders.push(`($${paramIdx}, $${paramIdx + 1}, $${paramIdx + 2}, $${paramIdx + 3})`)
+    attendeeValues.push(meetingId, email.trim().toLowerCase(), "pending", false)
+    paramIdx += 4
+  }
+
+  await db.query(
+    `INSERT INTO meeting_attendees (meeting_id, email, status, is_organizer)
+     VALUES ${attendeePlaceholders.join(", ")}`,
+    attendeeValues
+  )
+}
+
+async function sendInvitationEmails(
+  attendeeEmails: string[],
+  meetingDetails: { title: string; description?: string | null; location?: string | null; start_time: string; end_time: string; recurrenceType: string; videoRoomUrl: string | null },
+  organizerName: string
+) {
+  const meetingDate = new Date(meetingDetails.start_time).toLocaleDateString("en-US", {
+    weekday: "long", year: "numeric", month: "long", day: "numeric",
+  })
+  const meetingTime = new Date(meetingDetails.start_time).toLocaleTimeString("en-US", {
+    hour: "2-digit", minute: "2-digit",
+  })
+  const endMeetingTime = new Date(meetingDetails.end_time).toLocaleTimeString("en-US", {
+    hour: "2-digit", minute: "2-digit",
+  })
+
+  const recurrenceNote = meetingDetails.recurrenceType === "none"
+    ? ""
+    : `<p style="margin: 8px 0;"><strong>Recurrence:</strong> ${meetingDetails.recurrenceType} meeting</p>`
+
+  await fetch(`${process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000"}/api/send-email`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      to: attendeeEmails,
+      subject: `Meeting Invitation: ${meetingDetails.title}`,
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+          <h2 style="color: #7c3aed;">Meeting Invitation</h2>
+          <p><strong>${organizerName}</strong> has invited you to a meeting.</p>
+          <div style="background-color: #f3f4f6; padding: 20px; border-radius: 8px; margin: 20px 0;">
+            <h3 style="margin-top: 0; color: #1f2937;">${meetingDetails.title}</h3>
+            <p style="margin: 8px 0;"><strong>Date:</strong> ${meetingDate}</p>
+            <p style="margin: 8px 0;"><strong>Time:</strong> ${meetingTime} - ${endMeetingTime}</p>
+            ${recurrenceNote}
+            ${meetingDetails.location ? `<p style="margin: 8px 0;"><strong>Location:</strong> ${meetingDetails.location}</p>` : ""}
+            ${meetingDetails.description ? `<p style="margin: 8px 0;"><strong>Description:</strong> ${meetingDetails.description}</p>` : ""}
+          </div>
+          ${meetingDetails.videoRoomUrl ? `
+            <p>Join the video call:</p>
+            <a href="${meetingDetails.videoRoomUrl}" style="display: inline-block; background-color: #7c3aed; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold;">Join Video Call</a>
+            <p style="margin-top: 12px; color: #6b7280; font-size: 14px;">Or copy this link: <a href="${meetingDetails.videoRoomUrl}">${meetingDetails.videoRoomUrl}</a></p>
+          ` : ""}
+        </div>
+      `,
+    }),
+  })
+}
+
 // ----------------------------------------------------------------------------
 // GET - Fetch meetings for the current user (with recurring expansion)
 // ----------------------------------------------------------------------------
@@ -52,64 +196,27 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url)
     const start = searchParams.get("start")
     const end = searchParams.get("end")
-    const padId = searchParams.get("pad_id")
-    const stickId = searchParams.get("stick_id")
-    const status = searchParams.get("status")
     const limit = searchParams.get("limit")
     const offset = searchParams.get("offset")
 
-    // Build query dynamically
-    const conditions: string[] = []
-    const values: any[] = []
-    let paramIndex = 1
+    const qp: QueryParams = { conditions: [], values: [], paramIndex: 1 }
 
     // User must be organizer or attendee
-    conditions.push(`(m.organizer_id = $${paramIndex} OR ma_user.user_id = $${paramIndex + 1} OR LOWER(ma_user.email) = LOWER((SELECT email FROM users WHERE id = $${paramIndex + 2})))`)
-    values.push(user.id, user.id, user.id)
-    paramIndex += 3
+    qp.conditions.push(`(m.organizer_id = $${qp.paramIndex} OR ma_user.user_id = $${qp.paramIndex + 1} OR LOWER(ma_user.email) = LOWER((SELECT email FROM users WHERE id = $${qp.paramIndex + 2})))`)
+    qp.values.push(user.id, user.id, user.id)
+    qp.paramIndex += 3
 
-    // Exclude child instances of recurring meetings from the main query —
-    // we'll expand them from the parent in-memory
-    conditions.push(`m.parent_meeting_id IS NULL`)
+    // Exclude child instances of recurring meetings
+    qp.conditions.push(`m.parent_meeting_id IS NULL`)
 
-    // Date range filtering
-    if (start && end) {
-      // For non-recurring: overlap check. For recurring: parent created before range end
-      conditions.push(`(
-        (COALESCE(m.recurrence_type, 'none') = 'none' AND m.start_time < $${paramIndex} AND m.end_time > $${paramIndex + 1})
-        OR (m.recurrence_type IS NOT NULL AND m.recurrence_type != 'none')
-      )`)
-      values.push(end, start)
-      paramIndex += 2
-    } else if (start) {
-      conditions.push(`(m.end_time >= $${paramIndex} OR (m.recurrence_type IS NOT NULL AND m.recurrence_type != 'none'))`)
-      values.push(start)
-      paramIndex++
-    } else if (end) {
-      conditions.push(`m.start_time <= $${paramIndex}`)
-      values.push(end)
-      paramIndex++
-    }
+    addDateRangeConditions(qp, start, end)
+    addOptionalFilter(qp, "m.pad_id", searchParams.get("pad_id"))
+    addOptionalFilter(qp, "m.stick_id", searchParams.get("stick_id"))
+    addOptionalFilter(qp, "m.status", searchParams.get("status"))
 
-    if (padId) {
-      conditions.push(`m.pad_id = $${paramIndex}`)
-      values.push(padId)
-      paramIndex++
-    }
-    if (stickId) {
-      conditions.push(`m.stick_id = $${paramIndex}`)
-      values.push(stickId)
-      paramIndex++
-    }
-    if (status) {
-      conditions.push(`m.status = $${paramIndex}`)
-      values.push(status)
-      paramIndex++
-    }
-
-    const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : ""
-    const limitClause = limit ? `LIMIT ${parseInt(limit, 10)}` : ""
-    const offsetClause = offset ? `OFFSET ${parseInt(offset, 10)}` : ""
+    const whereClause = qp.conditions.length > 0 ? `WHERE ${qp.conditions.join(" AND ")}` : ""
+    const limitClause = limit ? `LIMIT ${Number.parseInt(limit, 10)}` : ""
+    const offsetClause = offset ? `OFFSET ${Number.parseInt(offset, 10)}` : ""
 
     const query = `
       ${MEETING_SELECT}
@@ -119,56 +226,14 @@ export async function GET(request: NextRequest) {
       ${offsetClause}
     `
 
-    const result = await db.query(query, values)
+    const result = await db.query(query, qp.values)
     const dbMeetings = result.rows || []
 
     // Expand recurring meetings into virtual instances
     if (start && end) {
-      const rangeStart = new Date(start)
-      const rangeEnd = new Date(end)
-      const expanded: any[] = []
-
-      // Also fetch exception instances for recurring meetings in range
-      const recurringParentIds = dbMeetings
-        .filter((m: any) => m.recurrence_type && m.recurrence_type !== "none")
-        .map((m: any) => m.id)
-
-      let exceptions: any[] = []
-      if (recurringParentIds.length > 0) {
-        const excResult = await db.query(
-          `SELECT instance_date FROM meetings
-           WHERE parent_meeting_id = ANY($1) AND is_exception = true`,
-          [recurringParentIds]
-        )
-        exceptions = excResult.rows.map((r: any) => r.instance_date)
-      }
-
-      for (const meeting of dbMeetings) {
-        if (meeting.recurrence_type && meeting.recurrence_type !== "none") {
-          // Expand recurrence
-          const occurrences = expandRecurrence(meeting, rangeStart, rangeEnd)
-          for (const occ of occurrences) {
-            // Skip exceptions (they have their own modified instance row)
-            if (exceptions.includes(occ.instanceDate)) continue
-
-            expanded.push({
-              ...meeting,
-              start_time: occ.start.toISOString(),
-              end_time: occ.end.toISOString(),
-              instance_date: occ.instanceDate,
-              _is_virtual_instance: true,
-            })
-          }
-        } else {
-          expanded.push(meeting)
-        }
-      }
-
-      // Sort by start_time
-      expanded.sort((a: any, b: any) =>
-        new Date(a.start_time).getTime() - new Date(b.start_time).getTime()
-      )
-
+      const recurringParentIds = dbMeetings.filter(isRecurring).map((m: any) => m.id)
+      const exceptions = await fetchExceptionDates(recurringParentIds)
+      const expanded = expandMeetingsInRange(dbMeetings, new Date(start), new Date(end), exceptions)
       return NextResponse.json({ meetings: expanded })
     }
 
@@ -295,68 +360,16 @@ export async function POST(request: NextRequest) {
       ]
     )
 
-    // Add other attendees
+    // Add other attendees and send invitations
     if (attendee_emails.length > 0) {
-      const attendeeValues: any[] = []
-      const attendeePlaceholders: string[] = []
-      let paramIdx = 1
+      await insertAttendees(meeting.id, attendee_emails)
 
-      for (const email of attendee_emails) {
-        attendeePlaceholders.push(`($${paramIdx}, $${paramIdx + 1}, $${paramIdx + 2}, $${paramIdx + 3})`)
-        attendeeValues.push(meeting.id, email.trim().toLowerCase(), "pending", false)
-        paramIdx += 4
-      }
-
-      await db.query(
-        `INSERT INTO meeting_attendees (meeting_id, email, status, is_organizer)
-         VALUES ${attendeePlaceholders.join(", ")}`,
-        attendeeValues
-      )
-
-      // Send invitation emails
       try {
         const organizerName = userProfile?.full_name || userProfile?.username || userProfile?.email || "Someone"
-        const meetingDate = new Date(start_time).toLocaleDateString("en-US", {
-          weekday: "long", year: "numeric", month: "long", day: "numeric",
-        })
-        const meetingTime = new Date(start_time).toLocaleTimeString("en-US", {
-          hour: "2-digit", minute: "2-digit",
-        })
-        const endMeetingTime = new Date(end_time).toLocaleTimeString("en-US", {
-          hour: "2-digit", minute: "2-digit",
-        })
-
-        const recurrenceNote = recurrenceType !== "none"
-          ? `<p style="margin: 8px 0;"><strong>Recurrence:</strong> ${recurrenceType} meeting</p>`
-          : ""
-
-        await fetch(`${process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000"}/api/send-email`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            to: attendee_emails,
-            subject: `Meeting Invitation: ${title}`,
-            html: `
-              <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-                <h2 style="color: #7c3aed;">Meeting Invitation</h2>
-                <p><strong>${organizerName}</strong> has invited you to a meeting.</p>
-                <div style="background-color: #f3f4f6; padding: 20px; border-radius: 8px; margin: 20px 0;">
-                  <h3 style="margin-top: 0; color: #1f2937;">${title}</h3>
-                  <p style="margin: 8px 0;"><strong>Date:</strong> ${meetingDate}</p>
-                  <p style="margin: 8px 0;"><strong>Time:</strong> ${meetingTime} - ${endMeetingTime}</p>
-                  ${recurrenceNote}
-                  ${location ? `<p style="margin: 8px 0;"><strong>Location:</strong> ${location}</p>` : ""}
-                  ${description ? `<p style="margin: 8px 0;"><strong>Description:</strong> ${description}</p>` : ""}
-                </div>
-                ${videoRoomUrl ? `
-                  <p>Join the video call:</p>
-                  <a href="${videoRoomUrl}" style="display: inline-block; background-color: #7c3aed; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold;">Join Video Call</a>
-                  <p style="margin-top: 12px; color: #6b7280; font-size: 14px;">Or copy this link: <a href="${videoRoomUrl}">${videoRoomUrl}</a></p>
-                ` : ""}
-              </div>
-            `,
-          }),
-        })
+        await sendInvitationEmails(attendee_emails, {
+          title, description, location, start_time, end_time,
+          recurrenceType, videoRoomUrl,
+        }, organizerName)
       } catch (emailError) {
         console.error("[Meetings API] Error sending invitations:", emailError)
       }
@@ -470,14 +483,11 @@ export async function DELETE(request: NextRequest) {
 
     const meetingRow = meeting.rows[0]
 
-    if (deleteSeries && meetingRow.recurrence_type && meetingRow.recurrence_type !== "none") {
+    if (deleteSeries && isRecurring(meetingRow)) {
       // Delete parent + all instances
       await db.query(`DELETE FROM meetings WHERE id = $1 OR parent_meeting_id = $1`, [id])
-    } else if (meetingRow.parent_meeting_id) {
-      // Delete single instance of a recurring meeting
-      await db.query(`DELETE FROM meetings WHERE id = $1`, [id])
     } else {
-      // Delete standalone meeting
+      // Delete single meeting (standalone or single instance)
       await db.query(`DELETE FROM meetings WHERE id = $1`, [id])
     }
 
