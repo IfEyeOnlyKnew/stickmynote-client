@@ -30,14 +30,14 @@ export default function PaksPage() {
         <BreadcrumbNav
           items={[
             { label: "Dashboard", href: "/dashboard" },
-            { label: "Paks-Hub", current: true },
+            { label: "Alliance Hub", current: true },
           ]}
         />
       </div>
 
       <div className="flex justify-between items-center mb-8">
         <div className="text-center flex-1">
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">Paks Hub</h1>
+          <h1 className="text-3xl font-bold text-gray-900 mb-2">Alliance Hub</h1>
           <p className="text-gray-600">Organize your content with Pads and Sticks</p>
         </div>
         <div className="flex items-center">

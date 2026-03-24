@@ -5,7 +5,8 @@ import { useState, useEffect } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { StickyNote, Users, FileText, ArrowRight, Share2, MessagesSquare, Video, CalendarCheck, Download, BookOpen } from "lucide-react"
+import { StickyNote, Users, FileText, ArrowRight, Share2, MessagesSquare, Video, CalendarCheck, Download, BookOpen, Info } from "lucide-react"
+import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover"
 import { UserMenu } from "@/components/user-menu"
 import { useUser } from "@/contexts/user-context"
 import { useOrganization } from "@/contexts/organization-context"
@@ -114,7 +115,20 @@ export default function DashboardPage() {
               <div className="mx-auto w-16 h-16 bg-yellow-100 rounded-full flex items-center justify-center mb-4">
                 <StickyNote className="h-8 w-8 text-yellow-600" />
               </div>
-              <CardTitle className="text-2xl text-gray-900">Concur Hub</CardTitle>
+              <CardTitle className="text-2xl text-gray-900 flex items-center justify-center gap-2">
+                Concur Hub
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <button type="button" className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-gray-200 hover:bg-gray-300 transition-colors" aria-label="What is Concur?">
+                      <Info className="h-3 w-3 text-gray-600" />
+                    </button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-80 text-sm font-normal text-gray-700">
+                    <p className="font-semibold text-gray-900 mb-1">Concur</p>
+                    <p>In a working environment, to concur means to agree with a colleague&apos;s idea, decision, or assessment, often in a formal or professional way. It can also describe multiple people or departments acting together in support of the same plan or outcome.</p>
+                  </PopoverContent>
+                </Popover>
+              </CardTitle>
               <CardDescription className="text-base">
                 Create and manage your personal sticks with full control over sharing and organization
               </CardDescription>
@@ -155,7 +169,20 @@ export default function DashboardPage() {
               <div className="mx-auto w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mb-4">
                 <Users className="h-8 w-8 text-blue-600" />
               </div>
-              <CardTitle className="text-2xl text-gray-900">Paks Hub</CardTitle>
+              <CardTitle className="text-2xl text-gray-900 flex items-center justify-center gap-2">
+                Alliance Hub
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <button type="button" className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-gray-200 hover:bg-gray-300 transition-colors" aria-label="What is Alliance?">
+                      <Info className="h-3 w-3 text-gray-600" />
+                    </button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-80 text-sm font-normal text-gray-700">
+                    <p className="font-semibold text-gray-900 mb-1">Alliance</p>
+                    <p>In a working environment, an alliance is a deliberate, mutually beneficial relationship where colleagues or groups align their efforts and interests to advance shared goals and support one another&apos;s success.</p>
+                  </PopoverContent>
+                </Popover>
+              </CardTitle>
               <CardDescription className="text-base">
                 Access collaborative Pads for team projects and organized content
               </CardDescription>
@@ -184,7 +211,7 @@ export default function DashboardPage() {
                 className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 text-lg"
                 size="lg"
               >
-                Go to Paks Hub
+                Go to Alliance Hub
                 <ArrowRight className="h-5 w-5 ml-2" />
               </Button>
             </CardContent>
@@ -196,7 +223,20 @@ export default function DashboardPage() {
               <div className="mx-auto w-16 h-16 bg-purple-100 rounded-full flex items-center justify-center mb-4">
                 <Share2 className="h-8 w-8 text-purple-600" />
               </div>
-              <CardTitle className="text-2xl text-gray-900">Inference Hub</CardTitle>
+              <CardTitle className="text-2xl text-gray-900 flex items-center justify-center gap-2">
+                Inference Hub
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <button type="button" className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-gray-200 hover:bg-gray-300 transition-colors" aria-label="What is Inference?">
+                      <Info className="h-3 w-3 text-gray-600" />
+                    </button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-80 text-sm font-normal text-gray-700">
+                    <p className="font-semibold text-gray-900 mb-1">Inference</p>
+                    <p>In a working environment, inference is the process of drawing a conclusion or judgment from available data, observations, or statements rather than direct, explicit instructions. It means using evidence (metrics, feedback, behavior, past results) plus your existing knowledge to decide what is probably true or what action to take.</p>
+                  </PopoverContent>
+                </Popover>
+              </CardTitle>
               <CardDescription className="text-base">
                 Collaborate with teams through Social Pads and Sticks with enterprise-grade social features
               </CardDescription>
@@ -415,7 +455,7 @@ export default function DashboardPage() {
             </Badge>
             <Badge variant="secondary" className="px-4 py-2">
               <FileText className="h-4 w-4 mr-2" />
-              Paks: Team & Individual Workspaces
+              Alliance: Team & Individual Workspaces
             </Badge>
             <Badge variant="secondary" className="px-4 py-2">
               <Share2 className="h-4 w-4 mr-2" />
@@ -435,7 +475,7 @@ export default function DashboardPage() {
             </Badge>
           </div>
           <p className="text-gray-500 text-sm max-w-3xl mx-auto">
-            You can switch between Notes, Paks, Inference Hub, and CalSticks anytime. Each section offers powerful features for
+            You can switch between Notes, Alliance Hub, Inference Hub, and CalSticks anytime. Each section offers powerful features for
             organizing, collaborating, and engaging with your content and teams.
           </p>
         </div>

@@ -27,7 +27,7 @@
 
 import { useState, useEffect, useMemo, useCallback, useRef } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
-import { Loader2, Plus, Search, Undo2, X, BarChart3, ChevronLeft } from "lucide-react"
+import { Loader2, Plus, Search, Undo2, X, BarChart3, ChevronLeft, FolderPlus, Check } from "lucide-react"
 import type { Note } from "@/types/note"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -51,6 +51,15 @@ import {
   CommunicationPaletteProvider,
   CommunicationModals,
 } from "@/components/communication"
+import { PersonalGroupsSidebar } from "@/components/personal-groups-sidebar"
+import { usePersonalGroups } from "@/hooks/usePersonalGroups"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 
 // Props contract passed from server component (page.tsx)
 interface NotesClientProps {
@@ -122,6 +131,9 @@ export function NotesClient({ initialNotes, userId, stats }: Readonly<NotesClien
   // Sidebar state
   const [isSidebarOpen, setIsSidebarOpen] = useState(false)
 
+  // Groups hook
+  const groupsHook = usePersonalGroups(shouldLoad)
+
   // Track loading state when clicking a card
   const [loadingNoteId, setLoadingNoteId] = useState<string | null>(null)
 
@@ -138,19 +150,25 @@ export function NotesClient({ initialNotes, userId, stats }: Readonly<NotesClien
   const personalNotes = useMemo(() => uniqueNotes.filter((n) => !n.is_shared), [uniqueNotes])
   const sharedNotes = useMemo(() => uniqueNotes.filter((n) => n.is_shared), [uniqueNotes])
 
-  // Compute filtered set based on search term + filter selection
+  // Compute filtered set based on search term + filter selection + group
   const filteredNotes = useMemo(() => {
     let notesToFilter: Note[]
     if (searchFilter === "personal") notesToFilter = personalNotes
     else if (searchFilter === "shared") notesToFilter = sharedNotes
     else notesToFilter = uniqueNotes
 
+    // Filter by selected group
+    if (groupsHook.selectedGroupId) {
+      const groupStickIds = groupsHook.getStickIdsForGroup(groupsHook.selectedGroupId)
+      notesToFilter = notesToFilter.filter((note) => groupStickIds.has(note.id))
+    }
+
     if (!searchTerm.trim()) return notesToFilter
     const s = searchTerm.toLowerCase()
     return notesToFilter.filter(
       (note) => (note.topic || "").toLowerCase().includes(s) || (note.content || "").toLowerCase().includes(s),
     )
-  }, [uniqueNotes, personalNotes, sharedNotes, searchTerm, searchFilter])
+  }, [uniqueNotes, personalNotes, sharedNotes, searchTerm, searchFilter, groupsHook.selectedGroupId, groupsHook.getStickIdsForGroup])
 
   // Create a new note and open it in fullscreen immediately
   const handleCreateNoteClick = useCallback(async () => {
@@ -557,27 +575,65 @@ export function NotesClient({ initialNotes, userId, stats }: Readonly<NotesClien
         </div>
       </div>
 
-      {/* Notes grid: simple responsive grid with card previews */}
-      <div className="relative min-h-[calc(100vh-200px)] pt-8 px-4 md:px-6">
-        {filteredNotes.length === 0 && !loading ? (
-          <div className="flex flex-col items-center justify-center py-16 text-gray-500">
-            <div className="text-6xl mb-4">📝</div>
-            <h3 className="text-lg font-medium mb-2">No notes found</h3>
-            <p className="text-sm">
-              {searchTerm ? "Try adjusting your search or filter" : "Create your first note to get started!"}
-            </p>
-          </div>
-        ) : (
-          <SimpleNoteGrid
-            notes={filteredNotes}
-            onNoteClick={handleNoteClick}
-            onUpdateColor={handleUpdateNoteColor}
-            onLoadMore={loadMoreNotes}
-            hasMore={hasMore}
-            isLoadingMore={loadingMore}
-            loadingNoteId={loadingNoteId}
-          />
-        )}
+      {/* Main content: sidebar + notes grid */}
+      <div className="flex min-h-[calc(100vh-200px)]">
+        {/* Groups Sidebar */}
+        <PersonalGroupsSidebar
+          groups={groupsHook.groups}
+          selectedGroupId={groupsHook.selectedGroupId}
+          onSelectGroup={groupsHook.setSelectedGroupId}
+          onCreateGroup={groupsHook.createGroup}
+          onRenameGroup={(id, name) => groupsHook.updateGroup(id, { name })}
+          onDeleteGroup={groupsHook.deleteGroup}
+        />
+
+        {/* Notes grid: simple responsive grid with card previews */}
+        <div className="relative flex-1 pt-8 px-4 md:px-6">
+          {/* Active group indicator */}
+          {groupsHook.selectedGroupId && (
+            <div className="flex items-center gap-2 mb-4">
+              <div
+                className="w-3 h-3 rounded"
+                style={{ backgroundColor: groupsHook.groups.find((g) => g.id === groupsHook.selectedGroupId)?.color }}
+              />
+              <span className="text-sm font-medium text-gray-700">
+                {groupsHook.groups.find((g) => g.id === groupsHook.selectedGroupId)?.name}
+              </span>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => groupsHook.setSelectedGroupId(null)}
+                className="h-6 text-xs text-gray-500"
+              >
+                Clear filter
+              </Button>
+            </div>
+          )}
+
+          {filteredNotes.length === 0 && !loading ? (
+            <div className="flex flex-col items-center justify-center py-16 text-gray-500">
+              <div className="text-6xl mb-4">📝</div>
+              <h3 className="text-lg font-medium mb-2">No notes found</h3>
+              <p className="text-sm">
+                {groupsHook.selectedGroupId
+                  ? "No sticks in this group yet. Open a stick and add it to this group."
+                  : searchTerm
+                    ? "Try adjusting your search or filter"
+                    : "Create your first note to get started!"}
+              </p>
+            </div>
+          ) : (
+            <SimpleNoteGrid
+              notes={filteredNotes}
+              onNoteClick={handleNoteClick}
+              onUpdateColor={handleUpdateNoteColor}
+              onLoadMore={loadMoreNotes}
+              hasMore={hasMore}
+              isLoadingMore={loadingMore}
+              loadingNoteId={loadingNoteId}
+            />
+          )}
+        </div>
       </div>
 
       {/* Floating Stats Button toggling the sidebar */}
@@ -700,6 +756,61 @@ export function NotesClient({ initialNotes, userId, stats }: Readonly<NotesClien
             <DialogHeader className="sr-only">
               <DialogTitle>Note Details</DialogTitle>
             </DialogHeader>
+            {/* Group assignment dropdown */}
+            {fullscreenHook.fullscreenNoteId && groupsHook.groups.length > 0 && (
+              <div className="flex items-center gap-2 mb-2">
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="outline" size="sm" className="h-7 text-xs gap-1">
+                      <FolderPlus className="h-3.5 w-3.5" />
+                      Groups
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="start">
+                    {groupsHook.groups.map((group) => {
+                      const isInGroup = groupsHook.getGroupsForStick(fullscreenHook.fullscreenNoteId!).includes(group.id)
+                      return (
+                        <DropdownMenuItem
+                          key={group.id}
+                          onClick={() =>
+                            isInGroup
+                              ? groupsHook.removeStickFromGroup(group.id, fullscreenHook.fullscreenNoteId!)
+                              : groupsHook.addStickToGroup(group.id, fullscreenHook.fullscreenNoteId!)
+                          }
+                          className="gap-2"
+                        >
+                          <div className="w-3 h-3 rounded" style={{ backgroundColor: group.color }} />
+                          <span className="flex-1">{group.name}</span>
+                          {isInGroup && <Check className="h-3.5 w-3.5 text-green-600" />}
+                        </DropdownMenuItem>
+                      )
+                    })}
+                  </DropdownMenuContent>
+                </DropdownMenu>
+                {/* Show current group badges */}
+                {groupsHook.getGroupsForStick(fullscreenHook.fullscreenNoteId).map((gId) => {
+                  const group = groupsHook.groups.find((g) => g.id === gId)
+                  if (!group) return null
+                  return (
+                    <span
+                      key={gId}
+                      className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium text-white"
+                      style={{ backgroundColor: group.color }}
+                    >
+                      {group.name}
+                      <button
+                        type="button"
+                        title="Remove from group"
+                        onClick={() => groupsHook.removeStickFromGroup(gId, fullscreenHook.fullscreenNoteId!)}
+                        className="hover:bg-white/20 rounded-full p-0.5"
+                      >
+                        <X className="h-2.5 w-2.5" />
+                      </button>
+                    </span>
+                  )
+                })}
+              </div>
+            )}
             {fullscreenHook.fullscreenNoteId && (
               <UnifiedNote
                 note={allNotes.find((n) => n.id === fullscreenHook.fullscreenNoteId)!}

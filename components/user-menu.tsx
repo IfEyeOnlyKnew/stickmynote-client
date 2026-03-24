@@ -202,7 +202,7 @@ export function UserMenu({
         </DropdownMenuItem>
         <DropdownMenuItem onClick={() => router.push("/paks")}>
           <FolderKanban className="mr-2 h-4 w-4" />
-          <span>Paks Hub</span>
+          <span>Alliance Hub</span>
         </DropdownMenuItem>
         <DropdownMenuItem onClick={() => router.push("/inference")}>
           <Users className="mr-2 h-4 w-4" />
