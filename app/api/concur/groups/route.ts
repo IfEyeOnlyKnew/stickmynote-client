@@ -226,6 +226,23 @@ export async function POST(request: Request) {
       }
     }
 
+    // Auto-add Concur administrators as members
+    const ownerIds = new Set([owner1.id, owner2.id])
+    const { data: admins } = await db
+      .from("concur_administrators")
+      .select("user_id")
+      .eq("org_id", orgContext.orgId)
+
+    if (admins && admins.length > 0) {
+      for (const admin of admins) {
+        // Skip if already added as owner
+        if (ownerIds.has(admin.user_id)) continue
+        await db
+          .from("concur_group_members")
+          .insert({ group_id: group.id, user_id: admin.user_id, org_id: orgContext.orgId, role: "member", added_by: user.id })
+      }
+    }
+
     // Broadcast event
     publishToOrg(orgContext.orgId, {
       type: "concur.group_created",
