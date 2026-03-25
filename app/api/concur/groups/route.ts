@@ -239,7 +239,7 @@ export async function POST(request: Request) {
         if (ownerIds.has(admin.user_id)) continue
         await db
           .from("concur_group_members")
-          .insert({ group_id: group.id, user_id: admin.user_id, org_id: orgContext.orgId, role: "member", added_by: user.id })
+          .insert({ group_id: group.id, user_id: admin.user_id, org_id: orgContext.orgId, role: "owner", added_by: user.id })
       }
     }
 
