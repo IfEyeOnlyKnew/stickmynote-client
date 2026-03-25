@@ -52,6 +52,7 @@ export async function GET(request: NextRequest) {
     const limitParam = searchParams.get("limit")
     const limit = Math.min(parseInt(limitParam || "10", 10), 50)
     const source = searchParams.get("source") || "ldap"
+    const excludeSelf = searchParams.get("excludeSelf") !== "false"
 
     // Require at least 2 characters to search
     if (query.length < 2) {
@@ -69,7 +70,7 @@ export async function GET(request: NextRequest) {
         if (ldapResult.success && ldapResult.users) {
           for (const ldapUser of ldapResult.users) {
             const email = ldapUser.email?.toLowerCase()
-            if (email && !seenEmails.has(email) && email !== user.email?.toLowerCase()) {
+            if (email && !seenEmails.has(email) && (!excludeSelf || email !== user.email?.toLowerCase())) {
               seenEmails.add(email)
               
               // Check if this LDAP user already exists in our database
@@ -102,7 +103,7 @@ export async function GET(request: NextRequest) {
       const dbResult = await db.query<{ id: string; username: string | null; email: string; full_name: string | null }>(
         `SELECT id, username, email, full_name
          FROM users
-         WHERE id != $1
+         WHERE ($1::uuid IS NULL OR id != $1)
            AND (
              full_name ILIKE $2
              OR username ILIKE $2
@@ -110,7 +111,7 @@ export async function GET(request: NextRequest) {
            )
          ORDER BY full_name ASC
          LIMIT $3`,
-        [user.id, searchPattern, limit]
+        [excludeSelf ? user.id : null, searchPattern, limit]
       )
 
       for (const dbUser of dbResult.rows) {

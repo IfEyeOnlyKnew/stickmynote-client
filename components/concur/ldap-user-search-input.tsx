@@ -75,7 +75,7 @@ export function LdapUserSearchInput({
     searchTimeoutRef.current = setTimeout(async () => {
       setSearching(true)
       try {
-        const res = await fetch(`/api/user-search?query=${encodeURIComponent(query)}`)
+        const res = await fetch(`/api/user-search?query=${encodeURIComponent(query)}&excludeSelf=false`)
         if (res.ok) {
           const users: SearchedUser[] = await res.json()
           const filtered = users.filter(
