@@ -7,6 +7,9 @@ export type ActivityType =
   | "pad_joined"
   | "stick_created"
   | "stick_updated"
+  | "kudos_given"
+  | "kudos_received"
+  | "badge_awarded"
 
 export interface Activity {
   id: string

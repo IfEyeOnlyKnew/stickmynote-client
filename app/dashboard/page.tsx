@@ -5,7 +5,7 @@ import { useState, useEffect } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { StickyNote, Users, FileText, ArrowRight, Share2, MessagesSquare, Video, CalendarCheck, Download, BookOpen, Info } from "lucide-react"
+import { StickyNote, Users, FileText, ArrowRight, Share2, MessagesSquare, Video, CalendarCheck, Download, BookOpen, Info, Sparkles } from "lucide-react"
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover"
 import { UserMenu } from "@/components/user-menu"
 import { useUser } from "@/contexts/user-context"
@@ -440,6 +440,60 @@ export default function DashboardPage() {
                 size="lg"
               >
                 Go to Noted
+                <ArrowRight className="h-5 w-5 ml-2" />
+              </Button>
+            </CardContent>
+          </Card>
+
+          {/* Recognition Hub Section */}
+          <Card className="hover:shadow-xl transition-all duration-300 hover:scale-105 border-2 hover:border-yellow-300">
+            <CardHeader className="text-center pb-4">
+              <div className="mx-auto w-16 h-16 bg-gradient-to-br from-yellow-100 to-orange-100 rounded-full flex items-center justify-center mb-4">
+                <Sparkles className="h-8 w-8 text-yellow-600" />
+              </div>
+              <CardTitle className="text-2xl text-gray-900 flex items-center justify-center gap-2">
+                Recognition Hub
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <button type="button" className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-gray-200 hover:bg-gray-300 transition-colors" aria-label="What is Recognition?">
+                      <Info className="h-3 w-3 text-gray-600" />
+                    </button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-80 text-sm font-normal text-gray-700">
+                    <p className="font-semibold text-gray-900 mb-1">Recognition & Praise</p>
+                    <p>Celebrate your team&apos;s achievements with kudos, badges, and a live recognition wall. Give public praise tied to your organization&apos;s core values and watch your culture thrive.</p>
+                  </PopoverContent>
+                </Popover>
+              </CardTitle>
+              <CardDescription className="text-base">
+                Give kudos, earn badges, and celebrate your team&apos;s achievements
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-3">
+                <div className="flex items-center text-sm text-gray-600">
+                  <div className="w-2 h-2 bg-yellow-500 rounded-full mr-2"></div>
+                  Kudos with organization values
+                </div>
+                <div className="flex items-center text-sm text-gray-600">
+                  <div className="w-2 h-2 bg-yellow-500 rounded-full mr-2"></div>
+                  Achievement badges and streaks
+                </div>
+                <div className="flex items-center text-sm text-gray-600">
+                  <div className="w-2 h-2 bg-yellow-500 rounded-full mr-2"></div>
+                  Live recognition wall and reactions
+                </div>
+                <div className="flex items-center text-sm text-gray-600">
+                  <div className="w-2 h-2 bg-yellow-500 rounded-full mr-2"></div>
+                  Leaderboard and team insights
+                </div>
+              </div>
+              <Button
+                onClick={() => router.push("/recognition")}
+                className="w-full bg-gradient-to-r from-yellow-500 to-orange-500 hover:from-yellow-600 hover:to-orange-600 text-white font-semibold py-3 text-lg"
+                size="lg"
+              >
+                Go to Recognition Hub
                 <ArrowRight className="h-5 w-5 ml-2" />
               </Button>
             </CardContent>

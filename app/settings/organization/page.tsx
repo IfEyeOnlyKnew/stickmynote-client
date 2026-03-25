@@ -52,6 +52,7 @@ import {
   ComplianceTab,
   PMHubTab,
   ConcurTab,
+  RecognitionTab,
 } from "./_components"
 import { ComplianceDashboard } from "@/components/auth/ComplianceDashboard"
 
@@ -938,6 +939,12 @@ function OrganizationSettingsPage() {
                 Concur
               </TabsTrigger>
             )}
+            {(isOwner || currentOrgRole === "admin") && !isPersonalOrg && (
+              <TabsTrigger value="recognition" className="justify-start gap-2 px-3 py-2 text-sm rounded-md data-[state=active]:bg-gray-100 data-[state=active]:shadow-none">
+                <Sparkles className="h-4 w-4" />
+                Recognition
+              </TabsTrigger>
+            )}
 
             {/* Security section divider */}
             {!isPersonalOrg && (
@@ -1187,6 +1194,12 @@ function OrganizationSettingsPage() {
           {isOwner && !isPersonalOrg && (
             <TabsContent value="concur">
               <ConcurTab />
+            </TabsContent>
+          )}
+          {/* Recognition Tab */}
+          {(isOwner || currentOrgRole === "admin") && !isPersonalOrg && (
+            <TabsContent value="recognition">
+              <RecognitionTab />
             </TabsContent>
           )}
           </div>
