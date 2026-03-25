@@ -66,10 +66,11 @@ export function GiveKudosModal({ open, onOpenChange, onSuccess, preselectedUserI
     }
     setSearching(true)
     try {
-      const res = await fetch(`/api/user-search?q=${encodeURIComponent(query)}&limit=8`)
+      const res = await fetch(`/api/user-search?query=${encodeURIComponent(query)}&limit=8&source=both`)
       const data = await res.json()
-      const results = (data.users || []).filter(
-        (u: UserSearchResult) => !selectedUsers.some(s => s.id === u.id)
+      const users = Array.isArray(data) ? data : (data.users || [])
+      const results = users.filter(
+        (u: UserSearchResult) => u.id && !selectedUsers.some(s => s.id === u.id)
       )
       setSearchResults(results)
     } catch {

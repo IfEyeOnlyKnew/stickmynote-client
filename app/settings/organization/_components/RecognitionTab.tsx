@@ -137,9 +137,10 @@ export function RecognitionTab() {
   const searchUsers = async (query: string) => {
     if (query.length < 2) { setUserResults([]); return }
     try {
-      const res = await fetch(`/api/user-search?q=${encodeURIComponent(query)}&limit=5`)
+      const res = await fetch(`/api/user-search?query=${encodeURIComponent(query)}&limit=5&source=both`)
       const data = await res.json()
-      setUserResults(data.users || [])
+      const users = Array.isArray(data) ? data : (data.users || [])
+      setUserResults(users.filter((u: UserSearchResult) => u.id))
     } catch {
       setUserResults([])
     }
