@@ -58,12 +58,13 @@ foreach ($b in $backups) {
 }
 
 # --------------------------------------------------
-# Step 3: Delete old build folder
+# Step 3: Backup old build folder (allows rollback if build fails)
 # --------------------------------------------------
-Write-Host "[3/7] Removing old .next build folder..." -ForegroundColor Yellow
+Write-Host "[3/7] Backing up old .next build folder..." -ForegroundColor Yellow
+Remove-Item -Recurse -Force .next-old -ErrorAction SilentlyContinue
 if (Test-Path ".next") {
-    Remove-Item -Recurse -Force .next
-    Write-Host "  .next folder removed." -ForegroundColor Green
+    Rename-Item .next .next-old
+    Write-Host "  .next renamed to .next-old (rollback available)." -ForegroundColor Green
 } else {
     Write-Host "  .next folder not found, skipping." -ForegroundColor DarkYellow
 }
@@ -144,6 +145,8 @@ if (Test-Path ".env.local") {
     Write-Host "  Removed .env.local after build (prevents empty POSTGRES_PASSWORD)" -ForegroundColor Green
 }
 
+# Clean up old build backup on success
+Remove-Item -Recurse -Force .next-old -ErrorAction SilentlyContinue
 Write-Host "  Build complete." -ForegroundColor Green
 
 # --------------------------------------------------
@@ -205,4 +208,7 @@ Write-Host "Manual verification steps:" -ForegroundColor White
 Write-Host "  1. Browse to https://stickmynote.com" -ForegroundColor Gray
 Write-Host "  2. Test sign-in works (catches DB connection issues)" -ForegroundColor Gray
 Write-Host "  3. Run: nslookup stickmynote.com (should return 192.168.50.20)" -ForegroundColor Gray
+Write-Host "  4. Check /mypads and /mysticks breadcrumbs show 'Alliance Hub'" -ForegroundColor Gray
+Write-Host "  5. Check /dashboard shows 'Your Stick replaces...' statement" -ForegroundColor Gray
+Write-Host "  6. Open a Concur group, Alliance pad, or Inference pad and click Library" -ForegroundColor Gray
 Write-Host ""
