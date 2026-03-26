@@ -32,9 +32,11 @@ import {
   PinOff,
   BarChart3,
   Calendar,
+  HardDrive,
 } from "lucide-react"
 import { CreateChatModal } from "@/components/stick-chats/CreateChatModal"
 import { PadChatPanel } from "@/components/inference/pad-chat-panel"
+import { LibraryDialog } from "@/components/library/LibraryDialog"
 import { PadPresenceIndicator } from "@/components/inference/pad-presence-indicator"
 import {
   CommunicationPaletteProvider,
@@ -128,6 +130,7 @@ export default function InferencePadPage({ params }: Readonly<{ params: { padId:
   const [showPadChat, setShowPadChat] = useState(false)
   const [padChatCollapsed, setPadChatCollapsed] = useState(false)
   const [padMembers, setPadMembers] = useState<Array<{ user_id: string; role?: string; user?: any }>>([])
+  const [showLibraryDialog, setShowLibraryDialog] = useState(false)
 
 
   /* eslint-disable react-hooks/exhaustive-deps */
@@ -381,6 +384,10 @@ export default function InferencePadPage({ params }: Readonly<{ params: { padId:
                   </Button>
                 </>
               )}
+              <Button variant="outline" size="sm" onClick={() => setShowLibraryDialog(true)} className="gap-1">
+                <HardDrive className="h-4 w-4" />
+                <span className="hidden sm:inline">Library</span>
+              </Button>
               <UserMenu />
             </div>
           </div>
@@ -708,6 +715,15 @@ export default function InferencePadPage({ params }: Readonly<{ params: { padId:
           onClose={() => setShowPadChat(false)}
         />
       )}
+
+      {/* Library Dialog */}
+      <LibraryDialog
+        open={showLibraryDialog}
+        onOpenChange={setShowLibraryDialog}
+        scopeType="inference_pad"
+        scopeId={padId}
+        title={pad ? `${pad.name} Library` : "Hub Library"}
+      />
 
       {/* Communication Palette Modals */}
       <CommunicationModals />

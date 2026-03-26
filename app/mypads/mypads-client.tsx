@@ -75,7 +75,7 @@ export function MyPadsClient({ initialPads }: Readonly<MyPadsClientProps>) {
           <BreadcrumbNav
             items={[              
               { label: "Dashboard", href: "/dashboard" },
-              { label: "Paks-Hub", href: "/paks" },
+              { label: "Alliance Hub", href: "/paks" },
               { label: "My Pads", href: "/mypads", current: true },
             ]}
           />
@@ -104,7 +104,7 @@ export function MyPadsClient({ initialPads }: Readonly<MyPadsClientProps>) {
         <BreadcrumbNav
           items={[
             { label: "Dashboard", href: "/dashboard" },
-            { label: "Paks-Hub", href: "/paks" },
+            { label: "Alliance Hub", href: "/paks" },
             { label: "My Pads", href: "/mypads", current: true },
           ]}
         />

@@ -136,7 +136,7 @@ export function MySticksClient({ initialSticks }: MySticksClientProps) {
           <BreadcrumbNav
             items={[
               { label: "Dashboard", href: "/dashboard" },
-              { label: "Paks-Hub", href: "/paks" },
+              { label: "Alliance Hub", href: "/paks" },
               { label: "My Sticks", href: "/mysticks", current: true },
             ]}
           />
@@ -165,7 +165,7 @@ export function MySticksClient({ initialSticks }: MySticksClientProps) {
         <BreadcrumbNav
           items={[
             { label: "Dashboard", href: "/dashboard" },
-            { label: "Paks-Hub", href: "/paks" },
+            { label: "Alliance Hub", href: "/paks" },
             { label: "My Sticks", href: "/mysticks", current: true },
           ]}
         />

@@ -52,7 +52,7 @@ const DEBOUNCE_DELAY_MS = 300
 
 const BREADCRUMB_ITEMS = [
   { label: "Dashboard", href: "/dashboard" },
-  { label: "Paks-Hub", href: "/paks" },
+  { label: "Alliance Hub", href: "/paks" },
   { label: "QuickSticks", current: true },
 ]
 

@@ -92,7 +92,7 @@ export default function IntakeFormsClient() {
         <div className="container mx-auto px-4 py-3">
           <BreadcrumbNav
             items={[
-              { label: "Paks-Hub", href: "/paks" },
+              { label: "Alliance Hub", href: "/paks" },
               { label: "CalSticks", href: "/calsticks" },
               { label: "Intake Forms", current: true },
             ]}

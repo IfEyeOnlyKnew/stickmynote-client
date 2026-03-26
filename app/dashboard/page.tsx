@@ -107,6 +107,18 @@ export default function DashboardPage() {
           </div>
         </div>
 
+        {/* Replacement Statement */}
+        <div className="text-center mb-6">
+          <p className="text-sm text-gray-500 leading-relaxed">
+            <span className="font-medium text-yellow-700">Your Stick</span> replaces Engage &middot;{" "}
+            <span className="font-medium text-blue-700">Your Stick</span> replaces OneNote &middot;{" "}
+            <span className="font-medium text-purple-700">Your Stick</span> replaces MS Teams
+          </p>
+          <p className="text-sm font-medium text-gray-600 mt-1">
+            Your Stick is the source of truth.
+          </p>
+        </div>
+
         {/* Main Choice Cards */}
         <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
           {/* Notes Section */}
