@@ -481,7 +481,13 @@ export function PadPageClient({ pad, sticks, userRole }: Readonly<PadPageClientP
       return
     }
 
-    // Default: open the stick in fullscreen (e.g. CalSticks)
+    // CalSticks: open in a new window filtered to this stick
+    if (nodeId === "calsticks") {
+      window.open(`/calsticks?stickId=${stickId}`, "_blank")
+      return
+    }
+
+    // Default: open the stick in fullscreen
     const stick = localSticks.find((s) => s.id === stickId)
     if (stick) {
       setSelectedStick(stick)
