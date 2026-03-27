@@ -281,7 +281,7 @@ export function LibraryPanel({ stickId, stickType, className }: Readonly<Library
       {!loading && filteredFiles.length > 0 && (
         <div className="space-y-1.5">
           {filteredFiles.map((file) => (
-            <Card key={file.id} className="hover:shadow-sm transition-shadow">
+            <Card key={file.id} className="hover:shadow-sm transition-shadow cursor-pointer" onClick={() => window.open(file.file_url, "_blank")}>
               <CardContent className="p-2.5">
                 <div className="flex items-center gap-2.5">
                   <div className="flex-shrink-0 w-9 h-9 rounded-lg bg-gray-50 flex items-center justify-center">
@@ -289,7 +289,7 @@ export function LibraryPanel({ stickId, stickType, className }: Readonly<Library
                   </div>
 
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium truncate" title={file.original_filename}>
+                    <p className="text-sm font-medium truncate text-blue-600 hover:text-blue-800" title={`Click to open ${file.original_filename}`}>
                       {file.original_filename}
                     </p>
                     <div className="flex items-center gap-2 mt-0.5">
@@ -303,7 +303,7 @@ export function LibraryPanel({ stickId, stickType, className }: Readonly<Library
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-0.5 flex-shrink-0">
+                  <div className="flex items-center gap-0.5 flex-shrink-0" onClick={(e) => e.stopPropagation()}>
                     <Button
                       variant="ghost"
                       size="sm"
