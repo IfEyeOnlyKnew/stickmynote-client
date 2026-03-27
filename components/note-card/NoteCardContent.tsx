@@ -50,6 +50,7 @@ export const NoteCardContent: React.FC<NoteCardContentProps> = ({
         onNoteInteraction?.(noteId)
       }}
       showMedia={false}
+      stickType="personal"
     />
   )
 }

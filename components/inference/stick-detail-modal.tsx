@@ -969,6 +969,7 @@ export function StickDetailModal({ open, onOpenChange, stickId, onUpdate }: Stic
                           isEditing={isEditing}
                           onCancel={handleCancel}
                           onStick={handleStick}
+                          stickType="inference"
                         />
                         <div className="mt-4 pt-4 border-t flex items-center gap-4 text-sm text-gray-500">
                           <div className="flex items-center gap-1">

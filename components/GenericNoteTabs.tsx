@@ -3,7 +3,7 @@ import { useState, useEffect, useMemo } from "react"
 import dynamic from "next/dynamic"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Badge } from "@/components/ui/badge"
-import { Play, ImageIcon, FileText } from "lucide-react"
+import { Play, ImageIcon, FileText, FolderOpen } from "lucide-react"
 import type { VideoItem, ImageItem } from "@/types/note"
 import type { NoteTabsConfig } from "@/types/note-tabs-config"
 
@@ -14,6 +14,7 @@ import { useFileUpload } from "@/hooks/use-file-upload"
 import { NoteContentEditor } from "@/components/note-tabs/NoteContentEditor"
 import { VideoTabContent } from "@/components/note-tabs/VideoTabContent"
 import { ImageTabContent } from "@/components/note-tabs/ImageTabContent"
+import { LibraryPanel } from "@/components/library/LibraryPanel"
 
 // DetailsTabContent uses Tiptap which requires client-side only rendering
 const DetailsTabContent = dynamic(
@@ -40,6 +41,7 @@ interface GenericNoteTabsProps {
   onCancel?: () => void
   onStick?: () => void
   isSaving?: boolean
+  stickType?: "personal" | "concur" | "alliance" | "inference"
 }
 
 export function GenericNoteTabs({
@@ -61,6 +63,7 @@ export function GenericNoteTabs({
   onCancel,
   onStick,
   isSaving,
+  stickType,
 }: Readonly<GenericNoteTabsProps>) {
   const [activeTab, setActiveTab] = useState("main")
   const [topic, setTopic] = useState(initialTopic)
@@ -175,6 +178,16 @@ export function GenericNoteTabs({
             <FileText className="h-4 w-4 flex-shrink-0" />
             <span className="hidden sm:inline truncate">Details</span>
           </TabsTrigger>
+
+          {stickType && (
+            <TabsTrigger
+              value="files"
+              className="flex-1 flex items-center justify-center gap-1 sm:gap-2 px-1 sm:px-3 min-w-0 data-[state=inactive]:border-2 data-[state=inactive]:border-gray-400 data-[state=inactive]:bg-white data-[state=inactive]:shadow-sm"
+            >
+              <FolderOpen className="h-4 w-4 flex-shrink-0" />
+              <span className="hidden sm:inline truncate">Files</span>
+            </TabsTrigger>
+          )}
         </TabsList>
 
         <TabsContent value="main" className="space-y-4 !w-full !min-w-0 !max-w-full !overflow-hidden">
@@ -238,6 +251,12 @@ export function GenericNoteTabs({
             onRefreshTabs={refreshTabs}
           />
         </TabsContent>
+
+        {stickType && (
+          <TabsContent value="files" className="space-y-4 !w-full !min-w-0 !max-w-full !overflow-hidden">
+            <LibraryPanel stickId={noteId} stickType={stickType} />
+          </TabsContent>
+        )}
       </Tabs>
     </div>
   )

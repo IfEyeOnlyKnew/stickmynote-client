@@ -20,6 +20,7 @@ interface InferenceStickTabsProps {
   isEditing?: boolean
   onCancel?: () => void
   onStick?: () => void
+  stickType?: "personal" | "concur" | "alliance" | "inference"
 }
 
 const inferenceStickTabsConfig: NoteTabsConfig = {

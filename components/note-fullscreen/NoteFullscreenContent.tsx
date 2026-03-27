@@ -64,6 +64,7 @@ export const NoteFullscreenContent: React.FC<NoteFullscreenContentProps> = ({
       onCancel={onCancel}
       onStick={onStick}
       isSaving={isSaving}
+      stickType="personal"
     />
   )
 }

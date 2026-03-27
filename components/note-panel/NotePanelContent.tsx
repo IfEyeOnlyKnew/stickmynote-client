@@ -50,6 +50,7 @@ export const NotePanelContent: React.FC<NotePanelContentProps> = ({
         onNoteInteraction?.(note.id)
       }}
       showMedia={false} // No media in panel mode
+      stickType="personal"
     />
   )
 }

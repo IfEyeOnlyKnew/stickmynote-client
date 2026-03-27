@@ -24,6 +24,7 @@ interface NoteTabsProps {
   onCancel?: () => void
   onStick?: () => void
   isSaving?: boolean
+  stickType?: "personal" | "concur" | "alliance" | "inference"
 }
 
 const noteTabsConfig: NoteTabsConfig = {
