@@ -254,7 +254,7 @@ export function GenericNoteTabs({
 
         {stickType && (
           <TabsContent value="files" className="space-y-4 !w-full !min-w-0 !max-w-full !overflow-hidden">
-            <LibraryPanel stickId={noteId} stickType={stickType} />
+            <LibraryPanel stickId={noteId} stickType={stickType} readOnly={readOnly} />
           </TabsContent>
         )}
       </Tabs>

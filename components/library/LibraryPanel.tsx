@@ -42,6 +42,7 @@ interface LibraryFile {
 interface LibraryPanelProps {
   stickId: string
   stickType: StickType
+  readOnly?: boolean
   className?: string
 }
 
@@ -82,7 +83,7 @@ function getExtension(filename: string): string {
   return filename.split(".").pop()?.toUpperCase() || "FILE"
 }
 
-export function LibraryPanel({ stickId, stickType, className }: Readonly<LibraryPanelProps>) {
+export function LibraryPanel({ stickId, stickType, readOnly, className }: Readonly<LibraryPanelProps>) {
   const [files, setFiles] = useState<LibraryFile[]>([])
   const [permissions, setPermissions] = useState<string[]>([])
   const [role, setRole] = useState<string>("")
@@ -91,9 +92,9 @@ export function LibraryPanel({ stickId, stickType, className }: Readonly<Library
   const [searchQuery, setSearchQuery] = useState("")
   const fileInputRef = useRef<HTMLInputElement>(null)
 
-  const canUpload = permissions.includes("upload")
-  const canDeleteAny = permissions.includes("delete_any")
-  const canDeleteOwn = permissions.includes("delete_own")
+  const canUpload = !readOnly && permissions.includes("upload")
+  const canDeleteAny = !readOnly && permissions.includes("delete_any")
+  const canDeleteOwn = !readOnly && permissions.includes("delete_own")
 
   const fetchFiles = useCallback(async () => {
     try {

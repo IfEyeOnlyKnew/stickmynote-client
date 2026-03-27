@@ -294,7 +294,7 @@ export function GenericStickTabs({
 
         {stickType && (
           <TabsContent value="files" className="space-y-4 !w-full !min-w-0 !max-w-full !overflow-hidden">
-            <LibraryPanel stickId={stickId} stickType={stickType} />
+            <LibraryPanel stickId={stickId} stickType={stickType} readOnly={readOnly} />
           </TabsContent>
         )}
       </Tabs>
