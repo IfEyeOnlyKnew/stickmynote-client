@@ -69,8 +69,19 @@ export function GenericNoteTabs({
   const [topic, setTopic] = useState(initialTopic)
   const [content, setContent] = useState(initialContent)
   const [details, setDetails] = useState(initialDetails)
+  const [fileCount, setFileCount] = useState(0)
 
   const { noteTabs, setNoteTabs, loading, refreshTabs } = useNoteTabs(noteId, resetKey, config)
+
+  // Fetch file count for the Files tab badge
+  useEffect(() => {
+    if (!stickType) return
+    const params = new URLSearchParams({ stickId: noteId, stickType })
+    fetch(`/api/library?${params}`)
+      .then((res) => res.ok ? res.json() : null)
+      .then((data) => { if (data?.files) setFileCount(data.files.length) })
+      .catch(() => {})
+  }, [noteId, stickType])
 
   const videoManagement = useVideoManagement(noteId, config, setNoteTabs, onTabChange)
   const imageManagement = useImageManagement(noteId, config, setNoteTabs, onTabChange)
@@ -186,6 +197,7 @@ export function GenericNoteTabs({
             >
               <FolderOpen className="h-4 w-4 flex-shrink-0" />
               <span className="hidden sm:inline truncate">Files</span>
+              {fileCount > 0 && <Badge variant="secondary" className="hidden sm:flex">{fileCount}</Badge>}
             </TabsTrigger>
           )}
         </TabsList>

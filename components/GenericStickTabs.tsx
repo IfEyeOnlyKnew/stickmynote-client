@@ -2,6 +2,7 @@
 import { useState, useEffect, useMemo } from "react"
 import dynamic from "next/dynamic"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Badge } from "@/components/ui/badge"
 import { Play, ImageIcon, FileText, FolderOpen } from "lucide-react"
 import type { VideoItem, ImageItem } from "@/types/pad"
 import type { StickTabsConfig } from "@/types/stick-tabs-config"
@@ -80,8 +81,19 @@ export function GenericStickTabs({
   const [topic, setTopic] = useState(initialTopic)
   const [content, setContent] = useState(initialContent)
   const [details, setDetails] = useState(initialDetails)
+  const [fileCount, setFileCount] = useState(0)
 
   const { stickTabs, setStickTabs, loading, refreshTabs } = useStickTabs(stickId, resetKey, config)
+
+  // Fetch file count for the Files tab badge
+  useEffect(() => {
+    if (!stickType) return
+    const params = new URLSearchParams({ stickId, stickType })
+    fetch(`/api/library?${params}`)
+      .then((res) => res.ok ? res.json() : null)
+      .then((data) => { if (data?.files) setFileCount(data.files.length) })
+      .catch(() => {})
+  }, [stickId, stickType])
 
   const videoManagement = useStickVideoManagement(stickId, config, setStickTabs, onTabChange)
   const imageManagement = useStickImageManagement(stickId, config, setStickTabs, onTabChange)
@@ -217,6 +229,7 @@ export function GenericStickTabs({
             >
               <FolderOpen className="h-4 w-4 flex-shrink-0" />
               <span className="hidden sm:inline truncate">Files</span>
+              {fileCount > 0 && <Badge variant="secondary" className="hidden sm:flex">{fileCount}</Badge>}
             </TabsTrigger>
           )}
         </TabsList>
