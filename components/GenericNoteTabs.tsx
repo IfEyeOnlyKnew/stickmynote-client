@@ -73,16 +73,6 @@ export function GenericNoteTabs({
 
   const { noteTabs, setNoteTabs, loading, refreshTabs } = useNoteTabs(noteId, resetKey, config)
 
-  // Fetch file count for the Files tab badge
-  useEffect(() => {
-    if (!stickType) return
-    const params = new URLSearchParams({ stickId: noteId, stickType })
-    fetch(`/api/library?${params}`)
-      .then((res) => res.ok ? res.json() : null)
-      .then((data) => { if (data?.files) setFileCount(data.files.length) })
-      .catch(() => {})
-  }, [noteId, stickType])
-
   const videoManagement = useVideoManagement(noteId, config, setNoteTabs, onTabChange)
   const imageManagement = useImageManagement(noteId, config, setNoteTabs, onTabChange)
   const fileUpload = useFileUpload(noteId, config, setNoteTabs, onTabChange)
@@ -266,7 +256,7 @@ export function GenericNoteTabs({
 
         {stickType && (
           <TabsContent value="files" className="space-y-4 !w-full !min-w-0 !max-w-full !overflow-hidden">
-            <LibraryPanel stickId={noteId} stickType={stickType} readOnly={readOnly} />
+            <LibraryPanel stickId={noteId} stickType={stickType} readOnly={readOnly} onFileCountChange={setFileCount} />
           </TabsContent>
         )}
       </Tabs>

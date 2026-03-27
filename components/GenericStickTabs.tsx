@@ -85,16 +85,6 @@ export function GenericStickTabs({
 
   const { stickTabs, setStickTabs, loading, refreshTabs } = useStickTabs(stickId, resetKey, config)
 
-  // Fetch file count for the Files tab badge
-  useEffect(() => {
-    if (!stickType) return
-    const params = new URLSearchParams({ stickId, stickType })
-    fetch(`/api/library?${params}`)
-      .then((res) => res.ok ? res.json() : null)
-      .then((data) => { if (data?.files) setFileCount(data.files.length) })
-      .catch(() => {})
-  }, [stickId, stickType])
-
   const videoManagement = useStickVideoManagement(stickId, config, setStickTabs, onTabChange)
   const imageManagement = useStickImageManagement(stickId, config, setStickTabs, onTabChange)
   const fileUpload = useStickFileUpload(stickId, config, setStickTabs, onTabChange)
@@ -307,7 +297,7 @@ export function GenericStickTabs({
 
         {stickType && (
           <TabsContent value="files" className="space-y-4 !w-full !min-w-0 !max-w-full !overflow-hidden">
-            <LibraryPanel stickId={stickId} stickType={stickType} readOnly={readOnly} />
+            <LibraryPanel stickId={stickId} stickType={stickType} readOnly={readOnly} onFileCountChange={setFileCount} />
           </TabsContent>
         )}
       </Tabs>

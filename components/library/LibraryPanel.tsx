@@ -44,6 +44,7 @@ interface LibraryPanelProps {
   stickType: StickType
   readOnly?: boolean
   className?: string
+  onFileCountChange?: (count: number) => void
 }
 
 function formatFileSize(bytes: number): string {
@@ -83,7 +84,7 @@ function getExtension(filename: string): string {
   return filename.split(".").pop()?.toUpperCase() || "FILE"
 }
 
-export function LibraryPanel({ stickId, stickType, readOnly, className }: Readonly<LibraryPanelProps>) {
+export function LibraryPanel({ stickId, stickType, readOnly, className, onFileCountChange }: Readonly<LibraryPanelProps>) {
   const [files, setFiles] = useState<LibraryFile[]>([])
   const [permissions, setPermissions] = useState<string[]>([])
   const [role, setRole] = useState<string>("")
@@ -102,9 +103,11 @@ export function LibraryPanel({ stickId, stickType, readOnly, className }: Readon
       const res = await fetch(`/api/library?${params}`)
       if (!res.ok) throw new Error("Failed to fetch")
       const data = await res.json()
-      setFiles(data.files || [])
+      const fileList = data.files || []
+      setFiles(fileList)
       setPermissions(data.permissions || [])
       setRole(data.role || "")
+      onFileCountChange?.(fileList.length)
     } catch (error) {
       console.error("Failed to fetch library:", error)
     } finally {
@@ -163,7 +166,11 @@ export function LibraryPanel({ stickId, stickType, readOnly, className }: Readon
         return
       }
       toast.success("File deleted")
-      setFiles((prev) => prev.filter((f) => f.id !== fileId))
+      setFiles((prev) => {
+        const updated = prev.filter((f) => f.id !== fileId)
+        onFileCountChange?.(updated.length)
+        return updated
+      })
     } catch {
       toast.error("Failed to delete file")
     }
