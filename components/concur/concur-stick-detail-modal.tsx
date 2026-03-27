@@ -358,6 +358,7 @@ export function ConcurStickDetailModal({
               onCancelContent={handleCancelEdit}
               onStickTopic={handleSaveStick}
               onStickContent={handleSaveStick}
+              stickType="concur"
             />
           </div>
 

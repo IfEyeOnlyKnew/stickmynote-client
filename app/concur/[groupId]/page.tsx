@@ -16,7 +16,6 @@ import {
   Settings,
   Eye,
   TrendingUp,
-  HardDrive,
 } from "lucide-react"
 import { formatDistanceToNow } from "date-fns"
 import { ConcurStickDetailModal } from "@/components/concur/concur-stick-detail-modal"
@@ -24,8 +23,6 @@ import { ConcurGroupStatsDialog } from "@/components/concur/concur-group-stats-d
 import { CreateConcurStickDialog } from "@/components/concur/create-concur-stick-dialog"
 import { ConcurMembersDialog } from "@/components/concur/concur-members-dialog"
 import { ConcurGroupSettingsDialog } from "@/components/concur/concur-group-settings-dialog"
-import { LibraryDialog } from "@/components/library/LibraryDialog"
-import { useUser } from "@/contexts/user-context"
 
 interface ConcurGroup {
   id: string
@@ -70,9 +67,6 @@ export default function ConcurGroupPage() {
   const [showMembersDialog, setShowMembersDialog] = useState(false)
   const [showStatsDialog, setShowStatsDialog] = useState(false)
   const [showSettingsDialog, setShowSettingsDialog] = useState(false)
-  const [showLibraryDialog, setShowLibraryDialog] = useState(false)
-
-  const { user } = useUser()
   const isOwner = group?.user_role === "owner"
 
   const fetchGroup = useCallback(async () => {
@@ -205,15 +199,6 @@ export default function ConcurGroupPage() {
                   </Button>
                 </>
               )}
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setShowLibraryDialog(true)}
-                className="gap-1"
-              >
-                <HardDrive className="h-4 w-4" />
-                <span className="hidden sm:inline">Library</span>
-              </Button>
               <Button
                 size="sm"
                 onClick={() => setShowCreateDialog(true)}
@@ -358,16 +343,6 @@ export default function ConcurGroupPage() {
         />
       )}
 
-      {/* Library Dialog - Personal OneDrive-style library */}
-      {user && (
-        <LibraryDialog
-          open={showLibraryDialog}
-          onOpenChange={setShowLibraryDialog}
-          scopeType="concur_user"
-          scopeId={user.id}
-          title="My Library"
-        />
-      )}
     </div>
   )
 }

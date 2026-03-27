@@ -43,6 +43,7 @@ interface PermissionBasedStickFullscreenProps {
   onClose: () => void
   onUpdate?: (stick: Stick) => void
   onDelete?: (stickId: string) => void
+  stickType?: "personal" | "concur" | "alliance" | "inference"
 }
 
 interface Tone {
@@ -56,6 +57,7 @@ export function PermissionBasedStickFullscreen({
   onClose,
   onUpdate,
   onDelete,
+  stickType,
 }: PermissionBasedStickFullscreenProps) {
   const [editedStick, setEditedStick] = useState<ExtendedStick>({
     ...stick,
@@ -739,6 +741,7 @@ export function PermissionBasedStickFullscreen({
               isGeneratingTags={isGeneratingTags}
               onSummarizeLinks={handleSummarizeLinks}
               isSummarizingLinks={isSummarizingLinks}
+              stickType={stickType}
             />
 
             {renderMetadata()}

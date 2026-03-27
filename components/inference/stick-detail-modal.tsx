@@ -5,7 +5,7 @@ import { useUser } from "@/contexts/user-context"
 import { Dialog, DialogContent, DialogTitle, DialogDescription } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { User, Calendar, Filter, MessageSquare, BookOpen, LinkIcon, Trash2, LayoutList, Clock, ChevronLeft, ChevronRight, Lightbulb, Play, CheckCircle2 } from "lucide-react"
+import { User, Calendar, Filter, MessageSquare, BookOpen, LinkIcon, Trash2, LayoutList, Clock, ChevronLeft, ChevronRight, Lightbulb, Play, CheckCircle2, FolderOpen } from "lucide-react"
 import { formatDistanceToNow } from "date-fns"
 import { ReplyModal, REPLY_CATEGORIES } from "@/components/inference/reply-modal"
 import { Badge } from "@/components/ui/badge"
@@ -29,6 +29,7 @@ import { AddCitationModal } from "@/components/inference/add-citation-modal"
 import { StickSummaryCard } from "@/components/inference/stick-summary-card"
 import { RelatedKBArticles } from "@/components/inference/related-kb-articles"
 import { FollowButton } from "@/components/inference/follow-button"
+import { LibraryDialog } from "@/components/library/LibraryDialog"
 import { toast } from "sonner"
 import { WORKFLOW_STATUSES, WORKFLOW_ORDER, type WorkflowStatus } from "@/types/inference-workflow"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
@@ -112,6 +113,7 @@ export function StickDetailModal({ open, onOpenChange, stickId, onUpdate }: Stic
 
   const [showKBDrawer, setShowKBDrawer] = useState(false)
   const [showCitationModal, setShowCitationModal] = useState(false)
+  const [showFilesDialog, setShowFilesDialog] = useState(false)
   const [citations, setCitations] = useState<any[]>([])
   const [padId, setPadId] = useState<string>("")
 
@@ -922,6 +924,16 @@ export function StickDetailModal({ open, onOpenChange, stickId, onUpdate }: Stic
                               <MessageSquare className="h-4 w-4 sm:mr-2" />
                               <span className="hidden sm:inline">Reply</span>
                             </Button>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => setShowFilesDialog(true)}
+                              title="View files"
+                              className="flex-1 sm:flex-none"
+                            >
+                              <FolderOpen className="h-4 w-4 sm:mr-2" />
+                              <span className="hidden sm:inline">Files</span>
+                            </Button>
                           </div>
                         </div>
                       </CardHeader>
@@ -1379,6 +1391,13 @@ export function StickDetailModal({ open, onOpenChange, stickId, onUpdate }: Stic
               fetchCitations()
               setShowCitationModal(false)
             }}
+          />
+          <LibraryDialog
+            open={showFilesDialog}
+            onOpenChange={setShowFilesDialog}
+            stickId={stickId}
+            stickType="inference"
+            title={`${stick?.topic || "Stick"} — Files`}
           />
         </>
       )}

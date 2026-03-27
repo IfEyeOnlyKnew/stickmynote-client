@@ -1,213 +1,194 @@
 import { db } from "@/lib/database/pg-client"
 
-export type LibraryScopeType = "concur_user" | "alliance_pad" | "inference_pad"
+export type LibraryScopeType = "stick"
+
+export type StickType = "personal" | "concur" | "alliance" | "inference"
 
 export type LibraryPermission = "view" | "upload" | "delete_own" | "delete_any" | "manage"
 
 interface PermissionResult {
   allowed: boolean
   permissions: LibraryPermission[]
-  role?: string
+  role: "owner" | "viewer" | "none"
 }
 
+const OWNER_PERMISSIONS: LibraryPermission[] = ["view", "upload", "delete_own", "delete_any", "manage"]
+const VIEWER_PERMISSIONS: LibraryPermission[] = ["view"]
+
 /**
- * Check what library permissions a user has for a given scope.
- * Permissions inherit from the parent resource's role system.
+ * Check library permissions for a stick's folder.
+ * Simple model: Owner = full Edit, everyone else with access = Read-only.
  */
-export async function checkLibraryPermissions(
+export async function checkStickLibraryPermissions(
   userId: string,
   orgId: string,
-  scopeType: LibraryScopeType,
-  scopeId: string,
+  stickId: string,
+  stickType: StickType,
 ): Promise<PermissionResult> {
-  switch (scopeType) {
-    case "concur_user":
-      return checkConcurPermissions(userId, orgId, scopeId)
-    case "alliance_pad":
-      return checkAlliancePadPermissions(userId, orgId, scopeId)
-    case "inference_pad":
-      return checkInferencePadPermissions(userId, orgId, scopeId)
+  switch (stickType) {
+    case "personal":
+      return checkPersonalStickPermissions(userId, orgId, stickId)
+    case "concur":
+      return checkConcurStickPermissions(userId, orgId, stickId)
+    case "alliance":
+      return checkAllianceStickPermissions(userId, orgId, stickId)
+    case "inference":
+      return checkInferenceStickPermissions(userId, orgId, stickId)
     default:
-      return { allowed: false, permissions: [] }
+      return { allowed: false, permissions: [], role: "none" }
   }
 }
 
 /**
- * Concur: Personal library (OneDrive-style)
- * - Owner (scopeId === userId): full control
- * - Same org member who shares a Concur group with the owner: view + download only
+ * Personal sticks: Owner = Edit, shared users = Read-only
  */
-async function checkConcurPermissions(
+async function checkPersonalStickPermissions(
   userId: string,
   orgId: string,
-  scopeId: string, // the library owner's user_id
+  stickId: string,
 ): Promise<PermissionResult> {
-  // User owns this library
-  if (userId === scopeId) {
-    return {
-      allowed: true,
-      permissions: ["view", "upload", "delete_own", "delete_any", "manage"],
-      role: "owner",
-    }
-  }
-
-  // Check if users share a Concur group in the same org
-  const sharedGroup = await db.query(
-    `SELECT 1 FROM concur_group_members gm1
-     JOIN concur_group_members gm2 ON gm1.group_id = gm2.group_id
-     WHERE gm1.user_id = $1 AND gm2.user_id = $2
-       AND gm1.org_id = $3 AND gm1.accepted = true AND gm2.accepted = true
-     LIMIT 1`,
-    [userId, scopeId, orgId],
+  const stick = await db.query(
+    `SELECT user_id, is_shared FROM personal_sticks WHERE id = $1`,
+    [stickId],
   )
 
-  if (sharedGroup.rows.length > 0) {
-    return {
-      allowed: true,
-      permissions: ["view"],
-      role: "viewer",
+  if (stick.rows.length === 0) return { allowed: false, permissions: [], role: "none" }
+
+  // Owner gets full Edit
+  if (stick.rows[0].user_id === userId) {
+    return { allowed: true, permissions: OWNER_PERMISSIONS, role: "owner" }
+  }
+
+  // Shared users get Read-only
+  if (stick.rows[0].is_shared) {
+    const share = await db.query(
+      `SELECT 1 FROM personal_sticks_shares WHERE stick_id = $1 AND shared_with_user_id = $2 LIMIT 1`,
+      [stickId, userId],
+    )
+    if (share.rows.length > 0) {
+      return { allowed: true, permissions: VIEWER_PERMISSIONS, role: "viewer" }
     }
   }
 
-  return { allowed: false, permissions: [] }
+  return { allowed: false, permissions: [], role: "none" }
 }
 
 /**
- * Alliance Pad: Pad-level library
- * - Pad owner: full control
- * - Admin: full control
- * - Edit role: view + upload + delete own
- * - View role: view only
+ * Concur sticks: Stick author = Edit, group members = Read-only
  */
-async function checkAlliancePadPermissions(
+async function checkConcurStickPermissions(
   userId: string,
   orgId: string,
-  scopeId: string, // pad_id
+  stickId: string,
 ): Promise<PermissionResult> {
-  // Check pad ownership
-  const pad = await db.query(
-    `SELECT owner_id FROM paks_pads WHERE id = $1 AND org_id = $2`,
-    [scopeId, orgId],
+  const stick = await db.query(
+    `SELECT cs.user_id, cs.group_id FROM concur_sticks cs WHERE cs.id = $1`,
+    [stickId],
   )
 
-  if (pad.rows.length === 0) {
-    return { allowed: false, permissions: [] }
+  if (stick.rows.length === 0) return { allowed: false, permissions: [], role: "none" }
+
+  // Stick author gets full Edit
+  if (stick.rows[0].user_id === userId) {
+    return { allowed: true, permissions: OWNER_PERMISSIONS, role: "owner" }
   }
 
-  if (pad.rows[0].owner_id === userId) {
-    return {
-      allowed: true,
-      permissions: ["view", "upload", "delete_own", "delete_any", "manage"],
-      role: "owner",
-    }
+  // Group owner also gets Edit
+  const groupOwner = await db.query(
+    `SELECT 1 FROM concur_group_members
+     WHERE group_id = $1 AND user_id = $2 AND role = 'owner' AND accepted = true`,
+    [stick.rows[0].group_id, userId],
+  )
+  if (groupOwner.rows.length > 0) {
+    return { allowed: true, permissions: OWNER_PERMISSIONS, role: "owner" }
   }
 
-  // Check multi-pak membership
-  const membership = await db.query(
-    `SELECT mpm.role FROM multi_pak_members mpm
+  // Group members get Read-only
+  const member = await db.query(
+    `SELECT 1 FROM concur_group_members
+     WHERE group_id = $1 AND user_id = $2 AND accepted = true`,
+    [stick.rows[0].group_id, userId],
+  )
+  if (member.rows.length > 0) {
+    return { allowed: true, permissions: VIEWER_PERMISSIONS, role: "viewer" }
+  }
+
+  return { allowed: false, permissions: [], role: "none" }
+}
+
+/**
+ * Alliance sticks: Stick creator or pad owner = Edit, pad members = Read-only
+ */
+async function checkAllianceStickPermissions(
+  userId: string,
+  orgId: string,
+  stickId: string,
+): Promise<PermissionResult> {
+  const stick = await db.query(
+    `SELECT s.user_id, s.pad_id, p.owner_id as pad_owner_id
+     FROM paks_pad_sticks s
+     JOIN paks_pads p ON s.pad_id = p.id
+     WHERE s.id = $1`,
+    [stickId],
+  )
+
+  if (stick.rows.length === 0) return { allowed: false, permissions: [], role: "none" }
+
+  const { user_id, pad_owner_id } = stick.rows[0]
+
+  // Stick creator or pad owner gets Edit
+  if (userId === user_id || userId === pad_owner_id) {
+    return { allowed: true, permissions: OWNER_PERMISSIONS, role: "owner" }
+  }
+
+  // Pad members get Read-only
+  const member = await db.query(
+    `SELECT 1 FROM multi_pak_members mpm
      JOIN paks_pads pp ON pp.multi_pak_id = mpm.multi_pak_id
      WHERE pp.id = $1 AND mpm.user_id = $2`,
-    [scopeId, userId],
+    [stick.rows[0].pad_id, userId],
   )
-
-  if (membership.rows.length > 0) {
-    const role = membership.rows[0].role
-    if (role === "admin") {
-      return {
-        allowed: true,
-        permissions: ["view", "upload", "delete_own", "delete_any", "manage"],
-        role: "admin",
-      }
-    }
-    if (role === "edit") {
-      return {
-        allowed: true,
-        permissions: ["view", "upload", "delete_own"],
-        role: "editor",
-      }
-    }
-    if (role === "view") {
-      return {
-        allowed: true,
-        permissions: ["view"],
-        role: "viewer",
-      }
-    }
+  if (member.rows.length > 0) {
+    return { allowed: true, permissions: VIEWER_PERMISSIONS, role: "viewer" }
   }
 
-  return { allowed: false, permissions: [] }
+  return { allowed: false, permissions: [], role: "none" }
 }
 
 /**
- * Inference Pad: Hub-level library
- * - Pad owner: full control
- * - Admin (admin_level='admin'): full control
- * - Editor: view + upload + delete own
- * - Contributor: view + upload
- * - Viewer: view only
+ * Inference sticks: Stick creator or pad owner = Edit, pad members = Read-only
  */
-async function checkInferencePadPermissions(
+async function checkInferenceStickPermissions(
   userId: string,
   orgId: string,
-  scopeId: string, // social_pad_id
+  stickId: string,
 ): Promise<PermissionResult> {
-  // Check pad ownership
-  const pad = await db.query(
-    `SELECT owner_id FROM social_pads WHERE id = $1 AND org_id = $2`,
-    [scopeId, orgId],
+  const stick = await db.query(
+    `SELECT ss.user_id, ss.social_pad_id, sp.owner_id as pad_owner_id
+     FROM social_sticks ss
+     JOIN social_pads sp ON ss.social_pad_id = sp.id
+     WHERE ss.id = $1`,
+    [stickId],
   )
 
-  if (pad.rows.length === 0) {
-    return { allowed: false, permissions: [] }
+  if (stick.rows.length === 0) return { allowed: false, permissions: [], role: "none" }
+
+  const { user_id, pad_owner_id } = stick.rows[0]
+
+  // Stick creator or pad owner gets Edit
+  if (userId === user_id || userId === pad_owner_id) {
+    return { allowed: true, permissions: OWNER_PERMISSIONS, role: "owner" }
   }
 
-  if (pad.rows[0].owner_id === userId) {
-    return {
-      allowed: true,
-      permissions: ["view", "upload", "delete_own", "delete_any", "manage"],
-      role: "owner",
-    }
-  }
-
-  // Check social_pad_members
-  const membership = await db.query(
-    `SELECT role, admin_level FROM social_pad_members
+  // Pad members get Read-only
+  const member = await db.query(
+    `SELECT 1 FROM social_pad_members
      WHERE social_pad_id = $1 AND user_id = $2 AND accepted = true`,
-    [scopeId, userId],
+    [stick.rows[0].social_pad_id, userId],
   )
-
-  if (membership.rows.length > 0) {
-    const { role, admin_level } = membership.rows[0]
-
-    if (admin_level === "owner" || admin_level === "admin" || role === "admin") {
-      return {
-        allowed: true,
-        permissions: ["view", "upload", "delete_own", "delete_any", "manage"],
-        role: "admin",
-      }
-    }
-    if (role === "editor") {
-      return {
-        allowed: true,
-        permissions: ["view", "upload", "delete_own"],
-        role: "editor",
-      }
-    }
-    if (role === "contributor") {
-      return {
-        allowed: true,
-        permissions: ["view", "upload"],
-        role: "contributor",
-      }
-    }
-    if (role === "viewer") {
-      return {
-        allowed: true,
-        permissions: ["view"],
-        role: "viewer",
-      }
-    }
+  if (member.rows.length > 0) {
+    return { allowed: true, permissions: VIEWER_PERMISSIONS, role: "viewer" }
   }
 
-  return { allowed: false, permissions: [] }
+  return { allowed: false, permissions: [], role: "none" }
 }

@@ -5,7 +5,7 @@ import { useState, useEffect, useCallback } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { Users, Plus, UserPlus, BarChart3, CheckCircle2, Circle, Settings, Sparkles, Network, HardDrive } from "lucide-react"
+import { Users, Plus, UserPlus, BarChart3, CheckCircle2, Circle, Settings, Sparkles, Network } from "lucide-react"
 import { NotedIcon } from "@/components/noted/NotedIcon"
 import { CreateStickModal } from "@/components/create-stick-modal"
 import { BreadcrumbNav } from "@/components/breadcrumb-nav"
@@ -17,7 +17,6 @@ import { ColorPalette } from "@/components/ColorPalette"
 import { StickGanttModal } from "@/components/stick-gantt-modal"
 import { StickMapModal } from "@/components/stick-map-modal"
 import { PadSettingsDialog } from "@/components/pad-settings-dialog"
-import { LibraryDialog } from "@/components/library/LibraryDialog"
 import { PadSummaryModal } from "@/components/ai/PadSummaryModal"
 import type { Pad, Stick } from "@/types/pad"
 import {
@@ -308,7 +307,6 @@ export function PadPageClient({ pad, sticks, userRole }: Readonly<PadPageClientP
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false)
   const [showInviteModal, setShowInviteModal] = useState(false)
   const [showSettingsDialog, setShowSettingsDialog] = useState(false)
-  const [showLibraryDialog, setShowLibraryDialog] = useState(false)
 
   // Stick states
   const [localSticks, setLocalSticks] = useState<Stick[]>(sticks)
@@ -642,10 +640,6 @@ export function PadPageClient({ pad, sticks, userRole }: Readonly<PadPageClientP
                 <Settings className="h-4 w-4" />
               </Button>
             )}
-            <Button variant="outline" size="sm" onClick={() => setShowLibraryDialog(true)} className="gap-1">
-              <HardDrive className="h-4 w-4" />
-              <span className="hidden sm:inline">Library</span>
-            </Button>
             {/* User Menu on mobile - at end of action buttons */}
             <div className="sm:hidden ml-auto">
               <UserMenu hideSettings={true} />
@@ -723,14 +717,6 @@ export function PadPageClient({ pad, sticks, userRole }: Readonly<PadPageClientP
           userRole={userRole}
         />
 
-        <LibraryDialog
-          open={showLibraryDialog}
-          onOpenChange={setShowLibraryDialog}
-          scopeType="alliance_pad"
-          scopeId={pad.id}
-          title={`${pad.name} Library`}
-        />
-
         {selectedStick && isFullscreenOpen && (
           <PermissionBasedStickFullscreen
             stick={selectedStick}
@@ -738,6 +724,7 @@ export function PadPageClient({ pad, sticks, userRole }: Readonly<PadPageClientP
             onClose={handleCloseFullscreen}
             onUpdate={handleUpdateStick}
             onDelete={handleDeleteStick}
+            stickType="alliance"
           />
         )}
       </div>

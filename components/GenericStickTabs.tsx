@@ -2,7 +2,7 @@
 import { useState, useEffect, useMemo } from "react"
 import dynamic from "next/dynamic"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Play, ImageIcon, FileText } from "lucide-react"
+import { Play, ImageIcon, FileText, FolderOpen } from "lucide-react"
 import type { VideoItem, ImageItem } from "@/types/pad"
 import type { StickTabsConfig } from "@/types/stick-tabs-config"
 
@@ -13,6 +13,7 @@ import { useStickFileUpload } from "@/hooks/use-stick-file-upload"
 import { StickContentEditor } from "@/components/stick-tabs/StickContentEditor"
 import { VideoTabContent } from "@/components/note-tabs/VideoTabContent"
 import { ImageTabContent } from "@/components/note-tabs/ImageTabContent"
+import { LibraryPanel } from "@/components/library/LibraryPanel"
 
 // DetailsTabContent uses Tiptap which requires client-side only rendering
 const DetailsTabContent = dynamic(
@@ -45,6 +46,7 @@ interface GenericStickTabsProps {
   isGeneratingTags?: boolean
   onSummarizeLinks?: () => void
   isSummarizingLinks?: boolean
+  stickType?: "personal" | "concur" | "alliance" | "inference"
 }
 
 export function GenericStickTabs({
@@ -72,6 +74,7 @@ export function GenericStickTabs({
   isGeneratingTags,
   onSummarizeLinks,
   isSummarizingLinks,
+  stickType,
 }: Readonly<GenericStickTabsProps>) {
   const [activeTab, setActiveTab] = useState("main")
   const [topic, setTopic] = useState(initialTopic)
@@ -206,6 +209,16 @@ export function GenericStickTabs({
             <FileText className="h-4 w-4 flex-shrink-0" />
             <span className="hidden sm:inline truncate">Details</span>
           </TabsTrigger>
+
+          {stickType && (
+            <TabsTrigger
+              value="files"
+              className="flex-1 flex items-center justify-center gap-1 sm:gap-2 px-1 sm:px-3 min-w-0 data-[state=inactive]:border-2 data-[state=inactive]:border-gray-400 data-[state=inactive]:bg-white data-[state=inactive]:shadow-sm"
+            >
+              <FolderOpen className="h-4 w-4 flex-shrink-0" />
+              <span className="hidden sm:inline truncate">Files</span>
+            </TabsTrigger>
+          )}
         </TabsList>
 
         <TabsContent value="main" className="space-y-4 !w-full !min-w-0 !max-w-full">
@@ -278,6 +291,12 @@ export function GenericStickTabs({
             onRefreshTabs={refreshTabs}
           />
         </TabsContent>
+
+        {stickType && (
+          <TabsContent value="files" className="space-y-4 !w-full !min-w-0 !max-w-full !overflow-hidden">
+            <LibraryPanel stickId={stickId} stickType={stickType} />
+          </TabsContent>
+        )}
       </Tabs>
     </div>
   )

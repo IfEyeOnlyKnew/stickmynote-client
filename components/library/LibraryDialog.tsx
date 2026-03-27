@@ -8,31 +8,24 @@ import {
 } from "@/components/ui/dialog"
 import { LibraryPanel } from "./LibraryPanel"
 
-type LibraryScopeType = "concur_user" | "alliance_pad" | "inference_pad"
+type StickType = "personal" | "concur" | "alliance" | "inference"
 
 interface LibraryDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
-  scopeType: LibraryScopeType
-  scopeId: string
+  stickId: string
+  stickType: StickType
   title?: string
 }
 
-export function LibraryDialog({ open, onOpenChange, scopeType, scopeId, title }: Readonly<LibraryDialogProps>) {
-  const defaultTitle =
-    scopeType === "concur_user"
-      ? "My Library"
-      : scopeType === "alliance_pad"
-        ? "Pad Library"
-        : "Hub Library"
-
+export function LibraryDialog({ open, onOpenChange, stickId, stickType, title }: Readonly<LibraryDialogProps>) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>{title || defaultTitle}</DialogTitle>
+          <DialogTitle>{title || "Files"}</DialogTitle>
         </DialogHeader>
-        <LibraryPanel scopeType={scopeType} scopeId={scopeId} />
+        <LibraryPanel stickId={stickId} stickType={stickType} />
       </DialogContent>
     </Dialog>
   )

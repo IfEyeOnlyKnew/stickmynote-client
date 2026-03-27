@@ -289,6 +289,7 @@ export function MySticksClient({ initialSticks }: MySticksClientProps) {
           onClose={handleCloseFullscreen}
           onUpdate={handleUpdateStick}
           onDelete={handleDeleteStick}
+          stickType="personal"
         />
       )}
 

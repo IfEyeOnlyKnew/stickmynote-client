@@ -15,16 +15,15 @@ import {
   FileAudio,
   Trash2,
   Download,
-  FolderOpen,
   Search,
   Loader2,
-  HardDrive,
+  FolderOpen,
   X,
 } from "lucide-react"
 import { toast } from "sonner"
 import { formatDistanceToNow } from "date-fns"
 
-type LibraryScopeType = "concur_user" | "alliance_pad" | "inference_pad"
+type StickType = "personal" | "concur" | "alliance" | "inference"
 
 interface LibraryFile {
   id: string
@@ -37,20 +36,12 @@ interface LibraryFile {
   uploader_name: string | null
   uploader_avatar: string | null
   description: string | null
-  folder: string | null
   created_at: string
 }
 
-interface LibraryFolder {
-  id: string
-  name: string
-  parent_folder_id: string | null
-}
-
 interface LibraryPanelProps {
-  scopeType: LibraryScopeType
-  scopeId: string
-  title?: string
+  stickId: string
+  stickType: StickType
   className?: string
 }
 
@@ -88,19 +79,16 @@ function getFileExtBadgeColor(mimeType: string): string {
 }
 
 function getExtension(filename: string): string {
-  const ext = filename.split(".").pop()?.toUpperCase() || "FILE"
-  return ext
+  return filename.split(".").pop()?.toUpperCase() || "FILE"
 }
 
-export function LibraryPanel({ scopeType, scopeId, title, className }: Readonly<LibraryPanelProps>) {
+export function LibraryPanel({ stickId, stickType, className }: Readonly<LibraryPanelProps>) {
   const [files, setFiles] = useState<LibraryFile[]>([])
-  const [folders, setFolders] = useState<LibraryFolder[]>([])
   const [permissions, setPermissions] = useState<string[]>([])
   const [role, setRole] = useState<string>("")
   const [loading, setLoading] = useState(true)
   const [uploading, setUploading] = useState(false)
   const [searchQuery, setSearchQuery] = useState("")
-  const [activeFolder, setActiveFolder] = useState<string | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   const canUpload = permissions.includes("upload")
@@ -109,13 +97,11 @@ export function LibraryPanel({ scopeType, scopeId, title, className }: Readonly<
 
   const fetchFiles = useCallback(async () => {
     try {
-      const params = new URLSearchParams({ scopeType, scopeId })
-      if (activeFolder) params.set("folder", activeFolder)
+      const params = new URLSearchParams({ stickId, stickType })
       const res = await fetch(`/api/library?${params}`)
       if (!res.ok) throw new Error("Failed to fetch")
       const data = await res.json()
       setFiles(data.files || [])
-      setFolders(data.folders || [])
       setPermissions(data.permissions || [])
       setRole(data.role || "")
     } catch (error) {
@@ -123,7 +109,7 @@ export function LibraryPanel({ scopeType, scopeId, title, className }: Readonly<
     } finally {
       setLoading(false)
     }
-  }, [scopeType, scopeId, activeFolder])
+  }, [stickId, stickType])
 
   useEffect(() => {
     fetchFiles()
@@ -140,9 +126,8 @@ export function LibraryPanel({ scopeType, scopeId, title, className }: Readonly<
       try {
         const formData = new FormData()
         formData.append("file", file)
-        formData.append("scopeType", scopeType)
-        formData.append("scopeId", scopeId)
-        if (activeFolder) formData.append("folder", activeFolder)
+        formData.append("stickId", stickId)
+        formData.append("stickType", stickType)
 
         const res = await fetch("/api/library", { method: "POST", body: formData })
 
@@ -152,7 +137,7 @@ export function LibraryPanel({ scopeType, scopeId, title, className }: Readonly<
           continue
         }
         successCount++
-      } catch (error) {
+      } catch {
         toast.error(`Failed to upload ${file.name}`)
       }
     }
@@ -163,7 +148,6 @@ export function LibraryPanel({ scopeType, scopeId, title, className }: Readonly<
     }
 
     setUploading(false)
-    // Reset file input
     if (fileInputRef.current) fileInputRef.current.value = ""
   }
 
@@ -193,7 +177,6 @@ export function LibraryPanel({ scopeType, scopeId, title, className }: Readonly<
     document.body.removeChild(a)
   }
 
-  // Filter files by search
   const filteredFiles = searchQuery
     ? files.filter(
         (f) =>
@@ -202,26 +185,22 @@ export function LibraryPanel({ scopeType, scopeId, title, className }: Readonly<
       )
     : files
 
-  const defaultTitle =
-    scopeType === "concur_user"
-      ? "My Library"
-      : scopeType === "alliance_pad"
-        ? "Pad Library"
-        : "Hub Library"
-
   return (
     <div className={className}>
       {/* Header */}
-      <div className="flex items-center justify-between mb-4">
+      <div className="flex items-center justify-between mb-3">
         <div className="flex items-center gap-2">
-          <HardDrive className="h-5 w-5 text-gray-600" />
-          <h3 className="text-lg font-semibold">{title || defaultTitle}</h3>
           <Badge variant="secondary" className="text-xs">
             {files.length} file{files.length !== 1 ? "s" : ""}
           </Badge>
-          {role && (
-            <Badge variant="outline" className="text-xs capitalize">
-              {role}
+          {role === "owner" && (
+            <Badge variant="outline" className="text-xs text-green-700 border-green-300">
+              Owner
+            </Badge>
+          )}
+          {role === "viewer" && (
+            <Badge variant="outline" className="text-xs text-gray-500">
+              Read-only
             </Badge>
           )}
         </div>
@@ -253,19 +232,21 @@ export function LibraryPanel({ scopeType, scopeId, title, className }: Readonly<
       </div>
 
       {/* Search */}
-      {files.length > 0 && (
-        <div className="relative mb-4">
+      {files.length > 3 && (
+        <div className="relative mb-3">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
           <Input
             placeholder="Search files..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-9 h-9"
+            className="pl-9 h-8 text-sm"
           />
           {searchQuery && (
             <button
+              type="button"
               onClick={() => setSearchQuery("")}
               className="absolute right-3 top-1/2 -translate-y-1/2"
+              title="Clear search"
             >
               <X className="h-4 w-4 text-gray-400 hover:text-gray-600" />
             </button>
@@ -273,49 +254,24 @@ export function LibraryPanel({ scopeType, scopeId, title, className }: Readonly<
         </div>
       )}
 
-      {/* Folders */}
-      {folders.length > 0 && (
-        <div className="flex flex-wrap gap-2 mb-4">
-          <Button
-            variant={activeFolder === null ? "default" : "outline"}
-            size="sm"
-            onClick={() => setActiveFolder(null)}
-            className="gap-1 text-xs"
-          >
-            All Files
-          </Button>
-          {folders.map((folder) => (
-            <Button
-              key={folder.id}
-              variant={activeFolder === folder.name ? "default" : "outline"}
-              size="sm"
-              onClick={() => setActiveFolder(folder.name)}
-              className="gap-1 text-xs"
-            >
-              <FolderOpen className="h-3 w-3" />
-              {folder.name}
-            </Button>
-          ))}
-        </div>
-      )}
-
-      {/* Loading state */}
+      {/* Loading */}
       {loading && (
-        <div className="flex items-center justify-center py-12">
+        <div className="flex items-center justify-center py-8">
           <Loader2 className="h-6 w-6 animate-spin text-gray-400" />
         </div>
       )}
 
       {/* Empty state */}
       {!loading && filteredFiles.length === 0 && (
-        <div className="text-center py-12 text-gray-500">
-          <HardDrive className="h-12 w-12 mx-auto mb-3 text-gray-300" />
+        <div className="text-center py-8 text-gray-500">
+          <FolderOpen className="h-10 w-10 mx-auto mb-2 text-gray-300" />
           {searchQuery ? (
-            <p>No files match your search</p>
+            <p className="text-sm">No files match your search</p>
           ) : (
             <>
-              <p className="font-medium mb-1">No files yet</p>
-              {canUpload && <p className="text-sm">Upload files to get started</p>}
+              <p className="text-sm font-medium mb-1">No files yet</p>
+              {canUpload && <p className="text-xs">Upload files to this stick&apos;s folder</p>}
+              {!canUpload && <p className="text-xs">The stick owner can upload files here</p>}
             </>
           )}
         </div>
@@ -323,17 +279,15 @@ export function LibraryPanel({ scopeType, scopeId, title, className }: Readonly<
 
       {/* File list */}
       {!loading && filteredFiles.length > 0 && (
-        <div className="space-y-2">
+        <div className="space-y-1.5">
           {filteredFiles.map((file) => (
             <Card key={file.id} className="hover:shadow-sm transition-shadow">
-              <CardContent className="p-3">
-                <div className="flex items-center gap-3">
-                  {/* File icon */}
-                  <div className="flex-shrink-0 w-10 h-10 rounded-lg bg-gray-50 flex items-center justify-center">
+              <CardContent className="p-2.5">
+                <div className="flex items-center gap-2.5">
+                  <div className="flex-shrink-0 w-9 h-9 rounded-lg bg-gray-50 flex items-center justify-center">
                     {getFileIcon(file.mime_type)}
                   </div>
 
-                  {/* File info */}
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium truncate" title={file.original_filename}>
                       {file.original_filename}
@@ -343,38 +297,31 @@ export function LibraryPanel({ scopeType, scopeId, title, className }: Readonly<
                         {getExtension(file.original_filename)}
                       </Badge>
                       <span className="text-xs text-gray-500">{formatFileSize(file.file_size)}</span>
-                      {file.uploader_name && (
-                        <span className="text-xs text-gray-400">by {file.uploader_name}</span>
-                      )}
                       <span className="text-xs text-gray-400">
                         {formatDistanceToNow(new Date(file.created_at), { addSuffix: true })}
                       </span>
                     </div>
-                    {file.description && (
-                      <p className="text-xs text-gray-500 mt-1 truncate">{file.description}</p>
-                    )}
                   </div>
 
-                  {/* Actions */}
-                  <div className="flex items-center gap-1 flex-shrink-0">
+                  <div className="flex items-center gap-0.5 flex-shrink-0">
                     <Button
                       variant="ghost"
                       size="sm"
                       onClick={() => handleDownload(file)}
-                      className="h-8 w-8 p-0"
+                      className="h-7 w-7 p-0"
                       title="Download"
                     >
-                      <Download className="h-4 w-4" />
+                      <Download className="h-3.5 w-3.5" />
                     </Button>
-                    {(canDeleteAny || (canDeleteOwn && file.uploaded_by === scopeId)) && (
+                    {(canDeleteAny || (canDeleteOwn && file.uploaded_by === stickId)) && (
                       <Button
                         variant="ghost"
                         size="sm"
                         onClick={() => handleDelete(file.id, file.original_filename)}
-                        className="h-8 w-8 p-0 text-red-500 hover:text-red-700 hover:bg-red-50"
+                        className="h-7 w-7 p-0 text-red-500 hover:text-red-700 hover:bg-red-50"
                         title="Delete"
                       >
-                        <Trash2 className="h-4 w-4" />
+                        <Trash2 className="h-3.5 w-3.5" />
                       </Button>
                     )}
                   </div>
