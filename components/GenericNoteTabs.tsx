@@ -73,6 +73,16 @@ export function GenericNoteTabs({
 
   const { noteTabs, setNoteTabs, loading, refreshTabs } = useNoteTabs(noteId, resetKey, config)
 
+  // Fetch file count immediately so badge shows before Files tab is clicked
+  useEffect(() => {
+    if (!stickType) return
+    const params = new URLSearchParams({ stickId: noteId, stickType })
+    fetch(`/api/library?${params}`)
+      .then((res) => res.ok ? res.json() : null)
+      .then((data) => { if (data?.files) setFileCount(data.files.length) })
+      .catch(() => {})
+  }, [noteId, stickType])
+
   const videoManagement = useVideoManagement(noteId, config, setNoteTabs, onTabChange)
   const imageManagement = useImageManagement(noteId, config, setNoteTabs, onTabChange)
   const fileUpload = useFileUpload(noteId, config, setNoteTabs, onTabChange)

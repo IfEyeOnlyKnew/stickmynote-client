@@ -85,6 +85,16 @@ export function GenericStickTabs({
 
   const { stickTabs, setStickTabs, loading, refreshTabs } = useStickTabs(stickId, resetKey, config)
 
+  // Fetch file count immediately so badge shows before Files tab is clicked
+  useEffect(() => {
+    if (!stickType) return
+    const params = new URLSearchParams({ stickId, stickType })
+    fetch(`/api/library?${params}`)
+      .then((res) => res.ok ? res.json() : null)
+      .then((data) => { if (data?.files) setFileCount(data.files.length) })
+      .catch(() => {})
+  }, [stickId, stickType])
+
   const videoManagement = useStickVideoManagement(stickId, config, setStickTabs, onTabChange)
   const imageManagement = useStickImageManagement(stickId, config, setStickTabs, onTabChange)
   const fileUpload = useStickFileUpload(stickId, config, setStickTabs, onTabChange)
