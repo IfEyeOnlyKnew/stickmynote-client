@@ -4,6 +4,7 @@ import { useState, useRef, useEffect } from "react"
 import { Plus, FolderOpen, Folder, Pencil, Trash2, X, Check, ChevronLeft, ChevronRight } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { useIsMobile } from "@/hooks/use-mobile"
 import type { PersonalGroup } from "@/hooks/usePersonalGroups"
 
 const GROUP_COLORS = [
@@ -24,6 +25,8 @@ interface PersonalGroupsSidebarProps {
   onCreateGroup: (name: string, color?: string) => Promise<PersonalGroup | null>
   onRenameGroup: (id: string, name: string) => Promise<void>
   onDeleteGroup: (id: string) => Promise<void>
+  mobileOpen?: boolean
+  onMobileClose?: () => void
 }
 
 export function PersonalGroupsSidebar({
@@ -33,7 +36,10 @@ export function PersonalGroupsSidebar({
   onCreateGroup,
   onRenameGroup,
   onDeleteGroup,
+  mobileOpen,
+  onMobileClose,
 }: PersonalGroupsSidebarProps) {
+  const isMobile = useIsMobile()
   const [isCreating, setIsCreating] = useState(false)
   const [newGroupName, setNewGroupName] = useState("")
   const [newGroupColor, setNewGroupColor] = useState(GROUP_COLORS[0])
@@ -73,6 +79,112 @@ export function PersonalGroupsSidebar({
   const handleDelete = async (id: string) => {
     if (!globalThis.confirm("Delete this group? Sticks in the group will NOT be deleted.")) return
     await onDeleteGroup(id)
+  }
+
+  // Mobile: overlay drawer triggered by parent
+  if (isMobile) {
+    if (!mobileOpen) return null
+    return (
+      <div className="fixed inset-0 z-[9998]">
+        <div className="absolute inset-0 bg-black/40" onClick={onMobileClose} />
+        <div className="absolute top-0 left-0 h-full w-64 bg-white shadow-xl flex flex-col animate-in slide-in-from-left duration-200">
+          <div className="flex items-center justify-between px-3 py-3 border-b border-gray-100">
+            <h3 className="text-sm font-semibold text-gray-700">Groups</h3>
+            <div className="flex items-center gap-1">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setIsCreating(true)}
+                className="h-7 w-7 p-0"
+                title="Create group"
+              >
+                <Plus className="h-3.5 w-3.5" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={onMobileClose}
+                className="h-7 w-7 p-0"
+              >
+                <X className="h-3.5 w-3.5" />
+              </Button>
+            </div>
+          </div>
+          <div className="flex-1 overflow-y-auto py-1">
+            <button
+              type="button"
+              onClick={() => { onSelectGroup(null); onMobileClose?.() }}
+              className={`w-full flex items-center gap-2 px-3 py-2.5 text-sm transition-colors ${
+                selectedGroupId === null
+                  ? "bg-blue-50 text-blue-700 font-medium"
+                  : "text-gray-600 hover:bg-gray-50"
+              }`}
+            >
+              <FolderOpen className="h-4 w-4 flex-shrink-0" />
+              <span className="truncate">All Sticks</span>
+            </button>
+            {groups.map((group) => (
+              <button
+                key={group.id}
+                type="button"
+                onClick={() => { onSelectGroup(selectedGroupId === group.id ? null : group.id); onMobileClose?.() }}
+                className={`w-full flex items-center gap-2 px-3 py-2.5 text-sm transition-colors ${
+                  selectedGroupId === group.id
+                    ? "bg-blue-50 text-blue-700 font-medium"
+                    : "text-gray-600 hover:bg-gray-50"
+                }`}
+              >
+                <div
+                  className="w-4 h-4 rounded flex-shrink-0 flex items-center justify-center"
+                  style={{ backgroundColor: group.color }}
+                >
+                  <Folder className="h-2.5 w-2.5 text-white" />
+                </div>
+                <span className="truncate flex-1 text-left">{group.name}</span>
+                <span className="text-xs text-gray-400 flex-shrink-0">{group.stick_count}</span>
+              </button>
+            ))}
+          </div>
+          {isCreating && (
+            <div className="border-t border-gray-100 p-3 space-y-2">
+              <Input
+                ref={createInputRef}
+                value={newGroupName}
+                onChange={(e) => setNewGroupName(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") handleCreate()
+                  if (e.key === "Escape") setIsCreating(false)
+                }}
+                placeholder="Group name..."
+                className="h-8 text-sm"
+              />
+              <div className="flex items-center gap-1 flex-wrap">
+                {GROUP_COLORS.map((c) => (
+                  <button
+                    key={c}
+                    type="button"
+                    onClick={() => setNewGroupColor(c)}
+                    className={`w-5 h-5 rounded-full transition-transform ${
+                      newGroupColor === c ? "ring-2 ring-offset-1 ring-gray-400 scale-110" : "hover:scale-105"
+                    }`}
+                    style={{ backgroundColor: c }}
+                    title={`Select color ${c}`}
+                  />
+                ))}
+              </div>
+              <div className="flex gap-1">
+                <Button size="sm" onClick={handleCreate} disabled={!newGroupName.trim()} className="flex-1 h-7 text-xs">
+                  Create
+                </Button>
+                <Button variant="ghost" size="sm" onClick={() => { setIsCreating(false); setNewGroupName("") }} className="h-7 text-xs">
+                  Cancel
+                </Button>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    )
   }
 
   if (isCollapsed) {

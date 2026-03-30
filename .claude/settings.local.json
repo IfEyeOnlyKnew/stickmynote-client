@@ -83,7 +83,9 @@
       "Bash(cp -r app/api/cron/cleanup-social-sticks app/api/cron/cleanup-inference-sticks)",
       "Bash(rm -rf app/api/cron/cleanup-social-sticks)",
       "Bash(sed -i 's/social-gradient/inference-gradient/g' app/globals.css)",
-      "Bash(sed -i 's/\\\\r$//' app/globals.css)"
+      "Bash(sed -i 's/\\\\r$//' app/globals.css)",
+      "Bash(mkdir -p \"c:/stick-my-note-dev/stickmynote-client-install/app/api/recognition/kudos/[kudosId]/reactions\")",
+      "Bash(mkdir -p \"c:/stick-my-note-dev/stickmynote-client-install/app/api/recognition/kudos/[kudosId]/comments\")"
     ],
     "additionalDirectories": [
       "C:\\stick-my-note-ubuntu\\stickmynote-client\\scripts",
@@ -93,7 +95,8 @@
       "c:\\stick-my-note-dev\\stickmynote-client-install\\app\\api\\noted\\pages",
       "C:\\stick-my-note-dev\\stickmynote-client-install\\app\\api\\noted\\tags",
       "C:\\stick-my-note-dev\\stickmynote-client-install\\app\\api\\noted\\pages\\[id]",
-      "c:\\stick-my-note-dev\\stickmynote-client-install\\app\\api\\sticks\\[id]"
+      "c:\\stick-my-note-dev\\stickmynote-client-install\\app\\api\\sticks\\[id]",
+      "c:\\stick-my-note-dev\\stickmynote-client-install\\app\\api\\personal-groups\\[id]"
     ]
   }
 }

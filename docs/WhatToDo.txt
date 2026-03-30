@@ -6,7 +6,7 @@
 
 Current State: Comprehensive collaborative note-taking and project management
                platform with 96 database tables, 485+ API routes, real-time
-               collaboration, AI integration, and social features.
+               collaboration, AI integration, and inference features.
 
 Goal: Surpass Microsoft's suite by providing a unified, intelligent, and
       delightful user experience.
@@ -326,7 +326,7 @@ Goal: Surpass Microsoft's suite by providing a unified, intelligent, and
       Updated: 2026-03-14
 
 ================================================================================
-                          CATEGORY 4: SOCIAL & ENGAGEMENT
+                          CATEGORY 4: inference & ENGAGEMENT
 ================================================================================
                             (Compete with Viva Engage)
 --------------------------------------------------------------------------------
@@ -339,7 +339,7 @@ Goal: Surpass Microsoft's suite by providing a unified, intelligent, and
      - Collapsible left sidebar on /panel linking to Shared Sticks + Concur ✓
      - Group list page at /concur with card grid ✓
      - Group detail page at /concur/[groupId] with stick grid ✓
-     - Sticks with threaded replies (social stick pattern) ✓
+     - Sticks with threaded replies (inference stick pattern) ✓
      - Pinned sticks, pin/unpin by group owners ✓
      - Role-based permissions: owners manage, members create sticks/replies ✓
      - WebSocket broadcast for real-time stick/reply creation ✓
@@ -385,7 +385,7 @@ Goal: Surpass Microsoft's suite by providing a unified, intelligent, and
      - Post scheduling
      - Draft posts
      - Post analytics
-     Status: PARTIAL (social sticks exist)
+     Status: PARTIAL (inference sticks exist)
 
 [  ] 4.6 Q&A / ASK ME ANYTHING
      - Q&A sessions (structured)
@@ -759,7 +759,7 @@ Goal: Surpass Microsoft's suite by providing a unified, intelligent, and
      Status: DONE (CDN-ready, see docs/cdn-configuration.md for deployment steps)
 
 [OK] 9.2 INFINITE SCROLL OPTIMIZATION
-     - API pagination: social-sticks (limit/offset/userId), social-notifications (limit/offset/hasMore)
+     - API pagination: inference-sticks (limit/offset/userId), inference-notifications (limit/offset/hasMore)
      - Infinite scroll: my-sticks page (IntersectionObserver + server-side userId filter)
      - Skeleton loaders: my-sticks, my-pads, notifications (page + loading.tsx), activity-feed-list, activity-feed-modal
      - IntersectionObserver auto-scroll: activity-feed-list, activity-feed-modal (replaces Load More buttons)
@@ -769,9 +769,9 @@ Goal: Surpass Microsoft's suite by providing a unified, intelligent, and
      Status: DONE
 
 [OK] 9.3 SEARCH PERFORMANCE
-     - Trigram GIN indexes on social_sticks, social_stick_replies, paks_pad_sticks, social_pads
+     - Trigram GIN indexes on inference_sticks, inference_stick_replies, paks_pad_sticks, inference_pads
      - SQL-level ILIKE text filtering (replaced O(n) JS filtering)
-     - Composite index on (org_id, social_pad_id, created_at DESC)
+     - Composite index on (org_id, inference_pad_id, created_at DESC)
      - In-memory caching with 1-minute TTL + Cache-Control headers
      - SQL-level pagination with exact count (limit/offset, default 20, max 100)
      - Skeleton loaders on search page + route-level loading.tsx
@@ -799,7 +799,7 @@ Goal: Surpass Microsoft's suite by providing a unified, intelligent, and
      - Owner-only /api/admin/db-stats endpoint: pool metrics, slow queries, top queries,
        index usage, unused indexes, sequential scan tables, table sizes, table bloat
      - Index analysis: unused indexes (0 scans), seq-scan-heavy tables, index sizes
-     - Materialized view refresh: social_kb_with_metrics auto-refreshed every 5 minutes
+     - Materialized view refresh: inference_kb_with_metrics auto-refreshed every 5 minutes
      - Read replicas: deferred (infrastructure change, not code)
      Status: DONE (migration 40-enable-pg-stat-statements.sql optional)
 
@@ -823,7 +823,7 @@ Goal: Surpass Microsoft's suite by providing a unified, intelligent, and
       - Recent items ✓
       - Keyboard shortcuts list ✓
       - Quick navigation ✓
-      Status: IMPLEMENTED (components/social/command-palette.tsx)
+      Status: IMPLEMENTED (components/inference/command-palette.tsx)
       Updated: 2026-02-01
       New: Full command palette with navigation, actions, and
            recent pads support. Press Cmd+K to activate.
@@ -855,7 +855,7 @@ Goal: Surpass Microsoft's suite by providing a unified, intelligent, and
       - Customizable shortcuts (partial)
       - Shortcuts cheat sheet ✓
       - Vim mode (power users) - not implemented
-      Status: MOSTLY IMPLEMENTED (components/social/keyboard-shortcuts-help.tsx)
+      Status: MOSTLY IMPLEMENTED (components/inference/keyboard-shortcuts-help.tsx)
       Updated: 2026-02-01
       New: Full keyboard shortcuts help dialog with categorized
            shortcuts. Press ? to view shortcuts list.
@@ -925,7 +925,7 @@ These can be implemented quickly with high impact:
 2. [✓] Presence indicators - DONE (2026-02-01) - Full user status system
 3. [✓] Keyboard shortcuts documentation - DONE (2026-02-01)
 4. [✓] Kanban view for CalSticks - DONE (2026-01-27)
-5. [ ] Poll component in social - 2-3 days
+5. [ ] Poll component in inference - 2-3 days
 6. [ ] 2FA with TOTP - 3-4 days
 7. [ ] PWA manifest + service worker - 2-3 days
 8. [ ] Onboarding tour component - 1 week
@@ -972,7 +972,7 @@ By Category:
 - Real-Time Communication: 7 features
 - Project Management: 10 features
 - Note-Taking & Knowledge: 10 features
-- Social & Engagement: 10 features
+- inference & Engagement: 10 features
 - AI & Intelligence: 7 features
 - Mobile & Accessibility: 5 features
 - Integrations & Ecosystem: 7 features

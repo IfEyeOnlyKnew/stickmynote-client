@@ -29,5 +29,6 @@
         "storymap",
         "timesheets",
         "unarchiving"
-    ]
+    ],
+    "jest.enable": false
 }

@@ -27,7 +27,7 @@
 
 import { useState, useEffect, useMemo, useCallback, useRef } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
-import { Loader2, Plus, Search, Undo2, X, BarChart3, ChevronLeft, FolderPlus, Check } from "lucide-react"
+import { Loader2, Plus, Search, Undo2, X, BarChart3, ChevronLeft, FolderPlus, Check, FolderOpen } from "lucide-react"
 import type { Note } from "@/types/note"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -53,6 +53,7 @@ import {
 } from "@/components/communication"
 import { PersonalGroupsSidebar } from "@/components/personal-groups-sidebar"
 import { usePersonalGroups } from "@/hooks/usePersonalGroups"
+import { useIsMobile } from "@/hooks/use-mobile"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -133,6 +134,8 @@ export function NotesClient({ initialNotes, userId, stats }: Readonly<NotesClien
 
   // Groups hook
   const groupsHook = usePersonalGroups(shouldLoad)
+  const isMobile = useIsMobile()
+  const [mobileGroupsOpen, setMobileGroupsOpen] = useState(false)
 
   // Track loading state when clicking a card
   const [loadingNoteId, setLoadingNoteId] = useState<string | null>(null)
@@ -511,7 +514,7 @@ export function NotesClient({ initialNotes, userId, stats }: Readonly<NotesClien
     <div className="min-h-screen bg-gray-50 relative">
       {/* Header: title, search, filter, creation & navigation actions, user menu */}
       <div className="sticky top-0 z-50 bg-white border-b shadow-sm">
-        <div className="container mx-auto px-4 py-3">
+        <div className="container mx-auto pl-14 pr-4 py-3 md:px-4">
           <BreadcrumbNav
             items={[
               { label: "Dashboard", href: "/dashboard" },
@@ -540,6 +543,19 @@ export function NotesClient({ initialNotes, userId, stats }: Readonly<NotesClien
 
             {/* Right section: Filter, Buttons, and User Menu */}
             <div className="flex items-center gap-2 lg:gap-3 w-full sm:w-auto justify-end">
+              {/* Mobile groups toggle */}
+              {isMobile && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setMobileGroupsOpen(true)}
+                  className="flex items-center gap-1.5 flex-shrink-0"
+                >
+                  <FolderOpen className="h-4 w-4" />
+                  <span className="text-xs">Groups</span>
+                </Button>
+              )}
+
               <Select value={searchFilter} onValueChange={setSearchFilter}>
                 <SelectTrigger className="w-20 md:w-32 lg:w-36 flex-shrink-0">
                   <SelectValue />
@@ -585,10 +601,12 @@ export function NotesClient({ initialNotes, userId, stats }: Readonly<NotesClien
           onCreateGroup={groupsHook.createGroup}
           onRenameGroup={(id, name) => groupsHook.updateGroup(id, { name })}
           onDeleteGroup={groupsHook.deleteGroup}
+          mobileOpen={mobileGroupsOpen}
+          onMobileClose={() => setMobileGroupsOpen(false)}
         />
 
         {/* Notes grid: simple responsive grid with card previews */}
-        <div className="relative flex-1 pt-8 px-4 md:px-6">
+        <div className="relative flex-1 pt-4 md:pt-8 px-2 md:px-6">
           {/* Active group indicator */}
           {groupsHook.selectedGroupId && (
             <div className="flex items-center gap-2 mb-4">
