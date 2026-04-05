@@ -21,4 +21,13 @@ module.exports = {
   setupFiles: [
     '<rootDir>/jest.env-setup.js',
   ],
+  collectCoverageFrom: [
+    'app/**/*.{ts,tsx}',
+    'components/**/*.{ts,tsx}',
+    'lib/**/*.{ts,tsx}',
+    'hooks/**/*.{ts,tsx}',
+    '!**/*.d.ts',
+    '!**/node_modules/**',
+  ],
+  coverageReporters: ['lcov', 'text-summary'],
 };

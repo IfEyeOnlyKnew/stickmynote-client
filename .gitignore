@@ -55,5 +55,8 @@ schema.sql
 # Generated exports (DOCX files)
 /public/exports/
 
+# Test coverage
+/coverage/
+
 # User uploads (stored outside public/ so deploys don't wipe them)
 /uploads/

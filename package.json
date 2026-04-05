@@ -24,6 +24,7 @@
     "start": "node server.js",
     "start:next": "next start",
     "test": "jest",
+    "test:coverage": "jest --coverage",
     "test:build": "npm run type-check && npm run lint && npm run build",
     "test:db": "tsx scripts/test-db-connection.ts",
     "test:rls": "npx tsx tests/rls-unauthorized-access.test.ts",
