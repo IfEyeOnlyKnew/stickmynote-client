@@ -13,7 +13,6 @@ import {
   CheckCircle2,
   ArrowLeft,
 } from "lucide-react"
-import Link from "next/link"
 
 function BackButton() {
   const router = useRouter()
@@ -90,8 +89,8 @@ export default function DownloadPage() {
 
     // Check if already installed as PWA
     const standalone =
-      window.matchMedia("(display-mode: standalone)").matches ||
-      (window.navigator as unknown as { standalone?: boolean }).standalone === true
+      globalThis.matchMedia("(display-mode: standalone)").matches ||
+      (globalThis.navigator as unknown as { standalone?: boolean }).standalone === true
     setIsPWAInstalled(standalone)
 
     // Capture PWA install prompt
@@ -99,8 +98,8 @@ export default function DownloadPage() {
       e.preventDefault()
       setPwaPrompt(e as BeforeInstallPromptEvent)
     }
-    window.addEventListener("beforeinstallprompt", handler)
-    return () => window.removeEventListener("beforeinstallprompt", handler)
+    globalThis.addEventListener("beforeinstallprompt", handler)
+    return () => globalThis.removeEventListener("beforeinstallprompt", handler)
   }, [])
 
   const handlePWAInstall = useCallback(async () => {
@@ -113,7 +112,7 @@ export default function DownloadPage() {
     setPwaPrompt(null)
   }, [pwaPrompt])
 
-  const primaryDownload = detectedPlatform !== "unknown" ? downloads[detectedPlatform] : null
+  const primaryDownload = detectedPlatform === "unknown" ? null : downloads[detectedPlatform]
   const otherDownloads = Object.values(downloads).filter(
     (d) => d.platform !== detectedPlatform,
   )
@@ -156,17 +155,19 @@ export default function DownloadPage() {
           </CardHeader>
           <CardContent>
             <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
-              {isPWAInstalled ? (
+              {isPWAInstalled && (
                 <div className="flex items-center gap-2 text-green-600 dark:text-green-400">
                   <CheckCircle2 className="h-5 w-5" />
                   <span className="font-medium">Already installed</span>
                 </div>
-              ) : pwaPrompt ? (
+              )}
+              {!isPWAInstalled && pwaPrompt && (
                 <Button onClick={handlePWAInstall} size="lg">
                   <Download className="h-4 w-4 mr-2" />
                   Install Now
                 </Button>
-              ) : (
+              )}
+              {!isPWAInstalled && !pwaPrompt && (
                 <div className="space-y-2">
                   <p className="text-sm text-muted-foreground">
                     <strong>Chrome / Edge:</strong> Click the install icon in the address bar, or use the
@@ -255,10 +256,10 @@ export default function DownloadPage() {
 function DesktopDownloadCard({
   info,
   recommended,
-}: {
+}: Readonly<{
   info: DownloadInfo
   recommended?: boolean
-}) {
+}>) {
   const Icon = info.icon
   const downloadUrl = `${GITHUB_RELEASES_BASE}/${info.filename}`
 
