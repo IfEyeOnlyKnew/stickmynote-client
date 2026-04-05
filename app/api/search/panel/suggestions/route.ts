@@ -91,7 +91,7 @@ export async function GET() {
             .map(([tag]) => tag)
 
           // Get all available tags (sorted alphabetically)
-          availableTags = Array.from(tagSet).sort()
+          availableTags = Array.from(tagSet).sort((a, b) => a.localeCompare(b))
         }
       }
     } catch (error) {

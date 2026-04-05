@@ -391,9 +391,7 @@ export const ChatRoomView: React.FC<ChatRoomViewProps> = ({
                     </p>
                   </div>
                   <p
-                    className={`text-xs mt-1 ${
-                      isOwnMessage ? "text-gray-400" : "text-gray-400"
-                    }`}
+                    className="text-xs mt-1 text-gray-400"
                   >
                     {formatMessageTime(msg.created_at)}
                   </p>

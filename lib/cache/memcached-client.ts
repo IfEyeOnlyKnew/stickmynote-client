@@ -169,7 +169,7 @@ class MemcachedCache {
     const pingSuccess = await this.ping()
 
     return {
-      healthy: pingSuccess || this.fallbackMap.size >= 0,
+      healthy: pingSuccess || this.fallbackMap.size > 0,
       message: pingSuccess ? "Memcached connected successfully" : "Memcached unavailable, using in-memory fallback",
       usingFallback: !pingSuccess,
     }

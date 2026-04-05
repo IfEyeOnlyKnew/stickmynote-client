@@ -147,7 +147,7 @@ export const NotePreviewCard: React.FC<NotePreviewCardProps> = ({
                 </PopoverContent>
               </Popover>
             )}
-            <span onClick={(e) => e.stopPropagation()}>
+            <span role="button" tabIndex={0} title="Noted" onClick={(e) => e.stopPropagation()} onKeyDown={(e) => e.stopPropagation()}>
               <NotedIcon
                 stickId={note.id}
                 stickTopic={note.topic || note.title}

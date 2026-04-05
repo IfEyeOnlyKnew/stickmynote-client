@@ -289,7 +289,7 @@ export function LibraryPanel({ stickId, stickType, readOnly, className, onFileCo
       {!loading && filteredFiles.length > 0 && (
         <div className="space-y-1.5">
           {filteredFiles.map((file) => (
-            <Card key={file.id} className="hover:shadow-sm transition-shadow cursor-pointer" onClick={() => window.open(file.file_url, "_blank")}>
+            <Card key={file.id} className="hover:shadow-sm transition-shadow cursor-pointer" role="button" tabIndex={0} onClick={() => window.open(file.file_url, "_blank")} onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); window.open(file.file_url, "_blank") } }}>
               <CardContent className="p-2.5">
                 <div className="flex items-center gap-2.5">
                   <div className="flex-shrink-0 w-9 h-9 rounded-lg bg-gray-50 flex items-center justify-center">

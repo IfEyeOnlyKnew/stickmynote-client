@@ -210,8 +210,8 @@ function checkMilestones(
       // Find the earliest timestamp when the milestone was reached
       const triggerTimestamps = milestone.triggerCategories
         .map((cat) => checklist[cat]?.firstAt)
-        .filter(Boolean)
-        .sort()
+        .filter((t): t is string => Boolean(t))
+        .sort((a, b) => a.localeCompare(b))
 
       if (triggerTimestamps.length > 0) {
         state.reachedAt = triggerTimestamps.at(-1)!

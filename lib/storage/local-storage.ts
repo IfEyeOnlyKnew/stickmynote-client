@@ -100,10 +100,15 @@ class LocalFileStorage {
       await this.ensureDirectory(searchDir)
 
       const files = await fs.readdir(searchDir, { recursive: true })
-      return files.filter((file) => {
+      const results: string[] = []
+      for (const file of files) {
         const filePath = path.join(searchDir, file)
-        return fs.stat(filePath).then((stat) => stat.isFile())
-      })
+        const stat = await fs.stat(filePath)
+        if (stat.isFile()) {
+          results.push(file)
+        }
+      }
+      return results
     } catch (error) {
       console.error("[Storage] List error:", error)
       return []

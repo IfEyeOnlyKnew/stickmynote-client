@@ -3,8 +3,8 @@ import { Redis } from "@upstash/redis"
 let redis: Redis | null = null
 
 try {
-  const url = process.env.KV_REST_API_URL || process.env.KV_REST_API_URL
-  const token = process.env.KV_REST_API_TOKEN || process.env.KV_REST_API_TOKEN
+  const url = process.env.KV_REST_API_URL
+  const token = process.env.KV_REST_API_TOKEN
 
   if (url && token && url.startsWith("https://")) {
     redis = new Redis({ url, token })
@@ -30,7 +30,7 @@ export class CalstickCache {
    */
   static getUserCacheKey(userId: string, filters: Record<string, string | number> = {}): string {
     const sortedFilters = Object.keys(filters)
-      .sort()
+      .sort((a, b) => a.localeCompare(b))
       .map((k) => `${k}=${filters[k]}`)
       .join(":")
     return `${this.PREFIX}user:${userId}:${sortedFilters}`
@@ -47,7 +47,7 @@ export class CalstickCache {
    * Generate cache key for dependencies
    */
   static getDependenciesCacheKey(taskIds: string[]): string {
-    const sortedIds = [...taskIds].sort().join(",")
+    const sortedIds = [...taskIds].sort((a, b) => a.localeCompare(b)).join(",")
     const hash = Buffer.from(sortedIds).toString("base64").slice(0, 16)
     return `${this.PREFIX}deps:${hash}`
   }
@@ -56,7 +56,7 @@ export class CalstickCache {
    * Generate cache key for critical path calculation
    */
   static getCriticalPathCacheKey(taskIds: string[]): string {
-    const sortedIds = [...taskIds].sort().join(",")
+    const sortedIds = [...taskIds].sort((a, b) => a.localeCompare(b)).join(",")
     const hash = Buffer.from(sortedIds).toString("base64").slice(0, 16)
     return `${this.PREFIX}critpath:${hash}`
   }

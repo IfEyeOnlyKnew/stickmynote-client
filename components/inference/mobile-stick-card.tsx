@@ -163,7 +163,7 @@ export function MobileStickCard({
           {/* Header: Checkbox, Color bar, Topic, Expand */}
           <div className="flex items-start gap-2" tabIndex={0} onClick={handleCardClick} onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") handleCardClick?.(e as unknown as React.MouseEvent) }}>
             {onSelect && (
-              <div onClick={(e) => e.stopPropagation()}>
+              <div role="presentation" onClick={(e) => e.stopPropagation()} onKeyDown={(e) => e.stopPropagation()}>
                 <Checkbox
                   checked={isSelected}
                   onCheckedChange={handleCheckboxChange}

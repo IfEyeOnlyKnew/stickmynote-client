@@ -57,7 +57,7 @@ export default function Verify2FAPage() {
         },
         body: JSON.stringify({
           verificationToken,
-          code: showBackupInput ? code : code,
+          code,
         }),
       })
 

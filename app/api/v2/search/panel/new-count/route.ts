@@ -7,17 +7,15 @@ export const dynamic = 'force-dynamic'
 
 // Optional Redis for caching
 let redis: any = null
-try {
-  if (process.env.KV_REST_API_URL && process.env.KV_REST_API_TOKEN) {
-    import('@upstash/redis').then((module) => {
-      redis = new module.Redis({
-        url: process.env.KV_REST_API_URL!,
-        token: process.env.KV_REST_API_TOKEN!,
-      })
-    }).catch(() => {})
-  }
-} catch {
-  // Redis is optional — caching will be skipped if unavailable
+if (process.env.KV_REST_API_URL && process.env.KV_REST_API_TOKEN) {
+  import('@upstash/redis').then((module) => {
+    redis = new module.Redis({
+      url: process.env.KV_REST_API_URL!,
+      token: process.env.KV_REST_API_TOKEN!,
+    })
+  }).catch(() => {
+    // Redis is optional — caching will be skipped if unavailable
+  })
 }
 
 // GET /api/v2/search/panel/new-count - Check for new sticks count

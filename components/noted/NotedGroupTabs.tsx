@@ -263,7 +263,10 @@ export function NotedGroupTabs({
                           <span className="truncate flex-1">{sub.name}</span>
                           <span
                             title="Edit sub-group"
+                            role="button"
+                            tabIndex={0}
                             onClick={(e) => { e.stopPropagation(); openEdit(sub, e) }}
+                            onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); e.stopPropagation(); openEdit(sub, e as unknown as React.MouseEvent) } }}
                             className={cn(
                               "h-4 w-4 rounded flex items-center justify-center shrink-0 opacity-0 group-hover/sub:opacity-100 transition-opacity",
                               activeGroupId === sub.id ? "hover:bg-primary-foreground/20" : "hover:bg-muted-foreground/20"

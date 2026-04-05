@@ -304,7 +304,7 @@ export function PadChatSettingsDialog({
     if (!settings) return
     const days = settings.office_hours_days.includes(day)
       ? settings.office_hours_days.filter((d) => d !== day)
-      : [...settings.office_hours_days, day].sort()
+      : [...settings.office_hours_days, day].sort((a, b) => a - b)
     setSettings({ ...settings, office_hours_days: days })
   }
 
