@@ -30,5 +30,9 @@
         "timesheets",
         "unarchiving"
     ],
-    "jest.enable": false
+    "jest.enable": false,
+    "sonarlint.connectedMode.project": {
+        "connectionId": "ifeyeonlyknew",
+        "projectKey": "IfEyeOnlyKnew_stickmynote-client"
+    }
 }

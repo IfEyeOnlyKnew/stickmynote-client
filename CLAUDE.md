@@ -202,3 +202,60 @@ const lockoutData = await checkLockout(email)
 **Files that must use direct calls (not fetch):**
 - `app/api/auth/signin/route.ts` - uses `checkLockout()` and `recordLoginAttempt()`
 - Any API route calling another API route internally
+
+## Architecture Book
+
+The technical book **"Stick My Note: Architecture from Source"** lives in `docs/book/`. It documents the architecture, design rationale, and trade-offs behind every subsystem (18 chapters + epilogue, ~6,800 lines).
+
+### Using the Book Before Making Changes
+
+**Before making architectural changes, read the relevant chapter first.** The book captures design rationale that the code cannot — why patterns were chosen, what alternatives were rejected, and what trade-offs were accepted. This prevents accidentally breaking established patterns or re-introducing problems that were already solved.
+
+| If you're changing... | Read chapter... | Key things to preserve |
+|-----------------------|-----------------|----------------------|
+| Database queries or adapters | 2 (Database Layer) | Dual access pattern (raw pg + query builder), no ORM, individual env vars |
+| Caching behavior | 3 (Caching) | Four independent layers, fail-open philosophy, no unified invalidation |
+| Auth or session logic | 4 (Authentication) | Three auth roads, no refresh tokens, direct DB calls not fetch |
+| Security middleware | 5 (Defense in Depth) | Stateless CSRF, fail-open rate limiting, fire-and-forget audit |
+| Org/role/permission logic | 6 (Organizations) | Numeric role ranking, getOrgContext pattern, JSONB settings merge |
+| Notes, sticks, or pads | 7 (Domain Model) | Three separate entities, sticks inherit pad's org_id, binary vs role-based permissions |
+| Tab system or TipTap editor | 8 (Tabs & Rich Content) | Lazy tab creation, CalSticks reuse reply table |
+| WebSocket or real-time features | 10 (WebSocket Server) | didWebSocketSetup hack, post-upgrade auth, 5-connection limit, 7900-byte NOTIFY limit |
+| Chat, presence, notifications | 11 (Chat & Presence) | Three chat systems, dual-mode WebSocket+polling, escalation heuristic in Ch 13 |
+| Video/LiveKit | 12 (Video) | Caddy TLS termination, token-based auth, transparent proxy in server.js |
+| AI features or Ollama | 13 (AI Architecture) | Ollama-first provider chain, direct API before SDK, delimiter parsing not JSON |
+| Inference hub or social pads | 14 (Inference Hub) | Separate social_* tables, workflow state machine, cleanup policies with exemptions |
+| Search | 15 (Search) | FTS + ILIKE dual mode, parallel enrichment, mock view counts |
+| React components or state | 17 (Components) | Three-tier hierarchy, Context not Redux, toast without Context, zero-render components |
+| Responsive/PWA/accessibility | 18 (PWA & A11y) | Custom virtualization (no react-virtual), 6 accessibility preferences, safe area handling |
+
+### When to Update the Book
+
+Update the relevant chapter(s) when any of these change:
+- **New subsystem or major feature** (e.g., new real-time feature, new auth method, new AI capability)
+- **Architectural pattern change** (e.g., switching cache layers, changing the database adapter, new deployment topology)
+- **Infrastructure change** (e.g., new server added, service moved, port change)
+- **Removed or replaced component** (e.g., Daily.co replaced by LiveKit)
+
+Do NOT update the book for: bug fixes, UI tweaks, copy changes, dependency bumps, or minor refactors.
+
+### Chapter Map
+
+| Chapters | Covers |
+|----------|--------|
+| 1-3 | Architecture, database, caching |
+| 4-6 | Auth (LDAP/SSO/local), security, organizations |
+| 7-9 | Notes/sticks/pads, tabs/rich text, templates |
+| 10-12 | WebSocket server, chat/presence, LiveKit video |
+| 13-14 | Ollama AI, inference hub |
+| 15-16 | Search, analytics/audit/health |
+| 17-18 | Frontend components/state, PWA/accessibility |
+| Epilogue | Cross-cutting patterns |
+
+Full outline with section details: `docs/book/00-outline.md`
+
+### How to Update
+
+Ask: **"Update the book for recent changes"** — Claude will diff code against book content and update relevant chapters.
+
+For a specific chapter: **"Update book chapter 10 — I changed the WebSocket server"**
