@@ -6,7 +6,7 @@ interface EnvironmentVariablesCheckProps {
   envVars: Record<string, string>
 }
 
-export function EnvironmentVariablesCheck({ envVars }: EnvironmentVariablesCheckProps) {
+export function EnvironmentVariablesCheck({ envVars }: Readonly<EnvironmentVariablesCheckProps>) {
   return (
     <div className="space-y-4">
       <h3 className="text-lg font-semibold">Environment Variables</h3>

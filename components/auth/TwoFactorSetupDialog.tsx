@@ -25,9 +25,9 @@ export function TwoFactorSetupDialog({
   open,
   onOpenChange,
   onSuccess,
-}: TwoFactorSetupDialogProps) {
+}: Readonly<TwoFactorSetupDialogProps>) {
   const [step, setStep] = useState<"qr" | "verify" | "backup">("qr")
-  const [qrCodeUri, setQrCodeUri] = useState<string>("")
+  const [, setQrCodeUri] = useState<string>("")
   const [qrCodeDataUrl, setQrCodeDataUrl] = useState<string>("")
   const [secret, setSecret] = useState<string>("")
   const [backupCodes, setBackupCodes] = useState<string[]>([])
@@ -58,7 +58,6 @@ export function TwoFactorSetupDialog({
 
       const data = await response.json()
       setSecret(data.secret)
-      setQrCodeUri(data.qrCodeUri)
       setBackupCodes(data.backupCodes)
 
       // Generate QR code image
@@ -259,8 +258,8 @@ export function TwoFactorSetupDialog({
                   </Button>
                 </div>
                 <div className="grid grid-cols-2 gap-2 p-4 bg-muted rounded-lg font-mono text-sm">
-                  {backupCodes.map((code, i) => (
-                    <div key={i} className="py-1">
+                  {backupCodes.map((code) => (
+                    <div key={code} className="py-1">
                       {code}
                     </div>
                   ))}

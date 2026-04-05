@@ -5,6 +5,17 @@ import { getOrgContext } from "@/lib/auth/get-org-context"
 import { encryptFileForOrg, getOrgPrefixedPath, isEncryptionEnabled } from "@/lib/encryption"
 import { getCachedAuthUser, createRateLimitResponse, createUnauthorizedResponse } from "@/lib/auth/cached-auth"
 
+async function getOrgContextSafe() {
+  try {
+    return await getOrgContext()
+  } catch (err) {
+    if (err instanceof Error && err.message === "RATE_LIMITED") {
+      return null
+    }
+    throw err
+  }
+}
+
 export async function POST(request: NextRequest) {
   try {
     await createDatabaseClient()
@@ -18,20 +29,8 @@ export async function POST(request: NextRequest) {
       return createUnauthorizedResponse()
     }
 
-    const user = authResult.user
-
     // Get organization context for tenant isolation
-    let orgContext
-    try {
-      orgContext = await getOrgContext()
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : String(err)
-      if (errorMessage === "RATE_LIMITED") {
-        return createRateLimitResponse()
-      }
-      throw err
-    }
-
+    const orgContext = await getOrgContextSafe()
     if (!orgContext) {
       return NextResponse.json({ error: "No organization context found" }, { status: 403 })
     }
@@ -115,20 +114,8 @@ export async function DELETE(request: NextRequest) {
       return createUnauthorizedResponse()
     }
 
-    const user = authResult.user
-
     // Get organization context for tenant isolation
-    let orgContext
-    try {
-      orgContext = await getOrgContext()
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : String(err)
-      if (errorMessage === "RATE_LIMITED") {
-        return createRateLimitResponse()
-      }
-      throw err
-    }
-
+    const orgContext = await getOrgContextSafe()
     if (!orgContext) {
       return NextResponse.json({ error: "No organization context found" }, { status: 403 })
     }

@@ -27,8 +27,8 @@ export async function POST(request: NextRequest) {
     console.log("[v0] Request body:", { noteId: body?.noteId, hasTopic: !!body?.topic, hasContent: !!body?.content })
 
     const noteId = String(body?.noteId || "")
-    const topic = body?.topic !== undefined ? String(body.topic) : undefined
-    const content = body?.content !== undefined ? String(body.content) : undefined
+    const topic = body?.topic === undefined ? undefined : String(body.topic)
+    const content = body?.content === undefined ? undefined : String(body.content)
 
     // Validate noteId
     if (!noteId || !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(noteId)) {

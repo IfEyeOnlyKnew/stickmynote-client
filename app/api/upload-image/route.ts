@@ -1,15 +1,15 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { getCachedAuthUser } from "@/lib/auth/cached-auth"
-import { writeFile, mkdir } from "fs/promises"
-import { existsSync } from "fs"
-import path from "path"
+import { writeFile, mkdir } from "node:fs/promises"
+import { existsSync } from "node:fs"
+import path from "node:path"
 import { getUploadDir } from "@/lib/storage/upload-path"
 import { getOrgContext } from "@/lib/auth/get-org-context"
 import { encryptFileForOrg } from "@/lib/encryption"
 import { isOrgFileEncryptionEnabled } from "@/lib/encryption-settings"
 import { put } from "@/lib/storage/local-storage"
 
-const ALLOWED_TYPES = ["image/jpeg", "image/jpg", "image/png", "image/webp", "image/gif"]
+const ALLOWED_TYPES = new Set(["image/jpeg", "image/jpg", "image/png", "image/webp", "image/gif"])
 const MAX_FILE_SIZE = 5 * 1024 * 1024
 const MAX_DIMENSION = 2048
 
@@ -26,7 +26,7 @@ async function loadSharp(): Promise<any> {
 
 function validateFile(file: File | null): string | null {
   if (!file) return "No file provided"
-  if (!ALLOWED_TYPES.includes(file.type)) return "File must be a valid image (JPEG, PNG, WebP, or GIF)"
+  if (!ALLOWED_TYPES.has(file.type)) return "File must be a valid image (JPEG, PNG, WebP, or GIF)"
   if (file.size > MAX_FILE_SIZE) return "File size must be less than 5MB"
   return null
 }
@@ -126,7 +126,7 @@ export async function POST(request: NextRequest) {
 
     if (shouldEncrypt && orgContext) {
       // Encrypt and store in non-public org-scoped directory
-      const arrBuf = new Uint8Array(optimizedBuffer).buffer as ArrayBuffer
+      const arrBuf = new Uint8Array(optimizedBuffer).buffer
       const encrypted = await encryptFileForOrg(arrBuf, orgContext.orgId)
       const orgFilename = filename
       const orgPath = `orgs/${orgContext.orgId}/images/${orgFilename}`

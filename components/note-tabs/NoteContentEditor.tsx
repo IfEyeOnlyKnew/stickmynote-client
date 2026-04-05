@@ -43,7 +43,7 @@ export function NoteContentEditor({
   onCancel,
   onStick,
   isSaving,
-}: NoteContentEditorProps) {
+}: Readonly<NoteContentEditorProps>) {
   const expandDialogRef = useRef<HTMLDialogElement>(null)
 
   const safeTopic = topic || ""
@@ -124,6 +124,7 @@ export function NoteContentEditor({
       <dialog
         ref={expandDialogRef}
         onClick={(e) => { if (e.target === expandDialogRef.current) expandDialogRef.current?.close() }}
+        onKeyDown={(e) => { if (e.key === "Escape") expandDialogRef.current?.close() }}
         className="backdrop:bg-black/50 bg-transparent p-0 border-none w-[calc(50%-1.5rem)] h-[75vh] rounded-lg ml-4 mr-auto mt-4"
       >
         <div className="bg-white rounded-lg shadow-2xl flex flex-col h-full">

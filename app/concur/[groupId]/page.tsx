@@ -226,11 +226,12 @@ export default function ConcurGroupPage() {
 
       {/* Content */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6">
-        {sticksLoading ? (
+        {sticksLoading && (
           <div className="flex items-center justify-center py-20">
             <Loader2 className="h-8 w-8 animate-spin text-indigo-600" />
           </div>
-        ) : sticks.length === 0 ? (
+        )}
+        {!sticksLoading && sticks.length === 0 && (
           <div className="text-center py-20">
             <MessageCircle className="h-16 w-16 mx-auto mb-4 text-muted-foreground/30" />
             <h2 className="text-xl font-semibold text-muted-foreground">No Sticks Yet</h2>
@@ -245,7 +246,8 @@ export default function ConcurGroupPage() {
               Create First Stick
             </Button>
           </div>
-        ) : (
+        )}
+        {!sticksLoading && sticks.length > 0 && (
           <>
             {/* Pinned Sticks */}
             {pinnedSticks.length > 0 && (
@@ -357,13 +359,13 @@ function StickCard({
   groupLogoUrl,
   groupHeaderImageUrl,
   onClick,
-}: {
+}: Readonly<{
   stick: ConcurStick
   groupName: string
   groupLogoUrl?: string | null
   groupHeaderImageUrl?: string | null
   onClick: () => void
-}) {
+}>) {
   return (
     <Card
       className="cursor-pointer hover:shadow-md hover:border-indigo-200 transition-all duration-200 overflow-hidden"

@@ -46,8 +46,8 @@ export function useStickTabs(stickId: string, resetKey: number | undefined, conf
   }, [stickId, resetKey, loadTabs])
 
   useEffect(() => {
-    if (typeof window !== "undefined" && config.globalRefreshFunctionName) {
-      ;(window as any)[config.globalRefreshFunctionName] = refreshTabs
+    if (typeof globalThis.window !== "undefined" && config.globalRefreshFunctionName) {
+      ;(globalThis as any)[config.globalRefreshFunctionName] = refreshTabs
     }
   }, [refreshTabs, config.globalRefreshFunctionName])
 

@@ -81,7 +81,7 @@ export async function POST(request: NextRequest) {
       `SELECT COUNT(*) FROM personal_sticks WHERE ${whereClause}`,
       params
     )
-    const totalCount = parseInt(countResult.rows[0]?.count || '0', 10)
+    const totalCount = Number.parseInt(countResult.rows[0]?.count || '0', 10)
 
     // Validate sort column
     const allowedSortColumns = ['created_at', 'updated_at', 'topic', 'title']

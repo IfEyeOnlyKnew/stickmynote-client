@@ -32,7 +32,7 @@ export async function GET(request: NextRequest) {
     }
 
     const sinceDate = new Date(since)
-    if (isNaN(sinceDate.getTime())) {
+    if (Number.isNaN(sinceDate.getTime())) {
       return new Response(
         JSON.stringify({ error: 'Invalid date format for since parameter' }),
         { status: 400 }

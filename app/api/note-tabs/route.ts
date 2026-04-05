@@ -126,7 +126,7 @@ function extractVideoInfo(url: string): VideoInfo | null {
     // Rumble
     if (u.hostname.includes("rumble.com")) {
       const parts = u.pathname.split("/").filter(Boolean)
-      const id = parts[parts.length - 1] || parts[parts.length - 2]
+      const id = parts.at(-1) || parts.at(-2)
       if (id) {
         return {
           id,
@@ -452,15 +452,7 @@ export async function PUT(request: NextRequest) {
 
     let tab = findResult.rows[0] as NoteTabRow | undefined
 
-    if (!tab) {
-      // Create new details tab
-      await db.query(
-        `INSERT INTO personal_sticks_tabs
-         (personal_stick_id, user_id, tab_type, tab_name, tab_content, tab_data, tab_order, created_at, updated_at)
-         VALUES ($1, $2, $3, 'Details', $4, $5, 3, NOW(), NOW())`,
-        [noteId, userId, dbType, details, JSON.stringify({ content: details })]
-      )
-    } else {
+    if (tab) {
       // Preserve existing tab_data (like exports) and only update the content
       const existingTabData = normalizeTabData(tab.tab_data)
       const updatedTabData = { ...existingTabData, content: details }
@@ -470,6 +462,14 @@ export async function PUT(request: NextRequest) {
          SET tab_content = $1, tab_data = $2, updated_at = NOW()
          WHERE id = $3`,
         [details, JSON.stringify(updatedTabData), tab.id]
+      )
+    } else {
+      // Create new details tab
+      await db.query(
+        `INSERT INTO personal_sticks_tabs
+         (personal_stick_id, user_id, tab_type, tab_name, tab_content, tab_data, tab_order, created_at, updated_at)
+         VALUES ($1, $2, $3, 'Details', $4, $5, 3, NOW(), NOW())`,
+        [noteId, userId, dbType, details, JSON.stringify({ content: details })]
       )
     }
 

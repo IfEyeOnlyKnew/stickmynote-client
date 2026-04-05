@@ -31,7 +31,7 @@ type KeyboardShortcutsHelpProps = {
   onOpenChange: (open: boolean) => void
 }
 
-export function KeyboardShortcutsHelp({ open, onOpenChange }: KeyboardShortcutsHelpProps) {
+export function KeyboardShortcutsHelp({ open, onOpenChange }: Readonly<KeyboardShortcutsHelpProps>) {
   const categories = Array.from(new Set(shortcuts.map((s) => s.category)))
 
   return (
@@ -49,15 +49,15 @@ export function KeyboardShortcutsHelp({ open, onOpenChange }: KeyboardShortcutsH
               <div className="space-y-2">
                 {shortcuts
                   .filter((s) => s.category === category)
-                  .map((shortcut, index) => (
+                  .map((shortcut) => (
                     <div
-                      key={index}
+                      key={shortcut.description}
                       className="flex items-center justify-between py-2 px-3 rounded-lg hover:bg-muted/50"
                     >
                       <span className="text-sm">{shortcut.description}</span>
                       <div className="flex items-center gap-1">
                         {shortcut.keys.map((key, i) => (
-                          <span key={i} className="flex items-center gap-1">
+                          <span key={key} className="flex items-center gap-1">
                             <Badge variant="outline" className="font-mono text-xs">
                               {key}
                             </Badge>

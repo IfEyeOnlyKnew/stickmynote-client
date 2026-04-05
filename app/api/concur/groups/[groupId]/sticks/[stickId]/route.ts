@@ -9,6 +9,25 @@ import { getCachedAuthUser, createRateLimitResponse, createUnauthorizedResponse 
 
 const LOG_PREFIX = "[ConcurStick]"
 
+function handleAuthError(authResult: { error?: string }): NextResponse {
+  if (authResult.error === "RATE_LIMITED") return createRateLimitResponse()
+  if (authResult.error === "UNAUTHORIZED") return createUnauthorizedResponse()
+  return NextResponse.json({ error: "No organization context" }, { status: 403 })
+}
+
+function buildStickUpdates(body: any, userId: string): Record<string, any> {
+  const updates: Record<string, any> = { updated_at: new Date().toISOString() }
+  if (body.topic !== undefined) updates.topic = body.topic?.trim() || null
+  if (body.content !== undefined) updates.content = body.content.trim()
+  if (body.color !== undefined) updates.color = body.color
+  if (body.is_pinned !== undefined) {
+    updates.is_pinned = body.is_pinned
+    updates.pinned_by = body.is_pinned ? userId : null
+    updates.pinned_at = body.is_pinned ? new Date().toISOString() : null
+  }
+  return updates
+}
+
 // ============================================================================
 // Auth Helpers
 // ============================================================================
@@ -46,11 +65,7 @@ export async function GET(
   try {
     const { groupId, stickId } = await params
     const authResult = await getAuthenticatedOrgContext()
-    if ("error" in authResult) {
-      if (authResult.error === "RATE_LIMITED") return createRateLimitResponse()
-      if (authResult.error === "UNAUTHORIZED") return createUnauthorizedResponse()
-      return NextResponse.json({ error: "No organization context" }, { status: 403 })
-    }
+    if ("error" in authResult) return handleAuthError(authResult)
 
     const { user, orgContext } = authResult
     const db = await createDatabaseClient()
@@ -87,11 +102,7 @@ export async function PATCH(
   try {
     const { groupId, stickId } = await params
     const authResult = await getAuthenticatedOrgContext()
-    if ("error" in authResult) {
-      if (authResult.error === "RATE_LIMITED") return createRateLimitResponse()
-      if (authResult.error === "UNAUTHORIZED") return createUnauthorizedResponse()
-      return NextResponse.json({ error: "No organization context" }, { status: 403 })
-    }
+    if ("error" in authResult) return handleAuthError(authResult)
 
     const { user, orgContext } = authResult
     const db = await createDatabaseClient()
@@ -115,20 +126,7 @@ export async function PATCH(
     }
 
     const body = await request.json()
-    const updates: Record<string, any> = { updated_at: new Date().toISOString() }
-    if (body.topic !== undefined) updates.topic = body.topic?.trim() || null
-    if (body.content !== undefined) updates.content = body.content.trim()
-    if (body.color !== undefined) updates.color = body.color
-    if (body.is_pinned !== undefined) {
-      updates.is_pinned = body.is_pinned
-      if (body.is_pinned) {
-        updates.pinned_by = user.id
-        updates.pinned_at = new Date().toISOString()
-      } else {
-        updates.pinned_by = null
-        updates.pinned_at = null
-      }
-    }
+    const updates = buildStickUpdates(body, user.id)
 
     const { data: stick, error } = await db
       .from("concur_sticks")
@@ -161,11 +159,7 @@ export async function DELETE(
   try {
     const { groupId, stickId } = await params
     const authResult = await getAuthenticatedOrgContext()
-    if ("error" in authResult) {
-      if (authResult.error === "RATE_LIMITED") return createRateLimitResponse()
-      if (authResult.error === "UNAUTHORIZED") return createUnauthorizedResponse()
-      return NextResponse.json({ error: "No organization context" }, { status: 403 })
-    }
+    if ("error" in authResult) return handleAuthError(authResult)
 
     const { user, orgContext } = authResult
     const db = await createDatabaseClient()

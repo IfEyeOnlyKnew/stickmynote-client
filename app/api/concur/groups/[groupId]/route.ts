@@ -115,7 +115,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ gr
     const db = await createDatabaseClient()
 
     const membership = await checkGroupMembership(db, groupId, user.id, orgContext.orgId)
-    if (!membership || membership.role !== "owner") return Errors.ownersOnly()
+    if (membership?.role !== "owner") return Errors.ownersOnly()
 
     const { name, description, logo_url, header_image_url } = await request.json()
 
@@ -177,7 +177,7 @@ export async function DELETE(request: Request, { params }: { params: Promise<{ g
     const db = await createDatabaseClient()
 
     const membership = await checkGroupMembership(db, groupId, user.id, orgContext.orgId)
-    if (!membership || membership.role !== "owner") return Errors.ownersOnly()
+    if (membership?.role !== "owner") return Errors.ownersOnly()
 
     const { error } = await db
       .from("concur_groups")

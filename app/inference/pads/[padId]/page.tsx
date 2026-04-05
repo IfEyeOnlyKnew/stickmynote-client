@@ -76,11 +76,11 @@ function ScheduleMeetingButton({
   stickId,
   stickTopic,
   onClick,
-}: {
+}: Readonly<{
   stickId: string
   stickTopic: string
   onClick?: (e: React.MouseEvent) => void
-}) {
+}>) {
   const paletteContext = useCommunicationPaletteContextSafe()
 
   const handleClick = (e: React.MouseEvent) => {
@@ -238,7 +238,7 @@ export default function InferencePadPage({ params }: Readonly<{ params: { padId:
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user, padId])
 
-  const isOwner = user && pad && pad.owner_id === user.id
+  const isOwner = user && pad?.owner_id === user.id
 
   const handleStickCreated = () => {
     setCreateStickOpen(false)

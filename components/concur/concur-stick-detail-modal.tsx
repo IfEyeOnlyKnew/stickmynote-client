@@ -110,7 +110,7 @@ export function ConcurStickDetailModal({
   isOwner,
   onClose,
   onStickUpdated,
-}: ConcurStickDetailModalProps) {
+}: Readonly<ConcurStickDetailModalProps>) {
   const { toast } = useToast()
   const { user } = useUser()
   const [replies, setReplies] = useState<Reply[]>([])
@@ -123,11 +123,9 @@ export function ConcurStickDetailModal({
   const [content, setContent] = useState(stick.content)
   const [isEditingTopic, setIsEditingTopic] = useState(false)
   const [isEditingContent, setIsEditingContent] = useState(false)
-  const [saving, setSaving] = useState(false)
   const replyInputRef = useRef<HTMLTextAreaElement>(null)
 
   const handleSaveStick = async () => {
-    setSaving(true)
     try {
       const res = await fetch(`/api/concur/groups/${groupId}/sticks/${stick.id}`, {
         method: "PATCH",
@@ -141,8 +139,6 @@ export function ConcurStickDetailModal({
       toast({ title: "Stick updated" })
     } catch {
       toast({ title: "Failed to save stick", variant: "destructive" })
-    } finally {
-      setSaving(false)
     }
   }
 
@@ -293,13 +289,9 @@ export function ConcurStickDetailModal({
                 disabled={pinning}
                 className="absolute top-2 right-2 text-white hover:bg-white/20"
               >
-                {pinning ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : stick.is_pinned ? (
-                  <PinOff className="h-4 w-4" />
-                ) : (
-                  <Pin className="h-4 w-4" />
-                )}
+                {pinning && <Loader2 className="h-4 w-4 animate-spin" />}
+                {!pinning && stick.is_pinned && <PinOff className="h-4 w-4" />}
+                {!pinning && !stick.is_pinned && <Pin className="h-4 w-4" />}
               </Button>
             )}
           </div>
@@ -327,13 +319,9 @@ export function ConcurStickDetailModal({
                   disabled={pinning}
                   className="shrink-0"
                 >
-                  {pinning ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : stick.is_pinned ? (
-                    <PinOff className="h-4 w-4" />
-                  ) : (
-                    <Pin className="h-4 w-4" />
-                  )}
+                  {pinning && <Loader2 className="h-4 w-4 animate-spin" />}
+                  {!pinning && stick.is_pinned && <PinOff className="h-4 w-4" />}
+                  {!pinning && !stick.is_pinned && <Pin className="h-4 w-4" />}
                 </Button>
               )}
             </div>
@@ -385,15 +373,17 @@ export function ConcurStickDetailModal({
               Replies ({replies.length})
             </h3>
 
-            {loading ? (
+            {loading && (
               <div className="flex items-center justify-center py-8">
                 <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
               </div>
-            ) : threadedReplies.length === 0 ? (
+            )}
+            {!loading && threadedReplies.length === 0 && (
               <p className="text-sm text-muted-foreground text-center py-6">
                 No replies yet. Be the first to respond!
               </p>
-            ) : (
+            )}
+            {!loading && threadedReplies.length > 0 && (
               <div className="space-y-2">
                 {threadedReplies.map((reply) =>
                   renderReply(reply, 0, user?.id, isOwner, handleDeleteReply, handleReplyToReply)

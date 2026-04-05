@@ -25,11 +25,11 @@ export function StickVideoTabContent({
   onVideoUrlChange,
   onAddVideo,
   onDeleteVideo,
-}: StickVideoTabContentProps) {
+}: Readonly<StickVideoTabContentProps>) {
   const filteredVideos = videos
     .map((video) => normalizeVideoData(video))
     .filter((video): video is NonNullable<typeof video> => {
-      return video !== null && video.platform !== undefined && video.embed_id !== undefined
+      return video?.platform !== undefined && video?.embed_id !== undefined
     })
 
   return (

@@ -50,7 +50,7 @@ interface MemoryCacheEntry<T> {
 
 class PadChatCache {
   private memcached: memjs.Client | null = null
-  private memoryCache = new Map<string, MemoryCacheEntry<CacheValue>>()
+  private readonly memoryCache = new Map<string, MemoryCacheEntry<CacheValue>>()
   private initialized = false
 
   constructor() {

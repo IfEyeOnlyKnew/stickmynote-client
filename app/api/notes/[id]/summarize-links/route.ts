@@ -3,9 +3,9 @@ import { getSession } from "@/lib/auth/local-auth"
 import { db } from "@/lib/database/pg-client"
 import { summarizeLinks } from "@/lib/ai/url-summarizer"
 import { isAIAvailable, checkOllamaHealth, getActiveProvider } from "@/lib/ai/ai-provider"
-import { writeFile, mkdir } from "fs/promises"
-import { existsSync } from "fs"
-import path from "path"
+import { writeFile, mkdir } from "node:fs/promises"
+import { existsSync } from "node:fs"
+import path from "node:path"
 
 // Dynamic imports for docx
 let Document: typeof import("docx").Document | undefined
@@ -14,6 +14,43 @@ let Paragraph: typeof import("docx").Paragraph | undefined
 let TextRun: typeof import("docx").TextRun | undefined
 let HeadingLevel: typeof import("docx").HeadingLevel | undefined
 let ExternalHyperlink: typeof import("docx").ExternalHyperlink | undefined
+
+async function upsertNoteExportLink(noteId: string, userId: string, exportLink: any): Promise<void> {
+  const detailsTabResult = await db.query(
+    `SELECT id, tab_data FROM personal_sticks_tabs WHERE personal_stick_id = $1 AND tab_type = 'details' ORDER BY created_at DESC LIMIT 1`,
+    [noteId],
+  )
+
+  if (detailsTabResult.rows.length > 0) {
+    const currentData = (typeof detailsTabResult.rows[0].tab_data === "object" && detailsTabResult.rows[0].tab_data) || {}
+    const newTabData = { ...currentData, exports: [...(currentData.exports || []), exportLink] }
+    await db.query(`UPDATE personal_sticks_tabs SET tab_data = $1, updated_at = NOW() WHERE id = $2`, [JSON.stringify(newTabData), detailsTabResult.rows[0].id])
+  } else {
+    await db.query(
+      `INSERT INTO personal_sticks_tabs (personal_stick_id, user_id, tab_type, tab_name, tab_data, tab_order) VALUES ($1, $2, 'details', 'Details', $3, 3)`,
+      [noteId, userId, JSON.stringify({ exports: [exportLink] })],
+    )
+  }
+
+  await db.query(`UPDATE personal_sticks SET updated_at = NOW() WHERE id = $1`, [noteId])
+}
+
+function extractLinksFromTab(row: any): Array<{ url: string; title: string }> {
+  if (!row) return []
+  if (row.tab_data?.hyperlinks) return row.tab_data.hyperlinks
+
+  const tags = row.tags
+  if (!tags) return []
+
+  let parsed = tags
+  if (typeof tags === "string") {
+    try { parsed = JSON.parse(tags) } catch { return [] }
+  }
+
+  if (Array.isArray(parsed)) return parsed.filter((item: any) => item && (item.url || item.title))
+  if (Array.isArray(parsed?.hyperlinks)) return parsed.hyperlinks
+  return []
+}
 
 const initializeDocx = async () => {
   try {
@@ -85,17 +122,13 @@ function createDocxDocument(
 
   // Add each link summary
   summaries.forEach((item, index) => {
-    // Link title as heading
+    // Link title as heading + URL
     children.push(
       new DocxParagraph({
         text: `${index + 1}. ${item.title || "Untitled Link"}`,
         heading: DocxHeadingLevel.HEADING_2,
         spacing: { before: 400, after: 200 },
-      })
-    )
-
-    // URL
-    children.push(
+      }),
       new DocxParagraph({
         children: [
           new DocxTextRun({ text: "URL: ", bold: true, size: 22 }),
@@ -122,9 +155,7 @@ function createDocxDocument(
             new DocxTextRun({ text: "Summary:", bold: true, size: 22 }),
           ],
           spacing: { after: 100 },
-        })
-      )
-      children.push(
+        }),
         new DocxParagraph({
           children: [
             new DocxTextRun({ text: item.summary, size: 22 }),
@@ -243,34 +274,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       [noteId]
     )
 
-    let links: Array<{ url: string; title: string }> = []
-
-    if (linksTabResult.rows.length > 0) {
-      const tabData = linksTabResult.rows[0].tab_data
-      const tags = linksTabResult.rows[0].tags
-
-      // Check tab_data for hyperlinks
-      if (tabData && tabData.hyperlinks) {
-        links = tabData.hyperlinks
-      }
-      // Also check tags column - hyperlinks are stored directly as JSON array
-      else if (tags) {
-        let parsedTags = tags
-        if (typeof tags === "string") {
-          try {
-            parsedTags = JSON.parse(tags)
-          } catch {
-            parsedTags = null
-          }
-        }
-
-        if (Array.isArray(parsedTags)) {
-          links = parsedTags.filter((item: any) => item && (item.url || item.title))
-        } else if (parsedTags && parsedTags.hyperlinks && Array.isArray(parsedTags.hyperlinks)) {
-          links = parsedTags.hyperlinks
-        }
-      }
-    }
+    const links = extractLinksFromTab(linksTabResult.rows[0])
 
     if (links.length === 0) {
       return NextResponse.json(
@@ -305,7 +309,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
 
     // Generate filename
     const timestamp = Date.now()
-    const safeTitle = noteTitle.replace(/[^a-zA-Z0-9]/g, "-").substring(0, 30)
+    const safeTitle = noteTitle.replaceAll(/[^a-zA-Z0-9]/g, "-").substring(0, 30)
     const filename = `link-summary-${safeTitle}-${timestamp}.docx`
     const filePath = path.join(exportsDir, filename)
 
@@ -323,45 +327,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       type: "link_summary",
     }
 
-    // Check if a Details tab already exists
-    const detailsTabResult = await db.query(
-      `SELECT id, tab_data FROM personal_sticks_tabs
-       WHERE personal_stick_id = $1 AND tab_type = 'details'
-       ORDER BY created_at DESC
-       LIMIT 1`,
-      [noteId]
-    )
-
-    // Update or create the details tab with the export link
-    if (detailsTabResult.rows.length > 0) {
-      let currentData: any = {}
-      const existingData = detailsTabResult.rows[0].tab_data
-      if (existingData && typeof existingData === "object") {
-        currentData = existingData
-      }
-
-      const updatedExports = [...(currentData.exports || []), exportLink]
-      const newTabData = { ...currentData, exports: updatedExports }
-
-      await db.query(
-        `UPDATE personal_sticks_tabs
-         SET tab_data = $1, updated_at = NOW()
-         WHERE id = $2`,
-        [JSON.stringify(newTabData), detailsTabResult.rows[0].id]
-      )
-    } else {
-      await db.query(
-        `INSERT INTO personal_sticks_tabs (personal_stick_id, user_id, tab_type, tab_name, tab_data, tab_order)
-         VALUES ($1, $2, 'details', 'Details', $3, 3)`,
-        [noteId, userId, JSON.stringify({ exports: [exportLink] })]
-      )
-    }
-
-    // Update the note's updated_at timestamp
-    await db.query(
-      `UPDATE personal_sticks SET updated_at = NOW() WHERE id = $1`,
-      [noteId]
-    )
+    await upsertNoteExportLink(noteId, userId, exportLink)
 
     console.log(`[Summarize Links] Export saved to ${filePath}`)
 

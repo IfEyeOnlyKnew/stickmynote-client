@@ -53,7 +53,7 @@ export async function POST(request: NextRequest) {
     })
     // Sort by relevance and return top results
     const topRelated = scoredSticks
-      .sort((a, b) => b.relevanceScore - a.relevanceScore)
+      .toSorted((a, b) => b.relevanceScore - a.relevanceScore)
       .slice(0, limit)
       .map(({ relevanceScore, ...stick }) => stick)
     return NextResponse.json({ relatedSticks: topRelated })

@@ -75,7 +75,7 @@ export function ImageTabContent({
   onUploadPersonalImage,
   onDeleteImage,
   onPasteImage,
-}: ImageTabContentProps) {
+}: Readonly<ImageTabContentProps>) {
   const [isDragOver, setIsDragOver] = useState(false)
   const dropZoneRef = useRef<HTMLDivElement>(null)
 

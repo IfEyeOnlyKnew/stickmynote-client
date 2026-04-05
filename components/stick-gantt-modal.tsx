@@ -13,7 +13,7 @@ interface StickGanttModalProps {
   stickTopic?: string
 }
 
-export function StickGanttModal({ open, onOpenChange, stickId, stickTopic }: StickGanttModalProps) {
+export function StickGanttModal({ open, onOpenChange, stickId, stickTopic }: Readonly<StickGanttModalProps>) {
   const [calsticks, setCalsticks] = useState<CalStick[]>([])
   const [loading, setLoading] = useState(false)
 

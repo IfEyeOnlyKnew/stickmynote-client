@@ -5,7 +5,7 @@ export const metadata = {
   description: "Concur community groups for discussions and collaboration",
 }
 
-export default function ConcurLayout({ children }: { children: React.ReactNode }) {
+export default function ConcurLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
     <div className="flex h-screen overflow-hidden">
       <PanelSidebar />

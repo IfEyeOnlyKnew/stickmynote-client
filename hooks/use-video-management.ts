@@ -48,12 +48,11 @@ export function useVideoManagement(
       title: parsed.title || "",
       thumbnail: parsed.thumbnail || "",
       duration: parsed.duration || "0",
-      embed_url:
-        parsed.platform === "youtube"
-          ? `https://www.youtube.com/embed/${parsed.embed_id}?rel=0`
-          : parsed.platform === "vimeo"
-            ? `https://player.vimeo.com/video/${parsed.embed_id}`
-            : `https://rumble.com/embed/${parsed.embed_id}/`,
+      embed_url: (() => {
+        if (parsed.platform === "youtube") return `https://www.youtube.com/embed/${parsed.embed_id}?rel=0`
+        if (parsed.platform === "vimeo") return `https://player.vimeo.com/video/${parsed.embed_id}`
+        return `https://rumble.com/embed/${parsed.embed_id}/`
+      })(),
     }
 
     console.log("[v0] Created new video object:", newVideo)

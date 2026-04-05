@@ -11,24 +11,24 @@
 
 /** Check if running inside a Capacitor native app */
 export function isNativeApp(): boolean {
-  if (typeof window === "undefined") return false
-  return !!(window as unknown as { Capacitor?: { isNativePlatform?: () => boolean } }).Capacitor
+  if (typeof globalThis.window === "undefined") return false
+  return !!(globalThis as unknown as { Capacitor?: { isNativePlatform?: () => boolean } }).Capacitor
     ?.isNativePlatform?.()
 }
 
 /** Get the current platform */
 export function getPlatform(): "ios" | "android" | "web" {
-  if (typeof window === "undefined") return "web"
-  const cap = (window as unknown as { Capacitor?: { getPlatform?: () => string } }).Capacitor
+  if (typeof globalThis.window === "undefined") return "web"
+  const cap = (globalThis as unknown as { Capacitor?: { getPlatform?: () => string } }).Capacitor
   return (cap?.getPlatform?.() as "ios" | "android") || "web"
 }
 
 /** Check if the app is running as a PWA (standalone) */
 export function isPWA(): boolean {
-  if (typeof window === "undefined") return false
+  if (typeof globalThis.window === "undefined") return false
   return (
-    window.matchMedia("(display-mode: standalone)").matches ||
-    (window.navigator as unknown as { standalone?: boolean }).standalone === true
+    globalThis.matchMedia("(display-mode: standalone)").matches ||
+    (globalThis.navigator as unknown as { standalone?: boolean }).standalone === true
   )
 }
 
@@ -67,7 +67,7 @@ export async function requestPushPermission(): Promise<string | null> {
   }
 
   // Web Push API fallback
-  if ("Notification" in window && "serviceWorker" in navigator) {
+  if ("Notification" in globalThis && "serviceWorker" in navigator) {
     const permission = await Notification.requestPermission()
     if (permission === "granted") {
       const registration = await navigator.serviceWorker.ready
@@ -183,13 +183,13 @@ export async function configureStatusBar(dark: boolean): Promise<void> {
  * Handle safe area insets for notched devices.
  */
 export function getSafeAreaInsets(): { top: number; bottom: number; left: number; right: number } {
-  if (typeof window === "undefined") return { top: 0, bottom: 0, left: 0, right: 0 }
+  if (typeof globalThis.window === "undefined") return { top: 0, bottom: 0, left: 0, right: 0 }
 
   const style = getComputedStyle(document.documentElement)
   return {
-    top: parseInt(style.getPropertyValue("env(safe-area-inset-top)") || "0", 10),
-    bottom: parseInt(style.getPropertyValue("env(safe-area-inset-bottom)") || "0", 10),
-    left: parseInt(style.getPropertyValue("env(safe-area-inset-left)") || "0", 10),
-    right: parseInt(style.getPropertyValue("env(safe-area-inset-right)") || "0", 10),
+    top: Number.parseInt(style.getPropertyValue("env(safe-area-inset-top)") || "0", 10),
+    bottom: Number.parseInt(style.getPropertyValue("env(safe-area-inset-bottom)") || "0", 10),
+    left: Number.parseInt(style.getPropertyValue("env(safe-area-inset-left)") || "0", 10),
+    right: Number.parseInt(style.getPropertyValue("env(safe-area-inset-right)") || "0", 10),
   }
 }

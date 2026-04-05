@@ -42,7 +42,7 @@ interface UpdateOrgBody {
 
 const LOG_PREFIX = "[Organizations]"
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
-const ADMIN_ROLES = ["owner", "admin"]
+const ADMIN_ROLES = new Set(["owner", "admin"])
 
 // Validation limits
 const AI_SESSIONS_MIN = 0
@@ -301,7 +301,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ orgId:
       return Errors.notMember()
     }
 
-    if (!ADMIN_ROLES.includes(membership.role)) {
+    if (!ADMIN_ROLES.has(membership.role)) {
       return Errors.notAdminOrOwner()
     }
 

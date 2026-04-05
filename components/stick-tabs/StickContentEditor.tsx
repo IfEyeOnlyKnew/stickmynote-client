@@ -63,7 +63,7 @@ export function StickContentEditor({
   generatedTags = [],
   generatedLinks = [],
   details = "",
-}: StickContentEditorProps) {
+}: Readonly<StickContentEditorProps>) {
   const topicLength = (topic || "").length
   const contentLength = (content || "").length
   const isEditing = isEditingTopic || isEditingContent
@@ -152,6 +152,7 @@ export function StickContentEditor({
       <dialog
         ref={expandDialogRef}
         onClick={(e) => { if (e.target === expandDialogRef.current) expandDialogRef.current?.close() }}
+        onKeyDown={(e) => { if (e.key === "Escape") expandDialogRef.current?.close() }}
         className="backdrop:bg-black/50 bg-transparent p-0 border-none max-w-[700px] w-[90vw] max-h-[85vh] rounded-lg"
       >
         <div className="bg-white rounded-lg shadow-2xl flex flex-col max-h-[85vh]">
@@ -239,8 +240,8 @@ export function StickContentEditor({
         <div className="space-y-2">
           <span className="text-sm font-medium text-gray-700 block">Related Links</span>
           <div className="space-y-2">
-            {generatedLinks.map((link, index) => (
-              <div key={index} className="flex items-center gap-2">
+            {generatedLinks.map((link) => (
+              <div key={link.url} className="flex items-center gap-2">
                 <ExternalLink className="h-3 w-3 text-blue-600 flex-shrink-0" />
                 <a
                   href={link.url}

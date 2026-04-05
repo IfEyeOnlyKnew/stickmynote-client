@@ -18,7 +18,7 @@ export function SearchEmptyState({
   trendingTags = [],
   onTagClick,
   onClearFilters,
-}: SearchEmptyStateProps) {
+}: Readonly<SearchEmptyStateProps>) {
   if (type === "no-query") {
     return (
       <div className="flex flex-col items-center justify-center py-16 px-4">

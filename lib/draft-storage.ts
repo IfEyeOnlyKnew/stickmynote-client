@@ -83,7 +83,7 @@ export class DraftStorage {
 
       for (const draftId of draftsList) {
         const draft = this.getDraft(draftId)
-        if (draft && draft.padId === padId) {
+        if (draft?.padId === padId) {
           drafts.push(draft)
         }
       }

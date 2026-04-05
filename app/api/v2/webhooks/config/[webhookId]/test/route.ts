@@ -76,7 +76,9 @@ export async function POST(
 
       try {
         responseBody = await response.text()
-      } catch {}
+      } catch {
+        // Response body may be unreadable — log delivery with null body
+      }
 
       // Log the test delivery
       await db.query(

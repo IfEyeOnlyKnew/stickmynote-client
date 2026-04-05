@@ -25,7 +25,7 @@ import {
   Quote, Code, Minus,
   Undo, Redo, Link as LinkIcon, Highlighter,
   Save, X, ExternalLink, FileText,
-  Table as TableIcon, Image as ImageIcon, Youtube as YoutubeIcon,
+  Table as TableIcon, Image as ImageIcon, Video as YoutubeIcon,
   AlignLeft, AlignCenter, AlignRight, AlignJustify,
   ChevronDown, ListTree, Info, AlertTriangle, CheckCircle2, XCircle,
   Columns3, History, Bookmark, PenTool, Mic, ScanLine,
@@ -71,12 +71,12 @@ function ToolbarButton({
   isActive,
   children,
   title,
-}: {
+}: Readonly<{
   onClick: () => void
   isActive?: boolean
   children: React.ReactNode
   title: string
-}) {
+}>) {
   return (
     <Button
       type="button"
@@ -94,7 +94,7 @@ function ToolbarButton({
   )
 }
 
-export function NotedPageEditor({ page, groups, saving, onSave, onCancel, onGroupChange, onSaveAsTemplate }: NotedPageEditorProps) {
+export function NotedPageEditor({ page, groups, saving, onSave, onCancel, onGroupChange, onSaveAsTemplate }: Readonly<NotedPageEditorProps>) {
   const [title, setTitle] = useState(page.title || page.display_title || "")
   const [hasChanges, setHasChanges] = useState(false)
   const [showToc, setShowToc] = useState(false)
@@ -154,7 +154,7 @@ export function NotedPageEditor({ page, groups, saving, onSave, onCancel, onGrou
       const text = el.textContent || ""
       if (text.trim()) {
         headings.push({
-          level: parseInt(el.tagName[1]),
+          level: Number.parseInt(el.tagName[1]),
           text,
           id: `heading-${i}`,
         })
@@ -214,7 +214,7 @@ export function NotedPageEditor({ page, groups, saving, onSave, onCancel, onGrou
 
   const addLink = useCallback(() => {
     if (!editor) return
-    const url = window.prompt("Enter URL:")
+    const url = globalThis.prompt("Enter URL:")
     if (url) {
       editor.chain().focus().setLink({ href: url }).run()
     }
@@ -222,7 +222,7 @@ export function NotedPageEditor({ page, groups, saving, onSave, onCancel, onGrou
 
   const addImage = useCallback(() => {
     if (!editor) return
-    const url = window.prompt("Enter image URL:")
+    const url = globalThis.prompt("Enter image URL:")
     if (url) {
       editor.chain().focus().setImage({ src: url }).run()
     }
@@ -230,7 +230,7 @@ export function NotedPageEditor({ page, groups, saving, onSave, onCancel, onGrou
 
   const addYoutube = useCallback(() => {
     if (!editor) return
-    const url = window.prompt("Enter YouTube URL:")
+    const url = globalThis.prompt("Enter YouTube URL:")
     if (url) {
       editor.chain().focus().setYoutubeVideo({ src: url }).run()
     }
@@ -286,9 +286,12 @@ export function NotedPageEditor({ page, groups, saving, onSave, onCancel, onGrou
   }, [editor])
 
   // Build the source stick URL — link to the specific stick
-  const sourceStickUrl = page.is_personal
-    ? (page.personal_stick_id ? `/personal?stick=${page.personal_stick_id}` : null)
-    : (page.stick_id && page.pad_id ? `/pads/${page.pad_id}?stick=${page.stick_id}` : null)
+  let sourceStickUrl: string | null = null
+  if (page.is_personal && page.personal_stick_id) {
+    sourceStickUrl = `/personal?stick=${page.personal_stick_id}`
+  } else if (!page.is_personal && page.stick_id && page.pad_id) {
+    sourceStickUrl = `/pads/${page.pad_id}?stick=${page.stick_id}`
+  }
 
   if (!editor) return null
 
@@ -691,7 +694,7 @@ export function NotedPageEditor({ page, groups, saving, onSave, onCancel, onGrou
                   {tocHeadings.map((h, i) => (
                     <button
                       type="button"
-                      key={i}
+                      key={h.text}
                       onClick={() => scrollToHeading(i)}
                       className={cn(
                         "w-full text-left px-3 py-1.5 text-xs hover:bg-muted transition-colors truncate",

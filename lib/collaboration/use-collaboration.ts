@@ -33,7 +33,7 @@ const USER_COLORS = [
 
 export function useCollaboration(options: CollaborationOptions) {
   const { documentId, enabled = true, onConnectionChange, onUsersChange } = options
-  const { user } = useUser()
+  useUser()
 
   const [isConnected, setIsConnected] = useState(false)
   const [activeUsers, setActiveUsers] = useState<Array<{ id: string; name: string; color: string }>>([])

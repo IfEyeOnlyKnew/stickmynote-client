@@ -27,7 +27,7 @@ interface CreateConcurStickDialogProps {
   onCreated: () => void
 }
 
-export function CreateConcurStickDialog({ groupId, onClose, onCreated }: CreateConcurStickDialogProps) {
+export function CreateConcurStickDialog({ groupId, onClose, onCreated }: Readonly<CreateConcurStickDialogProps>) {
   const { toast } = useToast()
   const [topic, setTopic] = useState("")
   const [content, setContent] = useState("")

@@ -22,7 +22,7 @@ export function NotedOfflineIndicator({
   syncPending,
   syncing,
   onSync,
-}: NotedOfflineIndicatorProps) {
+}: Readonly<NotedOfflineIndicatorProps>) {
   if (isOnline && syncPending === 0) return null
 
   return (
@@ -62,11 +62,11 @@ export function NotedOfflineIndicator({
             </TooltipTrigger>
             <TooltipContent>
               <p>
-                {syncing
-                  ? "Syncing changes..."
-                  : isOnline
-                    ? "Click to sync pending changes"
-                    : "Changes will sync when back online"}
+                {(() => {
+                  if (syncing) return "Syncing changes..."
+                  if (isOnline) return "Click to sync pending changes"
+                  return "Changes will sync when back online"
+                })()}
               </p>
             </TooltipContent>
           </Tooltip>

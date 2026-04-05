@@ -25,7 +25,7 @@ interface UserSearchResult {
   avatar_url: string | null
 }
 
-export function GiveKudosModal({ open, onOpenChange, onSuccess, preselectedUserId, preselectedUserName }: GiveKudosModalProps) {
+export function GiveKudosModal({ open, onOpenChange, onSuccess, preselectedUserId, preselectedUserName }: Readonly<GiveKudosModalProps>) {
   const [selectedUsers, setSelectedUsers] = useState<UserSearchResult[]>([])
   const [searchQuery, setSearchQuery] = useState("")
   const [searchResults, setSearchResults] = useState<UserSearchResult[]>([])

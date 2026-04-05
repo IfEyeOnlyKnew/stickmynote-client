@@ -20,7 +20,9 @@ export async function GET() {
       },
     }
 
-    const statusCode = healthCheck.overall === "healthy" ? 200 : healthCheck.overall === "degraded" ? 200 : 503
+    let statusCode = 503
+    if (healthCheck.overall === "healthy") statusCode = 200
+    else if (healthCheck.overall === "degraded") statusCode = 200
 
     return NextResponse.json(healthData, { status: statusCode })
   } catch (error) {

@@ -41,7 +41,6 @@ export function RecognitionTab() {
   // Badge awarding
   const [awardModalOpen, setAwardModalOpen] = useState(false)
   const [awardBadgeId, setAwardBadgeId] = useState("")
-  const [awardUserId, setAwardUserId] = useState("")
   const [awardReason, setAwardReason] = useState("")
   const [userSearch, setUserSearch] = useState("")
   const [userResults, setUserResults] = useState<UserSearchResult[]>([])
@@ -257,7 +256,7 @@ export function RecognitionTab() {
                 min={1}
                 max={100}
                 value={settings.points_per_kudos}
-                onChange={(e) => setSettings(s => ({ ...s, points_per_kudos: parseInt(e.target.value) || 1 }))}
+                onChange={(e) => setSettings(s => ({ ...s, points_per_kudos: Number.parseInt(e.target.value) || 1 }))}
               />
             </div>
             <div>
@@ -267,7 +266,7 @@ export function RecognitionTab() {
                 min={1}
                 max={100}
                 value={settings.max_kudos_per_day}
-                onChange={(e) => setSettings(s => ({ ...s, max_kudos_per_day: parseInt(e.target.value) || 10 }))}
+                onChange={(e) => setSettings(s => ({ ...s, max_kudos_per_day: Number.parseInt(e.target.value) || 10 }))}
               />
             </div>
           </div>
@@ -340,7 +339,7 @@ export function RecognitionTab() {
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
               {badges.map(badge => {
-                const tierInfo = BADGE_TIERS[badge.tier as keyof typeof BADGE_TIERS] || BADGE_TIERS.bronze
+                const tierInfo = BADGE_TIERS[badge.tier] || BADGE_TIERS.bronze
                 return (
                   <div key={badge.id} className="flex items-center gap-3 p-3 border rounded-lg" style={{ borderColor: tierInfo.color + "40" }}>
                     <div className="h-10 w-10 rounded-full flex items-center justify-center border-2" style={{ backgroundColor: tierInfo.bgColor, borderColor: tierInfo.color }}>
@@ -412,7 +411,7 @@ export function RecognitionTab() {
               {newBadge.criteriaType !== "manual" && (
                 <div>
                   <Label>Threshold</Label>
-                  <Input type="number" min={1} value={newBadge.criteriaThreshold} onChange={(e) => setNewBadge(b => ({ ...b, criteriaThreshold: parseInt(e.target.value) || 0 }))} />
+                  <Input type="number" min={1} value={newBadge.criteriaThreshold} onChange={(e) => setNewBadge(b => ({ ...b, criteriaThreshold: Number.parseInt(e.target.value) || 0 }))} />
                 </div>
               )}
             </div>
@@ -471,7 +470,7 @@ export function RecognitionTab() {
                 <SelectContent>
                   {badges.filter(b => b.is_active).map(badge => (
                     <SelectItem key={badge.id} value={badge.id}>
-                      {badge.name} ({BADGE_TIERS[badge.tier as keyof typeof BADGE_TIERS]?.label || badge.tier})
+                      {badge.name} ({BADGE_TIERS[badge.tier]?.label || badge.tier})
                     </SelectItem>
                   ))}
                 </SelectContent>

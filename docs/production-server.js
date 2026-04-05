@@ -87,7 +87,13 @@ app.prepare().then(() => {
 
   // HTTP redirect to HTTPS on port 80
   createHttpServer((req, res) => {
-    res.writeHead(301, { Location: `https://${req.headers.host}${req.url}` })
+    // Validate host header to prevent open redirect via user-controlled data (SonarCloud S5146)
+    const allowedHosts = ["stickmynote.com", "www.stickmynote.com", hostname]
+    const requestHost = (req.headers.host || "").replace(/:\d+$/, "")
+    const safeHost = allowedHosts.includes(requestHost) ? req.headers.host : hostname
+    // Ensure URL path is relative (starts with /) to prevent protocol-relative redirect
+    const safePath = req.url?.startsWith("/") ? req.url : "/"
+    res.writeHead(301, { Location: `https://${safeHost}${safePath}` })
     res.end()
   }).listen(httpPort, () => {
     console.log(`> HTTP redirect on port ${httpPort}`)

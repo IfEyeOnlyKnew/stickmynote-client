@@ -18,7 +18,7 @@ interface NotedAudioRecorderProps {
   onInsert: (data: { audioUrl: string; transcript: string }) => void
 }
 
-export function NotedAudioRecorder({ open, onClose, onInsert }: NotedAudioRecorderProps) {
+export function NotedAudioRecorder({ open, onClose, onInsert }: Readonly<NotedAudioRecorderProps>) {
   const [recording, setRecording] = useState(false)
   const [audioBlob, setAudioBlob] = useState<Blob | null>(null)
   const [audioUrl, setAudioUrl] = useState<string | null>(null)
@@ -157,16 +157,17 @@ export function NotedAudioRecorder({ open, onClose, onInsert }: NotedAudioRecord
           <div
             className={cn(
               "w-24 h-24 rounded-full flex items-center justify-center transition-all",
-              recording
-                ? "bg-red-100 dark:bg-red-900/30 animate-pulse"
-                : audioBlob
-                  ? "bg-green-100 dark:bg-green-900/30"
-                  : "bg-muted"
+              (() => {
+                if (recording) return "bg-red-100 dark:bg-red-900/30 animate-pulse"
+                if (audioBlob) return "bg-green-100 dark:bg-green-900/30"
+                return "bg-muted"
+              })()
             )}
           >
-            {recording ? (
+            {recording && (
               <Mic className="h-10 w-10 text-red-500" />
-            ) : audioBlob ? (
+            )}
+            {!recording && audioBlob && (
               <button type="button" onClick={togglePlayback} className="p-2">
                 {playing ? (
                   <Pause className="h-10 w-10 text-green-600" />
@@ -174,7 +175,8 @@ export function NotedAudioRecorder({ open, onClose, onInsert }: NotedAudioRecord
                   <Play className="h-10 w-10 text-green-600" />
                 )}
               </button>
-            ) : (
+            )}
+            {!recording && !audioBlob && (
               <Mic className="h-10 w-10 text-muted-foreground" />
             )}
           </div>

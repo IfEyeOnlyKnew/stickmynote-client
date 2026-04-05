@@ -25,7 +25,7 @@ interface CustomFieldsDialogProps {
   onOpenChange: (open: boolean) => void
 }
 
-export function CustomFieldsDialog({ open, onOpenChange }: CustomFieldsDialogProps) {
+export function CustomFieldsDialog({ open, onOpenChange }: Readonly<CustomFieldsDialogProps>) {
   const [fields, setFields] = useState<CustomField[]>([])
   const [loading, setLoading] = useState(false)
   const [showAddForm, setShowAddForm] = useState(false)
@@ -191,9 +191,10 @@ export function CustomFieldsDialog({ open, onOpenChange }: CustomFieldsDialogPro
         </DialogHeader>
 
         <div className="space-y-4 py-4">
-          {loading ? (
+          {loading && (
             <div className="text-center py-8 text-muted-foreground">Loading...</div>
-          ) : fields.length === 0 && !showAddForm ? (
+          )}
+          {!loading && fields.length === 0 && !showAddForm && (
             <div className="text-center py-8 text-muted-foreground">
               <p className="mb-4">No custom fields yet.</p>
               <Button onClick={() => setShowAddForm(true)}>
@@ -201,7 +202,8 @@ export function CustomFieldsDialog({ open, onOpenChange }: CustomFieldsDialogPro
                 Add First Field
               </Button>
             </div>
-          ) : (
+          )}
+          {!loading && (fields.length > 0 || showAddForm) && (
             <>
               {/* Existing Fields List */}
               {fields.length > 0 && (
@@ -316,16 +318,16 @@ export function CustomFieldsDialog({ open, onOpenChange }: CustomFieldsDialogPro
                         </div>
                         {newField.options && newField.options.length > 0 && (
                           <div className="flex flex-wrap gap-2 mt-2">
-                            {newField.options.map((option, index) => (
+                            {newField.options.map((option, optIdx) => (
                               <div
-                                key={index}
+                                key={option}
                                 className="flex items-center gap-1 px-2 py-1 bg-background border rounded"
                               >
                                 <span className="text-sm">{option}</span>
                                 <Button
                                   variant="ghost"
                                   size="sm"
-                                  onClick={() => removeOption(index)}
+                                  onClick={() => removeOption(optIdx)}
                                   className="h-4 w-4 p-0"
                                 >
                                   <X className="h-3 w-3" />

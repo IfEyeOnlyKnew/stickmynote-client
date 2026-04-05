@@ -97,7 +97,7 @@ export function PadChatPanel({
   isCollapsed = false,
   onToggleCollapse,
   onClose,
-}: PadChatPanelProps) {
+}: Readonly<PadChatPanelProps>) {
   const [messages, setMessages] = useState<PadMessage[]>([])
   const [newMessage, setNewMessage] = useState("")
   const [isLoading, setIsLoading] = useState(true)
@@ -141,78 +141,76 @@ export function PadChatPanel({
     return isWithinOfficeHours(settings)
   }, [settings])
 
+  // Handle notifications for new messages from other users
+  const handleNewMessageNotifications = useCallback((fetchedMessages: PadMessage[]) => {
+    const otherUserMessages = fetchedMessages.filter(msg => msg.user_id !== currentUserId)
+    if (otherUserMessages.length === 0) return
+
+    if (isCollapsed) {
+      setUnreadCount(prev => prev + otherUserMessages.length)
+    }
+
+    // Track unread per user for grouped view
+    if (viewMode === "grouped") {
+      for (const msg of otherUserMessages) {
+        if (expandedUsers.has(msg.user_id)) continue
+        setUnreadPerUser(prev => {
+          const newMap = new Map(prev)
+          newMap.set(msg.user_id, (newMap.get(msg.user_id) || 0) + 1)
+          return newMap
+        })
+      }
+    }
+
+    // Play sound if enabled (once for batch)
+    if (settings?.enable_sounds) {
+      playNotificationSound()
+    }
+
+    // Browser notification for last message from another user
+    const lastOtherMsg = otherUserMessages.at(-1)
+    if (lastOtherMsg?.user) {
+      const senderName = lastOtherMsg.user.full_name || lastOtherMsg.user.email?.split("@")[0] || "Someone"
+      notifyNewMessage(senderName, lastOtherMsg.content)
+    }
+  }, [currentUserId, isCollapsed, viewMode, expandedUsers, settings?.enable_sounds, notifyNewMessage])
+
   // Fetch messages - optimized with cursor-based polling
   // Initial fetch gets all messages, subsequent polls only get new ones
   const fetchMessages = useCallback(async (isInitialFetch = false) => {
     try {
-      // Use cursor for incremental fetches (reduces data transfer by ~99% on polls)
       const cursor = !isInitialFetch && lastMessageIdRef.current
         ? `?after=${lastMessageIdRef.current}`
         : ""
       const response = await fetch(`/api/inference-pads/${padId}/messages${cursor}`)
+      if (!response.ok) return
 
-      if (response.ok) {
-        const data = await response.json()
-        const fetchedMessages: PadMessage[] = data.messages || []
+      const data = await response.json()
+      const fetchedMessages: PadMessage[] = data.messages || []
+      if (fetchedMessages.length === 0) return
 
-        if (fetchedMessages.length > 0) {
-          // Handle new messages from poll
-          if (!isInitialFetch && lastMessageIdRef.current) {
-            // Incremental update - append new messages
-            setMessages(prev => {
-              // Deduplicate just in case
-              const existingIds = new Set(prev.map(m => m.id))
-              const newOnes = fetchedMessages.filter(m => !existingIds.has(m.id))
-              return newOnes.length > 0 ? [...prev, ...newOnes] : prev
-            })
+      const isIncrementalUpdate = !isInitialFetch && lastMessageIdRef.current
 
-            // Notify for each new message from others
-            for (const msg of fetchedMessages) {
-              if (msg.user_id !== currentUserId) {
-                // Track unread
-                if (isCollapsed) {
-                  setUnreadCount(prev => prev + 1)
-                }
-
-                // Track unread per user for grouped view
-                if (viewMode === "grouped" && !expandedUsers.has(msg.user_id)) {
-                  setUnreadPerUser(prev => {
-                    const newMap = new Map(prev)
-                    newMap.set(msg.user_id, (newMap.get(msg.user_id) || 0) + 1)
-                    return newMap
-                  })
-                }
-
-                // Play sound if enabled (once for batch)
-                if (settings?.enable_sounds && msg === fetchedMessages[fetchedMessages.length - 1]) {
-                  playNotificationSound()
-                }
-
-                // Browser notification for moderators
-                if (msg.user) {
-                  const senderName = msg.user.full_name ||
-                    msg.user.email?.split("@")[0] || "Someone"
-                  notifyNewMessage(senderName, msg.content)
-                }
-              }
-            }
-          } else {
-            // Initial fetch - replace all
-            setMessages(fetchedMessages)
-          }
-
-          // Update cursor to latest message
-          const latestMessage = fetchedMessages[fetchedMessages.length - 1]
-          lastMessageIdRef.current = latestMessage.id
-          lastMessageCountRef.current = fetchedMessages.length
-        }
+      if (isIncrementalUpdate) {
+        setMessages(prev => {
+          const existingIds = new Set(prev.map(m => m.id))
+          const newOnes = fetchedMessages.filter(m => !existingIds.has(m.id))
+          return newOnes.length > 0 ? [...prev, ...newOnes] : prev
+        })
+        handleNewMessageNotifications(fetchedMessages)
+      } else {
+        setMessages(fetchedMessages)
       }
+
+      const latestMessage = fetchedMessages.at(-1)!
+      lastMessageIdRef.current = latestMessage.id
+      lastMessageCountRef.current = fetchedMessages.length
     } catch (error) {
       console.error("[PadChat] Error fetching messages:", error)
     } finally {
       setIsLoading(false)
     }
-  }, [padId, isCollapsed, settings?.enable_sounds, currentUserId, notifyNewMessage, viewMode, expandedUsers])
+  }, [padId, handleNewMessageNotifications])
 
   // Fetch settings and moderators
   const fetchSettingsAndModerators = useCallback(async () => {
@@ -545,7 +543,8 @@ export function PadChatPanel({
 
   if (isCollapsed) {
     return (
-      <div
+      <button
+        type="button"
         className="fixed bottom-4 right-4 z-50 bg-white rounded-lg shadow-xl border border-purple-200 cursor-pointer hover:shadow-2xl transition-all hover:scale-105"
         onClick={() => {
           onToggleCollapse?.()
@@ -562,7 +561,7 @@ export function PadChatPanel({
           )}
           <ChevronUp className="h-4 w-4 text-gray-500 ml-2" />
         </div>
-      </div>
+      </button>
     )
   }
 
@@ -698,23 +697,19 @@ export function PadChatPanel({
           onScroll={handleScroll}
           className="flex-1 overflow-y-auto p-3 space-y-3 bg-gray-50 relative"
         >
-          {isLoading ? (
+          {isLoading && (
             <div className="flex items-center justify-center h-full">
               <Loader2 className="w-6 h-6 animate-spin text-purple-500" />
             </div>
-          ) : !settings?.chat_enabled ? (
-            <div className="flex flex-col items-center justify-center h-full text-gray-500 text-center">
-              <AlertCircle className="h-8 w-8 mb-2 opacity-50" />
-              <p className="text-sm">Chat is disabled</p>
-              <p className="text-xs">Contact the pad owner to enable chat</p>
-            </div>
-          ) : messages.length === 0 ? (
+          )}
+          {!isLoading && settings?.chat_enabled && messages.length === 0 && (
             <div className="flex flex-col items-center justify-center h-full text-gray-500 text-center">
               <MessageSquare className="h-8 w-8 mb-2 opacity-50" />
               <p className="text-sm">No messages yet</p>
               <p className="text-xs">Start the conversation!</p>
             </div>
-          ) : viewMode === "grouped" && isModerator ? (
+          )}
+          {!isLoading && settings?.chat_enabled && messages.length > 0 && viewMode === "grouped" && isModerator && (
             /* Grouped view for moderators */
             <div className="space-y-2">
               {groupedMessages.map((group) => {
@@ -756,7 +751,7 @@ export function PadChatPanel({
                           )}
                         </div>
                         <p className="text-xs text-gray-500 truncate">
-                          {group.messages.length} message{group.messages.length !== 1 ? "s" : ""} · Last {formatMessageTime(group.lastMessageTime)}
+                          {group.messages.length} message{group.messages.length === 1 ? "" : "s"} · Last {formatMessageTime(group.lastMessageTime)}
                         </p>
                       </div>
                       <div className="flex items-center gap-2">
@@ -807,7 +802,8 @@ export function PadChatPanel({
                 )
               })}
             </div>
-          ) : (
+          )}
+          {!isLoading && settings?.chat_enabled && messages.length > 0 && !(viewMode === "grouped" && isModerator) && (
             /* Chronological view (default) */
             messages.filter(m => !m.is_deleted).map((msg) => {
               const isOwnMessage = msg.user_id === currentUserId
@@ -855,11 +851,11 @@ export function PadChatPanel({
                   <div className={`max-w-[75%] ${isOwnMessage ? "text-right" : ""}`}>
                     <div
                       className={`relative inline-block rounded-lg px-3 py-2 ${
-                        msg.is_ai_message
-                          ? "bg-gradient-to-r from-purple-100 to-blue-100 text-gray-900 border border-purple-200"
-                          : isOwnMessage
-                          ? "bg-purple-600 text-white"
-                          : "bg-white text-gray-900 border"
+                        (() => {
+                          if (msg.is_ai_message) return "bg-gradient-to-r from-purple-100 to-blue-100 text-gray-900 border border-purple-200"
+                          if (isOwnMessage) return "bg-purple-600 text-white"
+                          return "bg-white text-gray-900 border"
+                        })()
                       }`}
                     >
                       {/* AI badge */}
@@ -984,6 +980,13 @@ export function PadChatPanel({
               )
             })
           )}
+          {!isLoading && !settings?.chat_enabled && (
+            <div className="flex flex-col items-center justify-center h-full text-gray-500 text-center">
+              <AlertCircle className="h-8 w-8 mb-2 opacity-50" />
+              <p className="text-sm">Chat is disabled</p>
+              <p className="text-xs">Contact the pad owner to enable chat</p>
+            </div>
+          )}
 
           {/* Typing indicator */}
           {typingUsers.length > 0 && (
@@ -1014,7 +1017,11 @@ export function PadChatPanel({
 
         {/* Input area */}
         <div className="p-3 border-t bg-white rounded-b-lg">
-          {settings?.chat_enabled !== false ? (
+          {settings?.chat_enabled === false ? (
+            <p className="text-xs text-gray-500 text-center py-2">
+              Chat is currently disabled
+            </p>
+          ) : (
             <>
               <div className="flex gap-2">
                 <Textarea
@@ -1053,10 +1060,6 @@ export function PadChatPanel({
                 )}
               </div>
             </>
-          ) : (
-            <p className="text-xs text-gray-500 text-center py-2">
-              Chat is currently disabled
-            </p>
           )}
         </div>
       </div>

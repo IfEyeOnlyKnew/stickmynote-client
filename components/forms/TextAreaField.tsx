@@ -29,8 +29,8 @@ export function TextAreaField({
   maxLength,
   showCharCount = true,
   className = "",
-}: TextAreaFieldProps) {
-  const id = `textarea-${label.toLowerCase().replace(/\s+/g, "-")}`
+}: Readonly<TextAreaFieldProps>) {
+  const id = `textarea-${label.toLowerCase().replaceAll(/\s+/g, "-")}`
   const safeValue = value || ""
 
   return (

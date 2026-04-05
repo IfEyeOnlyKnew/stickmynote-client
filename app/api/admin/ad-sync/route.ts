@@ -94,8 +94,8 @@ export async function GET(request: NextRequest) {
     const adUsers = await db.query(`SELECT COUNT(*) as count FROM users WHERE distinguished_name IS NOT NULL`)
 
     return NextResponse.json({
-      totalUsers: parseInt(totalUsers.rows[0].count, 10),
-      adUsers: parseInt(adUsers.rows[0].count, 10),
+      totalUsers: Number.parseInt(totalUsers.rows[0].count, 10),
+      adUsers: Number.parseInt(adUsers.rows[0].count, 10),
     })
   } catch (error) {
     console.error("[AD Sync] GET error:", error)

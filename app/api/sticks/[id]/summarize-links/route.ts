@@ -4,6 +4,42 @@ import { db } from "@/lib/database/pg-client"
 import { summarizeLinks, formatSummariesAsHtml } from "@/lib/ai/url-summarizer"
 import { isAIAvailable } from "@/lib/ai/ai-provider"
 
+async function verifyStickAccess(stick: any, userId: string): Promise<boolean> {
+  if (stick.user_id === userId || stick.pad_owner_id === userId) return true
+  const memberResult = await db.query(
+    `SELECT 1 FROM paks_pad_members WHERE pad_id = $1 AND user_id = $2`,
+    [stick.pad_id, userId],
+  )
+  return memberResult.rows.length > 0
+}
+
+async function upsertDetailsTab(stickId: string, userId: string, orgId: string, htmlSummary: string): Promise<void> {
+  const detailsTabResult = await db.query(
+    `SELECT id, tab_data FROM paks_pad_stick_tabs
+     WHERE stick_id = $1 AND tab_type = 'details'
+     ORDER BY created_at DESC LIMIT 1`,
+    [stickId],
+  )
+
+  const existingContent = detailsTabResult.rows[0]?.tab_data?.content || ""
+  const newContent = existingContent ? `${existingContent}\n\n<hr>\n\n${htmlSummary}` : htmlSummary
+
+  if (detailsTabResult.rows.length > 0) {
+    await db.query(
+      `UPDATE paks_pad_stick_tabs SET tab_data = $1, updated_at = NOW() WHERE id = $2`,
+      [JSON.stringify({ content: newContent }), detailsTabResult.rows[0].id],
+    )
+  } else {
+    await db.query(
+      `INSERT INTO paks_pad_stick_tabs (stick_id, user_id, org_id, tab_type, tab_name, tab_data, tab_order)
+       VALUES ($1, $2, $3, 'details', 'Details', $4, 3)`,
+      [stickId, userId, orgId, JSON.stringify({ content: newContent })],
+    )
+  }
+
+  await db.query(`UPDATE paks_pad_sticks SET details = $1, updated_at = NOW() WHERE id = $2`, [newContent, stickId])
+}
+
 export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const session = await getSession()
@@ -38,15 +74,9 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
 
     // Verify user has access (owner of stick or pad)
     const userId = session.user.id
-    if (stick.user_id !== userId && stick.pad_owner_id !== userId) {
-      // Check if user is a member of the pad
-      const memberResult = await db.query(
-        `SELECT 1 FROM paks_pad_members WHERE pad_id = $1 AND user_id = $2`,
-        [stick.pad_id, userId]
-      )
-      if (memberResult.rows.length === 0) {
-        return NextResponse.json({ error: "Access denied" }, { status: 403 })
-      }
+    const hasAccess = await verifyStickAccess(stick, userId)
+    if (!hasAccess) {
+      return NextResponse.json({ error: "Access denied" }, { status: 403 })
     }
 
     // Get the links from the stick's tabs
@@ -62,7 +92,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
 
     if (linksTabResult.rows.length > 0) {
       const tabData = linksTabResult.rows[0].tab_data
-      if (tabData && tabData.hyperlinks) {
+      if (tabData?.hyperlinks) {
         links = tabData.hyperlinks
       }
     }
@@ -87,50 +117,8 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     // Format as HTML for the Details tab
     const htmlSummary = formatSummariesAsHtml(result)
 
-    // Get existing details content
-    const detailsTabResult = await db.query(
-      `SELECT id, tab_data FROM paks_pad_stick_tabs
-       WHERE stick_id = $1 AND tab_type = 'details'
-       ORDER BY created_at DESC
-       LIMIT 1`,
-      [stickId]
-    )
-
-    // Prepare the new details content (append to existing)
-    let existingContent = ""
-    if (detailsTabResult.rows.length > 0) {
-      const existingData = detailsTabResult.rows[0].tab_data
-      if (existingData && existingData.content) {
-        existingContent = existingData.content
-      }
-    }
-
-    // Add separator if there's existing content
-    const newContent = existingContent
-      ? `${existingContent}\n\n<hr>\n\n${htmlSummary}`
-      : htmlSummary
-
-    // Update or create the details tab
-    if (detailsTabResult.rows.length > 0) {
-      await db.query(
-        `UPDATE paks_pad_stick_tabs
-         SET tab_data = $1, updated_at = NOW()
-         WHERE id = $2`,
-        [JSON.stringify({ content: newContent }), detailsTabResult.rows[0].id]
-      )
-    } else {
-      await db.query(
-        `INSERT INTO paks_pad_stick_tabs (stick_id, user_id, org_id, tab_type, tab_name, tab_data, tab_order)
-         VALUES ($1, $2, $3, 'details', 'Details', $4, 3)`,
-        [stickId, userId, stick.org_id, JSON.stringify({ content: newContent })]
-      )
-    }
-
-    // Also update the stick's details field for quick access
-    await db.query(
-      `UPDATE paks_pad_sticks SET details = $1, updated_at = NOW() WHERE id = $2`,
-      [newContent, stickId]
-    )
+    // Upsert details tab content with the summary
+    await upsertDetailsTab(stickId, userId, stick.org_id, htmlSummary)
 
     return NextResponse.json({
       success: true,

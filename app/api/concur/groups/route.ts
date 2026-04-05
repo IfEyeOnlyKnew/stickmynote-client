@@ -26,6 +26,35 @@ interface ConcurGroup {
 
 const LOG_PREFIX = "[ConcurGroups]"
 
+async function addGroupOwners(db: any, groupId: string, orgId: string, addedBy: string, owner1Id: string, owner2Id: string): Promise<boolean> {
+  const { error: err1 } = await db.from("concur_group_members").insert({ group_id: groupId, user_id: owner1Id, org_id: orgId, role: "owner", added_by: addedBy })
+  if (err1) return true
+
+  if (owner1Id !== owner2Id) {
+    const { error: err2 } = await db.from("concur_group_members").insert({ group_id: groupId, user_id: owner2Id, org_id: orgId, role: "owner", added_by: addedBy })
+    if (err2) return true
+  }
+
+  return false
+}
+
+async function addAdminsToGroup(db: any, groupId: string, orgId: string, addedBy: string, ownerIds: string[]): Promise<void> {
+  const ownerSet = new Set(ownerIds)
+  const { data: admins } = await db.from("concur_administrators").select("user_id").eq("org_id", orgId)
+  if (!admins?.length) return
+
+  for (const admin of admins) {
+    if (ownerSet.has(admin.user_id)) continue
+    await db.from("concur_group_members").insert({ group_id: groupId, user_id: admin.user_id, org_id: orgId, role: "owner", added_by: addedBy })
+  }
+}
+
+function handleConcurAuthError(error: string | undefined): NextResponse {
+  if (error === "RATE_LIMITED") return Errors.rateLimit()
+  if (error === "UNAUTHORIZED") return Errors.unauthorized()
+  return Errors.noOrgContext()
+}
+
 const Errors = {
   rateLimit: () => createRateLimitResponse(),
   unauthorized: () => createUnauthorizedResponse(),
@@ -59,15 +88,10 @@ async function getAuthenticatedOrgContext() {
 export async function GET() {
   try {
     const authResult = await getAuthenticatedOrgContext()
-    if ("error" in authResult) {
-      if (authResult.error === "RATE_LIMITED") return Errors.rateLimit()
-      if (authResult.error === "UNAUTHORIZED") return Errors.unauthorized()
-      return Errors.noOrgContext()
-    }
+    if ("error" in authResult) return handleConcurAuthError(authResult.error)
 
     const { user, orgContext } = authResult
     const db = await createDatabaseClient()
-    const serviceDb = await createServiceDatabaseClient()
 
     // Get groups where user is a member
     const { data: memberships, error: memberError } = await db
@@ -150,11 +174,7 @@ export async function GET() {
 export async function POST(request: Request) {
   try {
     const authResult = await getAuthenticatedOrgContext()
-    if ("error" in authResult) {
-      if (authResult.error === "RATE_LIMITED") return Errors.rateLimit()
-      if (authResult.error === "UNAUTHORIZED") return Errors.unauthorized()
-      return Errors.noOrgContext()
-    }
+    if ("error" in authResult) return handleConcurAuthError(authResult.error)
 
     const { user, orgContext } = authResult
     const db = await createDatabaseClient()
@@ -204,44 +224,15 @@ export async function POST(request: Request) {
       return Errors.createFailed()
     }
 
-    // Add both owners as members with 'owner' role (insert one at a time - adapter doesn't support array inserts)
-    const { error: owner1MemberError } = await db
-      .from("concur_group_members")
-      .insert({ group_id: group.id, user_id: owner1.id, org_id: orgContext.orgId, role: "owner", added_by: user.id })
-
-    if (owner1MemberError) {
+    // Add both owners as members with 'owner' role
+    const addOwnerError = await addGroupOwners(db, group.id, orgContext.orgId, user.id, owner1.id, owner2.id)
+    if (addOwnerError) {
       await db.from("concur_groups").delete().eq("id", group.id)
       return Errors.createFailed()
     }
 
-    // Add second owner (skip if same person)
-    if (owner1.id !== owner2.id) {
-      const { error: owner2MemberError } = await db
-        .from("concur_group_members")
-        .insert({ group_id: group.id, user_id: owner2.id, org_id: orgContext.orgId, role: "owner", added_by: user.id })
-
-      if (owner2MemberError) {
-        await db.from("concur_groups").delete().eq("id", group.id)
-        return Errors.createFailed()
-      }
-    }
-
     // Auto-add Concur administrators as members
-    const ownerIds = new Set([owner1.id, owner2.id])
-    const { data: admins } = await db
-      .from("concur_administrators")
-      .select("user_id")
-      .eq("org_id", orgContext.orgId)
-
-    if (admins && admins.length > 0) {
-      for (const admin of admins) {
-        // Skip if already added as owner
-        if (ownerIds.has(admin.user_id)) continue
-        await db
-          .from("concur_group_members")
-          .insert({ group_id: group.id, user_id: admin.user_id, org_id: orgContext.orgId, role: "owner", added_by: user.id })
-      }
-    }
+    await addAdminsToGroup(db, group.id, orgContext.orgId, user.id, [owner1.id, owner2.id])
 
     // Broadcast event
     publishToOrg(orgContext.orgId, {

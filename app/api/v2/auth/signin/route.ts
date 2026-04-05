@@ -57,7 +57,7 @@ export async function POST(request: NextRequest) {
     await recordLoginAttempt(normalizedEmail, true)
 
     // Set auth cookie
-    const cookieStore = await cookies()
+    const cookieStore = cookies()
     cookieStore.set('session', token, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',

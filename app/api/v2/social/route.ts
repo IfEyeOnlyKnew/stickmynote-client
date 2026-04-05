@@ -2,7 +2,6 @@
 import { NextRequest } from 'next/server'
 import { requireADSession } from '@/lib/auth/ad-session'
 import { listSocialNotifications, createSocialNotification, markNotificationRead, markAllNotificationsRead } from '@/lib/handlers/social-handler'
-import { requireId } from '@/lib/api/validate'
 
 // GET /api/v2/social - List notifications for user/org
 export async function GET(request: NextRequest) {

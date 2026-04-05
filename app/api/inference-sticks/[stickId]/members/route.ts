@@ -182,7 +182,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ sti
     const auth = await validateAuth()
     if (auth.error) return auth.error
 
-    const user = auth.user!
+    const user = auth.user
     const { email } = await request.json()
 
     if (!email?.trim()) {

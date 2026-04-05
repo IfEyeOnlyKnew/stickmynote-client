@@ -31,12 +31,12 @@ export function useNotedOffline() {
     const handleOffline = () => setIsOnline(false)
 
     setIsOnline(navigator.onLine)
-    window.addEventListener("online", handleOnline)
-    window.addEventListener("offline", handleOffline)
+    globalThis.addEventListener("online", handleOnline)
+    globalThis.addEventListener("offline", handleOffline)
 
     return () => {
-      window.removeEventListener("online", handleOnline)
-      window.removeEventListener("offline", handleOffline)
+      globalThis.removeEventListener("online", handleOnline)
+      globalThis.removeEventListener("offline", handleOffline)
     }
   }, [])
 

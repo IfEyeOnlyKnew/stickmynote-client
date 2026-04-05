@@ -30,7 +30,7 @@ interface EnhancedSearchBarProps {
   placeholder?: string
 }
 
-export function EnhancedSearchBar({ items, onResultsChange, placeholder }: EnhancedSearchBarProps) {
+export function EnhancedSearchBar({ items, onResultsChange, placeholder }: Readonly<EnhancedSearchBarProps>) {
   const {
     query,
     setQuery,
@@ -39,7 +39,6 @@ export function EnhancedSearchBar({ items, onResultsChange, placeholder }: Enhan
     activeFilter,
     searchHistory,
     saveFilter,
-    deleteFilter,
     applyFilter,
     clearFilter,
     clearHistory,
@@ -95,8 +94,8 @@ export function EnhancedSearchBar({ items, onResultsChange, placeholder }: Enhan
             <DropdownMenuSeparator />
             {searchHistory.length > 0 ? (
               <>
-                {searchHistory.map((item, index) => (
-                  <DropdownMenuItem key={index} onClick={() => setQuery(item)}>
+                {searchHistory.map((item) => (
+                  <DropdownMenuItem key={item} onClick={() => setQuery(item)}>
                     <History className="h-4 w-4 mr-2" />
                     {item}
                   </DropdownMenuItem>
@@ -157,7 +156,7 @@ export function EnhancedSearchBar({ items, onResultsChange, placeholder }: Enhan
 
       {results.length > 0 && query && (
         <p className="text-sm text-muted-foreground">
-          Found {results.length} result{results.length !== 1 ? "s" : ""}
+          Found {results.length} result{results.length === 1 ? "" : "s"}
         </p>
       )}
 

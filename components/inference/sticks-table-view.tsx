@@ -28,7 +28,7 @@ interface SticksTableViewProps {
   groupByPad?: boolean
 }
 
-export function SticksTableView({ sticks, groupByPad = false }: SticksTableViewProps) {
+export function SticksTableView({ sticks, groupByPad = false }: Readonly<SticksTableViewProps>) {
   const router = useRouter()
 
   if (sticks.length === 0) {

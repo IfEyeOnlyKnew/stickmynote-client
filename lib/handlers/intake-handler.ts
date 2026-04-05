@@ -1,5 +1,4 @@
 // Intake handler logic - extracted for testability
-import { handleApiError } from '@/lib/api/handle-api-error'
 import { querySingle, query } from '@/lib/database/pg-helpers'
 import { requireString, requireOptionalString } from '@/lib/api/validate'
 

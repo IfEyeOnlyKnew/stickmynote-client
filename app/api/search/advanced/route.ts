@@ -22,7 +22,7 @@ export async function POST(request: Request) {
     let paramIndex = 2
 
     // Apply text search
-    if (query && query.trim()) {
+    if (query?.trim()) {
       const searchTerm = query.trim().toLowerCase()
       if (query.includes(":")) {
         // Topic-only search

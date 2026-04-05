@@ -36,7 +36,7 @@ interface SignInFormProps {
   isLoading: boolean
 }
 
-export function SignInForm({ onSubmit, isLoading }: SignInFormProps) {
+export function SignInForm({ onSubmit, isLoading }: Readonly<SignInFormProps>) {
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [showPassword, setShowPassword] = useState(false)
@@ -47,7 +47,7 @@ export function SignInForm({ onSubmit, isLoading }: SignInFormProps) {
 
   useEffect(() => {
     const checkOrganization = async () => {
-      if (!email || !email.includes("@")) {
+      if (!email?.includes("@")) {
         setOrgInfo(null)
         setAuthMethod(null)
         return
@@ -101,7 +101,7 @@ export function SignInForm({ onSubmit, isLoading }: SignInFormProps) {
 
       if (res.ok) {
         const { redirectUrl } = await res.json()
-        window.location.href = redirectUrl
+        globalThis.location.href = redirectUrl
       } else {
         const data = await res.json()
         console.error("SSO initiation failed:", data.error)
@@ -145,15 +145,17 @@ export function SignInForm({ onSubmit, isLoading }: SignInFormProps) {
         <Alert className={orgInfo.isMember ? "border-green-200 bg-green-50" : "border-yellow-200 bg-yellow-50"}>
           <Building2 className={`h-4 w-4 ${orgInfo.isMember ? "text-green-600" : "text-yellow-600"}`} />
           <AlertDescription>
-            {orgInfo.isMember ? (
+            {orgInfo.isMember && (
               <span className="text-green-700">
                 You are a member of <strong>{orgInfo.organization?.name}</strong>
               </span>
-            ) : orgInfo.hasPendingRequest ? (
+            )}
+            {!orgInfo.isMember && orgInfo.hasPendingRequest && (
               <span className="text-yellow-700">
                 Your access request to <strong>{orgInfo.organization?.name}</strong> is pending approval.
               </span>
-            ) : (
+            )}
+            {!orgInfo.isMember && !orgInfo.hasPendingRequest && (
               <div className="text-yellow-700">
                 <p>
                   Organization <strong>{orgInfo.organization?.name}</strong> found for your domain.

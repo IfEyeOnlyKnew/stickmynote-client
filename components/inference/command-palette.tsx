@@ -38,7 +38,7 @@ export function CommandPalette({
   recentPads = [],
   onCreateStick,
   onCreatePad,
-}: CommandPaletteProps) {
+}: Readonly<CommandPaletteProps>) {
   const router = useRouter()
   const [search, setSearch] = useState("")
 

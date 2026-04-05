@@ -25,7 +25,9 @@ export async function saveStickTab(id: string, tabType: string, data: any): Prom
   try {
     console.log("[v0] saveStickTab called with:", { id, tabType, data })
 
-    const mappedTabType = tabType === "video" ? "videos" : tabType === "image" ? "images" : tabType
+    let mappedTabType = tabType
+    if (tabType === "video") mappedTabType = "videos"
+    else if (tabType === "image") mappedTabType = "images"
 
     const response = await fetch(`/api/sticks/${id}/tabs`, {
       method: "PUT",

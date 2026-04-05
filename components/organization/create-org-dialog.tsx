@@ -22,7 +22,7 @@ interface CreateOrgDialogProps {
   onOpenChange: (open: boolean) => void
 }
 
-export function CreateOrgDialog({ open, onOpenChange }: CreateOrgDialogProps) {
+export function CreateOrgDialog({ open, onOpenChange }: Readonly<CreateOrgDialogProps>) {
   const { createOrganization, switchOrganization } = useOrganization()
   const { toast } = useToast()
 

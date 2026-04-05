@@ -4,7 +4,7 @@ import { getCachedAuthUser, createRateLimitResponse, createUnauthorizedResponse 
 import { getOrgContext } from "@/lib/auth/get-org-context"
 import { validateCSRFMiddleware } from "@/lib/csrf"
 import { publishToUser } from "@/lib/ws/publish-event"
-import type { ChatRequest, ChatRequestStatus } from "@/types/chat-request"
+import type { ChatRequest } from "@/types/chat-request"
 
 /**
  * CHAT REQUESTS API
@@ -166,7 +166,7 @@ async function enrichRequestWithUsers(
     parent_reply: parentReply ? {
       id: parentReply.id,
       content: parentReply.content,
-      user: parentReplyUser || undefined,
+      user: parentReplyUser ?? undefined,
     } : undefined,
   }
 }

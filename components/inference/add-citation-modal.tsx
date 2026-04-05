@@ -28,7 +28,7 @@ interface AddCitationModalProps {
   onCitationAdded: () => void
 }
 
-export function AddCitationModal({ open, onOpenChange, stickId, padId, onCitationAdded }: AddCitationModalProps) {
+export function AddCitationModal({ open, onOpenChange, stickId, padId, onCitationAdded }: Readonly<AddCitationModalProps>) {
   const [citationType, setCitationType] = useState("reference")
   const [sourceType, setSourceType] = useState<"kb" | "external">("kb")
   const [selectedKBArticle, setSelectedKBArticle] = useState<string>("")

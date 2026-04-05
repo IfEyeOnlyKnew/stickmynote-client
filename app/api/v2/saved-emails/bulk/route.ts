@@ -88,9 +88,9 @@ export async function POST(request: NextRequest) {
       const lines = fileText.split(/\r?\n/).filter((line) => line.trim())
       emailsToInsert = lines
         .map((line) => {
-          const trimmedLine = line.trim().replace(/^["']|["']$/g, '')
+          const trimmedLine = line.trim().replaceAll(/^["']|["']$/g, '')
           if (trimmedLine.includes(',')) {
-            const [email, name] = trimmedLine.split(',').map((s) => s.trim().replace(/^["']|["']$/g, ''))
+            const [email, name] = trimmedLine.split(',').map((s) => s.trim().replaceAll(/^["']|["']$/g, ''))
             return { email: email?.toLowerCase(), name: name || null }
           } else {
             return { email: trimmedLine.toLowerCase(), name: null }

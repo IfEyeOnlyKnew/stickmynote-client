@@ -19,7 +19,7 @@ const PERMISSION_LABELS = {
   can_pin_sticks: "Pin",
 }
 
-export function PermissionMatrixView({ members, onEditMember }: PermissionMatrixViewProps) {
+export function PermissionMatrixView({ members, onEditMember }: Readonly<PermissionMatrixViewProps>) {
   return (
     <Card>
       <CardHeader>

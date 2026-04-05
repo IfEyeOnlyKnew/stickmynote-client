@@ -43,7 +43,7 @@ const DEFAULT_DLP: DLPSettings = {
   default_sensitivity: "internal",
 }
 
-export function DLPTab({ currentOrgId }: DLPTabProps) {
+export function DLPTab({ currentOrgId }: Readonly<DLPTabProps>) {
   const [dlp, setDlp] = useState<DLPSettings>(DEFAULT_DLP)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)

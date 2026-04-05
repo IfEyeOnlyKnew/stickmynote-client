@@ -82,10 +82,8 @@ function generateSearchQueries(topic: string): string[] {
   // Create search queries directly from topic without AI
   const queries: string[] = []
 
-  if (topic && topic.trim()) {
-    queries.push(topic.trim())
-    queries.push(`${topic.trim()} tutorial`)
-    queries.push(`${topic.trim()} guide`)
+  if (topic?.trim()) {
+    queries.push(topic.trim(), `${topic.trim()} tutorial`, `${topic.trim()} guide`)
   }
 
   return queries.slice(0, 3)

@@ -64,11 +64,8 @@ export function UnifiedTabs({
   onGenerateTags,
   isGeneratingTags,
   showBadges = false,
-}: UnifiedTabsProps) {
+}: Readonly<UnifiedTabsProps>) {
   const [activeTab, setActiveTab] = useState("main")
-  const [topic, setTopic] = useState(initialTopic)
-  const [content, setContent] = useState(initialContent)
-  const [details, setDetails] = useState(initialDetails)
   const [tabs, setTabs] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
 
@@ -95,8 +92,8 @@ export function UnifiedTabs({
   const videos: VideoItem[] = useMemo(() => {
     const result: VideoItem[] = []
     tabs.forEach((tab) => {
-      if (tab.tab_type === "videos" && (tab.tab_data as any)?.videos) {
-        result.push(...(tab.tab_data as any).videos)
+      if (tab.tab_type === "videos" && tab.tab_data?.videos) {
+        result.push(...tab.tab_data.videos)
       }
     })
     return result
@@ -105,55 +102,12 @@ export function UnifiedTabs({
   const images: ImageItem[] = useMemo(() => {
     const result: ImageItem[] = []
     tabs.forEach((tab) => {
-      if (tab.tab_type === "images" && (tab.tab_data as any)?.images) {
-        result.push(...(tab.tab_data as any).images)
+      if (tab.tab_type === "images" && tab.tab_data?.images) {
+        result.push(...tab.tab_data.images)
       }
     })
     return result
   }, [tabs])
-
-  const generatedTags: string[] = useMemo(() => {
-    if (!config.isStick) return []
-    const tagsTab = tabs.find((tab) => tab.tab_type === "tags")
-    if (tagsTab) {
-      const tabData = tagsTab.tab_data as any
-      if (tabData?.tags && Array.isArray(tabData.tags)) {
-        return tabData.tags
-      }
-    }
-    return []
-  }, [tabs, config.isStick])
-
-  const generatedLinks: Array<{ title: string; url: string }> = useMemo(() => {
-    if (!config.isStick) return []
-    const linksTab = tabs.find((tab) => tab.tab_type === "links")
-    if (linksTab) {
-      const tabData = linksTab.tab_data as any
-      if (tabData?.hyperlinks && Array.isArray(tabData.hyperlinks)) {
-        return tabData.hyperlinks
-      }
-    }
-    return []
-  }, [tabs, config.isStick])
-
-  useEffect(() => {
-    setDetails(initialDetails)
-  }, [initialDetails])
-
-  const handleTopicChange = (newTopic: string) => {
-    setTopic(newTopic)
-    onTopicChange?.(newTopic)
-  }
-
-  const handleContentChange = (newContent: string) => {
-    setContent(newContent)
-    onContentChange?.(newContent)
-  }
-
-  const handleDetailsChange = (newDetails: string) => {
-    setDetails(newDetails)
-    onDetailsChange?.(newDetails)
-  }
 
   if (loading) {
     return (

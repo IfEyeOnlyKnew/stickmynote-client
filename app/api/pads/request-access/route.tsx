@@ -48,7 +48,7 @@ export async function POST(request: Request) {
       .eq("user_id", user.id)
       .single()
 
-    if (existingRequest && existingRequest.status === "pending") {
+    if (existingRequest?.status === "pending") {
       return NextResponse.json({ error: "You already have a pending request for this Pad" }, { status: 400 })
     }
 

@@ -45,12 +45,11 @@ async function fetchSearXNGResults(query: string): Promise<Hyperlink[]> {
 function generateSearchQueries(topic: string, content: string): string[] {
   const queries: string[] = []
 
-  if (topic && topic.trim()) {
-    queries.push(topic.trim())
-    queries.push(`${topic.trim()} tutorial`)
+  if (topic?.trim()) {
+    queries.push(topic.trim(), `${topic.trim()} tutorial`)
   }
 
-  if (content && content.trim()) {
+  if (content?.trim()) {
     const firstPhrase = content.trim().substring(0, 100).split(/[.!?]/)[0]?.trim()
     if (firstPhrase && firstPhrase.length > 5 && !queries.includes(firstPhrase)) {
       queries.push(firstPhrase)

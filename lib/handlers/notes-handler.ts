@@ -1,6 +1,6 @@
 // Notes handler logic - extracted for testability
 import { query, querySingle } from '@/lib/database/pg-helpers'
-import { requireString, requireId, requireOptionalString } from '@/lib/api/validate'
+import { requireId, requireOptionalString } from '@/lib/api/validate'
 
 export interface NotesSession {
   user: { id: string; org_id?: string }
@@ -41,7 +41,7 @@ export async function listNotes(session: NotesSession, limit = 50, offset = 0) {
       'SELECT COUNT(*) as count FROM personal_sticks WHERE user_id = $1',
       [session.user.id]
     )
-    const total = parseInt(countResult[0]?.count || '0', 10)
+    const total = Number.parseInt(countResult[0]?.count || '0', 10)
 
     // Get note IDs for fetching related data
     const noteIds = notes.map((n: { id: string }) => n.id)

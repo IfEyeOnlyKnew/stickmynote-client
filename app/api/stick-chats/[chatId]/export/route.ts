@@ -233,21 +233,14 @@ export async function POST(
         children: [
           new TextRunClass({ text: `Participants: ${chat.members?.length || 1}`, italics: true }),
         ],
-      })
-    )
-
-    docChildren.push(
+      }),
       new ParagraphClass({
         children: [
           new TextRunClass({ text: `Messages: ${messages.length}`, italics: true }),
         ],
-      })
-    )
-
-    docChildren.push(new ParagraphClass({ text: "" })) // Spacer
-
-    // AI Summary Section
-    docChildren.push(
+      }),
+      new ParagraphClass({ text: "" }), // Spacer
+      // AI Summary Section
       new ParagraphClass({
         text: "Executive Summary",
         heading: HeadingLevel.HEADING_2,
@@ -263,10 +256,9 @@ export async function POST(
       )
     }
 
-    docChildren.push(new ParagraphClass({ text: "" })) // Spacer
-
-    // Full Conversation Section
     docChildren.push(
+      new ParagraphClass({ text: "" }), // Spacer
+      // Full Conversation Section
       new ParagraphClass({
         text: "Full Conversation",
         heading: HeadingLevel.HEADING_2,
@@ -291,20 +283,16 @@ export async function POST(
       docChildren.push(
         new ParagraphClass({
           children: [new TextRunClass({ text: msg.content })],
-        })
+        }),
+        new ParagraphClass({ text: "" }) // Spacer between messages
       )
-
-      docChildren.push(new ParagraphClass({ text: "" })) // Spacer between messages
     }
 
     // Footer
     docChildren.push(
       new ParagraphClass({
         text: "---",
-      })
-    )
-
-    docChildren.push(
+      }),
       new ParagraphClass({
         children: [
           new TextRunClass({
@@ -330,8 +318,8 @@ export async function POST(
     const buffer = await PackerClass.toBuffer(doc)
 
     // Generate filename
-    const timestamp = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19)
-    const safeFileName = chatName.replace(/[^a-zA-Z0-9]/g, "_").slice(0, 50)
+    const timestamp = new Date().toISOString().replaceAll(/[:.]/g, "-").slice(0, 19)
+    const safeFileName = chatName.replaceAll(/[^a-zA-Z0-9]/g, "_").slice(0, 50)
     const filename = `chat_export_${safeFileName}_${timestamp}.docx`
 
     // Upload to storage

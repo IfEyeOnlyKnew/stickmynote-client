@@ -9,6 +9,130 @@ import { getADGroupMembers } from "@/lib/auth/ldap-auth"
  * Invite all members of an Active Directory group to a social pad.
  */
 
+const APP_URL = process.env.NEXT_PUBLIC_APP_URL || ""
+
+async function processADGroupMember(
+  db: any,
+  member: { email: string; dn?: string },
+  padId: string,
+  pad: { user_id: string; name: string },
+  memberRole: string,
+  inviterId: string,
+): Promise<"added" | "invited" | "skipped"> {
+  const { data: existingUser } = await db
+    .from("users")
+    .select("id, email")
+    .or(`email.eq.${member.email},distinguished_name.eq.${member.dn}`)
+    .maybeSingle()
+
+  if (existingUser) {
+    return processExistingADUser(db, existingUser, padId, pad, memberRole)
+  }
+  return processNewADUser(db, member, padId, pad, memberRole, inviterId)
+}
+
+async function processExistingADUser(
+  db: any,
+  existingUser: { id: string; email: string },
+  padId: string,
+  pad: { user_id: string; name: string },
+  memberRole: string,
+): Promise<"added" | "skipped"> {
+  const { data: existingMember } = await db
+    .from("social_pad_members")
+    .select("id")
+    .eq("social_pad_id", padId)
+    .eq("user_id", existingUser.id)
+    .maybeSingle()
+
+  if (existingMember || pad.user_id === existingUser.id) {
+    return "skipped"
+  }
+
+  await db.from("social_pad_members").insert({
+    social_pad_id: padId,
+    user_id: existingUser.id,
+    role: memberRole,
+    accepted: true,
+  })
+
+  sendADGroupEmail(existingUser.email, pad.name, memberRole, `${APP_URL}/social?padId=${padId}`, false).catch(
+    (err) => console.warn("[ADGroup] Failed to send notification email:", err),
+  )
+
+  return "added"
+}
+
+async function processNewADUser(
+  db: any,
+  member: { email: string },
+  padId: string,
+  pad: { name: string },
+  memberRole: string,
+  inviterId: string,
+): Promise<"invited" | "skipped"> {
+  const { data: existingInvite } = await db
+    .from("social_pad_pending_invites")
+    .select("id")
+    .eq("social_pad_id", padId)
+    .eq("email", member.email.toLowerCase())
+    .maybeSingle()
+
+  if (existingInvite) {
+    return "skipped"
+  }
+
+  await db.from("social_pad_pending_invites").insert({
+    social_pad_id: padId,
+    email: member.email.toLowerCase(),
+    role: memberRole,
+    invited_by: inviterId,
+  })
+
+  sendADGroupEmail(member.email, pad.name, memberRole, `${APP_URL}/signin`, true).catch(
+    (err) => console.warn("[ADGroup] Failed to send invitation email:", err),
+  )
+
+  return "invited"
+}
+
+async function sendADGroupEmail(
+  toEmail: string,
+  padName: string,
+  role: string,
+  actionUrl: string,
+  isInvite: boolean,
+): Promise<void> {
+  const heading = isInvite ? "You've been invited to a Social Pad" : "You've been added to a Social Pad"
+  const bodyText = isInvite
+    ? `You have been invited to join <strong>"${padName}"</strong> as a <strong>${role}</strong>.<br/>This invitation was sent via an Active Directory group.<br/>To accept this invitation, sign up for StickyMyNote using your organization credentials.`
+    : `You have been added to <strong>"${padName}"</strong> as a <strong>${role}</strong>.<br/>You were added via an Active Directory group invitation.`
+  const buttonText = isInvite ? "Sign Up" : "View Pad"
+  const subject = isInvite
+    ? `You've been invited to "${padName}" on StickyMyNote`
+    : `You've been added to "${padName}" on StickyMyNote`
+
+  await fetch(`${APP_URL}/api/send-email`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      to: toEmail,
+      subject,
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+          <h2 style="color: #9333ea;">${heading}</h2>
+          <p>${bodyText}</p>
+          <p style="margin-top: 20px;">
+            <a href="${actionUrl}" style="background-color: #9333ea; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px;">
+              ${buttonText}
+            </a>
+          </p>
+        </div>
+      `,
+    }),
+  })
+}
+
 // POST: Invite all members of an AD group
 export async function POST(request: NextRequest, { params }: { params: Promise<{ padId: string }> }) {
   try {
@@ -102,121 +226,10 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       }
 
       try {
-        // Check if user exists in our database
-        const { data: existingUser } = await db
-          .from("users")
-          .select("id, email")
-          .or(`email.eq.${member.email},distinguished_name.eq.${member.dn}`)
-          .maybeSingle()
-
-        if (existingUser) {
-          // User exists - check if already a member
-          const { data: existingMember } = await db
-            .from("social_pad_members")
-            .select("id")
-            .eq("social_pad_id", padId)
-            .eq("user_id", existingUser.id)
-            .maybeSingle()
-
-          if (existingMember) {
-            skipped++
-            continue
-          }
-
-          // Check if user is the pad owner
-          if (pad.user_id === existingUser.id) {
-            skipped++
-            continue
-          }
-
-          // Add as member
-          await db.from("social_pad_members").insert({
-            social_pad_id: padId,
-            user_id: existingUser.id,
-            role: memberRole,
-            accepted: true,
-          })
-
-          added++
-
-          // Send notification email (optional, non-blocking)
-          try {
-            await fetch(`${process.env.NEXT_PUBLIC_APP_URL || ""}/api/send-email`, {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({
-                to: existingUser.email,
-                subject: `You've been added to "${pad.name}" on StickyMyNote`,
-                html: `
-                  <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-                    <h2 style="color: #9333ea;">You've been added to a Social Pad</h2>
-                    <p>You have been added to <strong>"${pad.name}"</strong> as a <strong>${memberRole}</strong>.</p>
-                    <p>You were added via an Active Directory group invitation.</p>
-                    <p style="margin-top: 20px;">
-                      <a href="${process.env.NEXT_PUBLIC_APP_URL}/social?padId=${padId}"
-                         style="background-color: #9333ea; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px;">
-                        View Pad
-                      </a>
-                    </p>
-                  </div>
-                `,
-              }),
-            })
-          } catch (emailErr) {
-            console.warn("[ADGroup] Failed to send notification email:", emailErr)
-          }
-        } else {
-          // User doesn't exist - check for existing pending invite
-          const { data: existingInvite } = await db
-            .from("social_pad_pending_invites")
-            .select("id")
-            .eq("social_pad_id", padId)
-            .eq("email", member.email.toLowerCase())
-            .maybeSingle()
-
-          if (existingInvite) {
-            skipped++
-            continue
-          }
-
-          // Create pending invite
-          await db.from("social_pad_pending_invites").insert({
-            social_pad_id: padId,
-            email: member.email.toLowerCase(),
-            role: memberRole,
-            invited_by: user.id,
-          })
-
-          invited++
-
-          // Send invitation email
-          try {
-            await fetch(`${process.env.NEXT_PUBLIC_APP_URL || ""}/api/send-email`, {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({
-                to: member.email,
-                subject: `You've been invited to "${pad.name}" on StickyMyNote`,
-                html: `
-                  <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-                    <h2 style="color: #9333ea;">You've been invited to a Social Pad</h2>
-                    <p>You have been invited to join <strong>"${pad.name}"</strong> as a <strong>${memberRole}</strong>.</p>
-                    <p>This invitation was sent via an Active Directory group.</p>
-                    <p>To accept this invitation, sign up for StickyMyNote using your organization credentials.</p>
-                    <p style="margin-top: 20px;">
-                      <a href="${process.env.NEXT_PUBLIC_APP_URL}/signin"
-                         style="background-color: #9333ea; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px;">
-                        Sign Up
-                      </a>
-                    </p>
-                  </div>
-                `,
-              }),
-            })
-          } catch (emailErr) {
-            console.warn("[ADGroup] Failed to send invitation email:", emailErr)
-          }
-        }
+        const result = await processADGroupMember(db, member, padId, pad, memberRole, user.id)
+        if (result === "added") added++
+        else if (result === "invited") invited++
+        else skipped++
       } catch (memberErr) {
         const errMsg = memberErr instanceof Error ? memberErr.message : String(memberErr)
         errors.push(`Error processing ${member.email}: ${errMsg}`)

@@ -20,8 +20,6 @@ export async function GET(req: Request, { params }: { params: Promise<{ padId: s
     if (!authResult.user) {
       return new NextResponse("Unauthorized", { status: 401 })
     }
-    const user = authResult.user
-
     const orgContext = await getOrgContext()
     if (!orgContext) {
       return new NextResponse("No organization context", { status: 403 })

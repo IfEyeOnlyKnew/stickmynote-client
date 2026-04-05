@@ -19,6 +19,77 @@ interface SearchedUser {
   dn?: string
 }
 
+async function searchLDAP(
+  query: string,
+  limit: number,
+  currentUserEmail: string | undefined,
+  excludeSelf: boolean,
+  seenEmails: Set<string>,
+  results: SearchedUser[],
+): Promise<void> {
+  try {
+    const ldapResult = await searchLDAPUsers(query, limit)
+    if (!ldapResult.success || !ldapResult.users) return
+
+    for (const ldapUser of ldapResult.users) {
+      const email = ldapUser.email?.toLowerCase()
+      if (!email || seenEmails.has(email)) continue
+      if (excludeSelf && email === currentUserEmail?.toLowerCase()) continue
+
+      seenEmails.add(email)
+
+      const existingUser = await db.query(
+        `SELECT id FROM users WHERE email = $1 OR distinguished_name = $2 LIMIT 1`,
+        [ldapUser.email, ldapUser.dn],
+      )
+
+      results.push({
+        id: existingUser.rows[0]?.id || null,
+        username: ldapUser.sAMAccountName,
+        email: ldapUser.email,
+        full_name: ldapUser.displayName || `${ldapUser.givenName} ${ldapUser.surname}`.trim(),
+        source: "ldap",
+        dn: ldapUser.dn,
+      })
+    }
+  } catch (ldapError) {
+    console.error("[UserSearch] LDAP search error:", ldapError)
+  }
+}
+
+async function searchDatabase(
+  query: string,
+  limit: number,
+  excludeUserId: string | null,
+  seenEmails: Set<string>,
+  results: SearchedUser[],
+): Promise<void> {
+  const searchPattern = `%${query}%`
+
+  const dbResult = await db.query<{ id: string; username: string | null; email: string; full_name: string | null }>(
+    `SELECT id, username, email, full_name
+     FROM users
+     WHERE ($1::uuid IS NULL OR id != $1)
+       AND (full_name ILIKE $2 OR username ILIKE $2 OR email ILIKE $2)
+     ORDER BY full_name ASC
+     LIMIT $3`,
+    [excludeUserId, searchPattern, limit],
+  )
+
+  for (const dbUser of dbResult.rows) {
+    const email = dbUser.email?.toLowerCase()
+    if (!email || seenEmails.has(email)) continue
+    seenEmails.add(email)
+    results.push({
+      id: dbUser.id,
+      username: dbUser.username,
+      email: dbUser.email,
+      full_name: dbUser.full_name,
+      source: "database",
+    })
+  }
+}
+
 // Handle rate limit errors
 function handleRateLimitError(error: unknown): NextResponse | null {
   if (error instanceof Error && error.message === "RATE_LIMITED") {
@@ -50,7 +121,7 @@ export async function GET(request: NextRequest) {
     const searchParams = request.nextUrl.searchParams
     const query = searchParams.get("query")?.trim() || ""
     const limitParam = searchParams.get("limit")
-    const limit = Math.min(parseInt(limitParam || "10", 10), 50)
+    const limit = Math.min(Number.parseInt(limitParam || "10", 10), 50)
     const source = searchParams.get("source") || "ldap"
     const excludeSelf = searchParams.get("excludeSelf") !== "false"
 
@@ -64,69 +135,12 @@ export async function GET(request: NextRequest) {
 
     // Search LDAP (Active Directory)
     if (source === "ldap" || source === "both") {
-      try {
-        const ldapResult = await searchLDAPUsers(query, limit)
-        
-        if (ldapResult.success && ldapResult.users) {
-          for (const ldapUser of ldapResult.users) {
-            const email = ldapUser.email?.toLowerCase()
-            if (email && !seenEmails.has(email) && (!excludeSelf || email !== user.email?.toLowerCase())) {
-              seenEmails.add(email)
-              
-              // Check if this LDAP user already exists in our database
-              const existingUser = await db.query(
-                `SELECT id FROM users WHERE email = $1 OR distinguished_name = $2 LIMIT 1`,
-                [ldapUser.email, ldapUser.dn]
-              )
-              
-              results.push({
-                id: existingUser.rows[0]?.id || null,
-                username: ldapUser.sAMAccountName,
-                email: ldapUser.email,
-                full_name: ldapUser.displayName || `${ldapUser.givenName} ${ldapUser.surname}`.trim(),
-                source: "ldap",
-                dn: ldapUser.dn,
-              })
-            }
-          }
-        }
-      } catch (ldapError) {
-        console.error("[UserSearch] LDAP search error:", ldapError)
-        // Continue with database search if LDAP fails
-      }
+      await searchLDAP(query, limit, user.email, excludeSelf, seenEmails, results)
     }
 
     // Search local database (for users who have already logged in)
     if (source === "database" || source === "both" || results.length === 0) {
-      const searchPattern = `%${query}%`
-      
-      const dbResult = await db.query<{ id: string; username: string | null; email: string; full_name: string | null }>(
-        `SELECT id, username, email, full_name
-         FROM users
-         WHERE ($1::uuid IS NULL OR id != $1)
-           AND (
-             full_name ILIKE $2
-             OR username ILIKE $2
-             OR email ILIKE $2
-           )
-         ORDER BY full_name ASC
-         LIMIT $3`,
-        [excludeSelf ? user.id : null, searchPattern, limit]
-      )
-
-      for (const dbUser of dbResult.rows) {
-        const email = dbUser.email?.toLowerCase()
-        if (email && !seenEmails.has(email)) {
-          seenEmails.add(email)
-          results.push({
-            id: dbUser.id,
-            username: dbUser.username,
-            email: dbUser.email,
-            full_name: dbUser.full_name,
-            source: "database",
-          })
-        }
-      }
+      await searchDatabase(query, limit, excludeSelf ? user.id : null, seenEmails, results)
     }
 
     return NextResponse.json(results.slice(0, limit))

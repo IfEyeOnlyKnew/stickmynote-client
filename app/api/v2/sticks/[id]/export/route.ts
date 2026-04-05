@@ -24,7 +24,9 @@ const initializeModules = async () => {
     Paragraph = docxModule.Paragraph
     TextRun = docxModule.TextRun
     HeadingLevel = docxModule.HeadingLevel
-  } catch {}
+  } catch {
+    // docx module is optional — DOCX export will be unavailable if import fails
+  }
 }
 
 const toneInstructions: Record<string, string> = {
@@ -245,8 +247,8 @@ Provide a well-structured summary.`
     })
 
     const sanitizedTopic = (stickData.topic || 'Untitled')
-      .replace(/[^a-zA-Z0-9\s-]/g, '')
-      .replace(/\s+/g, '-')
+      .replaceAll(/[^a-zA-Z0-9\s-]/g, '')
+      .replaceAll(/\s+/g, '-')
       .toLowerCase()
       .substring(0, 50)
 
@@ -273,7 +275,9 @@ Provide a well-structured summary.`
         currentData = typeof existingTab.rows[0].tab_data === 'string'
           ? JSON.parse(existingTab.rows[0].tab_data)
           : existingTab.rows[0].tab_data || {}
-      } catch {}
+      } catch {
+        // Parse error ignored — using empty default for tab_data
+      }
 
       const updatedExports = [...(currentData.exports || []), exportLink]
       await db.query(

@@ -25,7 +25,6 @@ import {
 } from "lucide-react"
 import { toast } from "sonner"
 import { format } from "date-fns"
-import { useCommunicationPaletteContext } from "./communication-palette-provider"
 import { useCSRF } from "@/hooks/useCSRF"
 import type { MeetingWithDetails } from "@/types/meeting"
 
@@ -42,7 +41,7 @@ interface MeetingNotesModalProps {
 // Component
 // ----------------------------------------------------------------------------
 
-export function MeetingNotesModal({ open, onOpenChange }: MeetingNotesModalProps) {
+export function MeetingNotesModal({ open, onOpenChange }: Readonly<MeetingNotesModalProps>) {
   const { csrfToken } = useCSRF()
 
   // State
@@ -150,11 +149,11 @@ export function MeetingNotesModal({ open, onOpenChange }: MeetingNotesModalProps
             Meeting Notes
           </DialogTitle>
           <DialogDescription>
-            {mode === "list"
-              ? "Select a meeting to add notes, or create standalone notes."
-              : selectedMeeting
-              ? `Notes for: ${selectedMeeting.title}`
-              : "Create standalone meeting notes"}
+            {(() => {
+              if (mode === "list") return "Select a meeting to add notes, or create standalone notes."
+              if (selectedMeeting) return `Notes for: ${selectedMeeting.title}`
+              return "Create standalone meeting notes"
+            })()}
           </DialogDescription>
         </DialogHeader>
 
@@ -173,16 +172,18 @@ export function MeetingNotesModal({ open, onOpenChange }: MeetingNotesModalProps
             {/* Recent Meetings */}
             <div>
               <h3 className="text-sm font-medium mb-2">Recent Meetings</h3>
-              {isLoading ? (
+              {isLoading && (
                 <div className="flex items-center justify-center py-8">
                   <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
                 </div>
-              ) : recentMeetings.length === 0 ? (
+              )}
+              {!isLoading && recentMeetings.length === 0 && (
                 <div className="text-center py-8 text-muted-foreground">
                   <Calendar className="h-10 w-10 mx-auto mb-2 opacity-50" />
                   <p>No recent meetings</p>
                 </div>
-              ) : (
+              )}
+              {!isLoading && recentMeetings.length > 0 && (
                 <ScrollArea className="h-[250px]">
                   <div className="space-y-2 pr-4">
                     {recentMeetings.map((meeting) => (

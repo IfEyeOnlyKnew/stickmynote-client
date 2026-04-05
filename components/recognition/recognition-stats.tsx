@@ -87,7 +87,10 @@ export function RecognitionStats() {
       icon: Flame,
       label: "Current Streak",
       value: givingStreak,
-      subtitle: givingStreak > 0 ? `${givingStreak} day${givingStreak !== 1 ? "s" : ""}` : "Start giving!",
+      subtitle: (() => {
+        if (givingStreak <= 0) return "Start giving!"
+        return `${givingStreak} day${givingStreak !== 1 ? "s" : ""}`
+      })(),
       color: "text-orange-500",
       bg: "bg-orange-50",
     },
@@ -95,7 +98,7 @@ export function RecognitionStats() {
       icon: TrendingUp,
       label: "Longest Streak",
       value: longestStreak,
-      subtitle: `${longestStreak} day${longestStreak !== 1 ? "s" : ""}`,
+      subtitle: `${longestStreak} day${longestStreak === 1 ? "" : "s"}`,
       color: "text-green-500",
       bg: "bg-green-50",
     },

@@ -12,7 +12,7 @@ interface NLQueryBarProps {
   onFiltersChange: (filters: any) => void
 }
 
-export function NLQueryBar({ onFiltersChange }: NLQueryBarProps) {
+export function NLQueryBar({ onFiltersChange }: Readonly<NLQueryBarProps>) {
   const [query, setQuery] = useState("")
   const [loading, setLoading] = useState(false)
   const [active, setActive] = useState(false)

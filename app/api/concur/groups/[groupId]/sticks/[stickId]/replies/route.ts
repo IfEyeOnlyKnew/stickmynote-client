@@ -205,7 +205,7 @@ export async function PUT(
   { params }: { params: Promise<{ groupId: string; stickId: string }> }
 ) {
   try {
-    const { groupId, stickId } = await params
+    await params
     const authResult = await getAuthenticatedOrgContext()
     if ("error" in authResult) {
       if (authResult.error === "RATE_LIMITED") return createRateLimitResponse()
@@ -263,7 +263,7 @@ export async function DELETE(
   { params }: { params: Promise<{ groupId: string; stickId: string }> }
 ) {
   try {
-    const { groupId, stickId } = await params
+    const { groupId } = await params
     const authResult = await getAuthenticatedOrgContext()
     if ("error" in authResult) {
       if (authResult.error === "RATE_LIMITED") return createRateLimitResponse()

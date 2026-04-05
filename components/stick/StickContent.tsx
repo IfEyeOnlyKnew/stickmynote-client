@@ -55,7 +55,7 @@ export function StickContent({
   onCancelContent,
   onStickTopic,
   onStickContent,
-}: StickContentProps) {
+}: Readonly<StickContentProps>) {
   if (!stick || !editedStick) {
     console.error("StickContent: Missing stick or editedStick")
     return <div className="text-red-500">Error: Stick data is missing</div>

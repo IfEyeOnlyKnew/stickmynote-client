@@ -7,7 +7,7 @@ interface CheckResultCardProps {
   check: Check
 }
 
-export function CheckResultCard({ check }: CheckResultCardProps) {
+export function CheckResultCard({ check }: Readonly<CheckResultCardProps>) {
   const getIcon = (status: Check["status"]) => {
     switch (status) {
       case "success":

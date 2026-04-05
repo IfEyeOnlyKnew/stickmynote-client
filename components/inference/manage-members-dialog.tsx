@@ -68,7 +68,7 @@ interface ManageMembersDialogProps {
   padName: string
 }
 
-export function ManageMembersDialog({ open, onOpenChange, padId, padName }: ManageMembersDialogProps) {
+export function ManageMembersDialog({ open, onOpenChange, padId, padName }: Readonly<ManageMembersDialogProps>) {
   const [members, setMembers] = useState<Member[]>([])
   const [pendingInvites, setPendingInvites] = useState<PendingInvite[]>([])
   const [isOwner, setIsOwner] = useState(false)
@@ -336,7 +336,7 @@ export function ManageMembersDialog({ open, onOpenChange, padId, padName }: Mana
 
   const handleUpdateRate = async (memberId: string, rate: string) => {
     const rateCents = Math.round(Number.parseFloat(rate) * 100)
-    if (isNaN(rateCents)) return
+    if (Number.isNaN(rateCents)) return
 
     try {
       const response = await fetch(`/api/inference-pads/${padId}/members`, {
@@ -540,7 +540,7 @@ export function ManageMembersDialog({ open, onOpenChange, padId, padName }: Mana
                         value={inviteEmail}
                         onChange={(e) => handleEmailInputChange(e.target.value)}
                         onFocus={() => ldapSearchResults.length > 0 && setShowLdapDropdown(true)}
-                        onKeyPress={(e) => {
+                        onKeyDown={(e) => {
                           if (e.key === "Enter") {
                             setShowLdapDropdown(false)
                             handleInviteMember()
@@ -657,13 +657,15 @@ export function ManageMembersDialog({ open, onOpenChange, padId, padName }: Mana
                 <Shield className="h-4 w-4" />
                 Members ({members.length})
               </h3>
-              {loading ? (
+              {loading && (
                 <div className="text-center py-8">
                   <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto" />
                 </div>
-              ) : members.length === 0 ? (
+              )}
+              {!loading && members.length === 0 && (
                 <div className="text-center py-8 text-gray-500">No members yet</div>
-              ) : (
+              )}
+              {!loading && members.length > 0 && (
                 <div className="space-y-3">
                   {members.map((member) => (
                     <div key={member.id} className="flex items-center justify-between p-3 border rounded-lg">

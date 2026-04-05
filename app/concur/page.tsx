@@ -83,11 +83,12 @@ export default function ConcurPage() {
 
       {/* Content */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6">
-        {loading ? (
+        {loading && (
           <div className="flex items-center justify-center py-20">
             <Loader2 className="h-8 w-8 animate-spin text-indigo-600" />
           </div>
-        ) : groups.length === 0 ? (
+        )}
+        {!loading && groups.length === 0 && (
           <div className="text-center py-20">
             <MessageCircle className="h-16 w-16 mx-auto mb-4 text-muted-foreground/30" />
             <h2 className="text-xl font-semibold text-muted-foreground">No Concur Groups</h2>
@@ -98,7 +99,8 @@ export default function ConcurPage() {
               }
             </p>
           </div>
-        ) : (
+        )}
+        {!loading && groups.length > 0 && (
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
             {groups.map((group) => (
               <Card
@@ -123,11 +125,11 @@ export default function ConcurPage() {
                   <div className="flex items-center gap-4 text-sm text-muted-foreground">
                     <div className="flex items-center gap-1">
                       <Users className="h-4 w-4" />
-                      <span>{group.member_count} member{group.member_count !== 1 ? "s" : ""}</span>
+                      <span>{group.member_count} member{group.member_count === 1 ? "" : "s"}</span>
                     </div>
                     <div className="flex items-center gap-1">
                       <MessageCircle className="h-4 w-4" />
-                      <span>{group.stick_count} stick{group.stick_count !== 1 ? "s" : ""}</span>
+                      <span>{group.stick_count} stick{group.stick_count === 1 ? "" : "s"}</span>
                     </div>
                   </div>
                   <div className="flex items-center justify-between mt-3 pt-3 border-t">

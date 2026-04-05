@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server"
 import { createServiceDatabaseClient } from "@/lib/database/database-adapter"
-import { randomBytes } from "crypto"
+import { randomBytes } from "node:crypto"
 import { getCachedAuthUser } from "@/lib/auth/cached-auth"
 
 export async function POST(request: Request) {
@@ -18,7 +18,7 @@ export async function POST(request: Request) {
     // Generate a secure random token
     const token = randomBytes(32).toString("hex")
 
-    const { data, error } = await db
+    const { error } = await db
       .from("calendar_feeds")
       .upsert(
         {

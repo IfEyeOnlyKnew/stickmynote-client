@@ -31,13 +31,13 @@ const iconMap: Record<string, any> = {
   target: Target,
 }
 
-export function PadTemplatePicker({ hubType, onTemplateSelect }: PadTemplatePickerProps) {
+export function PadTemplatePicker({ hubType, onTemplateSelect }: Readonly<PadTemplatePickerProps>) {
   const [templates, setTemplates] = useState<PadTemplate[]>([])
   const [categories, setCategories] = useState<Record<string, number>>({})
   const [selectedCategory, setSelectedCategory] = useState<string>("all")
   const [searchQuery, setSearchQuery] = useState("")
   const [open, setOpen] = useState(false)
-  const [loading, setLoading] = useState(false)
+  const [, setLoading] = useState(false)
 
   /* eslint-disable react-hooks/exhaustive-deps */
   useEffect(() => {
@@ -182,10 +182,10 @@ export function PadTemplatePicker({ hubType, onTemplateSelect }: PadTemplatePick
 function PadTemplateCard({
   template,
   onSelect,
-}: {
+}: Readonly<{
   template: PadTemplate
   onSelect: (template: PadTemplate) => void
-}) {
+}>) {
   const Icon = template.icon_name ? iconMap[template.icon_name] : Briefcase
 
   return (

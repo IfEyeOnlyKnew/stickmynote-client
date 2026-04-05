@@ -13,7 +13,7 @@ interface AITagGeneratorProps {
   existingTags?: string[]
 }
 
-export function AITagGenerator({ content, topic, onTagsGenerated, existingTags = [] }: AITagGeneratorProps) {
+export function AITagGenerator({ content, topic, onTagsGenerated, existingTags = [] }: Readonly<AITagGeneratorProps>) {
   const { generateTags, isGenerating } = useAIFeatures()
   const [generatedTags, setGeneratedTags] = useState<string[]>([])
 
@@ -60,9 +60,9 @@ export function AITagGenerator({ content, topic, onTagsGenerated, existingTags =
 
       {generatedTags.length > 0 && (
         <div className="flex flex-wrap gap-2 p-3 bg-muted rounded-md">
-          {generatedTags.map((tag, index) => (
+          {generatedTags.map((tag) => (
             <Badge
-              key={index}
+              key={tag}
               variant="secondary"
               className="cursor-pointer hover:bg-primary hover:text-primary-foreground transition-colors"
               onClick={() => handleAddTag(tag)}

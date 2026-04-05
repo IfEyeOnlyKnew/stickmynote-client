@@ -18,7 +18,7 @@ export function DuplicateCheckAlert({
   similarToId,
   onDismiss,
   onViewSimilar,
-}: DuplicateCheckAlertProps) {
+}: Readonly<DuplicateCheckAlertProps>) {
   if (!isDuplicate) return null
 
   return (

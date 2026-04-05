@@ -8,6 +8,42 @@ import type { UpdateTemplateRequest } from "@/types/discussion-templates"
 
 export const dynamic = "force-dynamic"
 
+function buildTemplateUpdates(body: UpdateTemplateRequest): { updates: string[]; values: any[]; paramCount: number } {
+  const stringFields = ["name", "description", "category", "goal_text", "expected_outcome"]
+  const jsonFields = ["required_categories", "optional_categories", "category_flow", "scoring_rubric", "milestones"]
+  const directFields = ["completion_mode", "require_approval", "min_approvers", "icon_name", "color_scheme", "is_public"]
+
+  const updates: string[] = []
+  const values: any[] = []
+  let paramCount = 0
+
+  for (const field of stringFields) {
+    if ((body as any)[field] !== undefined) {
+      paramCount++
+      updates.push(`${field} = $${paramCount}`)
+      values.push((body as any)[field]?.trim() || null)
+    }
+  }
+
+  for (const field of jsonFields) {
+    if ((body as any)[field] !== undefined) {
+      paramCount++
+      updates.push(`${field} = $${paramCount}`)
+      values.push(JSON.stringify((body as any)[field]))
+    }
+  }
+
+  for (const field of directFields) {
+    if ((body as any)[field] !== undefined) {
+      paramCount++
+      updates.push(`${field} = $${paramCount}`)
+      values.push((body as any)[field])
+    }
+  }
+
+  return { updates, values, paramCount }
+}
+
 // GET /api/v2/discussion-templates/[templateId] - Get single template
 export async function GET(
   request: NextRequest,
@@ -151,97 +187,19 @@ export async function PATCH(
     const body: UpdateTemplateRequest = await request.json()
 
     // Build update query dynamically
-    const updates: string[] = []
-    const values: any[] = []
-    let paramCount = 0
-
-    if (body.name !== undefined) {
-      paramCount++
-      updates.push(`name = $${paramCount}`)
-      values.push(body.name.trim())
-    }
-    if (body.description !== undefined) {
-      paramCount++
-      updates.push(`description = $${paramCount}`)
-      values.push(body.description?.trim() || null)
-    }
-    if (body.category !== undefined) {
-      paramCount++
-      updates.push(`category = $${paramCount}`)
-      values.push(body.category.trim())
-    }
-    if (body.goal_text !== undefined) {
-      paramCount++
-      updates.push(`goal_text = $${paramCount}`)
-      values.push(body.goal_text?.trim() || null)
-    }
-    if (body.expected_outcome !== undefined) {
-      paramCount++
-      updates.push(`expected_outcome = $${paramCount}`)
-      values.push(body.expected_outcome?.trim() || null)
-    }
-    if (body.required_categories !== undefined) {
-      paramCount++
-      updates.push(`required_categories = $${paramCount}`)
-      values.push(JSON.stringify(body.required_categories))
-    }
-    if (body.optional_categories !== undefined) {
-      paramCount++
-      updates.push(`optional_categories = $${paramCount}`)
-      values.push(JSON.stringify(body.optional_categories))
-    }
-    if (body.category_flow !== undefined) {
-      paramCount++
-      updates.push(`category_flow = $${paramCount}`)
-      values.push(JSON.stringify(body.category_flow))
-    }
-    if (body.milestones !== undefined) {
-      paramCount++
-      updates.push(`milestones = $${paramCount}`)
-      values.push(JSON.stringify(body.milestones))
-    }
-    if (body.completion_mode !== undefined) {
-      paramCount++
-      updates.push(`completion_mode = $${paramCount}`)
-      values.push(body.completion_mode)
-    }
-    if (body.require_approval !== undefined) {
-      paramCount++
-      updates.push(`require_approval = $${paramCount}`)
-      values.push(body.require_approval)
-    }
-    if (body.min_approvers !== undefined) {
-      paramCount++
-      updates.push(`min_approvers = $${paramCount}`)
-      values.push(body.min_approvers)
-    }
-    if (body.icon_name !== undefined) {
-      paramCount++
-      updates.push(`icon_name = $${paramCount}`)
-      values.push(body.icon_name)
-    }
-    if (body.color_scheme !== undefined) {
-      paramCount++
-      updates.push(`color_scheme = $${paramCount}`)
-      values.push(body.color_scheme)
-    }
-    if (body.is_public !== undefined) {
-      paramCount++
-      updates.push(`is_public = $${paramCount}`)
-      values.push(body.is_public)
-    }
+    const { updates, values, paramCount } = buildTemplateUpdates(body)
 
     if (updates.length === 0) {
       return new Response(JSON.stringify({ error: "No updates provided" }), { status: 400 })
     }
 
-    paramCount++
+    const idParam = paramCount + 1
     values.push(templateId)
 
     const result = await db.query(
       `UPDATE discussion_templates
        SET ${updates.join(", ")}, updated_at = NOW()
-       WHERE id = $${paramCount}
+       WHERE id = $${idParam}
        RETURNING *`,
       values
     )

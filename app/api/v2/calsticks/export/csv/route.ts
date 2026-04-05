@@ -71,9 +71,9 @@ export async function GET() {
     tasks.forEach((task: any) => {
       const row = [
         task.id,
-        `"${(task.stick_topic || '').replace(/"/g, '""')}"`,
-        `"${(task.content || '').replace(/"/g, '""')}"`,
-        `"${(task.pad_name || '').replace(/"/g, '""')}"`,
+        `"${(task.stick_topic || '').replaceAll('"', '""')}"`,
+        `"${(task.content || '').replaceAll('"', '""')}"`,
+        `"${(task.pad_name || '').replaceAll('"', '""')}"`,
         task.calstick_status || 'todo',
         task.calstick_priority || 'none',
         task.calstick_date ? new Date(task.calstick_date).toLocaleDateString() : '',

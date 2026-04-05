@@ -48,7 +48,7 @@ export function useHubModeGuard() {
         const userHubMode = profile?.hub_mode || "personal_only"
         setHubMode(userHubMode)
 
-        const currentPath = window.location.pathname
+        const currentPath = globalThis.location.pathname
         const isFullAccessRoute = FULL_ACCESS_ROUTES.some((route) => currentPath.startsWith(route))
 
         if (userHubMode === "personal_only" && isFullAccessRoute) {

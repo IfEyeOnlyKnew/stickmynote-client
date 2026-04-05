@@ -33,7 +33,7 @@ interface AccessRequestsPanelProps {
   organizationId: string
 }
 
-export function AccessRequestsPanel({ organizationId }: AccessRequestsPanelProps) {
+export function AccessRequestsPanel({ organizationId }: Readonly<AccessRequestsPanelProps>) {
   const [requests, setRequests] = useState<AccessRequest[]>([])
   const [loading, setLoading] = useState(true)
   const [processingId, setProcessingId] = useState<string | null>(null)

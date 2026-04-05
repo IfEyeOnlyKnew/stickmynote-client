@@ -40,7 +40,7 @@ interface OrgContext {
 }
 
 // Constants
-const VALID_ROLES = ["admin", "editor", "viewer", "edit", "view"]
+const VALID_ROLES = new Set(["admin", "editor", "viewer", "edit", "view"])
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000"
 
 const ROLE_MAP: Record<string, DbRole> = {
@@ -401,7 +401,7 @@ function validateInviteInput(body: InviteInput): ValidationSuccess | ValidationE
     return { valid: false, response: Errors.missingFields() }
   }
 
-  if (!VALID_ROLES.includes(role.toLowerCase())) {
+  if (!VALID_ROLES.has(role.toLowerCase())) {
     return { valid: false, response: Errors.invalidRole() }
   }
 

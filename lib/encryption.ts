@@ -147,7 +147,7 @@ export async function decryptFileForOrg(encryptedFile: ArrayBuffer, orgId: strin
  */
 export function getOrgPrefixedPath(orgId: string, filename: string): string {
   // Sanitize filename
-  const sanitized = filename.replace(/[^a-zA-Z0-9._-]/g, "_")
+  const sanitized = filename.replaceAll(/[^a-zA-Z0-9._-]/g, "_")
   // Add timestamp for uniqueness
   const timestamp = Date.now()
   // Create org-namespaced path

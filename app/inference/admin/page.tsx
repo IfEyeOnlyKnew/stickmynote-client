@@ -49,7 +49,7 @@ type InferenceStick = {
 export default function InferenceHubAdminPage() {
   const { user, loading } = useUser()
   const router = useRouter()
-  const [admins, setAdmins] = useState<AdminRole[]>([])
+  const [admins] = useState<AdminRole[]>([])
   const [pads, setPads] = useState<InferencePad[]>([])
   const [sticks, setSticks] = useState<InferenceStick[]>([])
   const [currentUserRole, setCurrentUserRole] = useState<string | null>(null)
@@ -183,7 +183,7 @@ export default function InferenceHubAdminPage() {
         <p className="text-muted-foreground">Manage Inference Hub settings, content, and administrators</p>
         {currentUserRole && (
           <Badge className={`mt-2 ${roleColors[currentUserRole]}`}>
-            {currentUserRole.replace(/_/g, " ").toUpperCase()}
+            {currentUserRole.replaceAll("_", " ").toUpperCase()}
           </Badge>
         )}
       </div>
@@ -333,7 +333,7 @@ export default function InferenceHubAdminPage() {
                       <CardDescription>{admin.users.email}</CardDescription>
                     </div>
                   </div>
-                  <Badge className={roleColors[admin.role]}>{admin.role.replace(/_/g, " ").toUpperCase()}</Badge>
+                  <Badge className={roleColors[admin.role]}>{admin.role.replaceAll("_", " ").toUpperCase()}</Badge>
                 </div>
               </CardHeader>
             </Card>

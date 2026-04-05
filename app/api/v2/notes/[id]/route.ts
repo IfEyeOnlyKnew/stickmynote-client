@@ -8,6 +8,40 @@ import { isUnderLegalHold } from '@/lib/legal-hold/check-hold'
 
 export const dynamic = 'force-dynamic'
 
+function extractTabData(tabs: any[]) {
+  let details = ''
+  let videos: any[] = []
+  let images: any[] = []
+  let hyperlinks: any[] = []
+
+  for (const tab of tabs) {
+    if (tab.tab_type === 'details' && tab.tab_data?.content) {
+      details = tab.tab_data.content
+    }
+    if ((tab.tab_type === 'videos' || tab.tab_type === 'video') && tab.tab_data) {
+      videos = Array.isArray(tab.tab_data) ? tab.tab_data : tab.tab_data.videos || []
+    }
+    if (tab.tab_type === 'images' && tab.tab_data) {
+      images = Array.isArray(tab.tab_data) ? tab.tab_data : tab.tab_data.images || []
+    }
+    if (tab.tab_name === 'Tags' && tab.tags) {
+      hyperlinks = parseHyperlinks(tab.tags)
+    }
+  }
+
+  return { details, videos, images, hyperlinks }
+}
+
+function parseHyperlinks(tags: any): any[] {
+  try {
+    if (Array.isArray(tags)) return tags
+    if (typeof tags === 'string') return JSON.parse(tags || '[]')
+    return []
+  } catch {
+    return []
+  }
+}
+
 // GET /api/v2/notes/[id] - Get single note
 export async function GET(
   request: NextRequest,
@@ -46,33 +80,7 @@ export async function GET(
       [noteId]
     )
 
-    let details = ''
-    let videos: any[] = []
-    let images: any[] = []
-    let hyperlinks: any[] = []
-
-    for (const tab of tabsResult.rows) {
-      if (tab.tab_type === 'details' && tab.tab_data?.content) {
-        details = tab.tab_data.content
-      }
-      if ((tab.tab_type === 'videos' || tab.tab_type === 'video') && tab.tab_data) {
-        videos = Array.isArray(tab.tab_data) ? tab.tab_data : tab.tab_data.videos || []
-      }
-      if (tab.tab_type === 'images' && tab.tab_data) {
-        images = Array.isArray(tab.tab_data) ? tab.tab_data : tab.tab_data.images || []
-      }
-      if (tab.tab_name === 'Tags' && tab.tags) {
-        try {
-          hyperlinks = Array.isArray(tab.tags)
-            ? tab.tags
-            : typeof tab.tags === 'string'
-              ? JSON.parse(tab.tags || '[]')
-              : []
-        } catch {
-          hyperlinks = []
-        }
-      }
-    }
+    const { details, videos, images, hyperlinks } = extractTabData(tabsResult.rows)
 
     // Get tags
     const tagsResult = await db.query(

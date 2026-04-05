@@ -1,9 +1,9 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { getSession } from "@/lib/auth/local-auth"
 import { db } from "@/lib/database/pg-client"
-import { unlink } from "fs/promises"
-import { existsSync } from "fs"
-import path from "path"
+import { unlink } from "node:fs/promises"
+import { existsSync } from "node:fs"
+import path from "node:path"
 
 function parseTabData(tabData: unknown): unknown[] {
   if (tabData === null || tabData === undefined) return []

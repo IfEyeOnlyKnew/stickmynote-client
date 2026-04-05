@@ -26,7 +26,7 @@ interface NotedVersionHistoryProps {
 }
 
 function stripHtml(html: string): string {
-  return html.replace(/<[^>]*>/g, "")
+  return html.replaceAll(/<[^>]*>/g, "")
 }
 
 function diffLines(oldText: string, newText: string): { type: "same" | "added" | "removed"; text: string }[] {
@@ -77,7 +77,7 @@ export function NotedVersionHistory({
   currentContent,
   onRestore,
   onClose,
-}: NotedVersionHistoryProps) {
+}: Readonly<NotedVersionHistoryProps>) {
   const { versions, loading, fetchVersions, fetchVersion, restoreVersion } = useNotedVersions(pageId)
   const [selectedVersion, setSelectedVersion] = useState<NotedPageVersion | null>(null)
   const [versionContent, setVersionContent] = useState<string | null>(null)
@@ -124,14 +124,16 @@ export function NotedVersionHistory({
         {/* Version list */}
         <div className="w-56 shrink-0 border-r">
           <ScrollArea className="h-full">
-            {loading ? (
+            {loading && (
               <div className="p-4 text-xs text-muted-foreground text-center">Loading...</div>
-            ) : versions.length === 0 ? (
+            )}
+            {!loading && versions.length === 0 && (
               <div className="p-4 text-xs text-muted-foreground text-center">
                 <History className="h-8 w-8 mx-auto mb-2 opacity-30" />
                 No versions saved yet. Save a version to start tracking changes.
               </div>
-            ) : (
+            )}
+            {!loading && versions.length > 0 && (
               <div className="py-1">
                 {versions.map((v) => (
                   <button
@@ -198,7 +200,7 @@ export function NotedVersionHistory({
                   <div className="font-mono text-xs space-y-0">
                     {diffResult.map((line, i) => (
                       <div
-                        key={i}
+                        key={`${line.type}-${i}`}
                         className={cn(
                           "px-2 py-0.5 whitespace-pre-wrap",
                           line.type === "added" && "bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300",
@@ -207,7 +209,7 @@ export function NotedVersionHistory({
                         )}
                       >
                         <span className="select-none mr-2 text-muted-foreground/50">
-                          {line.type === "added" ? "+" : line.type === "removed" ? "-" : " "}
+                          {(() => { if (line.type === "added") return "+"; if (line.type === "removed") return "-"; return " " })()}
                         </span>
                         {line.text || "\u00A0"}
                       </div>

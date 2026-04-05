@@ -177,8 +177,8 @@ export const StickSummaryCard = memo(function StickSummaryCard({
             <div>
               <h4 className="text-xs font-semibold text-gray-700 mb-2">Action Items ({actionItems.length})</h4>
               <div className="space-y-2">
-                {actionItems.map((item, idx) => (
-                  <div key={idx} className="flex items-start gap-2 text-sm">
+                {actionItems.map((item) => (
+                  <div key={item.title} className="flex items-start gap-2 text-sm">
                     {getStatusIcon(item.status)}
                     <div className="flex-1">
                       <p className="text-gray-900">{item.title}</p>
@@ -206,8 +206,8 @@ export const StickSummaryCard = memo(function StickSummaryCard({
             <div>
               <h4 className="text-xs font-semibold text-gray-700 mb-2">Next Questions</h4>
               <div className="space-y-2">
-                {suggestedQuestions.map((question, idx) => (
-                  <div key={idx} className="flex items-center gap-2">
+                {suggestedQuestions.map((question) => (
+                  <div key={question} className="flex items-center gap-2">
                     <p className="text-sm text-gray-700 flex-1">{question}</p>
                     {onInsertQuestion && (
                       <Button

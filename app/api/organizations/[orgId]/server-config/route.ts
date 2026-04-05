@@ -21,7 +21,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ orgI
       .eq("user_id", user.id)
       .single()
 
-    if (!member || member.role !== "owner") {
+    if (member?.role !== "owner") {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 })
     }
 
@@ -63,7 +63,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ org
       .eq("user_id", user.id)
       .single()
 
-    if (!member || member.role !== "owner") {
+    if (member?.role !== "owner") {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 })
     }
 

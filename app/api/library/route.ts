@@ -3,12 +3,12 @@ import { db } from "@/lib/database/pg-client"
 import { getOrgContext } from "@/lib/auth/get-org-context"
 import { getCachedAuthUser, createRateLimitResponse, createUnauthorizedResponse } from "@/lib/auth/cached-auth"
 import { checkStickLibraryPermissions, type StickType } from "@/lib/library/library-permissions"
-import path from "path"
-import { randomUUID } from "crypto"
-import { promises as fs } from "fs"
+import path from "node:path"
+import { randomUUID } from "node:crypto"
+import { promises as fs } from "node:fs"
 
 const MAX_FILE_SIZE = 50 * 1024 * 1024 // 50MB
-const ALLOWED_TYPES = [
+const ALLOWED_TYPES = new Set([
   "image/jpeg", "image/png", "image/gif", "image/webp", "image/svg+xml",
   "application/pdf",
   "application/msword",
@@ -21,7 +21,7 @@ const ALLOWED_TYPES = [
   "application/zip",
   "video/mp4", "video/webm",
   "audio/mpeg", "audio/wav",
-]
+])
 
 /**
  * GET /api/library - List files in a stick's folder
@@ -107,7 +107,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "File size exceeds 50MB limit" }, { status: 400 })
     }
 
-    if (!ALLOWED_TYPES.includes(file.type)) {
+    if (!ALLOWED_TYPES.has(file.type)) {
       return NextResponse.json({ error: `File type ${file.type} is not allowed` }, { status: 400 })
     }
 
@@ -116,14 +116,14 @@ export async function POST(request: NextRequest) {
     const libraryDir = path.join(baseDir, "library", "sticks", stickId)
     await fs.mkdir(libraryDir, { recursive: true })
 
-    const sanitizedName = file.name.replace(/[<>:"|?*]/g, "_").replace(/\\/g, "_")
+    const sanitizedName = file.name.replaceAll(/[<>:"|?*]/g, "_").replaceAll("\\", "_")
     const uniqueFilename = `${randomUUID()}-${sanitizedName}`
     const filePath = path.join(libraryDir, uniqueFilename)
 
     const buffer = Buffer.from(await file.arrayBuffer())
     await fs.writeFile(filePath, buffer)
 
-    const relativePath = path.relative(baseDir, filePath).replace(/\\/g, "/")
+    const relativePath = path.relative(baseDir, filePath).replaceAll("\\", "/")
     const fileUrl = `/uploads/${relativePath}`
 
     const result = await db.query(

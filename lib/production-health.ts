@@ -190,12 +190,11 @@ export async function checkExternalAPIsHealth(): Promise<HealthCheckResult> {
 
     return {
       service: "external_apis",
-      status:
-        failedChecks.length === 0
-          ? "healthy"
-          : failedChecks.length < Object.keys(checks).length
-            ? "degraded"
-            : "unhealthy",
+      status: (() => {
+        if (failedChecks.length === 0) return "healthy"
+        if (failedChecks.length < Object.keys(checks).length) return "degraded"
+        return "unhealthy"
+      })(),
       responseTime,
       details: {
         checks,

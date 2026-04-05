@@ -166,7 +166,7 @@ export async function GET(req: NextRequest) {
 
     // Sort by created_at and apply pagination
     const sortedActivities = activities
-      .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+      .toSorted((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
       .slice(offset, offset + limit)
 
     return NextResponse.json({

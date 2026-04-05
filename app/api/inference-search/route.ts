@@ -99,8 +99,8 @@ const Errors = {
 
 // Helper functions
 function parseSearchParams(searchParams: URLSearchParams): SearchParams {
-  const rawLimit = parseInt(searchParams.get("limit") || "20", 10)
-  const rawOffset = parseInt(searchParams.get("offset") || "0", 10)
+  const rawLimit = Number.parseInt(searchParams.get("limit") || "20", 10)
+  const rawOffset = Number.parseInt(searchParams.get("offset") || "0", 10)
 
   return {
     query: searchParams.get("q") || "",
@@ -304,7 +304,7 @@ export async function GET(request: NextRequest) {
       .from("social_pads")
       .select("id, name, is_public, owner_id")
       .eq("org_id", orgContext.orgId)
-      .or(`is_public.eq.true,owner_id.eq.${user.id}${padIds.length > 0 ? `,id.in.(${padIds.join(",")})` : ""}`)
+      .or("is_public.eq.true,owner_id.eq." + user.id + (padIds.length > 0 ? ",id.in.(" + padIds.join(",") + ")" : ""))
 
     const padMap: Record<string, InferencePadData> = {}
     const accessiblePadIds: string[] = []

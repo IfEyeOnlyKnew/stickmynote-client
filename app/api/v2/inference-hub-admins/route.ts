@@ -6,7 +6,7 @@ import { handleApiError } from '@/lib/api/handle-api-error'
 
 export const dynamic = 'force-dynamic'
 
-const ADMIN_EMAILS = ['chrisdoran63@outlook.com']
+const ADMIN_EMAILS = new Set(['chrisdoran63@outlook.com'])
 
 // GET /api/v2/inference-hub-admins - Get hub admins (admin only)
 export async function GET(request: NextRequest) {
@@ -23,7 +23,7 @@ export async function GET(request: NextRequest) {
     }
     const user = authResult.user
 
-    const isAdmin = ADMIN_EMAILS.includes(user.email || '')
+    const isAdmin = ADMIN_EMAILS.has(user.email || '')
     if (!isAdmin) {
       return new Response(JSON.stringify({ error: 'Forbidden' }), { status: 403 })
     }
@@ -55,7 +55,7 @@ export async function POST(request: NextRequest) {
     }
     const user = authResult.user
 
-    const isAdmin = ADMIN_EMAILS.includes(user.email || '')
+    const isAdmin = ADMIN_EMAILS.has(user.email || '')
     if (!isAdmin) {
       return new Response(
         JSON.stringify({ error: 'Only global admins can assign roles' }),
@@ -93,7 +93,7 @@ export async function DELETE(request: NextRequest) {
     }
     const user = authResult.user
 
-    const isAdmin = ADMIN_EMAILS.includes(user.email || '')
+    const isAdmin = ADMIN_EMAILS.has(user.email || '')
     if (!isAdmin) {
       return new Response(
         JSON.stringify({ error: 'Only global admins can remove roles' }),

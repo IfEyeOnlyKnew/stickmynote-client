@@ -48,7 +48,7 @@ const DAYS = [
   { value: 6, label: "Saturday" },
 ]
 
-export function DigestSettings({ preferences, onUpdate }: DigestSettingsProps) {
+export function DigestSettings({ preferences, onUpdate }: Readonly<DigestSettingsProps>) {
   const [saving, setSaving] = useState(false)
   const [sendingTest, setSendingTest] = useState(false)
   const [testResult, setTestResult] = useState<{ success: boolean; message: string } | null>(null)

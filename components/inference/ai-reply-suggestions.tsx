@@ -12,7 +12,7 @@ interface AIReplySuggestionsProps {
   onSelectSuggestion: (suggestion: string) => void
 }
 
-export function AIReplySuggestions({ stickContent, stickTopic, onSelectSuggestion }: AIReplySuggestionsProps) {
+export function AIReplySuggestions({ stickContent, stickTopic, onSelectSuggestion }: Readonly<AIReplySuggestionsProps>) {
   const { suggestReplies, isGenerating } = useAIFeatures()
   const [suggestions, setSuggestions] = useState<string[]>([])
   const [isExpanded, setIsExpanded] = useState(false)

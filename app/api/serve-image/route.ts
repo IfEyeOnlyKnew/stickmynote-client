@@ -3,7 +3,7 @@ import { getCachedAuthUser } from "@/lib/auth/cached-auth"
 import { localStorage } from "@/lib/storage/local-storage"
 import { decryptFileForOrg, isEncryptionEnabled } from "@/lib/encryption"
 import { db } from "@/lib/database/pg-client"
-import path from "path"
+import path from "node:path"
 
 export const dynamic = "force-dynamic"
 
@@ -55,7 +55,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Extract orgId from path pattern: orgs/{orgId}/...
-    const orgMatch = filePath.match(/^orgs\/([0-9a-f-]+)\//i)
+    const orgMatch = /^orgs\/([0-9a-f-]+)\//i.exec(filePath)
     if (!orgMatch) {
       return NextResponse.json({ error: "Invalid file path" }, { status: 400 })
     }
@@ -85,7 +85,7 @@ export async function GET(request: NextRequest) {
     // Decrypt if encryption is enabled
     if (isEncryptionEnabled()) {
       try {
-        const arrBuf = new Uint8Array(fileBuffer).buffer as ArrayBuffer
+        const arrBuf = new Uint8Array(fileBuffer).buffer
         const decrypted = await decryptFileForOrg(arrBuf, orgId)
         responseData = decrypted
       } catch {

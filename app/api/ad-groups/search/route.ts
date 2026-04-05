@@ -31,7 +31,7 @@ export async function GET(request: NextRequest) {
     const searchParams = request.nextUrl.searchParams
     const query = searchParams.get("query")?.trim() || ""
     const limitParam = searchParams.get("limit")
-    const limit = Math.min(parseInt(limitParam || "10", 10), 50)
+    const limit = Math.min(Number.parseInt(limitParam || "10", 10), 50)
 
     // Require at least 2 characters to search
     if (query.length < 2) {

@@ -3,6 +3,47 @@ import { NextResponse } from "next/server"
 import { getOrgContext } from "@/lib/auth/get-org-context"
 import { getCachedAuthUser } from "@/lib/auth/cached-auth"
 
+async function findOrCreatePaksPad(db: any, padName: string, userId: string, orgId: string): Promise<string | undefined> {
+  const { data: existing } = await db
+    .from("paks_pads").select("id")
+    .eq("owner_id", userId).eq("org_id", orgId).eq("name", padName)
+    .maybeSingle()
+
+  if (existing) return existing.id
+
+  const { data: created, error } = await db
+    .from("paks_pads")
+    .insert({ name: padName, owner_id: userId, org_id: orgId })
+    .select("id").maybeSingle()
+
+  if (error) console.error("[v0] Error creating paks_pad:", error)
+  return created?.id
+}
+
+async function findOrCreateParentStick(
+  db: any, paksPadId: string, userId: string, orgId: string,
+  topic: string | null, reply: { content: string; color: string },
+): Promise<string | undefined> {
+  const { data: existing } = await db
+    .from("paks_pad_sticks").select("id")
+    .eq("pad_id", paksPadId).eq("user_id", userId)
+    .limit(1).maybeSingle()
+
+  if (existing) return existing.id
+
+  const { data: created, error } = await db
+    .from("paks_pad_sticks")
+    .insert({
+      topic: `Social: ${topic || "Untitled"}`,
+      content: reply.content, color: reply.color,
+      user_id: userId, org_id: orgId, pad_id: paksPadId,
+    })
+    .select("id").maybeSingle()
+
+  if (error) console.error("[v0] Error creating paks_pad_stick:", error)
+  return created?.id
+}
+
 export async function POST(request: Request, { params }: { params: Promise<{ stickId: string; replyId: string }> }) {
   try {
     const { stickId, replyId } = await params
@@ -76,74 +117,15 @@ export async function POST(request: Request, { params }: { params: Promise<{ sti
     const padName = inferencePad.name || "CalSticks"
 
     // Find or create a paks_pad with the same name as the social pad
-    let paksPadId: string | undefined
-
-    const { data: existingPaksPad } = await db
-      .from("paks_pads")
-      .select("id")
-      .eq("owner_id", user.id)
-      .eq("org_id", orgContext.orgId)
-      .eq("name", padName)
-      .maybeSingle()
-
-    if (existingPaksPad) {
-      paksPadId = existingPaksPad.id
-    } else {
-      // Create a paks_pad with the social pad's name
-      const { data: newPaksPad, error: padError } = await db
-        .from("paks_pads")
-        .insert({
-          name: padName,
-          owner_id: user.id,
-          org_id: orgContext.orgId,
-        })
-        .select("id")
-        .maybeSingle()
-
-      if (padError) {
-        console.error("[v0] Error creating paks_pad:", padError)
-        return NextResponse.json({ error: "Failed to create CalStick pad" }, { status: 500 })
-      }
-      paksPadId = newPaksPad?.id
-    }
-
+    const paksPadId = await findOrCreatePaksPad(db, padName, user.id, orgContext.orgId)
     if (!paksPadId) {
       return NextResponse.json({ error: "Could not find or create CalStick pad" }, { status: 500 })
     }
 
-    // Now find or create a paks_pad_sticks entry
-    const { data: parentStick } = await db
-      .from("paks_pad_sticks")
-      .select("id")
-      .eq("pad_id", paksPadId)
-      .eq("user_id", user.id)
-      .limit(1)
-      .maybeSingle()
-
-    let stickIdForCalstick = parentStick?.id
-
-    // If no parent stick exists in the paks_pad, create one
-    if (!stickIdForCalstick) {
-      const { data: newStick, error: newStickError } = await db
-        .from("paks_pad_sticks")
-        .insert({
-          topic: `Social: ${inferenceStick.topic || "Untitled"}`,
-          content: reply.content,
-          color: reply.color,
-          user_id: user.id,
-          org_id: orgContext.orgId,
-          pad_id: paksPadId,
-        })
-        .select("id")
-        .maybeSingle()
-
-      if (newStickError) {
-        console.error("[v0] Error creating paks_pad_stick:", newStickError)
-        return NextResponse.json({ error: "Failed to create CalStick parent" }, { status: 500 })
-      }
-      stickIdForCalstick = newStick?.id
-    }
-
+    // Find or create a paks_pad_sticks entry
+    const stickIdForCalstick = await findOrCreateParentStick(
+      db, paksPadId, user.id, orgContext.orgId, inferenceStick.topic, reply,
+    )
     if (!stickIdForCalstick) {
       return NextResponse.json({ error: "Could not find or create CalStick parent" }, { status: 500 })
     }

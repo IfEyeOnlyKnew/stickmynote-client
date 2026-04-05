@@ -60,16 +60,8 @@ export async function POST(
     }
 
     // Check access (owner, public, or member)
-    let hasAccess = pad.owner_id === userId || pad.is_public
-    if (!hasAccess) {
-      const { data: membership } = await db
-        .from("social_pad_members")
-        .select("id")
-        .eq("social_pad_id", padId)
-        .eq("user_id", userId)
-        .maybeSingle()
-      hasAccess = !!membership
-    }
+    const hasAccess = pad.owner_id === userId || pad.is_public ||
+      !!(await db.from("social_pad_members").select("id").eq("social_pad_id", padId).eq("user_id", userId).maybeSingle()).data
 
     if (!hasAccess) {
       return NextResponse.json({ error: "Access denied" }, { status: 403 })
@@ -136,7 +128,7 @@ export async function GET(
   { params }: { params: Promise<{ padId: string; messageId: string }> }
 ) {
   try {
-    const { padId, messageId } = await params
+    const { messageId } = await params
     const authResult = await getCachedAuthUser()
 
     if (authResult.rateLimited) {

@@ -91,11 +91,11 @@ export function UserMenu({
       await fetch('/api/auth/signout', { method: 'POST', credentials: 'include' })
 
       setTimeout(() => {
-        window.location.href = "/"
+        globalThis.location.href = "/"
       }, 500)
     } catch (error) {
       console.error("Logout error:", error)
-      window.location.href = "/"
+      globalThis.location.href = "/"
     }
   }
 
@@ -123,11 +123,12 @@ export function UserMenu({
       <DropdownMenuTrigger asChild>
         <Button variant="ghost" className="relative h-8 w-8 rounded-full">
           <Avatar className="h-8 w-8">
-            {orgLogoUrl ? (
+            {orgLogoUrl && (
               <AvatarImage src={orgLogoUrl || "/placeholder.svg"} alt={currentOrg?.name || "Organization"} />
-            ) : profile?.avatar_url ? (
+            )}
+            {!orgLogoUrl && profile?.avatar_url && (
               <AvatarImage src={profile.avatar_url || "/placeholder.svg"} alt={getDisplayName()} />
-            ) : null}
+            )}
             <AvatarFallback>{orgLogoUrl ? getOrgInitials() : getInitials()}</AvatarFallback>
           </Avatar>
           {/* Status indicator dot */}

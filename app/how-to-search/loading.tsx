@@ -82,7 +82,7 @@ export default function HowToSearchLoading() {
             </CardHeader>
             <CardContent className="space-y-4">
               {Array.from({ length: 5 }).map((_, index) => (
-                <div key={index} className="flex items-start gap-3">
+                <div key={`tip-skeleton-${index}`} className="flex items-start gap-3">
                   <Skeleton className="w-6 h-6 rounded-full flex-shrink-0 mt-0.5" />
                   <div className="space-y-2 flex-1">
                     <Skeleton className="h-5 w-full" />
@@ -147,7 +147,7 @@ export default function HowToSearchLoading() {
                 <div className="space-y-4">
                   <Skeleton className="h-6 w-32" />
                   {Array.from({ length: 4 }).map((_, index) => (
-                    <div key={index} className="flex items-center gap-3">
+                    <div key={`left-ref-${index}`} className="flex items-center gap-3">
                       <Skeleton className="w-4 h-4 rounded" />
                       <Skeleton className="h-4 w-full" />
                     </div>
@@ -158,7 +158,7 @@ export default function HowToSearchLoading() {
                 <div className="space-y-4">
                   <Skeleton className="h-6 w-36" />
                   {Array.from({ length: 4 }).map((_, index) => (
-                    <div key={index} className="flex items-center gap-3">
+                    <div key={`right-ref-${index}`} className="flex items-center gap-3">
                       <Skeleton className="w-4 h-4 rounded" />
                       <Skeleton className="h-4 w-full" />
                     </div>

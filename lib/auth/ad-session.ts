@@ -4,7 +4,7 @@ import { getSession } from './local-auth'
 
 export async function requireADSession(request: NextRequest) {
   const session = await getSession()
-  if (!session || !session.user) {
+  if (!session?.user) {
     throw new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401 })
   }
   return session

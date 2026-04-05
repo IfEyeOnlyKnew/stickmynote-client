@@ -20,7 +20,7 @@ const statusIcons: Record<WorkflowStatus, React.ReactNode> = {
   resolved: <CheckCircle2 className="h-4 w-4" />,
 }
 
-export function WorkflowStatusSelect({ value, onChange, disabled, className }: WorkflowStatusSelectProps) {
+export function WorkflowStatusSelect({ value, onChange, disabled, className }: Readonly<WorkflowStatusSelectProps>) {
   const currentConfig = WORKFLOW_STATUSES[value]
 
   return (

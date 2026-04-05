@@ -2,7 +2,7 @@ import { type NextRequest, NextResponse } from "next/server"
 import { createDatabaseClient, createServiceDatabaseClient } from "@/lib/database/database-adapter"
 import { getCachedAuthUser } from "@/lib/auth/cached-auth"
 import { getOrgContext } from "@/lib/auth/get-org-context"
-import { differenceInDays, parseISO, format, addDays, isBefore, isAfter } from "date-fns"
+import { differenceInDays, parseISO, format, addDays, isBefore } from "date-fns"
 import type { Sprint, SprintBurndownSnapshot, SprintBurndownData } from "@/types/sprint"
 
 export const dynamic = "force-dynamic"

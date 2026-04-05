@@ -31,7 +31,7 @@ type CleanupPolicySettingsProps = {
   padName: string
 }
 
-export function CleanupPolicySettings({ padId, padName }: CleanupPolicySettingsProps) {
+export function CleanupPolicySettings({ padId, padName }: Readonly<CleanupPolicySettingsProps>) {
   const [policy, setPolicy] = useState<CleanupPolicy | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [isSaving, setIsSaving] = useState(false)

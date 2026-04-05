@@ -21,7 +21,7 @@ interface ManageCategoriesDialogProps {
   onUpdate: () => void
 }
 
-export function ManageCategoriesDialog({ open, onOpenChange, onUpdate }: ManageCategoriesDialogProps) {
+export function ManageCategoriesDialog({ open, onOpenChange, onUpdate }: Readonly<ManageCategoriesDialogProps>) {
   const [categories, setCategories] = useState<Category[]>([])
   const [loading, setLoading] = useState(false)
   const [newCategoryName, setNewCategoryName] = useState("")

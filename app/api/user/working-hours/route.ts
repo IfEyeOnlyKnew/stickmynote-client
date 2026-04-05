@@ -1,7 +1,7 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { getCachedAuthUser, createRateLimitResponse, createUnauthorizedResponse } from "@/lib/auth/cached-auth"
 import { db } from "@/lib/database/pg-client"
-import type { WorkingHours, UpdateWorkingHoursRequest, DEFAULT_WORKING_HOURS } from "@/types/user-status"
+import type { WorkingHours, UpdateWorkingHoursRequest } from "@/types/user-status"
 
 /**
  * USER WORKING HOURS API
@@ -66,6 +66,25 @@ export async function GET(request: NextRequest) {
 // ----------------------------------------------------------------------------
 // Update current user's working hours configuration
 
+const TIME_FIELDS = [
+  "monday_start", "monday_end", "tuesday_start", "tuesday_end",
+  "wednesday_start", "wednesday_end", "thursday_start", "thursday_end",
+  "friday_start", "friday_end", "saturday_start", "saturday_end",
+  "sunday_start", "sunday_end",
+] as const
+
+const TIME_REGEX = /^([01]?[0-9]|2[0-3]):[0-5][0-9]$/
+
+function validateTimeFields(body: any): string | null {
+  for (const field of TIME_FIELDS) {
+    const value = body[field]
+    if (value != null && !TIME_REGEX.test(value as string)) {
+      return field
+    }
+  }
+  return null
+}
+
 export async function PUT(request: NextRequest) {
   try {
     const { user, error: authError } = await getCachedAuthUser()
@@ -81,31 +100,9 @@ export async function PUT(request: NextRequest) {
     const body: UpdateWorkingHoursRequest = await request.json()
 
     // Validate time formats if provided
-    const timeFields = [
-      "monday_start",
-      "monday_end",
-      "tuesday_start",
-      "tuesday_end",
-      "wednesday_start",
-      "wednesday_end",
-      "thursday_start",
-      "thursday_end",
-      "friday_start",
-      "friday_end",
-      "saturday_start",
-      "saturday_end",
-      "sunday_start",
-      "sunday_end",
-    ]
-
-    for (const field of timeFields) {
-      const value = body[field as keyof UpdateWorkingHoursRequest]
-      if (value !== undefined && value !== null) {
-        const timeRegex = /^([01]?[0-9]|2[0-3]):[0-5][0-9]$/
-        if (!timeRegex.test(value as string)) {
-          return NextResponse.json({ error: `Invalid time format for ${field}` }, { status: 400 })
-        }
-      }
+    const invalidField = validateTimeFields(body)
+    if (invalidField) {
+      return NextResponse.json({ error: `Invalid time format for ${invalidField}` }, { status: 400 })
     }
 
     // Check if record exists

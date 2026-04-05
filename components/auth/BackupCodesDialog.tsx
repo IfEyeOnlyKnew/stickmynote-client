@@ -24,7 +24,7 @@ export function BackupCodesDialog({
   open,
   onOpenChange,
   onSuccess,
-}: BackupCodesDialogProps) {
+}: Readonly<BackupCodesDialogProps>) {
   const [step, setStep] = useState<"verify" | "codes">("verify")
   const [code, setCode] = useState("")
   const [backupCodes, setBackupCodes] = useState<string[]>([])
@@ -174,8 +174,8 @@ export function BackupCodesDialog({
                   </Button>
                 </div>
                 <div className="grid grid-cols-2 gap-2 p-4 bg-muted rounded-lg font-mono text-sm">
-                  {backupCodes.map((code, i) => (
-                    <div key={i} className="py-1">
+                  {backupCodes.map((code) => (
+                    <div key={code} className="py-1">
                       {code}
                     </div>
                   ))}

@@ -4,6 +4,15 @@ import { getCachedAuthUser } from "@/lib/auth/cached-auth"
 import { db as pgClient } from "@/lib/database/pg-client"
 import { getRecognitionSettings } from "@/lib/recognition/kudos"
 
+function getSortExpression(sortColumn: string): string {
+  const expressions: Record<string, string> = {
+    kudos_given_count: "g.kudos_given_count",
+    kudos_received_count: "r.kudos_received_count",
+    total_points: "r.total_points",
+  }
+  return expressions[sortColumn] || "r.total_points"
+}
+
 // GET /api/recognition/leaderboard - Get recognition leaderboard
 export async function GET(request: Request) {
   try {
@@ -25,18 +34,20 @@ export async function GET(request: Request) {
     const { searchParams } = new URL(request.url)
     const period = searchParams.get("period") || "all" // "week" | "month" | "quarter" | "all"
     const sortBy = searchParams.get("sortBy") || "points" // "points" | "received" | "given"
-    const limit = Math.min(parseInt(searchParams.get("limit") || "25", 10), 50)
+    const limit = Math.min(Number.parseInt(searchParams.get("limit") || "25", 10), 50)
 
-    let dateFilter = ""
-    if (period === "week") {
-      dateFilter = "AND k.created_at >= CURRENT_DATE - INTERVAL '7 days'"
-    } else if (period === "month") {
-      dateFilter = "AND k.created_at >= CURRENT_DATE - INTERVAL '30 days'"
-    } else if (period === "quarter") {
-      dateFilter = "AND k.created_at >= CURRENT_DATE - INTERVAL '90 days'"
+    const dateFilterMap: Record<string, string> = {
+      week: "AND k.created_at >= CURRENT_DATE - INTERVAL '7 days'",
+      month: "AND k.created_at >= CURRENT_DATE - INTERVAL '30 days'",
+      quarter: "AND k.created_at >= CURRENT_DATE - INTERVAL '90 days'",
     }
+    const dateFilter = dateFilterMap[period] || ""
 
-    const sortColumn = sortBy === "given" ? "kudos_given_count" : sortBy === "received" ? "kudos_received_count" : "total_points"
+    const sortColumnMap: Record<string, string> = {
+      given: "kudos_given_count",
+      received: "kudos_received_count",
+    }
+    const sortColumn = sortColumnMap[sortBy] || "total_points"
 
     const query = `
       WITH received AS (
@@ -69,16 +80,12 @@ export async function GET(request: Request) {
         COALESCE(g.kudos_given_count, 0) AS kudos_given_count,
         COALESCE(r.total_points, 0) AS total_points,
         COALESCE(bc.badges_earned_count, 0) AS badges_earned_count,
-        ROW_NUMBER() OVER (ORDER BY COALESCE(${
-          sortColumn === "kudos_given_count" ? "g.kudos_given_count" :
-          sortColumn === "kudos_received_count" ? "r.kudos_received_count" :
-          "r.total_points"
-        }, 0) DESC) AS rank
+        ROW_NUMBER() OVER (ORDER BY COALESCE(${getSortExpression(sortColumn)}, 0) DESC) AS rank
       FROM received r
       FULL OUTER JOIN given g ON g.user_id = r.user_id
       JOIN users u ON u.id = COALESCE(r.user_id, g.user_id)
       LEFT JOIN badge_counts bc ON bc.user_id = COALESCE(r.user_id, g.user_id)
-      ORDER BY ${sortColumn === "kudos_given_count" ? "COALESCE(g.kudos_given_count, 0)" : sortColumn === "kudos_received_count" ? "COALESCE(r.kudos_received_count, 0)" : "COALESCE(r.total_points, 0)"} DESC
+      ORDER BY COALESCE(${getSortExpression(sortColumn)}, 0) DESC
       LIMIT $2`
 
     const result = await pgClient.query(query, [orgContext.orgId, limit])

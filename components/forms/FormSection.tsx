@@ -9,7 +9,7 @@ interface FormSectionProps {
   className?: string
 }
 
-export function FormSection({ title, description, icon, children, className = "" }: FormSectionProps) {
+export function FormSection({ title, description, icon, children, className = "" }: Readonly<FormSectionProps>) {
   return (
     <Card className={className}>
       <CardHeader>

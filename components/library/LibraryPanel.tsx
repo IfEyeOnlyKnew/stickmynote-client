@@ -182,7 +182,7 @@ export function LibraryPanel({ stickId, stickType, readOnly, className, onFileCo
     a.download = file.original_filename
     document.body.appendChild(a)
     a.click()
-    document.body.removeChild(a)
+    a.remove()
   }
 
   const filteredFiles = searchQuery
@@ -199,7 +199,7 @@ export function LibraryPanel({ stickId, stickType, readOnly, className, onFileCo
       <div className="flex items-center justify-between mb-3">
         <div className="flex items-center gap-2">
           <Badge variant="secondary" className="text-xs">
-            {files.length} file{files.length !== 1 ? "s" : ""}
+            {files.length} file{files.length === 1 ? "" : "s"}
           </Badge>
           {role === "owner" && (
             <Badge variant="outline" className="text-xs text-green-700 border-green-300">

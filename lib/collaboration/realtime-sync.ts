@@ -64,8 +64,8 @@ export class RealtimeSync {
   private readonly pollingInterval: number
 
   constructor(
-    private channelName: string,
-    private options: RealtimeSyncOptions,
+    private readonly channelName: string,
+    private readonly options: RealtimeSyncOptions,
   ) {
     this.pollingInterval = options.pollingInterval ?? DEFAULT_POLLING_INTERVAL
   }

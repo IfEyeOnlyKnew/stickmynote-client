@@ -33,7 +33,7 @@ const getRelativeTime = (date: Date): string => {
 
 // Helper function to check if note has content
 const hasNoteContent = (note: Note): boolean => {
-  return Boolean(note.content && note.content.trim())
+  return Boolean(note.content?.trim())
 }
 
 export default function TagsPage() {

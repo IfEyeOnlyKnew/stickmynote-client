@@ -96,6 +96,46 @@ export function calculateTemplateProgress(
 /**
  * Generate guided prompts based on template configuration and current state
  */
+function shouldSuggestOptional(
+  opt: { category: string; suggestWhen?: string; suggestAfter?: string },
+  checklist: Record<string, CategoryChecklistItem>,
+  fulfilledCategories: string[],
+  requiredCount: number,
+): boolean {
+  const hasCategory = !!checklist[opt.category]?.count
+  if (hasCategory) return false
+
+  switch (opt.suggestWhen) {
+    case "always":
+    case "missing":
+      return true
+    case "after_required":
+      return fulfilledCategories.length === requiredCount
+    default:
+      return !!opt.suggestAfter && !!checklist[opt.suggestAfter]?.count
+  }
+}
+
+function addNextFlowPrompt(
+  flow: Array<{ category: string; step: number; label: string; description?: string }>,
+  checklist: Record<string, CategoryChecklistItem>,
+  prompts: GuidedPrompt[],
+): void {
+  for (const step of flow) {
+    if (checklist[step.category]?.count) continue
+    const alreadySuggested = prompts.some((p) => p.category === step.category)
+    if (!alreadySuggested) {
+      prompts.push({
+        category: step.category,
+        prompt: step.description || `Step ${step.step}: ${step.label}`,
+        priority: "low",
+        reason: "flow",
+      })
+    }
+    break // Only suggest the next step
+  }
+}
+
 function generateGuidedPrompts(
   template: DiscussionTemplate,
   checklist: Record<string, CategoryChecklistItem>,
@@ -117,64 +157,18 @@ function generateGuidedPrompts(
 
   // Add prompts for optional categories based on triggers
   for (const opt of template.optional_categories) {
-    // Check if we should suggest this category
-    let shouldSuggest = false
-
-    switch (opt.suggestWhen) {
-      case "always":
-        // Always suggest if not already present
-        shouldSuggest = !checklist[opt.category]?.count
-        break
-
-      case "missing":
-        // Suggest if category is missing
-        shouldSuggest = !checklist[opt.category]?.count
-        break
-
-      case "after_required":
-        // Suggest after all required categories are fulfilled
-        shouldSuggest =
-          fulfilledCategories.length === template.required_categories.length &&
-          !checklist[opt.category]?.count
-        break
-
-      default:
-        // Check suggestAfter trigger
-        if (opt.suggestAfter) {
-          shouldSuggest =
-            checklist[opt.suggestAfter]?.count > 0 && !checklist[opt.category]?.count
-        }
-    }
-
-    if (shouldSuggest) {
-      prompts.push({
-        category: opt.category,
-        prompt: opt.prompt,
-        priority: "medium",
-        reason: "suggested",
-      })
-    }
+    if (!shouldSuggestOptional(opt, checklist, fulfilledCategories, template.required_categories.length)) continue
+    prompts.push({
+      category: opt.category,
+      prompt: opt.prompt,
+      priority: "medium",
+      reason: "suggested",
+    })
   }
 
   // Add prompts based on category flow (low priority)
   if (template.category_flow.length > 0) {
-    // Find the next step in the flow that hasn't been completed
-    for (const step of template.category_flow) {
-      if (!checklist[step.category]?.count) {
-        // Only add if not already suggested
-        const alreadySuggested = prompts.some((p) => p.category === step.category)
-        if (!alreadySuggested) {
-          prompts.push({
-            category: step.category,
-            prompt: step.description || `Step ${step.step}: ${step.label}`,
-            priority: "low",
-            reason: "flow",
-          })
-        }
-        // Only suggest the next step, not all remaining steps
-        break
-      }
-    }
+    addNextFlowPrompt(template.category_flow, checklist, prompts)
   }
 
   // Sort by priority
@@ -220,12 +214,12 @@ function checkMilestones(
         .sort()
 
       if (triggerTimestamps.length > 0) {
-        state.reachedAt = triggerTimestamps[triggerTimestamps.length - 1]
+        state.reachedAt = triggerTimestamps.at(-1)!
       }
 
       // Find the reply that triggered the milestone
       const lastTriggerCategory =
-        milestone.triggerCategories[milestone.triggerCategories.length - 1]
+        milestone.triggerCategories.at(-1)!
       const triggerReplyId = checklist[lastTriggerCategory]?.replyIds?.[0]
       if (triggerReplyId) {
         state.triggeredBy = triggerReplyId

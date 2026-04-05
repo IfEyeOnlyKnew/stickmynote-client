@@ -13,7 +13,7 @@ interface PreferencesSettingsProps {
   onUpdate: (field: keyof UserSettings["preferences"], value: any) => void
 }
 
-export function PreferencesSettings({ preferences, onUpdate }: PreferencesSettingsProps) {
+export function PreferencesSettings({ preferences, onUpdate }: Readonly<PreferencesSettingsProps>) {
   return (
     <Card>
       <CardHeader>

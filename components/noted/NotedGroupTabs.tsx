@@ -51,7 +51,7 @@ export function NotedGroupTabs({
   onCreateGroup,
   onUpdateGroup,
   onDeleteGroup,
-}: NotedGroupTabsProps) {
+}: Readonly<NotedGroupTabsProps>) {
   const [showCreateModal, setShowCreateModal] = useState(false)
   const [editingGroup, setEditingGroup] = useState<NotedGroup | null>(null)
   const [groupName, setGroupName] = useState("")
@@ -177,22 +177,22 @@ export function NotedGroupTabs({
 
               return (
                 <div key={group.id}>
-                  <div
+                  <button
+                    type="button"
                     className={cn(
                       "w-full flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-sm font-medium transition-colors cursor-pointer group",
-                      isActive
-                        ? "bg-primary text-primary-foreground"
-                        : isChildActive
-                          ? "bg-muted/60 text-foreground"
-                          : "hover:bg-muted text-foreground"
+                      (() => {
+                        if (isActive) return "bg-primary text-primary-foreground"
+                        if (isChildActive) return "bg-muted/60 text-foreground"
+                        return "hover:bg-muted text-foreground"
+                      })()
                     )}
                     onClick={() => onSelectGroup(group.id)}
                   >
                     {/* Expand/collapse toggle */}
                     {hasChildren ? (
                       <span
-                        role="button"
-                        tabIndex={0}
+                        aria-label={isExpanded ? "Collapse group" : "Expand group"}
                         onClick={(e) => toggleExpand(group.id, e)}
                         onKeyDown={(e) => e.key === "Enter" && toggleExpand(group.id, e as unknown as React.MouseEvent)}
                         className="h-4 w-4 flex items-center justify-center shrink-0"
@@ -217,9 +217,8 @@ export function NotedGroupTabs({
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
                         <span
-                          role="button"
-                          tabIndex={0}
                           onClick={(e) => e.stopPropagation()}
+                          onKeyDown={(e) => e.stopPropagation()}
                           className={cn(
                             "h-5 w-5 rounded flex items-center justify-center shrink-0 opacity-0 group-hover:opacity-100 transition-opacity",
                             isActive ? "hover:bg-primary-foreground/20" : "hover:bg-muted-foreground/20"
@@ -239,14 +238,15 @@ export function NotedGroupTabs({
                         </DropdownMenuItem>
                       </DropdownMenuContent>
                     </DropdownMenu>
-                  </div>
+                  </button>
 
                   {/* Sub-groups */}
                   {hasChildren && isExpanded && (
                     <div className="ml-4 mt-0.5 space-y-0.5">
                       {children.map((sub) => (
-                        <div
+                        <button
                           key={sub.id}
+                          type="button"
                           className={cn(
                             "w-full flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium transition-colors cursor-pointer group/sub",
                             activeGroupId === sub.id
@@ -262,11 +262,8 @@ export function NotedGroupTabs({
                           />
                           <span className="truncate flex-1">{sub.name}</span>
                           <span
-                            role="button"
-                            tabIndex={0}
                             title="Edit sub-group"
-                            onClick={(e) => openEdit(sub, e)}
-                            onKeyDown={(e) => e.key === "Enter" && openEdit(sub, e as unknown as React.MouseEvent)}
+                            onClick={(e) => { e.stopPropagation(); openEdit(sub, e) }}
                             className={cn(
                               "h-4 w-4 rounded flex items-center justify-center shrink-0 opacity-0 group-hover/sub:opacity-100 transition-opacity",
                               activeGroupId === sub.id ? "hover:bg-primary-foreground/20" : "hover:bg-muted-foreground/20"
@@ -274,7 +271,7 @@ export function NotedGroupTabs({
                           >
                             <Pencil className="h-2.5 w-2.5" />
                           </span>
-                        </div>
+                        </button>
                       ))}
                     </div>
                   )}
@@ -299,11 +296,11 @@ export function NotedGroupTabs({
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>
-              {editingGroup
-                ? "Edit Group"
-                : parentId
-                  ? "New Sub-group"
-                  : "New Group"}
+              {(() => {
+                if (editingGroup) return "Edit Group"
+                if (parentId) return "New Sub-group"
+                return "New Group"
+              })()}
             </DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
@@ -356,6 +353,7 @@ export function NotedGroupTabs({
                   <button
                     key={color}
                     type="button"
+                    aria-label={`Select color ${color}`}
                     onClick={() => setGroupColor(color)}
                     className={cn(
                       "w-7 h-7 rounded-full transition-all",

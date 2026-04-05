@@ -29,6 +29,10 @@ export interface DigestEmailData {
   siteUrl: string
 }
 
+function plural(count: number): string {
+  return count > 1 ? "s" : ""
+}
+
 export function generateDigestEmailHtml(data: DigestEmailData): string {
   const { userName, frequency, periodStart, periodEnd, totalNotifications, padSummaries, siteUrl } = data
 
@@ -45,11 +49,11 @@ export function generateDigestEmailHtml(data: DigestEmailData): string {
         </a>
       </h3>
       <div style="display: flex; flex-wrap: wrap; gap: 12px; margin-bottom: 12px;">
-        ${pad.newSticks > 0 ? `<span style="background: #dbeafe; color: #1e40af; padding: 4px 8px; border-radius: 4px; font-size: 12px;">📝 ${pad.newSticks} new stick${pad.newSticks > 1 ? "s" : ""}</span>` : ""}
-        ${pad.replies > 0 ? `<span style="background: #e0e7ff; color: #3730a3; padding: 4px 8px; border-radius: 4px; font-size: 12px;">💬 ${pad.replies} repl${pad.replies > 1 ? "ies" : "y"}</span>` : ""}
-        ${pad.statusChanges > 0 ? `<span style="background: #fef3c7; color: #92400e; padding: 4px 8px; border-radius: 4px; font-size: 12px;">🔄 ${pad.statusChanges} status change${pad.statusChanges > 1 ? "s" : ""}</span>` : ""}
-        ${pad.unresolvedBlockers > 0 ? `<span style="background: #fee2e2; color: #991b1b; padding: 4px 8px; border-radius: 4px; font-size: 12px;">⚠️ ${pad.unresolvedBlockers} blocker${pad.unresolvedBlockers > 1 ? "s" : ""}</span>` : ""}
-        ${pad.mentions > 0 ? `<span style="background: #f3e8ff; color: #6b21a8; padding: 4px 8px; border-radius: 4px; font-size: 12px;">@ ${pad.mentions} mention${pad.mentions > 1 ? "s" : ""}</span>` : ""}
+        ${pad.newSticks > 0 ? `<span style="background: #dbeafe; color: #1e40af; padding: 4px 8px; border-radius: 4px; font-size: 12px;">📝 ${pad.newSticks} new stick${plural(pad.newSticks)}</span>` : ""}
+        ${pad.replies > 0 ? `<span style="background: #e0e7ff; color: #3730a3; padding: 4px 8px; border-radius: 4px; font-size: 12px;">💬 ${pad.replies} ${pad.replies > 1 ? "replies" : "reply"}</span>` : ""}
+        ${pad.statusChanges > 0 ? `<span style="background: #fef3c7; color: #92400e; padding: 4px 8px; border-radius: 4px; font-size: 12px;">🔄 ${pad.statusChanges} status change${plural(pad.statusChanges)}</span>` : ""}
+        ${pad.unresolvedBlockers > 0 ? `<span style="background: #fee2e2; color: #991b1b; padding: 4px 8px; border-radius: 4px; font-size: 12px;">⚠️ ${pad.unresolvedBlockers} blocker${plural(pad.unresolvedBlockers)}</span>` : ""}
+        ${pad.mentions > 0 ? `<span style="background: #f3e8ff; color: #6b21a8; padding: 4px 8px; border-radius: 4px; font-size: 12px;">@ ${pad.mentions} mention${plural(pad.mentions)}</span>` : ""}
       </div>
       ${pad.notifications
         .slice(0, 5)
@@ -95,7 +99,7 @@ export function generateDigestEmailHtml(data: DigestEmailData): string {
           
           <div style="background: #eef2ff; border-radius: 8px; padding: 16px; margin: 20px 0; text-align: center;">
             <span style="font-size: 32px; font-weight: bold; color: #4f46e5;">${totalNotifications}</span>
-            <p style="margin: 4px 0 0 0; color: #6366f1; font-size: 14px;">total update${totalNotifications !== 1 ? "s" : ""}</p>
+            <p style="margin: 4px 0 0 0; color: #6366f1; font-size: 14px;">total update${totalNotifications === 1 ? "" : "s"}</p>
           </div>
           
           ${padSummaryHtml || '<p style="color: #6b7280; text-align: center;">No activity to report.</p>'}
@@ -160,11 +164,11 @@ export function generateDigestPlainText(data: DigestEmailData): string {
 
 function escapeHtml(str: string): string {
   return str
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#039;")
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#039;")
 }
 
 function formatDate(dateStr: string): string {

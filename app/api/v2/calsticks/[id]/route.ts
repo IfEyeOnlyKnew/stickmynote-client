@@ -65,9 +65,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     }
 
     updates.push(`updated_at = $${paramIndex++}`)
-    values.push(new Date().toISOString())
-
-    values.push(id, orgContext.orgId)
+    values.push(new Date().toISOString(), id, orgContext.orgId)
 
     const result = await db.query(
       `UPDATE paks_pad_stick_replies

@@ -4,25 +4,18 @@ type ClassArray = ClassValue[]
 type ClassDictionary = Record<string, any>
 type ClassProp = ClassValue | ClassArray | ClassDictionary
 
-export function cn(...inputs: ClassProp[]): string {
-  const classes: string[] = []
-
-  for (const input of inputs) {
-    if (!input) continue
-
-    if (typeof input === "string") {
-      classes.push(input)
-    } else if (Array.isArray(input)) {
-      const result = cn(...input)
-      if (result) classes.push(result)
-    } else if (typeof input === "object") {
-      for (const key in input) {
-        if (input[key]) classes.push(key)
-      }
-    }
+function resolveClassProp(input: ClassProp): string {
+  if (!input) return ""
+  if (typeof input === "string") return input
+  if (Array.isArray(input)) return cn(...input)
+  if (typeof input === "object") {
+    return Object.keys(input).filter((key) => input[key]).join(" ")
   }
+  return ""
+}
 
-  return classes.join(" ")
+export function cn(...inputs: ClassProp[]): string {
+  return inputs.map(resolveClassProp).filter(Boolean).join(" ")
 }
 
 type VariantConfig = {
@@ -32,37 +25,49 @@ type VariantConfig = {
 
 export function cva(base: string, config?: VariantConfig) {
   return (props?: Record<string, string | undefined> & { className?: string }) => {
-    let result = base
+    const parts = [base]
 
     if (config?.variants && props) {
-      for (const [variantKey, variantValue] of Object.entries(props)) {
-        if (variantKey === "className") continue
-
-        const variant = config.variants[variantKey]
-        if (variant && variantValue && variant[variantValue]) {
-          result += " " + variant[variantValue]
-        }
-      }
+      parts.push(...resolveVariants(config.variants, props))
     }
 
-    // Apply default variants if not specified
     if (config?.defaultVariants) {
-      for (const [key, defaultValue] of Object.entries(config.defaultVariants)) {
-        if (!props || props[key] === undefined) {
-          const variant = config.variants?.[key]
-          if (variant && variant[defaultValue]) {
-            result += " " + variant[defaultValue]
-          }
-        }
-      }
+      parts.push(...resolveDefaultVariants(config.variants, config.defaultVariants, props))
     }
 
     if (props?.className) {
-      result += " " + props.className
+      parts.push(props.className)
     }
 
-    return result
+    return parts.filter(Boolean).join(" ")
   }
+}
+
+function resolveVariants(
+  variants: Record<string, Record<string, string>>,
+  props: Record<string, string | undefined>,
+): string[] {
+  const classes: string[] = []
+  for (const [key, value] of Object.entries(props)) {
+    if (key === "className") continue
+    const variantClass = value ? variants[key]?.[value] : undefined
+    if (variantClass) classes.push(variantClass)
+  }
+  return classes
+}
+
+function resolveDefaultVariants(
+  variants: Record<string, Record<string, string>> | undefined,
+  defaultVariants: Record<string, string>,
+  props?: Record<string, string | undefined>,
+): string[] {
+  const classes: string[] = []
+  for (const [key, defaultValue] of Object.entries(defaultVariants)) {
+    if (props?.[key] !== undefined) continue
+    const variantClass = variants?.[key]?.[defaultValue]
+    if (variantClass) classes.push(variantClass)
+  }
+  return classes
 }
 
 export type VariantProps<T extends (...args: any) => any> = {

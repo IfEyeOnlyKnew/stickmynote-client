@@ -3,7 +3,7 @@
  * Type-safe query functions for the stick chat system
  */
 
-import { db, queryOne, queryMany, execute } from "./pg-client"
+import { queryOne, queryMany, execute } from "./pg-client"
 import type { QueryResultRow } from "pg"
 import type {
   StickChat,
@@ -16,7 +16,6 @@ import type {
   StickChatFilters,
   ChatType,
   ChatVisibility,
-  MemberRole,
   MessageType,
   ChannelCategory,
   ReactionSummary,
@@ -665,7 +664,7 @@ export async function getTotalUnreadCount(userId: string): Promise<number> {
      AND m.user_id != $1`,
     [userId]
   )
-  return parseInt(result?.count || "0", 10)
+  return Number.parseInt(result?.count || "0", 10)
 }
 
 /**

@@ -137,7 +137,7 @@ export default function InvoicesPage() {
       </div>
 
       {/* Invoices List */}
-      {loading ? (
+      {loading && (
         <div className="space-y-3">
           {[1, 2, 3].map((i) => (
             <Card key={i} className="animate-pulse">
@@ -145,7 +145,8 @@ export default function InvoicesPage() {
             </Card>
           ))}
         </div>
-      ) : invoices.length === 0 && !tableNotFound ? (
+      )}
+      {!loading && invoices.length === 0 && !tableNotFound && (
         <Card>
           <CardContent className="pt-6 text-center text-muted-foreground py-12">
             <FileText className="h-12 w-12 mx-auto text-muted-foreground/50 mb-2" />
@@ -153,7 +154,8 @@ export default function InvoicesPage() {
             <p className="text-sm mt-1">Create your first invoice from approved billable time entries</p>
           </CardContent>
         </Card>
-      ) : (
+      )}
+      {!loading && (invoices.length > 0 || tableNotFound) && (
         <div className="space-y-2">
           {invoices.map((invoice) => {
             const StatusIcon = STATUS_ICONS[invoice.status] || FileText

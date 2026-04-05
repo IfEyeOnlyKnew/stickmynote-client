@@ -28,7 +28,7 @@ interface ComplianceDashboardProps {
   orgId: string
 }
 
-export function ComplianceDashboard({ orgId }: ComplianceDashboardProps) {
+export function ComplianceDashboard({ orgId }: Readonly<ComplianceDashboardProps>) {
   const [loading, setLoading] = useState(true)
   const [users, setUsers] = useState<ComplianceUser[]>([])
   const [policyEnabled, setPolicyEnabled] = useState(false)
@@ -130,21 +130,16 @@ export function ComplianceDashboard({ orgId }: ComplianceDashboardProps) {
         </CardDescription>
       </CardHeader>
       <CardContent>
-        {!policyEnabled ? (
-          <div className="text-center py-8 text-muted-foreground">
-            <ShieldCheck className="h-12 w-12 mx-auto mb-3 text-gray-400" />
-            <p className="font-medium">2FA Policy Not Enabled</p>
-            <p className="text-sm">Enable the 2FA policy in Org Settings to track compliance.</p>
-          </div>
-        ) : users.length === 0 ? (
-          <div className="text-center py-8 text-muted-foreground">
-            <CheckCircle className="h-12 w-12 mx-auto mb-3 text-green-500" />
-            <p className="font-medium">All users are compliant!</p>
-            <p className="text-sm">Everyone in scope has enabled two-factor authentication.</p>
-          </div>
-        ) : (
-          <>
-            {/* Summary */}
+        {policyEnabled && users.length === 0 && (
+            <div className="text-center py-8 text-muted-foreground">
+              <CheckCircle className="h-12 w-12 mx-auto mb-3 text-green-500" />
+              <p className="font-medium">All users are compliant!</p>
+              <p className="text-sm">Everyone in scope has enabled two-factor authentication.</p>
+            </div>
+        )}
+        {policyEnabled && users.length > 0 && (
+            <>
+              {/* Summary */}
             <div className="grid grid-cols-3 gap-4 mb-6">
               <div className="text-center p-4 bg-red-50 dark:bg-red-950/30 rounded-lg border border-red-200 dark:border-red-800">
                 <p className="text-2xl font-bold text-red-700 dark:text-red-300">{nonCompliantUsers.length}</p>
@@ -197,6 +192,13 @@ export function ComplianceDashboard({ orgId }: ComplianceDashboardProps) {
               </Table>
             </div>
           </>
+        )}
+        {!policyEnabled && (
+          <div className="text-center py-8 text-muted-foreground">
+            <ShieldCheck className="h-12 w-12 mx-auto mb-3 text-gray-400" />
+            <p className="font-medium">2FA Policy Not Enabled</p>
+            <p className="text-sm">Enable the 2FA policy in Org Settings to track compliance.</p>
+          </div>
         )}
       </CardContent>
     </Card>

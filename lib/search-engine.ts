@@ -53,7 +53,7 @@ export class SearchEngine {
     }
 
     // Apply search with fuzzy matching if enabled
-    if (query && query.trim()) {
+    if (query?.trim()) {
       if (fuzzy) {
         // Use trigram similarity for fuzzy search (handles typos)
         dbQuery = dbQuery.or(
@@ -111,7 +111,7 @@ export class SearchEngine {
     }
 
     // Apply search
-    if (query && query.trim()) {
+    if (query?.trim()) {
       if (fuzzy) {
         dbQuery = dbQuery.or(
           `name.ilike.%${query}%,description.ilike.%${query}%,name.fts(english).${query},description.fts(english).${query}`,
@@ -167,7 +167,7 @@ export class SearchEngine {
     }
 
     // Apply search
-    if (query && query.trim()) {
+    if (query?.trim()) {
       if (fuzzy) {
         dbQuery = dbQuery.or(
           `topic.ilike.%${query}%,content.ilike.%${query}%,topic.fts(english).${query},content.fts(english).${query}`,

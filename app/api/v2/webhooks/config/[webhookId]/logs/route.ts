@@ -37,7 +37,7 @@ export async function GET(
     }
 
     const { searchParams } = new URL(request.url)
-    const limit = parseInt(searchParams.get('limit') || '50')
+    const limit = Number.parseInt(searchParams.get('limit') || '50')
     const status = searchParams.get('status')
 
     let queryStr = `SELECT * FROM webhook_delivery_logs WHERE webhook_id = $1`

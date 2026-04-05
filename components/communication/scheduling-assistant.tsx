@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useMemo, useCallback } from "react"
+import { useState, useEffect, useMemo } from "react"
 import {
   Dialog,
   DialogContent,
@@ -9,7 +9,6 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
-import { Badge } from "@/components/ui/badge"
 import { Label } from "@/components/ui/label"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import {
@@ -19,7 +18,6 @@ import {
   Users,
   Clock,
   Calendar,
-  X,
   Check,
 } from "lucide-react"
 import {
@@ -110,7 +108,7 @@ export function SchedulingAssistant({
   onOpenChange,
   onSchedule,
   defaultDate,
-}: SchedulingAssistantProps) {
+}: Readonly<SchedulingAssistantProps>) {
   // Current week being viewed
   const [currentWeekStart, setCurrentWeekStart] = useState(() => {
     const baseDate = defaultDate || new Date()
@@ -153,7 +151,7 @@ export function SchedulingAssistant({
     const fetchMyBusyTimes = async () => {
       setIsLoadingMyBusy(true)
       try {
-        const weekEnd = addMinutes(setHours(weekDays[weekDays.length - 1], DEFAULT_END_HOUR), 0)
+        const weekEnd = addMinutes(setHours(weekDays.at(-1)!, DEFAULT_END_HOUR), 0)
         const params = new URLSearchParams({
           start: currentWeekStart.toISOString(),
           end: weekEnd.toISOString(),
@@ -192,7 +190,7 @@ export function SchedulingAssistant({
     const fetchAvailability = async () => {
       setIsLoadingAvailability(true)
       try {
-        const weekEnd = addMinutes(setHours(weekDays[weekDays.length - 1], DEFAULT_END_HOUR), 0)
+        const weekEnd = addMinutes(setHours(weekDays.at(-1)!, DEFAULT_END_HOUR), 0)
         const params = new URLSearchParams({
           emails: participantEmails.join(","),
           start: currentWeekStart.toISOString(),
@@ -244,7 +242,7 @@ export function SchedulingAssistant({
 
   // Get display name from email
   const getDisplayName = (email: string) => {
-    return email.split("@")[0].replace(/[._]/g, " ")
+    return email.split("@")[0].replaceAll(/[._]/g, " ")
   }
 
   // Check if a slot is selected
@@ -279,7 +277,7 @@ export function SchedulingAssistant({
             </div>
           </div>
           <p className="text-sm text-muted-foreground mt-1">
-            {format(currentWeekStart, "MMMM d")} - {format(weekDays[weekDays.length - 1], "MMMM d, yyyy")}
+            {format(currentWeekStart, "MMMM d")} - {format(weekDays.at(-1)!, "MMMM d, yyyy")}
           </p>
         </DialogHeader>
 
@@ -442,8 +440,6 @@ export function SchedulingAssistant({
                       }
 
                       const isSelected = isSlotSelected(day, slot)
-                      const hasConflict = myBusy || participantConflicts.length > 0
-
                       return (
                         <button
                           key={day.toISOString()}
@@ -456,11 +452,11 @@ export function SchedulingAssistant({
                             isToday(day) && !isSelected && "bg-orange-50/50 dark:bg-orange-950/10"
                           )}
                           title={
-                            myBusy
-                              ? `You: ${myBusy.title}`
-                              : participantConflicts.length > 0
-                              ? `Conflicts: ${participantConflicts.map((c) => getDisplayName(c.email)).join(", ")}`
-                              : "Available"
+                            (() => {
+                              if (myBusy) return `You: ${myBusy.title}`
+                              if (participantConflicts.length > 0) return `Conflicts: ${participantConflicts.map((c) => getDisplayName(c.email)).join(", ")}`
+                              return "Available"
+                            })()
                           }
                         >
                           {/* My busy indicator */}

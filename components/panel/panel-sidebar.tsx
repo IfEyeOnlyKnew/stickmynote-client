@@ -94,8 +94,10 @@ export function PanelSidebar() {
         {mobileOpen && (
           <div className="fixed inset-0 z-[9999]">
             {/* Backdrop */}
-            <div
-              className="absolute inset-0 bg-black/40"
+            <button
+              type="button"
+              className="absolute inset-0 bg-black/40 border-none cursor-default"
+              aria-label="Close sidebar"
               onClick={() => setMobileOpen(false)}
             />
             {/* Slide-over panel */}

@@ -104,7 +104,7 @@ export async function GET(
 
     // Parse pagination params
     const { searchParams } = new URL(request.url)
-    const limit = parseInt(searchParams.get("limit") || "50", 10)
+    const limit = Number.parseInt(searchParams.get("limit") || "50", 10)
     const cursor = searchParams.get("cursor") || undefined
 
     const { messages, hasMore } = await getChatMessages(chatId, { limit, cursor, currentUserId: user.id })

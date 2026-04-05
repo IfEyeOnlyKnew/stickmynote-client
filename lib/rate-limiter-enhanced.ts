@@ -46,8 +46,8 @@ const RATE_LIMIT_CONFIGS: Record<string, RateLimitConfig> = {
 }
 
 export class EnhancedRateLimiter {
-  private redis: Redis | null = null
-  private memoryStore = new Map<string, { count: number; resetTime: number }>()
+  private readonly redis: Redis | null = null
+  private readonly memoryStore = new Map<string, { count: number; resetTime: number }>()
 
   constructor() {
     if (!FORCE_MEMORY && process.env.KV_REST_API_URL && process.env.KV_REST_API_TOKEN) {

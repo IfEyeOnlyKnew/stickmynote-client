@@ -33,7 +33,7 @@ export function CollaborativeTextarea({
   maxLength,
   className,
   disabled = false,
-}: CollaborativeTextareaProps) {
+}: Readonly<CollaborativeTextareaProps>) {
   const { presenceUsers, isConnected } = usePresence({ stickId: roomId })
   const [isFocused, setIsFocused] = useState(false)
   const [isTyping, setIsTyping] = useState(false)

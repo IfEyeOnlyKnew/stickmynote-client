@@ -1,7 +1,6 @@
 "use client"
 
 import { ThreadedReplies } from "@/components/replies/ThreadedReplies"
-import type { ThreadedReply } from "@/components/replies/ThreadedReplyItem"
 
 interface Reply {
   id: string
@@ -50,7 +49,7 @@ export function StickReplies({
   isNew,
   currentUserId,
   ...props
-}: StickRepliesProps) {
+}: Readonly<StickRepliesProps>) {
   return (
     <ThreadedReplies
       {...props}

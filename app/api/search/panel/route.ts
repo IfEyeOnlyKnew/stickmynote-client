@@ -93,7 +93,7 @@ const NOTES_SELECT_QUERY = `*`
 
 // Helper functions
 function escapeSearchTerm(term: string): string {
-  return term.replace(/[%_\\]/g, "\\$&")
+  return term.replaceAll(/[%_\\]/g, String.raw`\$&`)
 }
 
 function buildCacheKey(query: string | undefined, filters: SearchFilters, page: number): string {
@@ -130,8 +130,8 @@ function buildUsersMap(users: UserInfo[] | null): Record<string, UserInfo> {
 function filterNotesByTags(notes: any[], tags: string[], tagsMap: Record<string, string[]>): any[] {
   const lowerTags = tags.map((t) => t.toLowerCase())
   return notes.filter((note) => {
-    const noteTags = (tagsMap[note.id] || []).map((t: string) => t.toLowerCase())
-    return lowerTags.some((tag) => noteTags.includes(tag))
+    const noteTags = new Set((tagsMap[note.id] || []).map((t: string) => t.toLowerCase()))
+    return lowerTags.some((tag) => noteTags.has(tag))
   })
 }
 

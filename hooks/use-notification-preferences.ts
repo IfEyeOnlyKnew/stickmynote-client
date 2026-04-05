@@ -50,7 +50,7 @@ export function useNotificationPreferences() {
       }
 
       const contentType = response.headers.get("content-type")
-      if (!contentType || !contentType.includes("application/json")) {
+      if (!contentType?.includes("application/json")) {
         // Non-JSON response - use defaults
         setPreferences(DEFAULT_PREFERENCES)
         setError(null)

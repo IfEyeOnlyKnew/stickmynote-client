@@ -82,7 +82,7 @@ export function VirtualizedNoteGrid({
   hasMore,
   isLoadingMore,
   ...props
-}: VirtualizedNoteGridProps) {
+}: Readonly<VirtualizedNoteGridProps>) {
   // Refs for container and the infinite-scroll sentinel
   const containerRef = useRef<HTMLDivElement>(null);
   const observerRef = useRef<IntersectionObserver | null>(null);
@@ -92,7 +92,6 @@ export function VirtualizedNoteGrid({
   // Local pagination state when server-driven paging is not used
   const {
     loadedPages,
-    totalPages,
     hasMorePages,
     displayedItemsCount,
     loadMorePages,

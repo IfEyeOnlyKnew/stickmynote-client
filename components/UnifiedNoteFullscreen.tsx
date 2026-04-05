@@ -64,9 +64,7 @@ export const UnifiedNoteFullscreen: React.FC = () => {
     isSaving,
     replies,
     replyCount,
-    hasChanges,
     tones,
-    initializeEditingState,
     handleStartEditing,
     handleCancelEdit,
     handleStickEdit,
@@ -102,7 +100,7 @@ export const UnifiedNoteFullscreen: React.FC = () => {
   }, [note.id, note.is_shared, onUpdateSharing])
 
   const handleDelete = useCallback(() => {
-    if (window.confirm("Are you sure you want to delete this note?")) {
+    if (globalThis.confirm("Are you sure you want to delete this note?")) {
       if (onDeleteNote) {
         onDeleteNote(note.id)
       }
@@ -132,8 +130,8 @@ export const UnifiedNoteFullscreen: React.FC = () => {
         setReplySummary(data.summary || "Summary generated successfully.")
 
         // Refresh note tabs to show the new export in Details tab
-        if (typeof window !== "undefined") {
-          window.dispatchEvent(new CustomEvent("refreshNoteTabs"))
+        if (typeof globalThis.window !== "undefined") {
+          globalThis.dispatchEvent(new CustomEvent("refreshNoteTabs"))
         }
       } else {
         const errorData = await response.json().catch(() => ({ error: "Unknown error" }))
@@ -166,7 +164,9 @@ export const UnifiedNoteFullscreen: React.FC = () => {
           <div className="mb-3 mt-3">
             <div className="flex flex-wrap gap-1">
               {note.hyperlinks.map((link, idx) => {
-                const linkUrl = typeof link === "string" ? link : typeof link?.url === "string" ? link.url : ""
+                let linkUrl = ""
+                if (typeof link === "string") linkUrl = link
+                else if (typeof link?.url === "string") linkUrl = link.url
 
                 let linkTitle = ""
                 if (typeof link === "string") {
@@ -177,7 +177,7 @@ export const UnifiedNoteFullscreen: React.FC = () => {
                   } else if (typeof link.url === "string") {
                     linkTitle = link.url
                   } else {
-                    linkTitle = String(link.title || link.url || "Link")
+                    linkTitle = String(link.title ?? link.url ?? "Link")
                   }
                 }
 

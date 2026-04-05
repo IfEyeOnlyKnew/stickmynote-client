@@ -29,7 +29,7 @@ export function CollaborativeRichTextModal({
   readOnly = false,
   maxLength = 500,
   enableCollaboration = true,
-}: CollaborativeRichTextModalProps) {
+}: Readonly<CollaborativeRichTextModalProps>) {
   const [localContent, setLocalContent] = useState(content)
 
   useEffect(() => {

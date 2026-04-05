@@ -116,7 +116,11 @@ export async function DELETE(
 
     return NextResponse.json({
       success: true,
-      deletedBy: isOwner ? "owner" : isModerator ? "moderator" : "author",
+      deletedBy: (() => {
+        if (isOwner) return "owner"
+        if (isModerator) return "moderator"
+        return "author"
+      })(),
     })
   } catch (error) {
     console.error("[PadMessages] DELETE error:", error)

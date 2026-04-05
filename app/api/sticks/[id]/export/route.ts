@@ -4,8 +4,8 @@ import { getCachedAuthUser } from "@/lib/auth/cached-auth";
 import { getOrgContext } from "@/lib/auth/get-org-context";
 import type { DatabaseClient } from "@/lib/database/database-adapter";
 import { generateText as aiProviderGenerateText, isAIAvailable } from "@/lib/ai/ai-provider";
-import { writeFile, mkdir } from "fs/promises";
-import path from "path";
+import { writeFile, mkdir } from "node:fs/promises";
+import path from "node:path";
 
 let Document: typeof import("docx").Document | undefined;
 let Packer: typeof import("docx").Packer | undefined;

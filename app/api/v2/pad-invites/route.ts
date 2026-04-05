@@ -9,7 +9,7 @@ export const dynamic = 'force-dynamic'
 
 type DbRole = 'admin' | 'edit' | 'view'
 
-const VALID_ROLES = ['admin', 'editor', 'viewer', 'edit', 'view']
+const VALID_ROLES = new Set(['admin', 'editor', 'viewer', 'edit', 'view'])
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'
 
 const ROLE_MAP: Record<string, DbRole> = {
@@ -76,6 +76,153 @@ async function sendInvitationEmail(params: {
   }
 }
 
+interface InviteContext {
+  padId: string
+  dbRole: DbRole
+  orgId: string
+  inviterId: string
+  inviterEmail: string
+  padName: string
+  role: string
+}
+
+async function processUserIdInvites(
+  userIds: string[],
+  ctx: InviteContext,
+  results: { success: any[]; failed: any[] },
+) {
+  for (const userId of userIds) {
+    try {
+      const existingResult = await db.query(
+        `SELECT id, accepted FROM paks_pad_members WHERE pad_id = $1 AND user_id = $2 AND org_id = $3`,
+        [ctx.padId, userId, ctx.orgId],
+      )
+
+      if (existingResult.rows.length > 0) {
+        const reason = existingResult.rows[0].accepted ? 'Already a member' : 'Invitation already sent'
+        results.failed.push({ userId, reason })
+        continue
+      }
+
+      await db.query(
+        `INSERT INTO paks_pad_members (pad_id, user_id, role, invited_by, invited_at, accepted, org_id)
+         VALUES ($1, $2, $3, $4, NOW(), true, $5)`,
+        [ctx.padId, userId, ctx.dbRole, ctx.inviterId, ctx.orgId],
+      )
+
+      const userResult = await db.query(
+        `SELECT email, full_name, username FROM users WHERE id = $1`,
+        [userId],
+      )
+
+      if (userResult.rows[0]?.email) {
+        const invitedUser = userResult.rows[0]
+        await sendInvitationEmail({
+          toEmail: invitedUser.email,
+          toName: invitedUser.full_name || invitedUser.username || 'User',
+          padName: ctx.padName,
+          role: ctx.role,
+          inviterName: ctx.inviterEmail || 'A team member',
+          padLink: `${SITE_URL}/pads/${ctx.padId}`,
+        })
+      }
+
+      results.success.push({ userId })
+    } catch {
+      results.failed.push({ userId, reason: 'Unexpected error' })
+    }
+  }
+}
+
+async function processEmailInvites(
+  emails: string[],
+  ctx: InviteContext,
+  results: { success: any[]; failed: any[] },
+) {
+  for (const email of emails) {
+    try {
+      const existingUserResult = await db.query(`SELECT id FROM users WHERE email = $1`, [email])
+
+      if (existingUserResult.rows.length > 0) {
+        await processExistingUserEmailInvite(email, existingUserResult.rows[0].id, ctx, results)
+      } else {
+        await processNewUserEmailInvite(email, ctx, results)
+      }
+    } catch {
+      results.failed.push({ email, reason: 'Unexpected error' })
+    }
+  }
+}
+
+async function processExistingUserEmailInvite(
+  email: string,
+  existingUserId: string,
+  ctx: InviteContext,
+  results: { success: any[]; failed: any[] },
+) {
+  const memberResult = await db.query(
+    `SELECT id, accepted FROM paks_pad_members WHERE pad_id = $1 AND user_id = $2 AND org_id = $3`,
+    [ctx.padId, existingUserId, ctx.orgId],
+  )
+
+  if (memberResult.rows.length > 0) {
+    const reason = memberResult.rows[0].accepted ? 'User already a member' : 'Invitation already sent'
+    results.failed.push({ email, reason })
+    return
+  }
+
+  await db.query(
+    `INSERT INTO paks_pad_members (pad_id, user_id, role, invited_by, invited_at, accepted, org_id)
+     VALUES ($1, $2, $3, $4, NOW(), true, $5)`,
+    [ctx.padId, existingUserId, ctx.dbRole, ctx.inviterId, ctx.orgId],
+  )
+
+  await sendInvitationEmail({
+    toEmail: email,
+    toName: email.split('@')[0],
+    padName: ctx.padName,
+    role: ctx.role,
+    inviterName: ctx.inviterEmail || 'A team member',
+    padLink: `${SITE_URL}/pads/${ctx.padId}`,
+  })
+
+  results.success.push({ email })
+}
+
+async function processNewUserEmailInvite(
+  email: string,
+  ctx: InviteContext,
+  results: { success: any[]; failed: any[] },
+) {
+  const pendingResult = await db.query(
+    `SELECT id FROM paks_pad_pending_invites WHERE pad_id = $1 AND email = $2 AND org_id = $3`,
+    [ctx.padId, email, ctx.orgId],
+  )
+
+  if (pendingResult.rows.length > 0) {
+    results.failed.push({ email, reason: 'Invitation already sent' })
+    return
+  }
+
+  await db.query(
+    `INSERT INTO paks_pad_pending_invites (pad_id, email, role, invited_by, invited_at, org_id)
+     VALUES ($1, $2, $3, $4, NOW(), $5)`,
+    [ctx.padId, email, ctx.dbRole, ctx.inviterId, ctx.orgId],
+  )
+
+  await sendInvitationEmail({
+    toEmail: email,
+    toName: email.split('@')[0],
+    padName: ctx.padName,
+    role: ctx.role,
+    inviterName: ctx.inviterEmail || 'A team member',
+    padLink: `${SITE_URL}/auth/login?redirect=/pads/${ctx.padId}`,
+    isNewUser: true,
+  })
+
+  results.success.push({ email })
+}
+
 // POST /api/v2/pad-invites - Invite members to a pad
 export async function POST(request: NextRequest) {
   try {
@@ -102,7 +249,7 @@ export async function POST(request: NextRequest) {
       return new Response(JSON.stringify({ error: 'Missing padId or role' }), { status: 400 })
     }
 
-    if (!VALID_ROLES.includes(role.toLowerCase())) {
+    if (!VALID_ROLES.has(role.toLowerCase())) {
       return new Response(
         JSON.stringify({ error: 'Invalid role. Must be admin, editor, or viewer' }),
         { status: 400 }
@@ -143,131 +290,12 @@ export async function POST(request: NextRequest) {
 
     // Process user ID invites
     if (userIds?.length) {
-      for (const userId of userIds) {
-        try {
-          // Check if already member
-          const existingResult = await db.query(
-            `SELECT id, accepted FROM paks_pad_members
-             WHERE pad_id = $1 AND user_id = $2 AND org_id = $3`,
-            [padId, userId, orgContext.orgId]
-          )
-
-          if (existingResult.rows.length > 0) {
-            const reason = existingResult.rows[0].accepted ? 'Already a member' : 'Invitation already sent'
-            results.failed.push({ userId, reason })
-            continue
-          }
-
-          // Add member
-          await db.query(
-            `INSERT INTO paks_pad_members (pad_id, user_id, role, invited_by, invited_at, accepted, org_id)
-             VALUES ($1, $2, $3, $4, NOW(), true, $5)`,
-            [padId, userId, dbRole, user.id, orgContext.orgId]
-          )
-
-          // Get user email for notification
-          const userResult = await db.query(
-            `SELECT email, full_name, username FROM users WHERE id = $1`,
-            [userId]
-          )
-
-          if (userResult.rows[0]?.email) {
-            const invitedUser = userResult.rows[0]
-            await sendInvitationEmail({
-              toEmail: invitedUser.email,
-              toName: invitedUser.full_name || invitedUser.username || 'User',
-              padName: pad.name,
-              role,
-              inviterName: user.email || 'A team member',
-              padLink: `${SITE_URL}/pads/${padId}`,
-            })
-          }
-
-          results.success.push({ userId })
-        } catch (err) {
-          results.failed.push({ userId, reason: 'Unexpected error' })
-        }
-      }
+      await processUserIdInvites(userIds, { padId, dbRole, orgId: orgContext.orgId, inviterId: user.id, inviterEmail: user.email || '', padName: pad.name, role }, results)
     }
 
     // Process email invites
     if (emails?.length) {
-      for (const email of emails) {
-        try {
-          // Check if user exists
-          const existingUserResult = await db.query(
-            `SELECT id FROM users WHERE email = $1`,
-            [email]
-          )
-
-          if (existingUserResult.rows.length > 0) {
-            const existingUserId = existingUserResult.rows[0].id
-
-            // Check if already member
-            const memberResult = await db.query(
-              `SELECT id, accepted FROM paks_pad_members
-               WHERE pad_id = $1 AND user_id = $2 AND org_id = $3`,
-              [padId, existingUserId, orgContext.orgId]
-            )
-
-            if (memberResult.rows.length > 0) {
-              const reason = memberResult.rows[0].accepted ? 'User already a member' : 'Invitation already sent'
-              results.failed.push({ email, reason })
-              continue
-            }
-
-            // Add as member
-            await db.query(
-              `INSERT INTO paks_pad_members (pad_id, user_id, role, invited_by, invited_at, accepted, org_id)
-               VALUES ($1, $2, $3, $4, NOW(), true, $5)`,
-              [padId, existingUserId, dbRole, user.id, orgContext.orgId]
-            )
-
-            await sendInvitationEmail({
-              toEmail: email,
-              toName: email.split('@')[0],
-              padName: pad.name,
-              role,
-              inviterName: user.email || 'A team member',
-              padLink: `${SITE_URL}/pads/${padId}`,
-            })
-
-            results.success.push({ email })
-          } else {
-            // New user - create pending invite
-            const pendingResult = await db.query(
-              `SELECT id FROM paks_pad_pending_invites
-               WHERE pad_id = $1 AND email = $2 AND org_id = $3`,
-              [padId, email, orgContext.orgId]
-            )
-
-            if (pendingResult.rows.length > 0) {
-              results.failed.push({ email, reason: 'Invitation already sent' })
-              continue
-            }
-
-            await db.query(
-              `INSERT INTO paks_pad_pending_invites (pad_id, email, role, invited_by, invited_at, org_id)
-               VALUES ($1, $2, $3, $4, NOW(), $5)`,
-              [padId, email, dbRole, user.id, orgContext.orgId]
-            )
-
-            await sendInvitationEmail({
-              toEmail: email,
-              toName: email.split('@')[0],
-              padName: pad.name,
-              role,
-              inviterName: user.email || 'A team member',
-              padLink: `${SITE_URL}/auth/login?redirect=/pads/${padId}`,
-              isNewUser: true,
-            })
-
-            results.success.push({ email })
-          }
-        } catch (err) {
-          results.failed.push({ email, reason: 'Unexpected error' })
-        }
-      }
+      await processEmailInvites(emails, { padId, dbRole, orgId: orgContext.orgId, inviterId: user.id, inviterEmail: user.email || '', padName: pad.name, role }, results)
     }
 
     results.total = results.success.length + results.failed.length

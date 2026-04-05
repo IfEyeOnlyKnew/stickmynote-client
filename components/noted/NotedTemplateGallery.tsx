@@ -52,7 +52,7 @@ export function NotedTemplateGallery({
   open,
   onClose,
   onUseTemplate,
-}: NotedTemplateGalleryProps) {
+}: Readonly<NotedTemplateGalleryProps>) {
   const { templates, loading, fetchTemplates, createTemplate, updateTemplate, deleteTemplate } = useNotedTemplates()
   const [activeCategory, setActiveCategory] = useState("")
   const [searchQuery, setSearchQuery] = useState("")
@@ -123,7 +123,7 @@ export function NotedTemplateGallery({
 
   const stripHtml = (html: string) => {
     if (!html) return ""
-    return html.replace(/<[^>]*>/g, "").slice(0, 150)
+    return html.replaceAll(/<[^>]*>/g, "").slice(0, 150)
   }
 
   return (
@@ -176,23 +176,27 @@ export function NotedTemplateGallery({
           <div className="flex flex-1 gap-4 overflow-hidden min-h-0">
             {/* Grid */}
             <ScrollArea className="flex-1">
-              {loading ? (
+              {loading && (
                 <div className="flex items-center justify-center py-12 text-sm text-muted-foreground">
                   Loading templates...
                 </div>
-              ) : filteredTemplates.length === 0 ? (
+              )}
+              {!loading && filteredTemplates.length === 0 && (
                 <div className="flex flex-col items-center justify-center py-12 text-center">
                   <FileText className="h-10 w-10 text-muted-foreground/30 mb-3" />
                   <p className="text-sm text-muted-foreground">
                     {searchQuery ? "No templates match your search" : "No templates in this category"}
                   </p>
                 </div>
-              ) : (
+              )}
+              {!loading && filteredTemplates.length > 0 && (
                 <div className="grid grid-cols-2 gap-3 pr-2">
                   {filteredTemplates.map((template) => (
                     <div
                       key={template.id}
+                      tabIndex={0}
                       onClick={() => setPreviewTemplate(template)}
+                      onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") setPreviewTemplate(template) }}
                       className={cn(
                         "border rounded-lg p-3 cursor-pointer transition-all hover:shadow-sm",
                         previewTemplate?.id === template.id
@@ -313,11 +317,11 @@ export function NotedTemplateGallery({
         initialCategory={editingTemplate?.category || "general"}
         initialContent={editingTemplate?.content || ""}
         title={
-          editingTemplate
-            ? editingTemplate.is_system
-              ? "Customize Template"
-              : "Edit Template"
-            : "Create Template"
+          (() => {
+            if (editingTemplate?.is_system) return "Customize Template"
+            if (editingTemplate) return "Edit Template"
+            return "Create Template"
+          })()
         }
       />
 

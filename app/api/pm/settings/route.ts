@@ -42,7 +42,7 @@ export async function GET() {
 
     const pmSettings: Record<string, any> = {}
     for (const [key, defaultVal] of Object.entries(PM_DEFAULTS)) {
-      pmSettings[key] = orgSettings[`pm_${key}`] !== undefined ? orgSettings[`pm_${key}`] : defaultVal
+      pmSettings[key] = orgSettings[`pm_${key}`] === undefined ? defaultVal : orgSettings[`pm_${key}`]
     }
 
     return NextResponse.json({ settings: pmSettings, defaults: PM_DEFAULTS })

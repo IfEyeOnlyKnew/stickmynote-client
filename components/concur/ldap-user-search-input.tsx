@@ -37,7 +37,7 @@ export function LdapUserSearchInput({
   onChange,
   excludeEmails = [],
   disabled = false,
-}: LdapUserSearchInputProps) {
+}: Readonly<LdapUserSearchInputProps>) {
   const [query, setQuery] = useState("")
   const [results, setResults] = useState<SearchedUser[]>([])
   const [searching, setSearching] = useState(false)

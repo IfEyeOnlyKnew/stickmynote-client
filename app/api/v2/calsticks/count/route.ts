@@ -2,7 +2,6 @@
 import { type NextRequest } from 'next/server'
 import { db } from '@/lib/database/pg-client'
 import { getCachedAuthUser } from '@/lib/auth/cached-auth'
-import { handleApiError } from '@/lib/api/handle-api-error'
 
 export const dynamic = 'force-dynamic'
 
@@ -19,7 +18,7 @@ export async function GET(_request: NextRequest) {
        WHERE is_calstick = true AND calstick_completed = false`
     )
 
-    const count = parseInt(result.rows[0]?.count || '0')
+    const count = Number.parseInt(result.rows[0]?.count || '0')
 
     return new Response(JSON.stringify({ count }), { status: 200 })
   } catch (error) {

@@ -46,7 +46,7 @@ function openDB(): Promise<IDBDatabase> {
     }
 
     request.onsuccess = () => resolve(request.result)
-    request.onerror = () => reject(request.error)
+    request.onerror = () => reject(request.error ?? new Error("Failed to open database"))
   })
 }
 
@@ -58,7 +58,7 @@ export async function cachePage(page: OfflinePage): Promise<void> {
     const tx = db.transaction(PAGES_STORE, "readwrite")
     tx.objectStore(PAGES_STORE).put({ ...page, cached_at: Date.now() })
     tx.oncomplete = () => resolve()
-    tx.onerror = () => reject(tx.error)
+    tx.onerror = () => reject(tx.error ?? new Error("Transaction failed"))
   })
 }
 
@@ -71,7 +71,7 @@ export async function cachePages(pages: OfflinePage[]): Promise<void> {
       store.put({ ...page, cached_at: Date.now() })
     }
     tx.oncomplete = () => resolve()
-    tx.onerror = () => reject(tx.error)
+    tx.onerror = () => reject(tx.error ?? new Error("Transaction failed"))
   })
 }
 
@@ -81,7 +81,7 @@ export async function getCachedPage(id: string): Promise<OfflinePage | null> {
     const tx = db.transaction(PAGES_STORE, "readonly")
     const request = tx.objectStore(PAGES_STORE).get(id)
     request.onsuccess = () => resolve(request.result || null)
-    request.onerror = () => reject(request.error)
+    request.onerror = () => reject(request.error ?? new Error("Request failed"))
   })
 }
 
@@ -91,7 +91,7 @@ export async function getAllCachedPages(): Promise<OfflinePage[]> {
     const tx = db.transaction(PAGES_STORE, "readonly")
     const request = tx.objectStore(PAGES_STORE).getAll()
     request.onsuccess = () => resolve(request.result || [])
-    request.onerror = () => reject(request.error)
+    request.onerror = () => reject(request.error ?? new Error("Request failed"))
   })
 }
 
@@ -101,7 +101,7 @@ export async function removeCachedPage(id: string): Promise<void> {
     const tx = db.transaction(PAGES_STORE, "readwrite")
     tx.objectStore(PAGES_STORE).delete(id)
     tx.oncomplete = () => resolve()
-    tx.onerror = () => reject(tx.error)
+    tx.onerror = () => reject(tx.error ?? new Error("Transaction failed"))
   })
 }
 
@@ -117,7 +117,7 @@ export async function addToSyncQueue(item: Omit<SyncQueueItem, "id" | "created_a
       created_at: Date.now(),
     })
     tx.oncomplete = () => resolve()
-    tx.onerror = () => reject(tx.error)
+    tx.onerror = () => reject(tx.error ?? new Error("Transaction failed"))
   })
 }
 
@@ -128,7 +128,7 @@ export async function getSyncQueue(): Promise<SyncQueueItem[]> {
     const index = tx.objectStore(SYNC_QUEUE_STORE).index("created_at")
     const request = index.getAll()
     request.onsuccess = () => resolve(request.result || [])
-    request.onerror = () => reject(request.error)
+    request.onerror = () => reject(request.error ?? new Error("Request failed"))
   })
 }
 
@@ -138,7 +138,7 @@ export async function removeSyncQueueItem(id: string): Promise<void> {
     const tx = db.transaction(SYNC_QUEUE_STORE, "readwrite")
     tx.objectStore(SYNC_QUEUE_STORE).delete(id)
     tx.oncomplete = () => resolve()
-    tx.onerror = () => reject(tx.error)
+    tx.onerror = () => reject(tx.error ?? new Error("Transaction failed"))
   })
 }
 
@@ -148,7 +148,7 @@ export async function clearSyncQueue(): Promise<void> {
     const tx = db.transaction(SYNC_QUEUE_STORE, "readwrite")
     tx.objectStore(SYNC_QUEUE_STORE).clear()
     tx.oncomplete = () => resolve()
-    tx.onerror = () => reject(tx.error)
+    tx.onerror = () => reject(tx.error ?? new Error("Transaction failed"))
   })
 }
 
@@ -158,6 +158,6 @@ export async function getSyncQueueCount(): Promise<number> {
     const tx = db.transaction(SYNC_QUEUE_STORE, "readonly")
     const request = tx.objectStore(SYNC_QUEUE_STORE).count()
     request.onsuccess = () => resolve(request.result)
-    request.onerror = () => reject(request.error)
+    request.onerror = () => reject(request.error ?? new Error("Request failed"))
   })
 }

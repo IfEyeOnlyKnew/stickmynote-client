@@ -18,7 +18,7 @@ export async function GET(request: NextRequest) {
 
   try {
     // 1. Read and validate state cookie
-    const cookieStore = await cookies()
+    const cookieStore = cookies()
     const ssoStateCookie = cookieStore.get("sso_state")?.value
 
     if (!ssoStateCookie) {
@@ -102,7 +102,7 @@ export async function GET(request: NextRequest) {
       // Create 2FA verification session
       const ipAddress = request.headers.get("x-forwarded-for") || request.headers.get("x-real-ip")
       const userAgent = request.headers.get("user-agent")
-      const { sessionToken, expiresAt } = await createVerificationSession(
+      const { sessionToken } = await createVerificationSession(
         result.userId,
         ipAddress,
         userAgent,

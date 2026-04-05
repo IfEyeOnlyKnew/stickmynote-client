@@ -2,6 +2,31 @@ import { type NextRequest, NextResponse } from "next/server"
 import { getCachedAuthUser } from "@/lib/auth/cached-auth"
 import { createDatabaseClient } from "@/lib/database/database-adapter"
 
+async function enrichEntriesWithTasks(db: any, entries: any[]): Promise<any[]> {
+  const taskIds = [...new Set(entries.map((e: any) => e.task_id).filter(Boolean))]
+  if (taskIds.length === 0) return entries
+
+  const { data: tasks } = await db.from("paks_pad_stick_replies").select("id, content, stick_id").in("id", taskIds)
+  if (!tasks) return entries
+
+  const taskMap: Record<string, any> = Object.fromEntries(tasks.map((t: any) => [t.id, t]))
+  const stickIds = [...new Set(tasks.map((t: any) => t.stick_id).filter(Boolean))]
+  let stickMap: Record<string, any> = {}
+
+  if (stickIds.length > 0) {
+    const { data: sticks } = await db.from("paks_pad_sticks").select("id, topic, content").in("id", stickIds)
+    if (sticks) stickMap = Object.fromEntries(sticks.map((s: any) => [s.id, s]))
+  }
+
+  return entries.map((entry: any) => {
+    const task = taskMap[entry.task_id]
+    return {
+      ...entry,
+      task: task ? { id: task.id, content: task.content, stick: stickMap[task.stick_id] || null } : null,
+    }
+  })
+}
+
 export async function GET(request: NextRequest) {
   try {
     const db = await createDatabaseClient()
@@ -62,48 +87,7 @@ export async function GET(request: NextRequest) {
       throw error
     }
 
-    // Fetch task data separately
-    const taskIds = [...new Set((entries || []).map((e: any) => e.task_id).filter(Boolean))]
-    let taskMap: Record<string, any> = {}
-    let stickMap: Record<string, any> = {}
-
-    if (taskIds.length > 0) {
-      const { data: tasks } = await db
-        .from("paks_pad_stick_replies")
-        .select("id, content, stick_id")
-        .in("id", taskIds)
-
-      if (tasks) {
-        taskMap = Object.fromEntries(tasks.map((t: any) => [t.id, t]))
-
-        // Fetch sticks
-        const stickIds = [...new Set(tasks.map((t: any) => t.stick_id).filter(Boolean))]
-        if (stickIds.length > 0) {
-          const { data: sticks } = await db
-            .from("paks_pad_sticks")
-            .select("id, topic, content")
-            .in("id", stickIds)
-
-          if (sticks) {
-            stickMap = Object.fromEntries(sticks.map((s: any) => [s.id, s]))
-          }
-        }
-      }
-    }
-
-    // Attach task data to entries
-    const entriesWithTasks = (entries || []).map((entry: any) => {
-      const task = taskMap[entry.task_id]
-      return {
-        ...entry,
-        task: task ? {
-          id: task.id,
-          content: task.content,
-          stick: stickMap[task.stick_id] || null,
-        } : null,
-      }
-    })
-
+    const entriesWithTasks = await enrichEntriesWithTasks(db, entries || [])
     return NextResponse.json({ entries: entriesWithTasks })
   } catch (error) {
     console.error("Error fetching time entries:", error)

@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Users, TrendingUp, AlertTriangle, Clock, ChevronLeft, ChevronRight } from "lucide-react"
+import { Users, AlertTriangle, ChevronLeft, ChevronRight } from "lucide-react"
 import { format, startOfWeek, endOfWeek, eachDayOfInterval, addWeeks, subWeeks, isSameDay } from "date-fns"
 
 interface WorkloadTask {
@@ -166,7 +166,7 @@ export default function ResourcesPage() {
         <Card>
           <CardContent className="pt-4">
             <div className="text-sm text-muted-foreground">Utilization</div>
-            <div className={`text-2xl font-bold ${overallUtilization > 100 ? "text-red-600" : overallUtilization >= 80 ? "text-amber-600" : "text-green-600"}`}>
+            <div className={`text-2xl font-bold ${(() => { if (overallUtilization > 100) return "text-red-600"; if (overallUtilization >= 80) return "text-amber-600"; return "text-green-600" })()}`}>
               {overallUtilization.toFixed(0)}%
             </div>
           </CardContent>

@@ -17,7 +17,7 @@ export function RequiredFieldsSection({
   isLoading,
   showPassword,
   onTogglePassword,
-}: RequiredFieldsSectionProps) {
+}: Readonly<RequiredFieldsSectionProps>) {
   return (
     <div className="space-y-4">
       <FormField
@@ -32,21 +32,16 @@ export function RequiredFieldsSection({
       />
 
       <PasswordField
-        id="signup-password"
         label="Password *"
         placeholder="Create a password (min 6 characters)"
         value={formData.password}
         onChange={(value) => updateField("password", value)}
         required
-        minLength={6}
         disabled={isLoading}
         autoComplete="new-password"
-        showPassword={showPassword}
-        onToggleVisibility={onTogglePassword}
       />
 
       <PasswordField
-        id="confirm-password"
         label="Confirm Password *"
         placeholder="Confirm your password"
         value={formData.confirmPassword}
@@ -54,7 +49,6 @@ export function RequiredFieldsSection({
         required
         disabled={isLoading}
         autoComplete="new-password"
-        showPassword={showPassword}
       />
 
       <FormField

@@ -7,7 +7,7 @@ import { handleApiError } from '@/lib/api/handle-api-error'
 
 export const dynamic = 'force-dynamic'
 
-const ADMIN_EMAILS = ['chrisdoran63@outlook.com']
+const ADMIN_EMAILS = new Set(['chrisdoran63@outlook.com'])
 const DEFAULT_STICK_COLOR = '#fef3c7'
 
 // GET /api/v2/inference-sticks - List social sticks
@@ -50,7 +50,7 @@ export async function GET(request: NextRequest) {
 
     // Admin view
     if (isAdmin) {
-      const isUserAdmin = user.email && ADMIN_EMAILS.includes(user.email)
+      const isUserAdmin = user.email && ADMIN_EMAILS.has(user.email)
       if (!isUserAdmin) {
         return new Response(JSON.stringify({ error: 'Forbidden' }), { status: 403 })
       }
@@ -215,7 +215,7 @@ async function enrichSticksWithData(sticks: any[]) {
        GROUP BY social_stick_id`,
       [stickIds]
     )
-    replyCountMap = new Map(repliesResult.rows.map((r: any) => [r.social_stick_id, parseInt(r.count, 10)]))
+    replyCountMap = new Map(repliesResult.rows.map((r: any) => [r.social_stick_id, Number.parseInt(r.count, 10)]))
   }
 
   return sticks.map((stick) => ({

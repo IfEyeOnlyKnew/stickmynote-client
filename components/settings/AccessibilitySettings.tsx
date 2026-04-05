@@ -52,7 +52,7 @@ export function AccessibilitySettings() {
           </p>
           <Select
             value={String(preferences.fontSize)}
-            onValueChange={(value) => updatePreference("fontSize", parseFloat(value))}
+            onValueChange={(value) => updatePreference("fontSize", Number.parseFloat(value))}
           >
             <SelectTrigger id="font-size">
               <SelectValue />

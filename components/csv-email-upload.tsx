@@ -20,7 +20,7 @@ interface UploadResult {
   error?: string
 }
 
-export function CsvEmailUpload({ onEmailsUploaded, className }: CsvEmailUploadProps) {
+export function CsvEmailUpload({ onEmailsUploaded, className }: Readonly<CsvEmailUploadProps>) {
   const [isDragOver, setIsDragOver] = useState(false)
   const [isProcessing, setIsProcessing] = useState(false)
   const [uploadResult, setUploadResult] = useState<UploadResult | null>(null)
@@ -195,9 +195,8 @@ export function CsvEmailUpload({ onEmailsUploaded, className }: CsvEmailUploadPr
               <Alert>
                 <Check className="h-4 w-4" />
                 <AlertDescription>
-                  {uploadResult.added > 0
-                    ? `Successfully added ${uploadResult.added} email${uploadResult.added !== 1 ? "s" : ""}`
-                    : "Upload completed"}
+                  {uploadResult.added > 0 && `Successfully added ${uploadResult.added} email${uploadResult.added !== 1 ? "s" : ""}`}
+                  {uploadResult.added === 0 && "Upload completed"}
                   {uploadResult.skipped > 0 && ` (${uploadResult.skipped} duplicates skipped)`}
                   {uploadResult.message && `. ${uploadResult.message}`}
                 </AlertDescription>

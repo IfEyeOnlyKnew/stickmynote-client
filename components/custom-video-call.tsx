@@ -54,7 +54,7 @@ interface CustomVideoCallProps {
   isMinimized?: boolean
 }
 
-export function CustomVideoCall({ roomName, onLeave, userName = "Guest", isMinimized = false }: CustomVideoCallProps) {
+export function CustomVideoCall({ roomName, onLeave, userName = "Guest", isMinimized = false }: Readonly<CustomVideoCallProps>) {
   const [token, setToken] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const livekitUrl = process.env.NEXT_PUBLIC_LIVEKIT_URL
@@ -111,7 +111,7 @@ export function CustomVideoCall({ roomName, onLeave, userName = "Guest", isMinim
   )
 }
 
-function VideoCallContent({ roomName, onLeave, userName, isMinimized }: CustomVideoCallProps) {
+function VideoCallContent({ roomName, onLeave, userName, isMinimized }: Readonly<CustomVideoCallProps>) {
   const room = useRoomContext()
   const participants = useParticipants()
   const { localParticipant, isMicrophoneEnabled, isCameraEnabled, isScreenShareEnabled } = useLocalParticipant()
@@ -129,7 +129,7 @@ function VideoCallContent({ roomName, onLeave, userName, isMinimized }: CustomVi
   const [backgroundImage, setBackgroundImage] = useState<string>(
     "https://images.unsplash.com/photo-1497366216548-37526070297c?w=800&q=80",
   )
-  const [bgProcessor, setBgProcessor] = useState<BackgroundProcessorWrapper | null>(null)
+  const [, setBgProcessor] = useState<BackgroundProcessorWrapper | null>(null)
 
   // Reaction data channel
   const { send: sendReactionData } = useDataChannel("reaction", (msg) => {
@@ -138,7 +138,9 @@ function VideoCallContent({ roomName, onLeave, userName, isMinimized }: CustomVi
       if (data.emoji) {
         addReaction(data.emoji)
       }
-    } catch {}
+    } catch {
+      // Parse error ignored — malformed reaction payloads are silently dropped
+    }
   })
 
   const activeSpeakerId = speakingParticipants.length > 0
@@ -164,13 +166,15 @@ function VideoCallContent({ roomName, onLeave, userName, isMinimized }: CustomVi
     },
   ]
 
+  const removeReaction = useCallback((reactionId: string) => {
+    setReactions((prev) => prev.filter((r) => r.id !== reactionId))
+  }, [])
+
   const addReaction = (emoji: string) => {
     const id = Math.random().toString(36).substring(7)
     const x = Math.random() * 80 + 10
     setReactions((prev) => [...prev, { id, emoji, x }])
-    setTimeout(() => {
-      setReactions((prev) => prev.filter((r) => r.id !== id))
-    }, 2000)
+    setTimeout(() => removeReaction(id), 2000)
   }
 
   const sendReaction = (emoji: string) => {
@@ -237,6 +241,33 @@ function VideoCallContent({ roomName, onLeave, userName, isMinimized }: CustomVi
     [localParticipant, backgroundImage],
   )
 
+  const getGridCols = () => {
+    if (participants.length <= 1) return "grid-cols-1"
+    if (participants.length <= 4) return "grid-cols-2"
+    if (participants.length <= 9) return "grid-cols-3"
+    return "grid-cols-4"
+  }
+
+  const renderSpeakerLayout = () => {
+    const speaker = speakingParticipants[0] || participants[0]
+    const others = participants.filter((p) => p.identity !== speaker.identity)
+
+    return (
+      <div className="flex h-full gap-4">
+        <div className="flex-1 relative">
+          <VideoTile participant={speaker} isLocal={speaker.identity === localParticipant.identity} isActiveSpeaker={true} />
+        </div>
+        <div className="w-64 flex flex-col gap-4 overflow-y-auto pr-2">
+          {others.map((p) => (
+            <div key={p.identity} className="h-48 flex-shrink-0">
+              <VideoTile participant={p} isLocal={p.identity === localParticipant.identity} isActiveSpeaker={false} />
+            </div>
+          ))}
+        </div>
+      </div>
+    )
+  }
+
   const renderGrid = () => {
     if (isMinimized) {
       const target = speakingParticipants[0] || participants[0] || localParticipant
@@ -248,37 +279,11 @@ function VideoCallContent({ roomName, onLeave, userName, isMinimized }: CustomVi
     }
 
     if (layout === "speaker" && participants.length > 1) {
-      const speaker = speakingParticipants[0] || participants[0]
-      const others = participants.filter((p) => p.identity !== speaker.identity)
-
-      return (
-        <div className="flex h-full gap-4">
-          <div className="flex-1 relative">
-            <VideoTile participant={speaker} isLocal={speaker.identity === localParticipant.identity} isActiveSpeaker={true} />
-          </div>
-          <div className="w-64 flex flex-col gap-4 overflow-y-auto pr-2">
-            {others.map((p) => (
-              <div key={p.identity} className="h-48 flex-shrink-0">
-                <VideoTile participant={p} isLocal={p.identity === localParticipant.identity} isActiveSpeaker={false} />
-              </div>
-            ))}
-          </div>
-        </div>
-      )
+      return renderSpeakerLayout()
     }
 
     return (
-      <div
-        className={`grid gap-4 h-full ${
-          participants.length <= 1
-            ? "grid-cols-1"
-            : participants.length <= 4
-              ? "grid-cols-2"
-              : participants.length <= 9
-                ? "grid-cols-3"
-                : "grid-cols-4"
-        }`}
-      >
+      <div className={`grid gap-4 h-full ${getGridCols()}`}>
         {participants.map((p) => (
           <VideoTile
             key={p.identity}
@@ -291,11 +296,194 @@ function VideoCallContent({ roomName, onLeave, userName, isMinimized }: CustomVi
     )
   }
 
+  const renderChatSidebar = () => (
+    <div className="absolute right-4 top-4 bottom-24 w-80 bg-slate-900 border border-slate-800 rounded-lg shadow-xl flex flex-col z-20">
+      <div className="p-4 border-b border-slate-800 flex justify-between items-center">
+        <h3 className="font-semibold">Chat</h3>
+        <Button variant="ghost" size="icon" onClick={() => setShowChat(false)} className="h-8 w-8">
+          <X className="h-4 w-4" />
+        </Button>
+      </div>
+      <ScrollArea className="flex-1 p-4">
+        <div className="space-y-4">
+          {chatMessages.map((msg) => {
+            const isMe = msg.from?.identity === localParticipant.identity
+            return (
+              <div key={msg.id} className={`flex flex-col ${isMe ? "items-end" : "items-start"}`}>
+                <span className="text-xs text-slate-400 mb-1">
+                  {isMe ? "You" : msg.from?.name || msg.from?.identity || "Guest"}
+                </span>
+                <div
+                  className={`px-3 py-2 rounded-lg max-w-[80%] ${
+                    isMe ? "bg-indigo-600 text-white" : "bg-slate-800 text-slate-200"
+                  }`}
+                >
+                  {msg.message}
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      </ScrollArea>
+      <div className="p-4 border-t border-slate-800 flex gap-2">
+        <Input
+          value={chatInput}
+          onChange={(e) => setChatInput(e.target.value)}
+          onKeyDown={(e) => e.key === "Enter" && handleSendMessage()}
+          placeholder="Type a message..."
+          className="bg-slate-950 border-slate-700 text-white"
+        />
+        <Button size="icon" onClick={handleSendMessage} className="bg-indigo-600 hover:bg-indigo-700">
+          <Send className="h-4 w-4" />
+        </Button>
+      </div>
+    </div>
+  )
+
+  const renderMinimizedControls = () => (
+    <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex items-center gap-2 bg-slate-900/90 p-2 rounded-full border border-slate-800 z-50 backdrop-blur-sm">
+      <Button variant={isMicrophoneEnabled ? "secondary" : "destructive"} size="icon" className="rounded-full h-8 w-8" onClick={toggleMic}>
+        {isMicrophoneEnabled ? <Mic className="h-4 w-4" /> : <MicOff className="h-4 w-4" />}
+      </Button>
+      <Button variant={isCameraEnabled ? "secondary" : "destructive"} size="icon" className="rounded-full h-8 w-8" onClick={toggleCam}>
+        {isCameraEnabled ? <Video className="h-4 w-4" /> : <VideoOff className="h-4 w-4" />}
+      </Button>
+      <Button variant="destructive" size="icon" className="rounded-full h-8 w-8" onClick={handleLeave}>
+        <PhoneOff className="h-4 w-4" />
+      </Button>
+    </div>
+  )
+
+  const renderRightToolbar = () => (
+    <div className="absolute right-4 flex gap-2">
+      <Button
+        variant={showWhiteboard ? "default" : "ghost"}
+        size="icon"
+        className={`text-slate-400 hover:text-white ${showWhiteboard ? "bg-indigo-600 text-white" : ""}`}
+        onClick={() => setShowWhiteboard(!showWhiteboard)}
+        title={showWhiteboard ? "Hide Whiteboard" : "Show Whiteboard"}
+      >
+        <PenTool />
+      </Button>
+
+      <Popover>
+        <PopoverTrigger asChild>
+          <Button variant="ghost" size="icon" className="text-slate-400 hover:text-white">
+            <Smile />
+          </Button>
+        </PopoverTrigger>
+        <PopoverContent className="w-full p-2 bg-slate-900 border-slate-800" side="top">
+          <div className="flex gap-2">
+            {["\u{1F44D}", "\u{1F44F}", "\u2764\uFE0F", "\u{1F602}", "\u{1F62E}", "\u{1F389}"].map((emoji) => (
+              <button key={emoji} className="text-2xl hover:scale-125 transition-transform" onClick={() => sendReaction(emoji)}>
+                {emoji}
+              </button>
+            ))}
+          </div>
+        </PopoverContent>
+      </Popover>
+
+      <Button
+        variant={showChat ? "default" : "ghost"}
+        size="icon"
+        className={`text-slate-400 hover:text-white ${showChat ? "bg-slate-800 text-white" : ""}`}
+        onClick={() => setShowChat(!showChat)}
+      >
+        <div className="relative">
+          <MessageSquare />
+          {chatMessages.length > 0 && !showChat && (
+            <Badge className="absolute -top-2 -right-2 h-4 w-4 flex items-center justify-center p-0 text-[10px] bg-red-500">
+              {chatMessages.length}
+            </Badge>
+          )}
+        </div>
+      </Button>
+
+      <Sheet open={showParticipants} onOpenChange={setShowParticipants}>
+        <SheetTrigger asChild>
+          <Button variant="ghost" size="icon" className="text-slate-400 hover:text-white">
+            <div className="relative">
+              <Users />
+              <Badge className="absolute -top-2 -right-2 h-5 w-5 flex items-center justify-center p-0 text-xs bg-slate-800 text-white">
+                {participants.length}
+              </Badge>
+            </div>
+          </Button>
+        </SheetTrigger>
+        <SheetContent className="w-[300px] sm:w-[400px] bg-slate-900 border-slate-800 text-white">
+          <SheetHeader>
+            <SheetTitle className="text-white">Participants</SheetTitle>
+          </SheetHeader>
+          <ScrollArea className="h-[calc(100vh-100px)] mt-4">
+            <div className="space-y-4">
+              {participants.map((p) => (
+                <ParticipantListItem key={p.identity} participant={p} isLocal={p.identity === localParticipant.identity} />
+              ))}
+            </div>
+          </ScrollArea>
+        </SheetContent>
+      </Sheet>
+      <Sheet open={showSettings} onOpenChange={setShowSettings}>
+        <SheetTrigger asChild>
+          <Button variant="ghost" size="icon" className="text-slate-400 hover:text-white">
+            <Settings />
+          </Button>
+        </SheetTrigger>
+        <SheetContent className="w-[300px] sm:w-[400px] bg-slate-900 border-slate-800 text-white">
+          <SheetHeader>
+            <SheetTitle className="text-white">Settings</SheetTitle>
+          </SheetHeader>
+          <VideoEffectsSettings
+            videoEffect={videoEffect}
+            backgroundImage={backgroundImage}
+            applyVideoEffect={applyVideoEffect}
+            presetBackgrounds={PRESET_BACKGROUNDS}
+          />
+        </SheetContent>
+      </Sheet>
+    </div>
+  )
+
+  const renderFullControls = () => (
+    <div className="h-20 bg-slate-900 border-t border-slate-800 flex items-center justify-center gap-4 px-4 relative z-30">
+      <div className="absolute left-4 flex gap-2">
+        <Button
+          variant="secondary"
+          size="icon"
+          className="rounded-full h-10 w-10"
+          onClick={() => setLayout(layout === "grid" ? "speaker" : "grid")}
+          title={layout === "grid" ? "Switch to Speaker View" : "Switch to Grid View"}
+        >
+          {layout === "grid" ? <Maximize className="h-4 w-4" /> : <LayoutGrid className="h-4 w-4" />}
+        </Button>
+      </div>
+
+      <Button variant={isMicrophoneEnabled ? "secondary" : "destructive"} size="icon" className="rounded-full h-12 w-12" onClick={toggleMic}>
+        {isMicrophoneEnabled ? <Mic /> : <MicOff />}
+      </Button>
+      <Button variant={isCameraEnabled ? "secondary" : "destructive"} size="icon" className="rounded-full h-12 w-12" onClick={toggleCam}>
+        {isCameraEnabled ? <Video /> : <VideoOff />}
+      </Button>
+      <Button
+        variant={isScreenShareEnabled ? "default" : "secondary"}
+        size="icon"
+        className={`rounded-full h-12 w-12 ${isScreenShareEnabled ? "bg-green-600 hover:bg-green-700" : ""}`}
+        onClick={toggleScreenShare}
+      >
+        {isScreenShareEnabled ? <MonitorOff /> : <Monitor />}
+      </Button>
+      <Button variant="destructive" size="icon" className="rounded-full h-12 w-12 ml-4" onClick={handleLeave}>
+        <PhoneOff />
+      </Button>
+
+      {renderRightToolbar()}
+    </div>
+  )
+
   return (
     <div className="flex flex-col h-full bg-slate-950 text-white relative">
       {/* Main Video Grid */}
       <div className="flex-1 p-4 overflow-hidden relative">
-        {/* Branding Overlay */}
         {!isMinimized && (
           <div className="absolute top-4 left-4 z-10 bg-black/50 px-3 py-1.5 rounded-full backdrop-blur-sm flex items-center gap-2 pointer-events-none">
             <div className="w-2 h-2 rounded-full bg-indigo-500 animate-pulse" />
@@ -314,285 +502,83 @@ function VideoCallContent({ roomName, onLeave, userName, isMinimized }: CustomVi
         {/* Reactions Overlay */}
         <div className="absolute inset-0 pointer-events-none overflow-hidden">
           {reactions.map((reaction) => (
-            <div
-              key={reaction.id}
-              className="absolute text-4xl animate-float-up"
-              style={{ left: `${reaction.x}%`, bottom: "0" }}
-            >
+            <div key={reaction.id} className="absolute text-4xl animate-float-up" style={{ left: `${reaction.x}%`, bottom: "0" }}>
               {reaction.emoji}
             </div>
           ))}
         </div>
       </div>
 
-      {/* Chat Sidebar */}
-      {showChat && !isMinimized && (
-        <div className="absolute right-4 top-4 bottom-24 w-80 bg-slate-900 border border-slate-800 rounded-lg shadow-xl flex flex-col z-20">
-          <div className="p-4 border-b border-slate-800 flex justify-between items-center">
-            <h3 className="font-semibold">Chat</h3>
-            <Button variant="ghost" size="icon" onClick={() => setShowChat(false)} className="h-8 w-8">
-              <X className="h-4 w-4" />
-            </Button>
-          </div>
-          <ScrollArea className="flex-1 p-4">
-            <div className="space-y-4">
-              {chatMessages.map((msg, i) => {
-                const isMe = msg.from?.identity === localParticipant.identity
-                return (
-                  <div key={i} className={`flex flex-col ${isMe ? "items-end" : "items-start"}`}>
-                    <span className="text-xs text-slate-400 mb-1">
-                      {isMe ? "You" : msg.from?.name || msg.from?.identity || "Guest"}
-                    </span>
-                    <div
-                      className={`px-3 py-2 rounded-lg max-w-[80%] ${
-                        isMe ? "bg-indigo-600 text-white" : "bg-slate-800 text-slate-200"
-                      }`}
-                    >
-                      {msg.message}
-                    </div>
-                  </div>
-                )
-              })}
-            </div>
-          </ScrollArea>
-          <div className="p-4 border-t border-slate-800 flex gap-2">
-            <Input
-              value={chatInput}
-              onChange={(e) => setChatInput(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && handleSendMessage()}
-              placeholder="Type a message..."
-              className="bg-slate-950 border-slate-700 text-white"
-            />
-            <Button size="icon" onClick={handleSendMessage} className="bg-indigo-600 hover:bg-indigo-700">
-              <Send className="h-4 w-4" />
-            </Button>
-          </div>
-        </div>
-      )}
-
-      {/* Controls Bar */}
-      {isMinimized ? (
-        <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex items-center gap-2 bg-slate-900/90 p-2 rounded-full border border-slate-800 z-50 backdrop-blur-sm">
-          <Button
-            variant={!isMicrophoneEnabled ? "destructive" : "secondary"}
-            size="icon"
-            className="rounded-full h-8 w-8"
-            onClick={toggleMic}
-          >
-            {!isMicrophoneEnabled ? <MicOff className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
-          </Button>
-          <Button
-            variant={!isCameraEnabled ? "destructive" : "secondary"}
-            size="icon"
-            className="rounded-full h-8 w-8"
-            onClick={toggleCam}
-          >
-            {!isCameraEnabled ? <VideoOff className="h-4 w-4" /> : <Video className="h-4 w-4" />}
-          </Button>
-          <Button variant="destructive" size="icon" className="rounded-full h-8 w-8" onClick={handleLeave}>
-            <PhoneOff className="h-4 w-4" />
-          </Button>
-        </div>
-      ) : (
-        <div className="h-20 bg-slate-900 border-t border-slate-800 flex items-center justify-center gap-4 px-4 relative z-30">
-          <div className="absolute left-4 flex gap-2">
-            <Button
-              variant="secondary"
-              size="icon"
-              className="rounded-full h-10 w-10"
-              onClick={() => setLayout(layout === "grid" ? "speaker" : "grid")}
-              title={layout === "grid" ? "Switch to Speaker View" : "Switch to Grid View"}
-            >
-              {layout === "grid" ? <Maximize className="h-4 w-4" /> : <LayoutGrid className="h-4 w-4" />}
-            </Button>
-          </div>
-
-          <Button
-            variant={!isMicrophoneEnabled ? "destructive" : "secondary"}
-            size="icon"
-            className="rounded-full h-12 w-12"
-            onClick={toggleMic}
-          >
-            {!isMicrophoneEnabled ? <MicOff /> : <Mic />}
-          </Button>
-
-          <Button
-            variant={!isCameraEnabled ? "destructive" : "secondary"}
-            size="icon"
-            className="rounded-full h-12 w-12"
-            onClick={toggleCam}
-          >
-            {!isCameraEnabled ? <VideoOff /> : <Video />}
-          </Button>
-
-          <Button
-            variant={isScreenShareEnabled ? "default" : "secondary"}
-            size="icon"
-            className={`rounded-full h-12 w-12 ${isScreenShareEnabled ? "bg-green-600 hover:bg-green-700" : ""}`}
-            onClick={toggleScreenShare}
-          >
-            {isScreenShareEnabled ? <MonitorOff /> : <Monitor />}
-          </Button>
-
-          <Button variant="destructive" size="icon" className="rounded-full h-12 w-12 ml-4" onClick={handleLeave}>
-            <PhoneOff />
-          </Button>
-
-          <div className="absolute right-4 flex gap-2">
-            <Button
-              variant={showWhiteboard ? "default" : "ghost"}
-              size="icon"
-              className={`text-slate-400 hover:text-white ${showWhiteboard ? "bg-indigo-600 text-white" : ""}`}
-              onClick={() => setShowWhiteboard(!showWhiteboard)}
-              title={showWhiteboard ? "Hide Whiteboard" : "Show Whiteboard"}
-            >
-              <PenTool />
-            </Button>
-
-            <Popover>
-              <PopoverTrigger asChild>
-                <Button variant="ghost" size="icon" className="text-slate-400 hover:text-white">
-                  <Smile />
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-full p-2 bg-slate-900 border-slate-800" side="top">
-                <div className="flex gap-2">
-                  {["👍", "👏", "❤️", "😂", "😮", "🎉"].map((emoji) => (
-                    <button
-                      key={emoji}
-                      className="text-2xl hover:scale-125 transition-transform"
-                      onClick={() => sendReaction(emoji)}
-                    >
-                      {emoji}
-                    </button>
-                  ))}
-                </div>
-              </PopoverContent>
-            </Popover>
-
-            <Button
-              variant={showChat ? "default" : "ghost"}
-              size="icon"
-              className={`text-slate-400 hover:text-white ${showChat ? "bg-slate-800 text-white" : ""}`}
-              onClick={() => setShowChat(!showChat)}
-            >
-              <div className="relative">
-                <MessageSquare />
-                {chatMessages.length > 0 && !showChat && (
-                  <Badge className="absolute -top-2 -right-2 h-4 w-4 flex items-center justify-center p-0 text-[10px] bg-red-500">
-                    {chatMessages.length}
-                  </Badge>
-                )}
-              </div>
-            </Button>
-
-            <Sheet open={showParticipants} onOpenChange={setShowParticipants}>
-              <SheetTrigger asChild>
-                <Button variant="ghost" size="icon" className="text-slate-400 hover:text-white">
-                  <div className="relative">
-                    <Users />
-                    <Badge className="absolute -top-2 -right-2 h-5 w-5 flex items-center justify-center p-0 text-xs bg-slate-800 text-white">
-                      {participants.length}
-                    </Badge>
-                  </div>
-                </Button>
-              </SheetTrigger>
-              <SheetContent className="w-[300px] sm:w-[400px] bg-slate-900 border-slate-800 text-white">
-                <SheetHeader>
-                  <SheetTitle className="text-white">Participants</SheetTitle>
-                </SheetHeader>
-                <ScrollArea className="h-[calc(100vh-100px)] mt-4">
-                  <div className="space-y-4">
-                    {participants.map((p) => (
-                      <ParticipantListItem
-                        key={p.identity}
-                        participant={p}
-                        isLocal={p.identity === localParticipant.identity}
-                      />
-                    ))}
-                  </div>
-                </ScrollArea>
-              </SheetContent>
-            </Sheet>
-            <Sheet open={showSettings} onOpenChange={setShowSettings}>
-              <SheetTrigger asChild>
-                <Button variant="ghost" size="icon" className="text-slate-400 hover:text-white">
-                  <Settings />
-                </Button>
-              </SheetTrigger>
-              <SheetContent className="w-[300px] sm:w-[400px] bg-slate-900 border-slate-800 text-white">
-                <SheetHeader>
-                  <SheetTitle className="text-white">Settings</SheetTitle>
-                </SheetHeader>
-                <div className="mt-6 space-y-6">
-                  <DeviceSettings kind="videoinput" label="Camera" />
-                  <DeviceSettings kind="audioinput" label="Microphone" />
-                  <DeviceSettings kind="audiooutput" label="Speakers" />
-
-                  <div className="space-y-2">
-                    <Label>Video Effects</Label>
-                    <div className="grid grid-cols-3 gap-2">
-                      <Button
-                        variant={videoEffect === "none" ? "default" : "outline"}
-                        className="w-full bg-slate-800 border-slate-700 hover:bg-slate-700"
-                        onClick={() => applyVideoEffect("none")}
-                      >
-                        None
-                      </Button>
-                      <Button
-                        variant={videoEffect === "blur" ? "default" : "outline"}
-                        className={`w-full border-slate-700 hover:bg-slate-700 ${
-                          videoEffect === "blur" ? "bg-indigo-600 hover:bg-indigo-700" : "bg-slate-800"
-                        }`}
-                        onClick={() => applyVideoEffect("blur")}
-                      >
-                        <Wand2 className="w-4 h-4 mr-2" />
-                        Blur
-                      </Button>
-                      <Button
-                        variant={videoEffect === "image" ? "default" : "outline"}
-                        className={`w-full border-slate-700 hover:bg-slate-700 ${
-                          videoEffect === "image" ? "bg-indigo-600 hover:bg-indigo-700" : "bg-slate-800"
-                        }`}
-                        onClick={() => applyVideoEffect("image")}
-                      >
-                        <ImageIcon className="w-4 h-4 mr-2" />
-                        Image
-                      </Button>
-                    </div>
-
-                    {videoEffect === "image" && (
-                      <div className="grid grid-cols-2 gap-2 mt-2">
-                        {PRESET_BACKGROUNDS.map((bg) => (
-                          <button
-                            key={bg.name}
-                            className={`relative aspect-video rounded-md overflow-hidden border-2 transition-all ${
-                              backgroundImage === bg.url
-                                ? "border-indigo-500 ring-2 ring-indigo-500/50"
-                                : "border-slate-700 hover:border-slate-500"
-                            }`}
-                            onClick={() => applyVideoEffect("image", bg.url)}
-                          >
-                            <Image src={bg.url || "/placeholder.svg"} alt={bg.name} fill className="object-cover" />
-                            <span className="absolute bottom-0 left-0 right-0 bg-black/60 text-[10px] text-white p-1 text-center backdrop-blur-sm">
-                              {bg.name}
-                            </span>
-                          </button>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </SheetContent>
-            </Sheet>
-          </div>
-        </div>
-      )}
+      {showChat && !isMinimized && renderChatSidebar()}
+      {isMinimized ? renderMinimizedControls() : renderFullControls()}
     </div>
   )
 }
 
-function DeviceSettings({ kind, label }: { kind: MediaDeviceKind; label: string }) {
+function VideoEffectsSettings({ videoEffect, backgroundImage, applyVideoEffect, presetBackgrounds }: Readonly<{
+  videoEffect: "none" | "blur" | "image"
+  backgroundImage: string
+  applyVideoEffect: (effect: "none" | "blur" | "image", imageUrl?: string) => void
+  presetBackgrounds: { name: string; url: string }[]
+}>) {
+  return (
+    <div className="mt-6 space-y-6">
+      <DeviceSettings kind="videoinput" label="Camera" />
+      <DeviceSettings kind="audioinput" label="Microphone" />
+      <DeviceSettings kind="audiooutput" label="Speakers" />
+
+      <div className="space-y-2">
+        <Label>Video Effects</Label>
+        <div className="grid grid-cols-3 gap-2">
+          <Button
+            variant={videoEffect === "none" ? "default" : "outline"}
+            className="w-full bg-slate-800 border-slate-700 hover:bg-slate-700"
+            onClick={() => applyVideoEffect("none")}
+          >
+            None
+          </Button>
+          <Button
+            variant={videoEffect === "blur" ? "default" : "outline"}
+            className={`w-full border-slate-700 hover:bg-slate-700 ${videoEffect === "blur" ? "bg-indigo-600 hover:bg-indigo-700" : "bg-slate-800"}`}
+            onClick={() => applyVideoEffect("blur")}
+          >
+            <Wand2 className="w-4 h-4 mr-2" />
+            Blur
+          </Button>
+          <Button
+            variant={videoEffect === "image" ? "default" : "outline"}
+            className={`w-full border-slate-700 hover:bg-slate-700 ${videoEffect === "image" ? "bg-indigo-600 hover:bg-indigo-700" : "bg-slate-800"}`}
+            onClick={() => applyVideoEffect("image")}
+          >
+            <ImageIcon className="w-4 h-4 mr-2" />
+            Image
+          </Button>
+        </div>
+
+        {videoEffect === "image" && (
+          <div className="grid grid-cols-2 gap-2 mt-2">
+            {presetBackgrounds.map((bg) => (
+              <button
+                key={bg.name}
+                className={`relative aspect-video rounded-md overflow-hidden border-2 transition-all ${
+                  backgroundImage === bg.url ? "border-indigo-500 ring-2 ring-indigo-500/50" : "border-slate-700 hover:border-slate-500"
+                }`}
+                onClick={() => applyVideoEffect("image", bg.url)}
+              >
+                <Image src={bg.url || "/placeholder.svg"} alt={bg.name} fill className="object-cover" />
+                <span className="absolute bottom-0 left-0 right-0 bg-black/60 text-[10px] text-white p-1 text-center backdrop-blur-sm">
+                  {bg.name}
+                </span>
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
+function DeviceSettings({ kind, label }: Readonly<{ kind: MediaDeviceKind; label: string }>) {
   const { devices, activeDeviceId, setActiveMediaDevice } = useMediaDeviceSelect({ kind })
 
   return (
@@ -620,10 +606,10 @@ function DeviceSettings({ kind, label }: { kind: MediaDeviceKind; label: string 
 function ParticipantListItem({
   participant,
   isLocal,
-}: {
+}: Readonly<{
   participant: { identity: string; name?: string; isMicrophoneEnabled?: boolean; isCameraEnabled?: boolean }
   isLocal: boolean
-}) {
+}>) {
   const displayName = participant.name || participant.identity || "Guest"
 
   return (

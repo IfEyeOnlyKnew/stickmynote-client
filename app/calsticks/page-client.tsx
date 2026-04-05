@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useCallback, useRef } from "react"
+import { useState, useEffect, useCallback } from "react"
 import { useSearchParams } from "next/navigation"
 import {
   Search,
@@ -92,7 +92,7 @@ export default function CalSticksPageClient() {
 
   const [autoArchiveDays, setAutoArchiveDays] = useState(14)
   const [selectedSprintId, setSelectedSprintId] = useState<string | null>(null)
-  const [sprintRefreshTrigger, setSprintRefreshTrigger] = useState(0)
+  const [sprintRefreshTrigger] = useState(0)
 
   const isMobile = useIsMobile()
 

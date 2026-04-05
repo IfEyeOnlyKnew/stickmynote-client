@@ -56,7 +56,7 @@ interface RichTextEditorProps {
 }
 
 // Extracted loading state component
-function EditorLoading({ className }: { className?: string }) {
+function EditorLoading({ className }: Readonly<{ className?: string }>) {
   return (
     <div className={cn("border border-gray-300 rounded-md p-3 min-h-[120px] bg-gray-50", className)}>
       <div className="animate-pulse flex items-center justify-center h-full">
@@ -71,11 +71,11 @@ function EditorError({
   error, 
   className, 
   onReload 
-}: { 
+}: Readonly<{
   error: string
   className?: string
-  onReload: () => void 
-}) {
+  onReload: () => void
+}>) {
   return (
     <div className={cn("border border-red-300 rounded-md p-3 min-h-[120px] bg-red-50", className)}>
       <div className="text-red-600">
@@ -192,7 +192,7 @@ export function RichTextEditor({
   maxLength = 500,
   onExpandClick,
   className,
-}: RichTextEditorProps) {
+}: Readonly<RichTextEditorProps>) {
   const isExternalUpdate = useRef(false)
   const lastContent = useRef(content)
   const [isLoading, setIsLoading] = useState(true)
@@ -398,7 +398,6 @@ export function RichTextEditor({
 
   return (
     <div
-      role="textbox"
       tabIndex={0}
       className={cn("border border-gray-300 rounded-md", className)}
       onKeyDown={handleContainerKeyDown}

@@ -27,7 +27,7 @@ export async function GET(request: Request) {
     }
 
     const { searchParams } = new URL(request.url)
-    const limit = Math.min(Math.max(parseInt(searchParams.get("limit") || "12", 10), 1), 50)
+    const limit = Math.min(Math.max(Number.parseInt(searchParams.get("limit") || "12", 10), 1), 50)
     const cursor = searchParams.get("cursor") || null
 
     // Fetch sticks from all groups the user belongs to, newest first
@@ -91,7 +91,7 @@ export async function GET(request: Request) {
     }))
 
     const nextCursor = hasMore && pageRows.length > 0
-      ? pageRows[pageRows.length - 1].created_at
+      ? pageRows.at(-1)!.created_at
       : null
 
     return NextResponse.json({ sticks, nextCursor, hasMore })

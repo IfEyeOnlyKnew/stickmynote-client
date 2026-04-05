@@ -4,8 +4,6 @@ import { getCachedAuthUser } from "@/lib/auth/cached-auth"
 import { getOrgContext } from "@/lib/auth/get-org-context"
 import type {
   SprintRetrospective,
-  RetrospectiveItem,
-  ActionItem,
   UpdateRetrospectiveInput,
 } from "@/types/sprint"
 
@@ -199,13 +197,13 @@ export async function PATCH(
     if (body.team_mood_score !== undefined) updates.team_mood_score = body.team_mood_score
 
     // Handle participants - add current user if not already included
-    if (body.participants !== undefined) {
-      updates.participants = body.participants
-    } else {
+    if (body.participants === undefined) {
       const currentParticipants = existing.participants || []
       if (!currentParticipants.includes(authResult.user.id)) {
         updates.participants = [...currentParticipants, authResult.user.id]
       }
+    } else {
+      updates.participants = body.participants
     }
 
     // Handle status change

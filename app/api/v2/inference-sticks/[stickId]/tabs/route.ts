@@ -32,7 +32,7 @@ export async function GET(
     )
 
     // Sort by tab_order or created_at
-    const sortedTabs = result.rows.sort((a: any, b: any) => {
+    const sortedTabs = result.rows.toSorted((a: any, b: any) => {
       if (a.tab_order !== undefined && b.tab_order !== undefined) {
         return a.tab_order - b.tab_order
       }

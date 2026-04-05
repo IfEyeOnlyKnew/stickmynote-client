@@ -54,7 +54,7 @@ const PERMISSION_CONFIGS = [
   },
 ]
 
-export function PermissionEditor({ member, padId, onUpdate }: PermissionEditorProps) {
+export function PermissionEditor({ member, padId, onUpdate }: Readonly<PermissionEditorProps>) {
   const [permissions, setPermissions] = useState<MemberPermissions>({
     can_create_sticks: member.can_create_sticks,
     can_reply: member.can_reply,

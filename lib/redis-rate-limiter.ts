@@ -18,7 +18,7 @@ type Provider = "upstash-redis" | "upstash-kv" | "memory"
 
 class RedisRateLimiter {
   private redis: Redis | null = null
-  private fallbackMap = new Map<string, { count: number; resetTime: number }>()
+  private readonly fallbackMap = new Map<string, { count: number; resetTime: number }>()
   private provider: Provider = "memory"
   private envConfigured = false
   private initWarning: string | null = null

@@ -153,13 +153,14 @@ export default function MyInferenceSticksPage() {
       </header>
 
       <main className="container mx-auto px-4 py-8">
-        {loadingSticks ? (
+        {loadingSticks && (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {Array.from({ length: 9 }).map((_, i) => (
-              <StickCardSkeleton key={i} />
+              <StickCardSkeleton key={`skeleton-${i}`} />
             ))}
           </div>
-        ) : sticks.length === 0 ? (
+        )}
+        {!loadingSticks && sticks.length === 0 && (
           <Card>
             <CardContent className="py-12 text-center">
               <FileText className="h-12 w-12 text-gray-400 mx-auto mb-4" />
@@ -168,7 +169,8 @@ export default function MyInferenceSticksPage() {
               <Button onClick={() => router.push("/inference")}>Go to Inference Hub</Button>
             </CardContent>
           </Card>
-        ) : (
+        )}
+        {!loadingSticks && sticks.length > 0 && (
           <>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {sticks.map((stick) => (

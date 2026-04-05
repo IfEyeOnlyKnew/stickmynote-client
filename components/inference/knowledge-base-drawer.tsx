@@ -8,7 +8,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { BookOpen, Plus, Search, ThumbsUp, Eye, Pin, ExternalLink, Trash2, Edit, X, Save, FileText } from "lucide-react"
+import { BookOpen, Plus, Search, ThumbsUp, Eye, Pin, ExternalLink, Trash2, Edit, X, Save } from "lucide-react"
 import { formatDistanceToNow } from "date-fns"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Separator } from "@/components/ui/separator"
@@ -55,7 +55,7 @@ interface KnowledgeBaseDrawerProps {
   onSelectArticle?: (article: KBArticle) => void
 }
 
-export function KnowledgeBaseDrawer({ open, onOpenChange, padId, onSelectArticle }: KnowledgeBaseDrawerProps) {
+export function KnowledgeBaseDrawer({ open, onOpenChange, padId, onSelectArticle }: Readonly<KnowledgeBaseDrawerProps>) {
   const [articles, setArticles] = useState<KBArticle[]>([])
   const [loading, setLoading] = useState(false)
   const [searchQuery, setSearchQuery] = useState("")

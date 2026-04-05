@@ -14,7 +14,7 @@ interface ResetPasswordFormProps {
   isLoading: boolean
 }
 
-export function ResetPasswordForm({ onSubmit, onSuccess, isLoading }: ResetPasswordFormProps) {
+export function ResetPasswordForm({ onSubmit, onSuccess, isLoading }: Readonly<ResetPasswordFormProps>) {
   const [email, setEmail] = useState("")
 
   const handleSubmit = async (e: React.FormEvent) => {

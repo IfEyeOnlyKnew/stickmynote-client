@@ -1,7 +1,7 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { getSession } from "@/lib/auth/local-auth"
 import { validateCSRFMiddleware } from "@/lib/csrf"
-import { encryptForOrg, decryptForOrg } from "@/lib/encryption"
+import { encryptForOrg } from "@/lib/encryption"
 import { logAuditEvent } from "@/lib/audit/audit-logger"
 import { getRequestContext } from "@/lib/audit/request-context"
 import { db } from "@/lib/database/pg-client"

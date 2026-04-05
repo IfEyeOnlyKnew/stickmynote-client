@@ -350,7 +350,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ padI
     // Check for search query parameter
     const { searchParams } = new URL(request.url)
     const searchQuery = searchParams.get("search")?.trim()
-    const limit = parseInt(searchParams.get("limit") || "0", 10)
+    const limit = Number.parseInt(searchParams.get("limit") || "0", 10)
 
     // If search query provided, search users first then filter members
     if (searchQuery && searchQuery.length >= 2) {

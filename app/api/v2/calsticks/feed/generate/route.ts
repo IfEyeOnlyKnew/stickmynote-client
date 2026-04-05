@@ -3,7 +3,7 @@ import { type NextRequest } from 'next/server'
 import { db } from '@/lib/database/pg-client'
 import { getCachedAuthUser } from '@/lib/auth/cached-auth'
 import { handleApiError } from '@/lib/api/handle-api-error'
-import { randomBytes } from 'crypto'
+import { randomBytes } from 'node:crypto'
 import { getOrgContext } from '@/lib/auth/get-org-context'
 import { checkDLPPolicy } from '@/lib/dlp/policy-checker'
 
@@ -40,7 +40,7 @@ export async function POST(request: NextRequest) {
     // Generate a secure random token
     const token = randomBytes(32).toString('hex')
 
-    const result = await db.query(
+    await db.query(
       `INSERT INTO paks_pad_calendar_feeds (user_id, name, token, is_active, filters)
        VALUES ($1, $2, $3, $4, $5)
        ON CONFLICT (user_id, name) DO UPDATE SET

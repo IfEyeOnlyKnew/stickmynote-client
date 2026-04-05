@@ -1,7 +1,6 @@
 // v2 Pad Templates Use API: production-quality, increment use count
 import { type NextRequest } from 'next/server'
 import { db } from '@/lib/database/pg-client'
-import { handleApiError } from '@/lib/api/handle-api-error'
 
 export const dynamic = 'force-dynamic'
 

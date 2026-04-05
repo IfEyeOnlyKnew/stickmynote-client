@@ -33,7 +33,7 @@ export const validateUUID = (uuid: string): boolean => {
 }
 
 export const sanitizeHtml = (html: string): string => {
-  return html.replace(/<script[^>]*>.*?<\/script>/gi, "").trim()
+  return html.replaceAll(/<script[^>]*>.*?<\/script>/gi, "").trim()
 }
 
 export const validateAndSanitize = (schema: z.ZodSchema, data: any) => {

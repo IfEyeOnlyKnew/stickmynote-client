@@ -20,7 +20,7 @@ interface VideoRoomModalProps {
   onClose: () => void
 }
 
-export function VideoRoomModal({ roomUrl, livekitRoomName, onClose }: VideoRoomModalProps) {
+export function VideoRoomModal({ roomUrl, livekitRoomName, onClose }: Readonly<VideoRoomModalProps>) {
   const [token, setToken] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [isJoining, setIsJoining] = useState(true)
@@ -184,7 +184,7 @@ export function VideoRoomModal({ roomUrl, livekitRoomName, onClose }: VideoRoomM
   )
 }
 
-function ModalVideoContent({ onLeave }: { onLeave: () => void }) {
+function ModalVideoContent({ onLeave }: Readonly<{ onLeave: () => void }>) {
   const room = useRoomContext()
   const { localParticipant, isMicrophoneEnabled, isCameraEnabled, isScreenShareEnabled } = useLocalParticipant()
 
@@ -211,34 +211,34 @@ function ModalVideoContent({ onLeave }: { onLeave: () => void }) {
         <p className="text-sm text-slate-400">Video conference active</p>
       </div>
 
-      <div className="flex justify-center gap-4" role="group" aria-label="Video conference controls">
+      <fieldset className="flex justify-center gap-4 border-none p-0 m-0" aria-label="Video conference controls">
         <Button
-          variant={!isMicrophoneEnabled ? "destructive" : "outline"}
+          variant={isMicrophoneEnabled ? "outline" : "destructive"}
           size="icon"
           onClick={toggleMute}
           className="rounded-full h-12 w-12"
-          aria-label={!isMicrophoneEnabled ? "Unmute microphone" : "Mute microphone"}
+          aria-label={isMicrophoneEnabled ? "Mute microphone" : "Unmute microphone"}
           aria-pressed={!isMicrophoneEnabled}
         >
-          {!isMicrophoneEnabled ? (
-            <MicOff className="h-5 w-5" aria-hidden="true" />
-          ) : (
+          {isMicrophoneEnabled ? (
             <Mic className="h-5 w-5" aria-hidden="true" />
+          ) : (
+            <MicOff className="h-5 w-5" aria-hidden="true" />
           )}
         </Button>
 
         <Button
-          variant={!isCameraEnabled ? "destructive" : "outline"}
+          variant={isCameraEnabled ? "outline" : "destructive"}
           size="icon"
           onClick={toggleVideo}
           className="rounded-full h-12 w-12"
-          aria-label={!isCameraEnabled ? "Turn on camera" : "Turn off camera"}
+          aria-label={isCameraEnabled ? "Turn off camera" : "Turn on camera"}
           aria-pressed={!isCameraEnabled}
         >
-          {!isCameraEnabled ? (
-            <VideoOff className="h-5 w-5" aria-hidden="true" />
-          ) : (
+          {isCameraEnabled ? (
             <Video className="h-5 w-5" aria-hidden="true" />
+          ) : (
+            <VideoOff className="h-5 w-5" aria-hidden="true" />
           )}
         </Button>
 
@@ -266,7 +266,7 @@ function ModalVideoContent({ onLeave }: { onLeave: () => void }) {
         >
           <PhoneOff className="h-5 w-5" aria-hidden="true" />
         </Button>
-      </div>
+      </fieldset>
     </div>
   )
 }

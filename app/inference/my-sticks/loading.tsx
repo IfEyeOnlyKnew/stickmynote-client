@@ -20,7 +20,7 @@ export default function MySticksLoading() {
       <main className="container mx-auto px-4 py-8">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {Array.from({ length: 9 }).map((_, i) => (
-            <Card key={i}>
+            <Card key={`skeleton-${i}`}>
               <CardHeader>
                 <Skeleton className="h-5 w-3/4" />
               </CardHeader>

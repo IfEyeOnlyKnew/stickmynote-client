@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server"
-import { promises as fs } from "fs"
-import path from "path"
+import { promises as fs } from "node:fs"
+import path from "node:path"
 
 const MIME_TYPES: Record<string, string> = {
   ".jpg": "image/jpeg",
@@ -30,7 +30,7 @@ export async function GET(
     const relativePath = segments.join("/")
 
     // Prevent directory traversal (/../ or starting with ../)
-    if (segments.some(s => s === "..")) {
+    if (segments.includes("..")) {
       return NextResponse.json({ error: "Invalid path" }, { status: 400 })
     }
 

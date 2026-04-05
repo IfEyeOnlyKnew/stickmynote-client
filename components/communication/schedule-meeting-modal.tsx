@@ -78,7 +78,7 @@ export function ScheduleMeetingModal({
   onSuccess,
   defaultDate,
   defaultParticipants,
-}: ScheduleMeetingModalProps) {
+}: Readonly<ScheduleMeetingModalProps>) {
   const { context } = useCommunicationPaletteContext()
 
   // Form state
@@ -126,7 +126,7 @@ export function ScheduleMeetingModal({
   const endTime = useMemo(() => {
     const [hours, minutes] = startTime.split(":").map(Number)
     const startDate = setMinutes(setHours(new Date(), hours), minutes)
-    const endDate = addMinutes(startDate, parseInt(duration, 10))
+    const endDate = addMinutes(startDate, Number.parseInt(duration, 10))
     return format(endDate, "HH:mm")
   }, [startTime, duration])
 
@@ -139,6 +139,14 @@ export function ScheduleMeetingModal({
       return `Discussion: ${context.stickTopic}`
     }
     return ""
+  }
+
+  const toggleRecurrenceDay = (dayValue: number) => {
+    setRecurrenceDays((prev) =>
+      prev.includes(dayValue)
+        ? prev.filter((d) => d !== dayValue)
+        : [...prev, dayValue].sort((a, b) => a - b)
+    )
   }
 
   const handleSubmit = async () => {
@@ -437,13 +445,7 @@ export function ScheduleMeetingModal({
                         <button
                           key={day.value}
                           type="button"
-                          onClick={() => {
-                            setRecurrenceDays((prev) =>
-                              prev.includes(day.value)
-                                ? prev.filter((d) => d !== day.value)
-                                : [...prev, day.value].sort((a, b) => a - b)
-                            )
-                          }}
+                          onClick={() => toggleRecurrenceDay(day.value)}
                           className={`w-9 h-8 rounded text-xs font-medium transition-colors ${
                             recurrenceDays.includes(day.value)
                               ? "bg-purple-600 text-white"

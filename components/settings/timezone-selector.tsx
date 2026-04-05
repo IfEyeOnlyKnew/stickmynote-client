@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useMemo } from "react"
+import { useState, useEffect } from "react"
 import {
   Select,
   SelectContent,
@@ -11,11 +11,9 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { Button } from "@/components/ui/button"
-import { Label } from "@/components/ui/label"
 import { Globe, RefreshCw } from "lucide-react"
 import {
   TIMEZONE_GROUPS,
-  TIMEZONE_OPTIONS,
   detectBrowserTimezone,
   getClosestTimezone,
   getTimezoneLabel,
@@ -35,7 +33,7 @@ export function TimezoneSelector({
   showAutoDetect = true,
   disabled = false,
   className,
-}: TimezoneSelectorProps) {
+}: Readonly<TimezoneSelectorProps>) {
   const [detectedTimezone, setDetectedTimezone] = useState<string | null>(null)
 
   // Detect browser timezone on mount
@@ -120,7 +118,7 @@ export function TimezoneSelector({
 }
 
 // Simpler inline version for compact displays
-export function TimezoneDisplay({ timezone }: { timezone: string }) {
+export function TimezoneDisplay({ timezone }: Readonly<{ timezone: string }>) {
   return (
     <span className="inline-flex items-center gap-1 text-sm text-muted-foreground">
       <Globe className="h-3 w-3" />

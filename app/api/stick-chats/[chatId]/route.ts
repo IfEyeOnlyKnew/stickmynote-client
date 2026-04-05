@@ -6,7 +6,6 @@ import {
   getChatById,
   updateChat,
   deleteChat,
-  isChatMember,
 } from "@/lib/database/stick-chat-queries"
 import type { UpdateStickChatRequest } from "@/types/stick-chat"
 

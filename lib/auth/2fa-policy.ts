@@ -101,7 +101,7 @@ export async function checkUserCompliance(
   // Get policy
   const policy = await getOrgPolicy(orgId)
 
-  if (!policy || !policy.require_2fa) {
+  if (!policy?.require_2fa) {
     return { compliant: true }
   }
 
@@ -154,7 +154,7 @@ export async function checkUserCompliance(
 export async function getUsersNeedingCompliance(orgId: string): Promise<UserCompliance[]> {
   const policy = await getOrgPolicy(orgId)
 
-  if (!policy || !policy.require_2fa) {
+  if (!policy?.require_2fa) {
     return []
   }
 
@@ -199,7 +199,7 @@ export async function getOrgComplianceStats(orgId: string): Promise<{
   const policy = await getOrgPolicy(orgId)
 
   // If no policy or not enforcing, return null (not applicable)
-  if (!policy || !policy.require_2fa) {
+  if (!policy?.require_2fa) {
     return null
   }
 

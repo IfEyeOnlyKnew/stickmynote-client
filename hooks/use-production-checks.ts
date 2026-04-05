@@ -66,9 +66,7 @@ export function useProductionChecks() {
         status: robots.ok ? "success" : "error",
         message: robots.ok ? "robots.txt served" : "robots.txt not available",
         details: { status: robots.status },
-      })
-
-      checks.push({
+      }, {
         name: "SEO: sitemap.xml",
         status: sitemap.ok ? "success" : "error",
         message: sitemap.ok ? "sitemap.xml served" : "sitemap.xml not available",
@@ -124,7 +122,11 @@ export function useProductionChecks() {
 
       checks.push({
         name: "Database Health",
-        status: response.ok && data.ok ? "success" : response.ok ? "warning" : "error",
+        status: (() => {
+          if (response.ok && data.ok) return "success" as const
+          if (response.ok) return "warning" as const
+          return "error" as const
+        })(),
         message: data.ok ? "Database connectivity looks good" : "DB health returned warnings",
         details: data,
       })
@@ -170,11 +172,12 @@ export function useProductionChecks() {
       const usedFallback = data?.source === "fallback"
 
       const status: Check["status"] = ok ? "success" : "warning"
-      const message = ok
-        ? usedFallback && !hasOllamaConfig && hasAiFallback
-          ? "Tags API succeeded via fallback (Ollama optional)"
-          : "Tags API returned tags"
-        : "Tags API failed"
+      let message = "Tags API failed"
+      if (ok && usedFallback && !hasOllamaConfig && hasAiFallback) {
+        message = "Tags API succeeded via fallback (Ollama optional)"
+      } else if (ok) {
+        message = "Tags API returned tags"
+      }
 
       checks.push({
         name: "AI: Generate Tags",

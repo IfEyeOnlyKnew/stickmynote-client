@@ -45,7 +45,7 @@ export function CommunicationPaletteProvider({
   padName,
   stickId,
   stickTopic,
-}: CommunicationPaletteProviderProps) {
+}: Readonly<CommunicationPaletteProviderProps>) {
   // State
   const [isOpen, setIsOpen] = useState(false)
   const [activeModal, setActiveModal] = useState<CommunicationAction | null>(null)

@@ -215,7 +215,7 @@ interface ProfileFieldsSectionProps {
   isLoading: boolean
 }
 
-export function ProfileFieldsSection({ formData, updateField, isLoading }: ProfileFieldsSectionProps) {
+export function ProfileFieldsSection({ formData, updateField, isLoading }: Readonly<ProfileFieldsSectionProps>) {
   const [isUploading, setIsUploading] = useState(false)
   const [uploadError, setUploadError] = useState<string | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)

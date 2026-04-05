@@ -6,6 +6,33 @@ import type { CreateSprintInput, Sprint } from "@/types/sprint"
 
 export const dynamic = "force-dynamic"
 
+const EMPTY_STATS = { tasks_count: 0, completed_tasks_count: 0, total_story_points: 0, completed_story_points: 0 }
+
+async function attachSprintStats(db: any, sprints: Sprint[]): Promise<any[]> {
+  const sprintIds = sprints.map((s) => s.id)
+  const { data: taskStats } = await db
+    .from("paks_pad_stick_replies")
+    .select("sprint_id, calstick_completed, story_points")
+    .in("sprint_id", sprintIds)
+    .eq("is_calstick", true)
+
+  const statsMap: Record<string, typeof EMPTY_STATS> = {}
+
+  for (const task of taskStats || []) {
+    if (!task.sprint_id) continue
+    if (!statsMap[task.sprint_id]) statsMap[task.sprint_id] = { ...EMPTY_STATS }
+    const entry = statsMap[task.sprint_id]
+    entry.tasks_count++
+    entry.total_story_points += task.story_points || 0
+    if (task.calstick_completed) {
+      entry.completed_tasks_count++
+      entry.completed_story_points += task.story_points || 0
+    }
+  }
+
+  return sprints.map((sprint) => ({ ...sprint, ...(statsMap[sprint.id] || EMPTY_STATS) }))
+}
+
 // GET: List all sprints for the organization
 export async function GET(request: NextRequest) {
   try {
@@ -52,50 +79,8 @@ export async function GET(request: NextRequest) {
     }
 
     // If includeStats, fetch task counts and story points for each sprint
-    if (includeStats && sprints && sprints.length > 0) {
-      const sprintIds = sprints.map((s: Sprint) => s.id)
-
-      const { data: taskStats } = await db
-        .from("paks_pad_stick_replies")
-        .select("sprint_id, calstick_completed, story_points")
-        .in("sprint_id", sprintIds)
-        .eq("is_calstick", true)
-
-      const statsMap: Record<string, {
-        tasks_count: number
-        completed_tasks_count: number
-        total_story_points: number
-        completed_story_points: number
-      }> = {}
-
-      for (const task of taskStats || []) {
-        if (!task.sprint_id) continue
-        if (!statsMap[task.sprint_id]) {
-          statsMap[task.sprint_id] = {
-            tasks_count: 0,
-            completed_tasks_count: 0,
-            total_story_points: 0,
-            completed_story_points: 0,
-          }
-        }
-        statsMap[task.sprint_id].tasks_count++
-        statsMap[task.sprint_id].total_story_points += task.story_points || 0
-        if (task.calstick_completed) {
-          statsMap[task.sprint_id].completed_tasks_count++
-          statsMap[task.sprint_id].completed_story_points += task.story_points || 0
-        }
-      }
-
-      const sprintsWithStats = sprints.map((sprint: Sprint) => ({
-        ...sprint,
-        ...statsMap[sprint.id] || {
-          tasks_count: 0,
-          completed_tasks_count: 0,
-          total_story_points: 0,
-          completed_story_points: 0,
-        },
-      }))
-
+    if (includeStats && sprints?.length) {
+      const sprintsWithStats = await attachSprintStats(db, sprints)
       return NextResponse.json({ sprints: sprintsWithStats })
     }
 

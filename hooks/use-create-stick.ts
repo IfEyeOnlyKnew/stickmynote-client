@@ -62,7 +62,7 @@ export function useCreateStick(padId: string, context: StickContext = "paks") {
         throw new Error(errorData.error || "Failed to create stick")
       }
 
-      const newStick = await response.json()
+      await response.json()
       router.refresh()
       return true
     } catch (err) {

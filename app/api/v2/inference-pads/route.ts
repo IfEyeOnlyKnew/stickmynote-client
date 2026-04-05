@@ -7,7 +7,7 @@ import { handleApiError } from '@/lib/api/handle-api-error'
 
 export const dynamic = 'force-dynamic'
 
-const ADMIN_EMAILS = ['chrisdoran63@outlook.com']
+const ADMIN_EMAILS = new Set(['chrisdoran63@outlook.com'])
 
 // GET /api/v2/inference-pads - List social pads
 export async function GET(request: NextRequest) {
@@ -43,7 +43,7 @@ export async function GET(request: NextRequest) {
 
     // Admin view - only for admin users
     if (isAdmin) {
-      const isUserAdmin = user.email && ADMIN_EMAILS.includes(user.email)
+      const isUserAdmin = user.email && ADMIN_EMAILS.has(user.email)
       if (!isUserAdmin) {
         return new Response(JSON.stringify({ error: 'Forbidden' }), { status: 403 })
       }

@@ -1,7 +1,6 @@
 "use client"
 
-import { Hash, Volume2, MessageSquare, ArrowRight } from "lucide-react"
-import Link from "next/link"
+import { Hash, Volume2, MessageSquare } from "lucide-react"
 
 export default function ChannelsPage() {
   return (

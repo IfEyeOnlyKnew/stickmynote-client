@@ -5,7 +5,7 @@ import { useChatRequests } from "@/hooks/useChatRequests"
 import { Button } from "@/components/ui/button"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { Loader2, MessageCircle, Check, Clock, Calendar, X } from "lucide-react"
+import { Loader2, MessageCircle, Check } from "lucide-react"
 import { ChatInvitationNotification } from "@/components/chat/ChatInvitationNotification"
 import type { ChatRequest, ChatRequestStatus } from "@/types/chat-request"
 import { getTimestampDisplay } from "@/utils/noteUtils"
@@ -65,11 +65,12 @@ export function ChatRequestList() {
               .toUpperCase()
               .slice(0, 2)
 
-            const replyPreview = request.parent_reply?.content
-              ? request.parent_reply.content.length > 60
+            let replyPreview = "a discussion"
+            if (request.parent_reply?.content) {
+              replyPreview = request.parent_reply.content.length > 60
                 ? request.parent_reply.content.slice(0, 60) + "..."
                 : request.parent_reply.content
-              : "a discussion"
+            }
 
             const isResponding = respondingId === request.id
 

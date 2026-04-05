@@ -25,7 +25,7 @@ export function RichTextModal({
   onSave,
   readOnly = false,
   maxLength = 500,
-}: RichTextModalProps) {
+}: Readonly<RichTextModalProps>) {
   const [localContent, setLocalContent] = useState(content)
 
   useEffect(() => {

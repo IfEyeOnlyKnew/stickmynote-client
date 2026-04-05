@@ -115,7 +115,7 @@ function getNodePosition(index: number, total: number, orbitRadius: number) {
 // Sub-components
 // ============================================================================
 
-function ConnectionLine({ x1, y1, x2, y2, hasData }: { x1: number; y1: number; x2: number; y2: number; hasData: boolean }) {
+function ConnectionLine({ x1, y1, x2, y2, hasData }: Readonly<{ x1: number; y1: number; x2: number; y2: number; hasData: boolean }>) {
   return (
     <line
       x1={x1}
@@ -131,7 +131,7 @@ function ConnectionLine({ x1, y1, x2, y2, hasData }: { x1: number; y1: number; x
   )
 }
 
-function CenterNode({ topic, color }: { topic: string; color: string }) {
+function CenterNode({ topic, color }: Readonly<{ topic: string; color: string }>) {
   return (
     <div
       className="absolute flex flex-col items-center justify-center rounded-full border-[3px] shadow-lg z-10 cursor-default"
@@ -153,7 +153,7 @@ function CenterNode({ topic, color }: { topic: string; color: string }) {
   )
 }
 
-function OrbitNode({ node, position, index, onClick }: { node: MapNode; position: { x: number; y: number }; index: number; onClick?: (nodeId: string, data?: { chatId?: string; meetingId?: string }) => void }) {
+function OrbitNode({ node, position, index, onClick }: Readonly<{ node: MapNode; position: { x: number; y: number }; index: number; onClick?: (nodeId: string, data?: { chatId?: string; meetingId?: string }) => void }>) {
   const hasData = node.count > 0
 
   return (
@@ -161,7 +161,9 @@ function OrbitNode({ node, position, index, onClick }: { node: MapNode; position
       <Tooltip>
         <TooltipTrigger asChild>
           <div
-            onClick={hasData && onClick ? () => onClick(node.id, node.data) : undefined}
+            tabIndex={(hasData && onClick) ? 0 : undefined}
+            onClick={(hasData && onClick) ? () => onClick(node.id, node.data) : undefined}
+            onKeyDown={(hasData && onClick) ? (e) => { if (e.key === "Enter" || e.key === " ") onClick(node.id, node.data) } : undefined}
             className={`absolute flex flex-col items-center justify-center rounded-full border-2
               transition-all duration-300 hover:scale-110 hover:shadow-lg z-10
               ${hasData ? "cursor-pointer" : "cursor-default"}
@@ -224,7 +226,7 @@ export function StickMapModal({
   stickContent,
   stickColor,
   onNodeClick,
-}: StickMapModalProps) {
+}: Readonly<StickMapModalProps>) {
   const [loading, setLoading] = useState(false)
   const [counts, setCounts] = useState<ComponentCounts | null>(null)
   const containerRef = useRef<HTMLDivElement>(null)
@@ -264,12 +266,13 @@ export function StickMapModal({
         </DialogHeader>
 
         <div className="flex-1 flex items-center justify-center py-4 overflow-auto">
-          {loading ? (
+          {loading && (
             <div className="flex flex-col items-center gap-3 py-12">
               <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
               <p className="text-sm text-muted-foreground">Mapping components...</p>
             </div>
-          ) : counts ? (
+          )}
+          {!loading && counts && (
             <div
               ref={containerRef}
               className="relative mx-auto"
@@ -307,7 +310,8 @@ export function StickMapModal({
                 )
               })}
             </div>
-          ) : (
+          )}
+          {!loading && !counts && (
             <p className="text-sm text-muted-foreground py-12">Failed to load map data</p>
           )}
         </div>

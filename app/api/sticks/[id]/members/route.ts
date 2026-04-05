@@ -30,7 +30,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       .eq("id", stickId)
       .maybeSingle()
 
-    if (!stick || stick.user_id !== user.id) {
+    if (stick?.user_id !== user.id) {
       return NextResponse.json({ error: "Not authorized" }, { status: 403 })
     }
 
@@ -129,7 +129,7 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
 
     const { data: stick } = await db.from("paks_pad_sticks").select("user_id").eq("id", stickId).maybeSingle()
 
-    if (!stick || stick.user_id !== user.id) {
+    if (stick?.user_id !== user.id) {
       return NextResponse.json({ error: "Not authorized" }, { status: 403 })
     }
 

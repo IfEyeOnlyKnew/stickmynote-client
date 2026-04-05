@@ -16,7 +16,9 @@ try {
       })
     }).catch(() => {})
   }
-} catch {}
+} catch {
+  // Redis is optional — caching will be skipped if unavailable
+}
 
 // GET /api/v2/search/panel/new-count - Check for new sticks count
 export async function GET(request: NextRequest) {
@@ -37,7 +39,9 @@ export async function GET(request: NextRequest) {
         if (cached !== null) {
           return new Response(JSON.stringify({ count: Math.min(Number(cached), 9) }), { status: 200 })
         }
-      } catch {}
+      } catch {
+        // Cache read failed — fall through to database query
+      }
     }
 
     // Query database
@@ -48,13 +52,15 @@ export async function GET(request: NextRequest) {
       [since]
     )
 
-    const newCount = Math.min(parseInt(result.rows[0]?.count || '0', 10), 9)
+    const newCount = Math.min(Number.parseInt(result.rows[0]?.count || '0', 10), 9)
 
     // Cache result
     if (redis) {
       try {
         await redis.set(cacheKey, newCount, { ex: 30 })
-      } catch {}
+      } catch {
+        // Non-critical — cache write is best-effort
+      }
     }
 
     return new Response(JSON.stringify({ count: newCount }), { status: 200 })

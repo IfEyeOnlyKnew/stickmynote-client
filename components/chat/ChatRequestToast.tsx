@@ -18,7 +18,7 @@ export function ChatRequestToast({
   onView,
   onDismiss,
   autoDismissMs = 10000,
-}: ChatRequestToastProps) {
+}: Readonly<ChatRequestToastProps>) {
   const [isVisible, setIsVisible] = useState(true)
   const [isExiting, setIsExiting] = useState(false)
 
@@ -35,11 +35,12 @@ export function ChatRequestToast({
     .toUpperCase()
     .slice(0, 2)
 
-  const replyPreview = request.parent_reply?.content
-    ? request.parent_reply.content.length > 50
+  let replyPreview = "a discussion"
+  if (request.parent_reply?.content) {
+    replyPreview = request.parent_reply.content.length > 50
       ? request.parent_reply.content.slice(0, 50) + "..."
       : request.parent_reply.content
-    : "a discussion"
+  }
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -169,7 +170,7 @@ export function ChatRequestToasts({
   requests,
   onView,
   onDismiss,
-}: ChatRequestToastsProps) {
+}: Readonly<ChatRequestToastsProps>) {
   // Only show the most recent request as a toast
   const latestRequest = requests[0]
 

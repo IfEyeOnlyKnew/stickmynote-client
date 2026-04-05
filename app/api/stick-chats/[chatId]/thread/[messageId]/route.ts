@@ -25,7 +25,7 @@ export async function GET(
     }
 
     const { searchParams } = new URL(request.url)
-    const limit = parseInt(searchParams.get("limit") || "50", 10)
+    const limit = Number.parseInt(searchParams.get("limit") || "50", 10)
     const cursor = searchParams.get("cursor") || undefined
 
     const result = await getThreadReplies(messageId, { limit, cursor })

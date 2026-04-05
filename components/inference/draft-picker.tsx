@@ -23,7 +23,7 @@ interface DraftPickerProps {
   onDraftSelect: (draft: StickDraft) => void
 }
 
-export function DraftPicker({ padId, onDraftSelect }: DraftPickerProps) {
+export function DraftPicker({ padId, onDraftSelect }: Readonly<DraftPickerProps>) {
   const [drafts, setDrafts] = useState<StickDraft[]>([])
   const [open, setOpen] = useState(false)
 

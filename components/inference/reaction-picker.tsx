@@ -23,7 +23,7 @@ interface ReactionPickerProps {
   size?: "sm" | "md" | "lg"
 }
 
-export function ReactionPicker({ onReactionSelect, userReactions = new Set(), size = "md" }: ReactionPickerProps) {
+export function ReactionPicker({ onReactionSelect, userReactions = new Set(), size = "md" }: Readonly<ReactionPickerProps>) {
   const [open, setOpen] = useState(false)
 
   const buttonSizeClasses = {

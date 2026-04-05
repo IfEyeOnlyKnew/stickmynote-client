@@ -67,7 +67,7 @@ class SMTPEmailService {
         to: Array.isArray(options.to) ? options.to.join(", ") : options.to,
         subject: options.subject,
         html: options.html,
-        text: options.text || options.html.replace(/<[^>]*>/g, ""),
+        text: options.text || options.html.replaceAll(/<[^>]*>/g, ""),
       })
 
       console.log(`[Email] Sent to ${options.to}: ${info.messageId}`)

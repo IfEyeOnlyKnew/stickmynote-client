@@ -1,9 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { Button } from "@/components/ui/button"
 import { Trophy, Medal, Award, TrendingUp, Heart, Star } from "lucide-react"
 import type { LeaderboardEntry } from "@/types/recognition"
 
@@ -25,7 +23,7 @@ const SORT_OPTIONS = [
   { value: "given", label: "Given", icon: TrendingUp },
 ]
 
-export function Leaderboard({ compact = false, maxEntries }: LeaderboardProps) {
+export function Leaderboard({ compact = false, maxEntries }: Readonly<LeaderboardProps>) {
   const [entries, setEntries] = useState<LeaderboardEntry[]>([])
   const [loading, setLoading] = useState(true)
   const [period, setPeriod] = useState("month")

@@ -12,7 +12,7 @@ interface NotificationItemProps {
   notification: NotificationWithUser
 }
 
-export function NotificationItem({ notification }: NotificationItemProps) {
+export function NotificationItem({ notification }: Readonly<NotificationItemProps>) {
   const { markAsRead, deleteNotification } = useNotifications()
   const router = useRouter()
 
@@ -42,7 +42,6 @@ export function NotificationItem({ notification }: NotificationItemProps) {
 
   return (
     <div
-      role="button"
       tabIndex={0}
       className={cn(
         "flex items-start gap-3 p-4 hover:bg-muted/50 transition-colors cursor-pointer group",
@@ -54,7 +53,7 @@ export function NotificationItem({ notification }: NotificationItemProps) {
       <div
         className={cn(
           "p-2 rounded-full",
-          !notification.read ? "bg-blue-100 text-blue-600" : "bg-muted text-muted-foreground",
+          notification.read ? "bg-muted text-muted-foreground" : "bg-blue-100 text-blue-600",
         )}
       >
         {getIcon()}

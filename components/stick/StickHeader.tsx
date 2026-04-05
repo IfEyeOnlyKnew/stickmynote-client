@@ -22,7 +22,7 @@ export function StickHeader({
   onStickNew,
   onCancelEdit,
   onStickEdit,
-}: StickHeaderProps) {
+}: Readonly<StickHeaderProps>) {
   return (
     <div className="flex items-center justify-between mb-4">
       <div className="flex items-center gap-2">
@@ -30,7 +30,7 @@ export function StickHeader({
         {!isNew && isEditing && <span className="text-sm text-orange-600">(editing)</span>}
       </div>
       <div className="flex items-center gap-2">
-        {isNew ? (
+        {isNew && (
           <>
             <Button variant="outline" onClick={onCancelNew} size="sm">
               Cancel
@@ -39,7 +39,8 @@ export function StickHeader({
               Stick
             </Button>
           </>
-        ) : isEditing && hasChanges ? (
+        )}
+        {!isNew && isEditing && hasChanges && (
           <>
             <Button variant="outline" onClick={onCancelEdit} size="sm" disabled={isSaving}>
               Cancel
@@ -55,7 +56,7 @@ export function StickHeader({
               )}
             </Button>
           </>
-        ) : null}
+        )}
       </div>
     </div>
   )

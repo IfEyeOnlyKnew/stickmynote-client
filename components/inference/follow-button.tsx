@@ -35,7 +35,7 @@ interface FollowButtonProps {
   className?: string
 }
 
-export function FollowButton({ entityType, entityId, entityName, variant = "default", className }: FollowButtonProps) {
+export function FollowButton({ entityType, entityId, entityName, variant = "default", className }: Readonly<FollowButtonProps>) {
   const { isFollowing, subscription, isLoading, follow, unfollow, updateChannels } = useFollow({
     entityType,
     entityId,

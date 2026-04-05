@@ -60,3 +60,7 @@ schema.sql
 
 # User uploads (stored outside public/ so deploys don't wipe them)
 /uploads/
+
+# SonarCloud exports
+sonar-issues*.json
+sonar-issues*.csv

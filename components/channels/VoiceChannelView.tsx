@@ -11,7 +11,6 @@ import {
   HeadphonesIcon,
   PhoneOff,
   Volume2,
-  Settings,
   Users,
   Loader2,
 } from "lucide-react"
@@ -33,7 +32,7 @@ interface VoiceChannelViewProps {
   currentUserId: string
 }
 
-export function VoiceChannelView({ channel, currentUserId }: VoiceChannelViewProps) {
+export function VoiceChannelView({ channel, currentUserId }: Readonly<VoiceChannelViewProps>) {
   const { csrfToken } = useCSRF()
   const { subscribe } = useWebSocket()
 
@@ -54,7 +53,9 @@ export function VoiceChannelView({ channel, currentUserId }: VoiceChannelViewPro
         const data = await res.json()
         setParticipants(data.participants || [])
       }
-    } catch {}
+    } catch {
+      // Non-critical — participant list will refresh on next event
+    }
   }, [channel.id])
 
   useEffect(() => {
@@ -111,7 +112,9 @@ export function VoiceChannelView({ channel, currentUserId }: VoiceChannelViewPro
           ...(csrfToken ? { "X-CSRF-Token": csrfToken } : {}),
         },
       })
-    } catch {}
+    } catch {
+      // Non-critical — best-effort server notification; local state cleans up regardless
+    }
     setIsJoined(false)
     setToken(null)
     setRoomName(null)
@@ -189,11 +192,11 @@ function VoiceChannelContent({
   channel,
   currentUserId,
   onLeave,
-}: {
+}: Readonly<{
   channel: StickChatWithDetails
   currentUserId: string
   onLeave: () => void
-}) {
+}>) {
   const room = useRoomContext()
   const livekitParticipants = useParticipants()
   const { localParticipant, isMicrophoneEnabled } = useLocalParticipant()
@@ -287,13 +290,13 @@ function VoiceChannelContent({
       {/* Controls */}
       <div className="flex items-center justify-center gap-4 p-4 border-t border-slate-800">
         <Button
-          variant={!isMicrophoneEnabled ? "destructive" : "secondary"}
+          variant={isMicrophoneEnabled ? "secondary" : "destructive"}
           size="icon"
           className="rounded-full h-12 w-12"
           onClick={toggleMic}
           title={isMicrophoneEnabled ? "Mute" : "Unmute"}
         >
-          {!isMicrophoneEnabled ? <MicOff /> : <Mic />}
+          {isMicrophoneEnabled ? <Mic /> : <MicOff />}
         </Button>
 
         <Button

@@ -108,7 +108,7 @@ const ACTION_OPTIONS = [
   { value: "admin.lockout_cleared", label: "Lockout Cleared" },
 ]
 
-export function AuditLogTab({ currentOrgId }: AuditLogTabProps) {
+export function AuditLogTab({ currentOrgId }: Readonly<AuditLogTabProps>) {
   const { toast } = useToast()
 
   const [logs, setLogs] = useState<AuditLogEntry[]>([])
@@ -233,14 +233,14 @@ export function AuditLogTab({ currentOrgId }: AuditLogTabProps) {
       if (!res.ok) throw new Error("Export failed")
 
       const blob = await res.blob()
-      const url = window.URL.createObjectURL(blob)
+      const url = globalThis.URL.createObjectURL(blob)
       const a = document.createElement("a")
       a.href = url
       a.download = `audit-logs-${new Date().toISOString().slice(0, 10)}.${format}`
       document.body.appendChild(a)
       a.click()
-      document.body.removeChild(a)
-      window.URL.revokeObjectURL(url)
+      a.remove()
+      globalThis.URL.revokeObjectURL(url)
 
       toast({ title: "Export complete", description: `Audit logs exported as ${format.toUpperCase()}` })
     } catch (error) {
@@ -380,7 +380,7 @@ export function AuditLogTab({ currentOrgId }: AuditLogTabProps) {
                 Clear filters
               </Button>
               <span className="text-xs text-muted-foreground">
-                {total} result{total !== 1 ? "s" : ""} found
+                {total} result{total === 1 ? "" : "s"} found
               </span>
             </div>
           )}
@@ -390,12 +390,13 @@ export function AuditLogTab({ currentOrgId }: AuditLogTabProps) {
       {/* Log Table */}
       <Card>
         <CardContent className="p-0">
-          {loading ? (
+          {loading && (
             <div className="flex items-center justify-center py-12">
               <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
               <span className="ml-2 text-muted-foreground">Loading audit logs...</span>
             </div>
-          ) : logs.length === 0 ? (
+          )}
+          {!loading && logs.length === 0 && (
             <div className="flex flex-col items-center justify-center py-12 text-center">
               <ScrollText className="h-10 w-10 text-muted-foreground mb-3" />
               <p className="text-muted-foreground">No audit log entries found</p>
@@ -403,7 +404,8 @@ export function AuditLogTab({ currentOrgId }: AuditLogTabProps) {
                 <p className="text-sm text-muted-foreground mt-1">Try adjusting your filters</p>
               )}
             </div>
-          ) : (
+          )}
+          {!loading && logs.length > 0 && (
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
@@ -560,7 +562,7 @@ export function AuditLogTab({ currentOrgId }: AuditLogTabProps) {
               <Label className="text-xs text-muted-foreground">Retention Period</Label>
               <Select
                 value={retentionDays.toString()}
-                onValueChange={(v) => setRetentionDays(parseInt(v, 10))}
+                onValueChange={(v) => setRetentionDays(Number.parseInt(v, 10))}
               >
                 <SelectTrigger className="mt-1">
                   <SelectValue />

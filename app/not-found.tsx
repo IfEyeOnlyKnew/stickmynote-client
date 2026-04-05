@@ -43,7 +43,7 @@ export default function NotFound() {
             </Button>
             <Button
               variant="ghost"
-              onClick={() => window.history.back()}
+              onClick={() => globalThis.history.back()}
               className="w-full"
             >
               <ArrowLeft className="mr-2 h-4 w-4" />

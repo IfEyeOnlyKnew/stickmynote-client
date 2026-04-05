@@ -24,7 +24,7 @@ export function TwoFactorDisableDialog({
   open,
   onOpenChange,
   onSuccess,
-}: TwoFactorDisableDialogProps) {
+}: Readonly<TwoFactorDisableDialogProps>) {
   const [code, setCode] = useState("")
   const [error, setError] = useState("")
   const [loading, setLoading] = useState(false)

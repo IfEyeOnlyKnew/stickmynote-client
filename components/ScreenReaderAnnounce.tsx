@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useCallback, createContext, useContext, type ReactNode } from "react"
+import { useState, useCallback, useMemo, createContext, useContext, type ReactNode } from "react"
 
 interface AnnounceContextType {
   announce: (message: string, priority?: "polite" | "assertive") => void
@@ -8,7 +8,7 @@ interface AnnounceContextType {
 
 const AnnounceContext = createContext<AnnounceContextType | undefined>(undefined)
 
-export function ScreenReaderAnnounceProvider({ children }: { children: ReactNode }) {
+export function ScreenReaderAnnounceProvider({ children }: Readonly<{ children: ReactNode }>) {
   const [politeMessage, setPoliteMessage] = useState("")
   const [assertiveMessage, setAssertiveMessage] = useState("")
 
@@ -23,8 +23,10 @@ export function ScreenReaderAnnounceProvider({ children }: { children: ReactNode
     }
   }, [])
 
+  const contextValue = useMemo(() => ({ announce }), [announce])
+
   return (
-    <AnnounceContext.Provider value={{ announce }}>
+    <AnnounceContext.Provider value={contextValue}>
       {children}
       {/* Polite announcements (queued, non-interrupting) */}
       <div

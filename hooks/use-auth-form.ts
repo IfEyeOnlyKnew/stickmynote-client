@@ -119,12 +119,12 @@ function buildAuthHeaders(csrfToken: string | null): Record<string, string> {
 }
 
 function formatLockoutMessage(minutes: number): string {
-  const plural = minutes !== 1 ? "s" : ""
+  const plural = minutes === 1 ? "" : "s"
   return `Account is temporarily locked. Please try again in ${minutes} minute${plural}.`
 }
 
 function formatLockoutToastMessage(minutes: number): string {
-  const plural = minutes !== 1 ? "s" : ""
+  const plural = minutes === 1 ? "" : "s"
   return `Too many failed login attempts. Please try again in ${minutes} minute${plural}.`
 }
 

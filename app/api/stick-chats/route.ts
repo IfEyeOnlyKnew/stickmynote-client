@@ -9,7 +9,7 @@ import {
   findChatForStick,
   findChatByName,
 } from "@/lib/database/stick-chat-queries"
-import type { CreateStickChatRequest, StickChatFilters } from "@/types/stick-chat"
+import type { CreateStickChatRequest, StickChatFilters, StickType } from "@/types/stick-chat"
 
 /**
  * STICK CHATS API
@@ -21,6 +21,21 @@ import type { CreateStickChatRequest, StickChatFilters } from "@/types/stick-cha
 // ============================================================================
 // Error Responses
 // ============================================================================
+
+async function findExistingChat(
+  stickId: string | undefined, stickType: StickType | undefined,
+  name: string | undefined, userId: string, orgId: string | null,
+): Promise<any | null> {
+  if (stickId && stickType) {
+    const chat = await findChatForStick(stickId, stickType, userId)
+    if (chat) return chat
+  }
+  if (name?.trim()) {
+    const chat = await findChatByName(name.trim(), userId, orgId)
+    if (chat) return chat
+  }
+  return null
+}
 
 const Errors = {
   csrf: () => NextResponse.json({ error: "Invalid or missing CSRF token" }, { status: 403 }),
@@ -150,43 +165,22 @@ export async function POST(request: NextRequest) {
     const body: CreateStickChatRequest = await request.json()
     const { name, stick_id, stick_type, is_group, member_ids } = body
 
-    // If this is a per-stick chat, check if one already exists
-    if (stick_id && stick_type) {
-      const existingChat = await findChatForStick(stick_id, stick_type, user.id)
-      if (existingChat) {
-        return NextResponse.json({ chat: existingChat, existing: true })
-      }
-    }
-
-    // Check if a chat with this name already exists for the user
-    if (name && name.trim()) {
-      const existingChatByName = await findChatByName(name.trim(), user.id, orgContextResult?.orgId || null)
-      if (existingChatByName) {
-        return NextResponse.json({ chat: existingChatByName, existing: true })
-      }
+    // Check for existing chat by stick or name
+    const existingChat = await findExistingChat(stick_id, stick_type, name, user.id, orgContextResult?.orgId || null)
+    if (existingChat) {
+      return NextResponse.json({ chat: existingChat, existing: true })
     }
 
     // Create the chat
     const chat = await createChat({
-      name,
-      stick_id,
-      stick_type,
-      owner_id: user.id,
-      org_id: orgContextResult?.orgId,
-      is_group,
+      name, stick_id, stick_type, owner_id: user.id, org_id: orgContextResult?.orgId, is_group,
     })
-
-    if (!chat) {
-      return Errors.createFailed()
-    }
+    if (!chat) return Errors.createFailed()
 
     // Add initial members if provided
-    if (member_ids && member_ids.length > 0) {
-      for (const memberId of member_ids) {
-        if (memberId !== user.id) {
-          await addChatMember(chat.id, memberId)
-        }
-      }
+    const otherMembers = (member_ids || []).filter((id: string) => id !== user.id)
+    for (const memberId of otherMembers) {
+      await addChatMember(chat.id, memberId)
     }
 
     return NextResponse.json({ chat, existing: false }, { status: 201 })

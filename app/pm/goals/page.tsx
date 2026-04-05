@@ -290,7 +290,7 @@ export default function GoalsPage() {
       )}
 
       {/* Objectives List */}
-      {loading ? (
+      {loading && (
         <div className="space-y-4">
           {[1, 2, 3].map((i) => (
             <Card key={i} className="animate-pulse">
@@ -298,7 +298,8 @@ export default function GoalsPage() {
             </Card>
           ))}
         </div>
-      ) : filtered.length === 0 ? (
+      )}
+      {!loading && filtered.length === 0 && (
         <Card>
           <CardContent className="pt-6 text-center text-muted-foreground py-12">
             {objectives.length === 0 ? (
@@ -312,7 +313,8 @@ export default function GoalsPage() {
             )}
           </CardContent>
         </Card>
-      ) : (
+      )}
+      {!loading && filtered.length > 0 && (
         <div className="space-y-3">
           {filtered.map((obj) => {
             const progress = computeProgress(obj)
@@ -329,8 +331,10 @@ export default function GoalsPage() {
             return (
               <Card key={obj.id} className="overflow-hidden" style={depth > 0 ? { marginLeft: depth * 24 } : undefined}>
                 <div
+                  tabIndex={0}
                   className="p-4 cursor-pointer hover:bg-muted/30 transition-colors"
                   onClick={() => toggleExpanded(obj.id!)}
+                  onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") toggleExpanded(obj.id!) }}
                 >
                   <div className="flex items-start justify-between">
                     <div className="flex-1 min-w-0">
@@ -361,7 +365,7 @@ export default function GoalsPage() {
                         </div>
                         <span className="text-sm font-medium">{progress.toFixed(0)}%</span>
                         <span className="text-xs text-muted-foreground">
-                          {obj.key_results?.length || 0} key result{obj.key_results?.length !== 1 ? "s" : ""}
+                          {obj.key_results?.length || 0} key result{obj.key_results?.length === 1 ? "" : "s"}
                         </span>
                       </div>
                     </div>
@@ -397,9 +401,12 @@ export default function GoalsPage() {
                   <div className="border-t bg-muted/20 px-4 py-3 space-y-3">
                     {obj.key_results.map((kr, idx) => {
                       const range = kr.target_value - kr.start_value
-                      const krProgress = range > 0
-                        ? Math.min(100, Math.max(0, ((kr.current_value - kr.start_value) / range) * 100))
-                        : kr.current_value >= kr.target_value ? 100 : 0
+                      let krProgress = 0
+                      if (range > 0) {
+                        krProgress = Math.min(100, Math.max(0, ((kr.current_value - kr.start_value) / range) * 100))
+                      } else if (kr.current_value >= kr.target_value) {
+                        krProgress = 100
+                      }
 
                       return (
                         <div key={kr.id || idx} className="flex items-center gap-4">

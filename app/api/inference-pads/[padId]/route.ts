@@ -160,7 +160,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
       .eq("org_id", orgContext.orgId)
       .maybeSingle()
 
-    if (!pad || pad.owner_id !== user.id) {
+    if (pad?.owner_id !== user.id) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 403 })
     }
 

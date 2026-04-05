@@ -203,7 +203,7 @@ SMTP_HOST=192.168.50.40
 SMTP_PORT=587
 SMTP_SECURE=true
 SMTP_USER=stickmynote@stickmynote.com
-SMTP_PASSWORD=[ENTER_PASSWORD_HERE]
+SMTP_PASSWORD=$($env:SMTP_PASSWORD)
 SMTP_FROM=noreply@stickmynote.com
 
 # To use in .env.local, copy these values and remove the RESEND settings

@@ -9,7 +9,7 @@ interface PresenceAvatarsProps {
   maxDisplay?: number
 }
 
-export function PresenceAvatars({ users, maxDisplay = 3 }: PresenceAvatarsProps) {
+export function PresenceAvatars({ users, maxDisplay = 3 }: Readonly<PresenceAvatarsProps>) {
   if (users.length === 0) return null
 
   const displayUsers = users.slice(0, maxDisplay)

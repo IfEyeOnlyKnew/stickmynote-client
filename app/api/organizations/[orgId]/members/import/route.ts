@@ -44,7 +44,7 @@ interface Membership {
 // Constants
 // ============================================================================
 
-const ADMIN_ROLES = ["owner", "admin"]
+const ADMIN_ROLES = new Set(["owner", "admin"])
 const DEFAULT_ROLE = "viewer"
 const MAX_MEMBERS_PER_IMPORT = 100
 const PRE_REGISTERED_STATUSES = ["pre_registered", "pending"]
@@ -101,7 +101,7 @@ function parseMembersFromBody(body: RequestBody): MemberInput[] {
 }
 
 function isValidEmail(email: string | undefined): email is string {
-  return Boolean(email && email.includes("@"))
+  return Boolean(email?.includes("@"))
 }
 
 // ============================================================================
@@ -321,7 +321,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     // Verify user is admin/owner
     const membership = await getUserMembership(db, orgId, user.id)
 
-    if (!membership || !ADMIN_ROLES.includes(membership.role)) {
+    if (!membership || !ADMIN_ROLES.has(membership.role)) {
       return Errors.forbidden()
     }
 

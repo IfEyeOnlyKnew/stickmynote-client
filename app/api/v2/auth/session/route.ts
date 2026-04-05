@@ -1,6 +1,5 @@
 // v2 Auth Session API: production-quality, get current session
 import { getSession } from '@/lib/auth/local-auth'
-import { handleApiError } from '@/lib/api/handle-api-error'
 
 export const dynamic = 'force-dynamic'
 

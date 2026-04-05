@@ -484,7 +484,7 @@ export function SSOTab({ currentOrgId }: Readonly<SSOTabProps>) {
             <AlertDescription>
               <strong>Callback URL</strong> (add this to your IdP):
               <code className="block mt-1 p-2 bg-muted rounded text-xs break-all">
-                {typeof window !== "undefined" ? `${window.location.origin}/api/auth/sso/callback` : "/api/auth/sso/callback"}
+                {typeof globalThis.window === "undefined" ? "/api/auth/sso/callback" : `${globalThis.location.origin}/api/auth/sso/callback`}
               </code>
             </AlertDescription>
           </Alert>
@@ -540,9 +540,9 @@ export function SSOTab({ currentOrgId }: Readonly<SSOTabProps>) {
             <div className="flex items-center gap-2">
               <span className="text-sm font-medium">Status:</span>
               <Badge
-                variant={idpStatus === "active" ? "default" : idpStatus === "draft" ? "secondary" : "outline"}
+                variant={(() => { if (idpStatus === "active") return "default" as const; if (idpStatus === "draft") return "secondary" as const; return "outline" as const })()}
               >
-                {idpStatus === "active" ? "Active" : idpStatus === "draft" ? "Draft" : "Disabled"}
+                {(() => { if (idpStatus === "active") return "Active"; if (idpStatus === "draft") return "Draft"; return "Disabled" })()}
               </Badge>
             </div>
 
@@ -581,15 +581,15 @@ export function SSOTab({ currentOrgId }: Readonly<SSOTabProps>) {
             )}
           </CardContent>
           <CardFooter className="flex gap-2">
-            {idpStatus !== "active" ? (
-              <Button onClick={handleActivate} disabled={!hasVerifiedDomain}>
-                <CheckCircle2 className="h-4 w-4 mr-1" />
-                Activate SSO
-              </Button>
-            ) : (
+            {idpStatus === "active" ? (
               <Button variant="outline" onClick={handleDeactivate}>
                 <XCircle className="h-4 w-4 mr-1" />
                 Deactivate SSO
+              </Button>
+            ) : (
+              <Button onClick={handleActivate} disabled={!hasVerifiedDomain}>
+                <CheckCircle2 className="h-4 w-4 mr-1" />
+                Activate SSO
               </Button>
             )}
           </CardFooter>

@@ -2,7 +2,7 @@ interface PasswordStrengthIndicatorProps {
   password: string
 }
 
-export function PasswordStrengthIndicator({ password }: PasswordStrengthIndicatorProps) {
+export function PasswordStrengthIndicator({ password }: Readonly<PasswordStrengthIndicatorProps>) {
   const getStrength = (password: string) => {
     let score = 0
     if (password.length >= 8) score++

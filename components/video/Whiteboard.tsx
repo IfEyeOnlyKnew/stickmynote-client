@@ -37,7 +37,7 @@ interface WhiteboardProps {
 const COLORS = ["#000000", "#EF4444", "#3B82F6", "#10B981", "#F59E0B", "#8B5CF6", "#EC4899", "#FFFFFF"]
 const LINE_WIDTHS = [2, 4, 8, 16]
 
-export function Whiteboard({ onDrawAction, incomingActions, className }: WhiteboardProps) {
+export function Whiteboard({ onDrawAction, incomingActions, className }: Readonly<WhiteboardProps>) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const [isDrawing, setIsDrawing] = useState(false)
   const [tool, setTool] = useState<"pen" | "line" | "rect" | "circle" | "eraser" | "text">("pen")
@@ -69,7 +69,7 @@ export function Whiteboard({ onDrawAction, incomingActions, className }: Whitebo
   // Process incoming actions from other users
   useEffect(() => {
     if (incomingActions && incomingActions.length > 0) {
-      const lastAction = incomingActions[incomingActions.length - 1]
+      const lastAction = incomingActions.at(-1)!
       setHistory((prev) => [...prev, lastAction])
       drawAction(lastAction)
     }
@@ -107,7 +107,7 @@ export function Whiteboard({ onDrawAction, incomingActions, className }: Whitebo
     } else if (action.tool === "line") {
       if (action.points.length < 2) return
       const start = action.points[0]
-      const end = action.points[action.points.length - 1]
+      const end = action.points.at(-1)!
       ctx.beginPath()
       ctx.moveTo(start.x, start.y)
       ctx.lineTo(end.x, end.y)
@@ -115,12 +115,12 @@ export function Whiteboard({ onDrawAction, incomingActions, className }: Whitebo
     } else if (action.tool === "rect") {
       if (action.points.length < 2) return
       const start = action.points[0]
-      const end = action.points[action.points.length - 1]
+      const end = action.points.at(-1)!
       ctx.strokeRect(start.x, start.y, end.x - start.x, end.y - start.y)
     } else if (action.tool === "circle") {
       if (action.points.length < 2) return
       const start = action.points[0]
-      const end = action.points[action.points.length - 1]
+      const end = action.points.at(-1)!
       const rx = Math.abs(end.x - start.x) / 2
       const ry = Math.abs(end.y - start.y) / 2
       const cx = (start.x + end.x) / 2
@@ -182,7 +182,7 @@ export function Whiteboard({ onDrawAction, incomingActions, className }: Whitebo
       ctx.lineCap = "round"
       ctx.lineJoin = "round"
       ctx.beginPath()
-      ctx.moveTo(points[points.length - 2].x, points[points.length - 2].y)
+      ctx.moveTo(points.at(-2)!.x, points.at(-2)!.y)
       ctx.lineTo(point.x, point.y)
       ctx.stroke()
     }
@@ -209,7 +209,7 @@ export function Whiteboard({ onDrawAction, incomingActions, className }: Whitebo
 
   const undo = () => {
     if (history.length === 0) return
-    const last = history[history.length - 1]
+    const last = history.at(-1)!
     setHistory((prev) => prev.slice(0, -1))
     setRedoStack((prev) => [...prev, last])
     // Redraw without last action

@@ -9,7 +9,7 @@ interface SetupStepProps {
   children?: React.ReactNode
 }
 
-export function SetupStep({ step, stepNumber, children }: SetupStepProps) {
+export function SetupStep({ step, stepNumber, children }: Readonly<SetupStepProps>) {
   const renderContent = (content: SetupStepConfig["content"][0]) => {
     switch (content.type) {
       case "text":
@@ -21,8 +21,8 @@ export function SetupStep({ step, stepNumber, children }: SetupStepProps) {
       case "list":
         return (
           <ol className="text-sm space-y-1 list-decimal list-inside text-gray-600">
-            {content.data.map((item: string, index: number) => (
-              <li key={index}>{item}</li>
+            {content.data.map((item: string) => (
+              <li key={item}>{item}</li>
             ))}
           </ol>
         )
@@ -52,14 +52,14 @@ export function SetupStep({ step, stepNumber, children }: SetupStepProps) {
       <div className="pl-6 space-y-2">
         {step.description && <p className="text-sm text-gray-600">{step.description}</p>}
 
-        {step.content?.map((content, index) => (
-          <div key={index}>{renderContent(content)}</div>
+        {step.content?.map((content) => (
+          <div key={`${content.type}-${content.data}`}>{renderContent(content)}</div>
         ))}
 
         {step.links && (
           <p className="text-xs text-gray-500">
-            {step.links.map((link, index) => (
-              <span key={index}>
+            {step.links.map((link) => (
+              <span key={link.url}>
                 Get your API key from{" "}
                 <a
                   href={link.url}

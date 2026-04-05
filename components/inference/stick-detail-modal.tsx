@@ -14,15 +14,6 @@ import { DiscussionTemplatePicker } from "@/components/inference/discussion-temp
 import { DiscussionTemplateProgress } from "@/components/inference/discussion-template-progress"
 import { GuidedPromptsPanel } from "@/components/inference/guided-prompts-panel"
 import type { DiscussionTemplate, TemplateProgress, StickDiscussionTemplate } from "@/types/discussion-templates"
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuCheckboxItem,
-  DropdownMenuTrigger,
-  DropdownMenuSeparator,
-  DropdownMenuLabel,
-} from "@/components/ui/dropdown-menu"
-import { ScrollArea } from "@/components/ui/scroll-area"
 import { InferenceStickTabs } from "@/components/inference/inference-stick-tabs"
 import { KnowledgeBaseDrawer } from "@/components/inference/knowledge-base-drawer"
 import { AddCitationModal } from "@/components/inference/add-citation-modal"
@@ -95,7 +86,22 @@ interface StickDetailModalProps {
   onUpdate?: () => void
 }
 
-export function StickDetailModal({ open, onOpenChange, stickId, onUpdate }: StickDetailModalProps) {
+function getWorkflowStepColor(isCurrent: boolean, isPast: boolean, currentColor: string, pastColor: string, defaultColor: string): string {
+  if (isCurrent) return currentColor
+  if (isPast) return pastColor
+  return defaultColor
+}
+
+// Recursively update a reply by id within a nested reply tree
+function updateReplyInTree(replies: Reply[], replyId: string, transform: (reply: Reply) => Reply): Reply[] {
+  return replies.map((reply) => {
+    if (reply.id === replyId) return transform(reply)
+    if (reply.replies?.length) return { ...reply, replies: updateReplyInTree(reply.replies, replyId, transform) }
+    return reply
+  })
+}
+
+export function StickDetailModal({ open, onOpenChange, stickId, onUpdate }: Readonly<StickDetailModalProps>) {
   const { user } = useUser()
   const [stick, setStick] = useState<InferenceStick | null>(null)
   const [loading, setLoading] = useState(false)
@@ -136,22 +142,12 @@ export function StickDetailModal({ open, onOpenChange, stickId, onUpdate }: Stic
     }
   }, [user])
 
-  const toggleCategory = (category: string) => {
-    setSelectedCategories((prevCategories) =>
-      prevCategories.includes(category) ? prevCategories.filter((c) => c !== category) : [...prevCategories, category],
-    )
-  }
-
   const selectOnlyCategory = (category: string) => {
     setSelectedCategories([category])
   }
 
   const resetCategories = () => {
     setSelectedCategories(REPLY_CATEGORIES.map((c) => c.value))
-  }
-
-  const clearCategories = () => {
-    setSelectedCategories([])
   }
 
   const fetchWithRetry = async (url: string, options?: RequestInit, maxRetries = 3): Promise<Response> => {
@@ -480,18 +476,7 @@ export function StickDetailModal({ open, onOpenChange, stickId, onUpdate }: Stic
         // Update reply locally instead of refetching entire stick
         setStick((prev) => {
           if (!prev || !prev.replies) return prev
-          const updateReplyInList = (replies: Reply[]): Reply[] => {
-            return replies.map((reply) => {
-              if (reply.id === replyId) {
-                return { ...reply, content, updated_at: new Date().toISOString() }
-              }
-              if (reply.replies && reply.replies.length > 0) {
-                return { ...reply, replies: updateReplyInList(reply.replies) }
-              }
-              return reply
-            })
-          }
-          return { ...prev, replies: updateReplyInList(prev.replies) }
+          return { ...prev, replies: updateReplyInTree(prev.replies, replyId, (r) => ({ ...r, content, updated_at: new Date().toISOString() })) }
         })
         onUpdate?.()
       } else {
@@ -527,18 +512,7 @@ export function StickDetailModal({ open, onOpenChange, stickId, onUpdate }: Stic
         // Update reply locally
         setStick((prev) => {
           if (!prev || !prev.replies) return prev
-          const updateReplyInList = (replies: Reply[]): Reply[] => {
-            return replies.map((reply) => {
-              if (reply.id === replyId) {
-                return { ...reply, content: newContent, updated_at: new Date().toISOString() }
-              }
-              if (reply.replies && reply.replies.length > 0) {
-                return { ...reply, replies: updateReplyInList(reply.replies) }
-              }
-              return reply
-            })
-          }
-          return { ...prev, replies: updateReplyInList(prev.replies) }
+          return { ...prev, replies: updateReplyInTree(prev.replies, replyId, (r) => ({ ...r, content: newContent, updated_at: new Date().toISOString() })) }
         })
         onUpdate?.()
       } else {
@@ -1070,8 +1044,6 @@ export function StickDetailModal({ open, onOpenChange, stickId, onUpdate }: Stic
                               const config = WORKFLOW_STATUSES[status]
                               const isCurrent = stick.workflow_status === status
                               const isPast = WORKFLOW_ORDER.indexOf(stick.workflow_status!) > index
-                              const isCompleted = isPast || isCurrent
-
                               return (
                                 <div key={status} className="flex items-center flex-1">
                                   <TooltipProvider>
@@ -1079,18 +1051,14 @@ export function StickDetailModal({ open, onOpenChange, stickId, onUpdate }: Stic
                                       <TooltipTrigger asChild>
                                         <div className={`flex flex-col items-center ${isCurrent ? 'scale-110' : ''}`}>
                                           <div className={`w-8 h-8 rounded-full flex items-center justify-center border-2 transition-all ${
-                                            isCurrent
-                                              ? `${config.bgColor} ${config.borderColor} ${config.color}`
-                                              : isPast
-                                                ? 'bg-green-100 border-green-400 text-green-600'
-                                                : 'bg-gray-100 border-gray-300 text-gray-400'
+                                            getWorkflowStepColor(isCurrent, isPast, `${config.bgColor} ${config.borderColor} ${config.color}`, 'bg-green-100 border-green-400 text-green-600', 'bg-gray-100 border-gray-300 text-gray-400')
                                           }`}>
                                             {status === 'idea' && <Lightbulb className="h-4 w-4" />}
                                             {status === 'triage' && <Filter className="h-4 w-4" />}
                                             {status === 'in_progress' && <Play className="h-4 w-4" />}
                                             {status === 'resolved' && <CheckCircle2 className="h-4 w-4" />}
                                           </div>
-                                          <span className={`text-xs mt-1 font-medium ${isCurrent ? config.color : isPast ? 'text-green-600' : 'text-gray-400'}`}>
+                                          <span className={`text-xs mt-1 font-medium ${getWorkflowStepColor(isCurrent, isPast, config.color, 'text-green-600', 'text-gray-400')}`}>
                                             {config.label}
                                           </span>
                                         </div>
@@ -1275,7 +1243,7 @@ export function StickDetailModal({ open, onOpenChange, stickId, onUpdate }: Stic
                                   const milestone = getMilestone(reply, index)
                                   const replyDate = new Date(reply.created_at)
                                   const prevDate = index > 0 ? new Date(timelineSortedReplies[index - 1].created_at) : null
-                                  const showDateHeader = !prevDate || replyDate.toDateString() !== prevDate.toDateString()
+                                  const showDateHeader = replyDate.toDateString() !== prevDate?.toDateString()
 
                                   return (
                                     <div key={reply.id}>

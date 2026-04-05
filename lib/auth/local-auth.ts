@@ -59,7 +59,7 @@ export async function verifyToken(token: string): Promise<{ userId: string } | n
 
 // Set session cookie
 export async function setSessionCookie(token: string): Promise<void> {
-  const cookieStore = await cookies()
+  const cookieStore = cookies()
   cookieStore.set("session", token, {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
@@ -71,7 +71,7 @@ export async function setSessionCookie(token: string): Promise<void> {
 
 // Get session from cookie
 export async function getSession(): Promise<Session | null> {
-  const cookieStore = await cookies()
+  const cookieStore = cookies()
   const token = cookieStore.get("session")?.value
 
   if (!token) {
@@ -101,7 +101,7 @@ export async function getSession(): Promise<Session | null> {
 
 // Clear session cookie
 export async function clearSession(): Promise<void> {
-  const cookieStore = await cookies()
+  const cookieStore = cookies()
   cookieStore.delete("session")
 }
 

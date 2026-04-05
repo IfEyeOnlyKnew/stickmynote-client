@@ -33,7 +33,7 @@ interface PadQADialogProps {
   trigger?: React.ReactNode
 }
 
-export function PadQADialog({ padId, padName, trigger }: PadQADialogProps) {
+export function PadQADialog({ padId, padName, trigger }: Readonly<PadQADialogProps>) {
   const [open, setOpen] = useState(false)
   const [question, setQuestion] = useState("")
   const [answer, setAnswer] = useState("")
@@ -197,7 +197,7 @@ export function PadQADialog({ padId, padName, trigger }: PadQADialogProps) {
                     <h4 className="text-xs font-semibold text-gray-700 mb-2">Referenced Sticks</h4>
                     <div className="space-y-2">
                       {citations.map((citation, idx) => (
-                        <div key={idx} className="flex items-start gap-2 text-sm">
+                        <div key={citation.topic} className="flex items-start gap-2 text-sm">
                           <Badge variant="secondary" className="text-xs">
                             {idx + 1}
                           </Badge>

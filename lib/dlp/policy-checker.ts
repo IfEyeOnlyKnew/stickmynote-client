@@ -98,104 +98,105 @@ export async function checkDLPPolicy(params: DLPCheckParams): Promise<DLPCheckRe
     return { allowed: true }
   }
 
-  const warnings: string[] = []
-
   // --- Sharing Controls ---
-  if (params.action === "share_note" && dlp.block_community_sharing) {
-    await logDLPEvent("dlp.share_blocked", params, "Community note sharing is disabled by your organization")
-    return { allowed: false, reason: "Community note sharing is disabled by your organization's data loss prevention policy." }
-  }
-
-  if (params.action === "make_pad_public" && dlp.block_public_pads) {
-    await logDLPEvent("dlp.public_pad_blocked", params, "Public pads are disabled")
-    return { allowed: false, reason: "Public pads are disabled by your organization's data loss prevention policy." }
-  }
-
-  if (params.action === "generate_ical" && dlp.block_ical_feeds) {
-    await logDLPEvent("dlp.ical_blocked", params, "iCal feeds are disabled")
-    return { allowed: false, reason: "Calendar feed generation is disabled by your organization's data loss prevention policy." }
-  }
-
-  if (params.action === "create_webhook" && dlp.block_external_webhooks) {
-    await logDLPEvent("dlp.webhook_blocked", params, "External webhooks are disabled")
-    return { allowed: false, reason: "External webhooks are disabled by your organization's data loss prevention policy." }
-  }
-
-  if (params.action === "invite_external" && dlp.block_video_external_invite) {
-    await logDLPEvent("dlp.invite_blocked", params, "External video invites are disabled")
-    return { allowed: false, reason: "External video invitations are disabled by your organization's data loss prevention policy." }
+  const sharingBlock = checkSharingControls(params.action, dlp)
+  if (sharingBlock) {
+    await logDLPEvent(sharingBlock.event, params, sharingBlock.detail)
+    return { allowed: false, reason: sharingBlock.reason }
   }
 
   // --- Domain Controls ---
-  if (params.action === "create_webhook" && params.targetUrl && dlp.allowed_webhook_domains && dlp.allowed_webhook_domains.length > 0) {
-    const domain = extractDomainFromUrl(params.targetUrl)
-    if (!domain || !isDomainAllowed(domain, dlp.allowed_webhook_domains)) {
-      await logDLPEvent("dlp.webhook_blocked", params, `Webhook domain not allowed: ${domain}`)
-      return {
-        allowed: false,
-        reason: `Webhook destination "${domain}" is not in your organization's allowed domains list.`,
-      }
-    }
-  }
-
-  if (params.action === "invite_external" && params.targetEmail && dlp.allowed_invite_domains && dlp.allowed_invite_domains.length > 0) {
-    const domain = extractDomainFromEmail(params.targetEmail)
-    if (!domain || !isDomainAllowed(domain, dlp.allowed_invite_domains)) {
-      await logDLPEvent("dlp.invite_blocked", params, `Invite domain not allowed: ${domain}`)
-      return {
-        allowed: false,
-        reason: `Invitations to "${domain}" are not allowed by your organization's domain policy.`,
-      }
-    }
+  const domainBlock = checkDomainControls(params, dlp)
+  if (domainBlock) {
+    await logDLPEvent(domainBlock.event, params, domainBlock.detail)
+    return { allowed: false, reason: domainBlock.reason }
   }
 
   // --- Classification Controls ---
-  if (params.sensitivityLevel && ["confidential", "restricted"].includes(params.sensitivityLevel)) {
-    if (params.action === "share_note" || params.action === "make_pad_public") {
-      await logDLPEvent("dlp.share_blocked", params, `Cannot share ${params.sensitivityLevel} content externally`)
-      return {
-        allowed: false,
-        reason: `Content classified as "${params.sensitivityLevel}" cannot be shared externally.`,
-      }
+  const classificationBlock = checkClassificationControls(params, dlp)
+  if (classificationBlock) {
+    if (classificationBlock.event) {
+      await logDLPEvent(classificationBlock.event, params, classificationBlock.detail!)
     }
-  }
-
-  if (dlp.require_classification && !params.sensitivityLevel) {
-    if (params.action === "share_note" || params.action === "make_pad_public") {
-      return {
-        allowed: false,
-        reason: "Content must have a sensitivity classification before it can be shared.",
-      }
-    }
+    return { allowed: false, reason: classificationBlock.reason }
   }
 
   // --- Content Scanning ---
-  if (dlp.content_scanning_enabled && params.content) {
-    const scanResult = scanContent(params.content, dlp.scan_patterns)
+  const scanResult = checkContentScanning(params, dlp)
+  if (scanResult) return scanResult
 
-    if (scanResult.hasSensitiveData) {
-      const matchSummary = scanResult.matches
-        .map((m) => `${m.count} ${m.label}`)
-        .join(", ")
+  return { allowed: true }
+}
 
-      if (dlp.scan_action === "block") {
-        await logDLPEvent("dlp.sensitive_data_detected", params, `Blocked: ${matchSummary}`)
-        return {
-          allowed: false,
-          reason: `Sensitive data detected: ${matchSummary}. Sharing is blocked by your organization's DLP policy.`,
-        }
-      }
+interface DLPBlock {
+  event: string
+  detail: string
+  reason: string
+}
 
-      // Default to warn
-      await logDLPEvent("dlp.share_warned", params, `Warning: ${matchSummary}`)
-      warnings.push(`Sensitive data detected: ${matchSummary}`)
+const SHARING_RULES: Array<{ action: DLPAction; settingKey: keyof DLPSettings; event: string; detail: string; reason: string }> = [
+  { action: "share_note", settingKey: "block_community_sharing", event: "dlp.share_blocked", detail: "Community note sharing is disabled by your organization", reason: "Community note sharing is disabled by your organization's data loss prevention policy." },
+  { action: "make_pad_public", settingKey: "block_public_pads", event: "dlp.public_pad_blocked", detail: "Public pads are disabled", reason: "Public pads are disabled by your organization's data loss prevention policy." },
+  { action: "generate_ical", settingKey: "block_ical_feeds", event: "dlp.ical_blocked", detail: "iCal feeds are disabled", reason: "Calendar feed generation is disabled by your organization's data loss prevention policy." },
+  { action: "create_webhook", settingKey: "block_external_webhooks", event: "dlp.webhook_blocked", detail: "External webhooks are disabled", reason: "External webhooks are disabled by your organization's data loss prevention policy." },
+  { action: "invite_external", settingKey: "block_video_external_invite", event: "dlp.invite_blocked", detail: "External video invites are disabled", reason: "External video invitations are disabled by your organization's data loss prevention policy." },
+]
+
+function checkSharingControls(action: DLPAction, dlp: DLPSettings): DLPBlock | null {
+  const rule = SHARING_RULES.find(r => r.action === action && dlp[r.settingKey])
+  if (!rule) return null
+  return { event: rule.event, detail: rule.detail, reason: rule.reason }
+}
+
+function checkDomainControls(params: DLPCheckParams, dlp: DLPSettings): DLPBlock | null {
+  if (params.action === "create_webhook" && params.targetUrl && dlp.allowed_webhook_domains?.length) {
+    const domain = extractDomainFromUrl(params.targetUrl)
+    if (!domain || !isDomainAllowed(domain, dlp.allowed_webhook_domains)) {
+      return { event: "dlp.webhook_blocked", detail: `Webhook domain not allowed: ${domain}`, reason: `Webhook destination "${domain}" is not in your organization's allowed domains list.` }
     }
   }
 
-  return {
-    allowed: true,
-    warnings: warnings.length > 0 ? warnings : undefined,
+  if (params.action === "invite_external" && params.targetEmail && dlp.allowed_invite_domains?.length) {
+    const domain = extractDomainFromEmail(params.targetEmail)
+    if (!domain || !isDomainAllowed(domain, dlp.allowed_invite_domains)) {
+      return { event: "dlp.invite_blocked", detail: `Invite domain not allowed: ${domain}`, reason: `Invitations to "${domain}" are not allowed by your organization's domain policy.` }
+    }
   }
+
+  return null
+}
+
+function checkClassificationControls(params: DLPCheckParams, dlp: DLPSettings): DLPBlock | null {
+  const isSharingAction = params.action === "share_note" || params.action === "make_pad_public"
+  if (!isSharingAction) return null
+
+  if (params.sensitivityLevel && ["confidential", "restricted"].includes(params.sensitivityLevel)) {
+    return { event: "dlp.share_blocked", detail: `Cannot share ${params.sensitivityLevel} content externally`, reason: `Content classified as "${params.sensitivityLevel}" cannot be shared externally.` }
+  }
+
+  if (dlp.require_classification && !params.sensitivityLevel) {
+    return { event: "", detail: "", reason: "Content must have a sensitivity classification before it can be shared." }
+  }
+
+  return null
+}
+
+function checkContentScanning(params: DLPCheckParams, dlp: DLPSettings): DLPCheckResult | null {
+  if (!dlp.content_scanning_enabled || !params.content) return null
+
+  const scanResult = scanContent(params.content, dlp.scan_patterns)
+  if (!scanResult.hasSensitiveData) return null
+
+  const matchSummary = scanResult.matches.map((m) => `${m.count} ${m.label}`).join(", ")
+
+  if (dlp.scan_action === "block") {
+    logDLPEvent("dlp.sensitive_data_detected", params, `Blocked: ${matchSummary}`)
+    return { allowed: false, reason: `Sensitive data detected: ${matchSummary}. Sharing is blocked by your organization's DLP policy.` }
+  }
+
+  // Default to warn
+  logDLPEvent("dlp.share_warned", params, `Warning: ${matchSummary}`)
+  return { allowed: true, warnings: [`Sensitive data detected: ${matchSummary}`] }
 }
 
 /**

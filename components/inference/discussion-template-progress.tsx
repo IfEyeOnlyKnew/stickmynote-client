@@ -24,7 +24,7 @@ import {
   Settings,
   Flag,
 } from "lucide-react"
-import type { TemplateProgress, Milestone, MilestoneState, RequiredCategory } from "@/types/discussion-templates"
+import type { TemplateProgress, RequiredCategory } from "@/types/discussion-templates"
 
 interface DiscussionTemplateProgressProps {
   progress: TemplateProgress
@@ -56,7 +56,7 @@ export function DiscussionTemplateProgress({
   templateCategory,
   onRemoveTemplate,
   className,
-}: DiscussionTemplateProgressProps) {
+}: Readonly<DiscussionTemplateProgressProps>) {
   const colors = categoryColors[templateCategory || "Custom"] || categoryColors.Custom
 
   // All required categories (both fulfilled and missing)
@@ -122,8 +122,8 @@ export function DiscussionTemplateProgress({
       <div className="mt-3 space-y-1.5">
         <TooltipProvider>
           <div className="flex flex-wrap gap-1.5">
-            {allRequired.map((item, idx) => (
-              <Tooltip key={idx}>
+            {allRequired.map((item) => (
+              <Tooltip key={item.category}>
                 <TooltipTrigger asChild>
                   <Badge
                     variant="outline"
@@ -168,9 +168,9 @@ export function DiscussionTemplateProgress({
           <div className="flex flex-wrap gap-1.5">
             {progress.milestones
               .filter((m) => m.state.reached)
-              .map((milestone, idx) => (
+              .map((milestone) => (
                 <Badge
-                  key={idx}
+                  key={milestone.name}
                   variant="outline"
                   className="text-xs bg-purple-50 border-purple-300 text-purple-700"
                 >
@@ -190,8 +190,8 @@ export function DiscussionTemplateProgress({
             <div className="text-xs">
               <p className="font-medium">Cannot mark as Resolved yet</p>
               <ul className="mt-1 space-y-0.5">
-                {progress.blockingReasons.map((reason, idx) => (
-                  <li key={idx}>{reason}</li>
+                {progress.blockingReasons.map((reason) => (
+                  <li key={reason}>{reason}</li>
                 ))}
               </ul>
             </div>

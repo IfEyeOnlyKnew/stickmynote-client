@@ -75,7 +75,7 @@ const Errors = {
 
 function generateSlug(domain: string): string {
   const randomSuffix = Math.random().toString(36).substring(2, 7)
-  return `${domain.replace(/\./g, "-")}-${randomSuffix}`
+  return `${domain.replaceAll(".", "-")}-${randomSuffix}`
 }
 
 function normalizeOrganization(orgData: Organization | Organization[]): Organization {
@@ -105,7 +105,7 @@ async function findOrganizationByDomain(
     throw error
   }
 
-  if (!data || !data.organizations) {
+  if (!data?.organizations) {
     return null
   }
 

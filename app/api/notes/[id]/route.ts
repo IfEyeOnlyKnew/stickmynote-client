@@ -9,6 +9,42 @@ import { isUnderLegalHold } from "@/lib/legal-hold/check-hold"
 export const runtime = "nodejs"
 export const dynamic = "force-dynamic"
 
+function extractTabData(tabs: any[]) {
+  let details = ""
+  let videos: any[] = []
+  let images: any[] = []
+  let hyperlinks: { url: string; title?: string }[] = []
+
+  if (!tabs || !Array.isArray(tabs)) return { details, videos, images, hyperlinks }
+
+  for (const tab of tabs) {
+    if (tab.tab_type === "details" && tab.tab_data?.content) {
+      details = tab.tab_data.content
+    }
+    if ((tab.tab_type === "videos" || tab.tab_type === "video") && tab.tab_data) {
+      videos = Array.isArray(tab.tab_data) ? tab.tab_data : []
+    }
+    if (tab.tab_type === "images" && tab.tab_data) {
+      images = Array.isArray(tab.tab_data) ? tab.tab_data : []
+    }
+    if (tab.tab_name === "Tags" && tab.tags) {
+      hyperlinks = parseHyperlinks(tab.tags)
+    }
+  }
+
+  return { details, videos, images, hyperlinks }
+}
+
+function parseHyperlinks(tags: any): { url: string; title?: string }[] {
+  try {
+    if (Array.isArray(tags)) return tags
+    if (typeof tags === "string") return JSON.parse(tags || "[]")
+    return []
+  } catch {
+    return []
+  }
+}
+
 // ============================================================================
 // GET - Fetch single note
 // ============================================================================
@@ -47,41 +83,7 @@ export async function GET(request: NextRequest, context: { params: Promise<{ id:
     const noteTabs = tabsResult.rows
 
     // Parse tabs for details, videos, images, hyperlinks
-    let details = ""
-    let videos: any[] = []
-    let images: any[] = []
-    let hyperlinks: { url: string; title?: string }[] = []
-
-    if (noteTabs && Array.isArray(noteTabs)) {
-      const detailsTab = noteTabs.find((tab: any) => tab.tab_type === "details")
-      if (detailsTab && detailsTab.tab_data?.content) {
-        details = detailsTab.tab_data.content
-      }
-
-      const videosTab = noteTabs.find((tab: any) => tab.tab_type === "videos" || tab.tab_type === "video")
-      if (videosTab && videosTab.tab_data) {
-        videos = Array.isArray(videosTab.tab_data) ? videosTab.tab_data : []
-      }
-
-      const imagesTab = noteTabs.find((tab: any) => tab.tab_type === "images")
-      if (imagesTab && imagesTab.tab_data) {
-        images = Array.isArray(imagesTab.tab_data) ? imagesTab.tab_data : []
-      }
-
-      const tagsTab = noteTabs.find((tab: any) => tab.tab_name === "Tags")
-      if (tagsTab && tagsTab.tags) {
-        try {
-          hyperlinks = Array.isArray(tagsTab.tags)
-            ? tagsTab.tags
-            : typeof tagsTab.tags === "string"
-              ? JSON.parse(tagsTab.tags || "[]")
-              : []
-        } catch (err) {
-          console.warn(`Failed to parse hyperlinks for note ${noteId}:`, err)
-          hyperlinks = []
-        }
-      }
-    }
+    const { details, videos, images, hyperlinks } = extractTabData(noteTabs)
 
     // Fetch tags data
     const tagsResult = await db.query(

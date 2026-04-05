@@ -37,7 +37,7 @@ export function BulkActionsToolbar({
   onShare,
   onChangeStatus,
   onAssignOwner,
-}: BulkActionsToolbarProps) {
+}: Readonly<BulkActionsToolbarProps>) {
   if (selectedCount === 0) return null
 
   return (

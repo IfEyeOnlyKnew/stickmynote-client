@@ -103,7 +103,7 @@ export async function GET(request: NextRequest) {
     clearTimeout(timeoutId)
 
     const duration = Date.now() - startTime
-    const data = await response.json()
+    await response.json()
     results.tests.push({
       name: "GET /api/tags (with AbortController)",
       success: true,

@@ -29,7 +29,7 @@ interface ImportResult {
   errors: string[]
 }
 
-export function CSVImportDialog({ organizationId, onImportComplete }: CSVImportDialogProps) {
+export function CSVImportDialog({ organizationId, onImportComplete }: Readonly<CSVImportDialogProps>) {
   const [open, setOpen] = useState(false)
   const [file, setFile] = useState<File | null>(null)
   const [pastedText, setPastedText] = useState("")
@@ -66,10 +66,10 @@ export function CSVImportDialog({ organizationId, onImportComplete }: CSVImportD
 
       // Handle CSV format: email, name
       const parts = line.split(",")
-      const email = parts[0].trim().replace(/^["']|["']$/g, "") // Remove quotes
-      const name = parts[1]?.trim().replace(/^["']|["']$/g, "") || undefined
+      const email = parts[0].trim().replaceAll(/^["']|["']$/g, "") // Remove quotes
+      const name = parts[1]?.trim().replaceAll(/^["']|["']$/g, "") || undefined
 
-      if (email && email.includes("@")) {
+      if (email?.includes("@")) {
         members.push({ email, name })
       }
     }
@@ -222,14 +222,12 @@ david.wilson@magna.com, David Wilson"
                 Download Template
               </Button>
 
-              <div
-                role="button"
-                tabIndex={0}
-                className="border-2 border-dashed rounded-lg p-6 text-center cursor-pointer hover:bg-muted/50 transition-colors"
+              <input ref={fileInputRef} type="file" accept=".csv" onChange={handleFileChange} className="hidden" aria-label="Upload CSV file" />
+              <button
+                type="button"
+                className="border-2 border-dashed rounded-lg p-6 text-center cursor-pointer hover:bg-muted/50 transition-colors w-full"
                 onClick={() => fileInputRef.current?.click()}
-                onKeyDown={(e) => e.key === "Enter" && fileInputRef.current?.click()}
               >
-                <input ref={fileInputRef} type="file" accept=".csv" onChange={handleFileChange} className="hidden" />
                 {file ? (
                   <div className="flex items-center justify-center gap-2">
                     <FileText className="h-8 w-8 text-primary" />
@@ -245,7 +243,7 @@ david.wilson@magna.com, David Wilson"
                     <p className="text-xs text-muted-foreground">CSV files only</p>
                   </>
                 )}
-              </div>
+              </button>
             </TabsContent>
           </Tabs>
 
@@ -264,8 +262,8 @@ david.wilson@magna.com, David Wilson"
                     Failed to pre-register {result.failed} member(s)
                     {result.errors.length > 0 && (
                       <ul className="mt-2 text-xs list-disc list-inside">
-                        {result.errors.slice(0, 5).map((err, i) => (
-                          <li key={i}>{err}</li>
+                        {result.errors.slice(0, 5).map((err) => (
+                          <li key={err}>{err}</li>
                         ))}
                         {result.errors.length > 5 && <li>...and {result.errors.length - 5} more</li>}
                       </ul>

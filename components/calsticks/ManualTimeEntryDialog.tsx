@@ -20,7 +20,7 @@ interface ManualTimeEntryDialogProps {
   onSaved: () => void
 }
 
-export function ManualTimeEntryDialog({ isOpen, onClose, onSaved }: ManualTimeEntryDialogProps) {
+export function ManualTimeEntryDialog({ isOpen, onClose, onSaved }: Readonly<ManualTimeEntryDialogProps>) {
   const [tasks, setTasks] = useState<CalStick[]>([])
   const [selectedTaskId, setSelectedTaskId] = useState<string>("")
   const [date, setDate] = useState<Date>(new Date())

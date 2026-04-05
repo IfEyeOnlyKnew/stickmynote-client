@@ -30,7 +30,7 @@ const DEFAULT_ENCRYPTION: EncryptionSettings = {
   file_encryption_enabled: false,
 }
 
-export function EncryptionTab({ currentOrgId }: EncryptionTabProps) {
+export function EncryptionTab({ currentOrgId }: Readonly<EncryptionTabProps>) {
   const [encryption, setEncryption] = useState<EncryptionSettings>(DEFAULT_ENCRYPTION)
   const [masterKeyConfigured, setMasterKeyConfigured] = useState(false)
   const [loading, setLoading] = useState(true)
@@ -271,11 +271,13 @@ export function EncryptionTab({ currentOrgId }: EncryptionTabProps) {
               <div className="flex items-center gap-2">
                 <span className="text-sm font-medium">File Uploads (Images)</span>
               </div>
-              {encryption.file_encryption_enabled && masterKeyConfigured ? (
+              {encryption.file_encryption_enabled && masterKeyConfigured && (
                 <Badge className="bg-green-100 text-green-800 border-green-300">Encrypted</Badge>
-              ) : masterKeyConfigured ? (
+              )}
+              {!(encryption.file_encryption_enabled && masterKeyConfigured) && masterKeyConfigured && (
                 <Badge variant="outline" className="text-yellow-700 border-yellow-300 bg-yellow-50">Disabled</Badge>
-              ) : (
+              )}
+              {!masterKeyConfigured && (
                 <Badge variant="outline" className="text-muted-foreground">Not Configured</Badge>
               )}
             </div>

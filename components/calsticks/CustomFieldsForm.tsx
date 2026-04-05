@@ -20,7 +20,7 @@ interface CustomFieldsFormProps {
   taskId: string
 }
 
-export function CustomFieldsForm({ taskId }: CustomFieldsFormProps) {
+export function CustomFieldsForm({ taskId }: Readonly<CustomFieldsFormProps>) {
   const [fields, setFields] = useState<CustomField[]>([])
   const [values, setValues] = useState<Record<string, any>>({})
   const [loading, setLoading] = useState(true)

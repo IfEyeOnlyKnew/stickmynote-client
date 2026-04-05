@@ -5,9 +5,28 @@ import { format } from "date-fns"
 
 function escapeCsvField(value: string): string {
   if (value.includes(",") || value.includes('"') || value.includes("\n")) {
-    return `"${value.replace(/"/g, '""')}"`
+    return `"${value.replaceAll('"', '""')}"`
   }
   return value
+}
+
+async function fetchTaskAndStickMaps(db: any, entries: any[]): Promise<{ taskMap: Record<string, any>; stickMap: Record<string, any> }> {
+  const taskIds = [...new Set(entries.map((e: any) => e.task_id).filter(Boolean))]
+  if (taskIds.length === 0) return { taskMap: {}, stickMap: {} }
+
+  const { data: tasks } = await db.from("paks_pad_stick_replies").select("id, content, stick_id").in("id", taskIds)
+  if (!tasks) return { taskMap: {}, stickMap: {} }
+
+  const taskMap = Object.fromEntries(tasks.map((t: any) => [t.id, t]))
+  const stickIds = [...new Set(tasks.map((t: any) => t.stick_id).filter(Boolean))]
+  let stickMap: Record<string, any> = {}
+
+  if (stickIds.length > 0) {
+    const { data: sticks } = await db.from("paks_pad_sticks").select("id, topic").in("id", stickIds)
+    if (sticks) stickMap = Object.fromEntries(sticks.map((s: any) => [s.id, s]))
+  }
+
+  return { taskMap, stickMap }
 }
 
 export async function GET(request: NextRequest) {
@@ -39,30 +58,7 @@ export async function GET(request: NextRequest) {
     if (error) throw error
 
     // Fetch task + stick data
-    const taskIds = [...new Set((entries || []).map((e: any) => e.task_id).filter(Boolean))]
-    let taskMap: Record<string, any> = {}
-    let stickMap: Record<string, any> = {}
-
-    if (taskIds.length > 0) {
-      const { data: tasks } = await db
-        .from("paks_pad_stick_replies")
-        .select("id, content, stick_id")
-        .in("id", taskIds)
-
-      if (tasks) {
-        taskMap = Object.fromEntries(tasks.map((t: any) => [t.id, t]))
-        const stickIds = [...new Set(tasks.map((t: any) => t.stick_id).filter(Boolean))]
-        if (stickIds.length > 0) {
-          const { data: sticks } = await db
-            .from("paks_pad_sticks")
-            .select("id, topic")
-            .in("id", stickIds)
-          if (sticks) {
-            stickMap = Object.fromEntries(sticks.map((s: any) => [s.id, s]))
-          }
-        }
-      }
-    }
+    const { taskMap, stickMap } = await fetchTaskAndStickMaps(db, entries || [])
 
     // Build CSV
     const headers = ["Date", "Task", "Project", "Hours", "Billable", "Status", "Note"]

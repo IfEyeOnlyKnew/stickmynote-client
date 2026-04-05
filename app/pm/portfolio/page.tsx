@@ -141,7 +141,7 @@ export default function PortfolioPage() {
               <span className="font-bold">{metrics.onTimeRate}%</span>
             </div>
             <Progress value={metrics.onTimeRate} className="h-2" />
-            <div className="text-xs text-muted-foreground">{metrics.overdueTasks} task{metrics.overdueTasks !== 1 ? "s" : ""} currently overdue</div>
+            <div className="text-xs text-muted-foreground">{metrics.overdueTasks} task{metrics.overdueTasks === 1 ? "" : "s"} currently overdue</div>
           </CardContent>
         </Card>
 
@@ -169,9 +169,9 @@ export default function PortfolioPage() {
           </CardHeader>
           <CardContent>
             <div className="space-y-2">
-              {metrics.risks.map((risk, i) => (
-                <div key={i} className="flex items-center gap-3 p-3 border rounded-lg">
-                  <AlertTriangle className={`h-4 w-4 shrink-0 ${risk.severity === "high" ? "text-red-500" : risk.severity === "medium" ? "text-amber-500" : "text-blue-500"}`} />
+              {metrics.risks.map((risk) => (
+                <div key={risk.message} className="flex items-center gap-3 p-3 border rounded-lg">
+                  <AlertTriangle className={`h-4 w-4 shrink-0 ${(() => { if (risk.severity === "high") return "text-red-500"; if (risk.severity === "medium") return "text-amber-500"; return "text-blue-500" })()}`} />
                   <span className="flex-1 text-sm">{risk.message}</span>
                   <Badge className={SEVERITY_COLORS[risk.severity]} variant="outline">
                     {risk.severity}
@@ -214,16 +214,16 @@ export default function PortfolioPage() {
                 <ResponsiveContainer width={180} height={180}>
                   <PieChart>
                     <Pie data={metrics.statusDistribution} cx="50%" cy="50%" innerRadius={50} outerRadius={80} dataKey="value">
-                      {metrics.statusDistribution.map((entry, i) => (
-                        <Cell key={i} fill={entry.color} />
+                      {metrics.statusDistribution.map((entry) => (
+                        <Cell key={entry.name} fill={entry.color} />
                       ))}
                     </Pie>
                     <Tooltip />
                   </PieChart>
                 </ResponsiveContainer>
                 <div className="space-y-2">
-                  {metrics.statusDistribution.map((entry, i) => (
-                    <div key={i} className="flex items-center gap-2 text-sm">
+                  {metrics.statusDistribution.map((entry) => (
+                    <div key={entry.name} className="flex items-center gap-2 text-sm">
                       <span className="w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: entry.color }} />
                       <span>{entry.name}</span>
                       <span className="text-muted-foreground ml-auto">{entry.value}</span>
@@ -262,10 +262,10 @@ export default function PortfolioPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {metrics.projectBreakdown.map((proj, i) => {
+                  {metrics.projectBreakdown.map((proj) => {
                     const projRag = RAG_CONFIG[proj.ragStatus as keyof typeof RAG_CONFIG] || RAG_CONFIG.amber
                     return (
-                      <tr key={i} className="border-b last:border-b-0 hover:bg-muted/30">
+                      <tr key={proj.name} className="border-b last:border-b-0 hover:bg-muted/30">
                         <td className="py-2 pr-4 font-medium">{proj.name}</td>
                         <td className="py-2 px-2 text-center">
                           <span className={`inline-block w-3 h-3 rounded-full ${projRag.bg}`} title={projRag.label} />

@@ -129,6 +129,35 @@ export function ActivityFeedModal({ open, onOpenChange }: ActivityFeedModalProps
     }
   }
 
+  const renderActivityCard = (activity: InferenceActivity) => (
+    <Card
+      key={activity.id}
+      className="cursor-pointer hover:shadow-md transition-shadow"
+      onClick={() => handleActivityClick(activity)}
+    >
+      <CardContent className="p-4">
+        <div className="flex items-start gap-3">
+          <div className="flex-shrink-0 mt-1">
+            <div className="w-8 h-8 rounded-full bg-purple-100 flex items-center justify-center text-purple-600">
+              {getActivityIcon(activity.activity_type)}
+            </div>
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="text-sm text-gray-900 mb-1">{getActivityMessage(activity)}</p>
+            <div className="flex items-center gap-2">
+              <Badge variant="outline" className="text-xs">
+                {activity.activity_type}
+              </Badge>
+              <span className="text-xs text-gray-500">
+                {formatDistanceToNow(new Date(activity.created_at), { addSuffix: true })}
+              </span>
+            </div>
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  )
+
   const renderContent = () => {
     if (loading && activities.length === 0) {
       return (
@@ -162,34 +191,7 @@ export function ActivityFeedModal({ open, onOpenChange }: ActivityFeedModalProps
           <div key={date} className="space-y-4">
             <h2 className="text-lg font-semibold text-gray-900 sticky top-0 bg-white py-2 z-10">{date}</h2>
             <div className="space-y-3">
-              {dateActivities.map((activity) => (
-                <Card
-                  key={activity.id}
-                  className="cursor-pointer hover:shadow-md transition-shadow"
-                  onClick={() => handleActivityClick(activity)}
-                >
-                  <CardContent className="p-4">
-                    <div className="flex items-start gap-3">
-                      <div className="flex-shrink-0 mt-1">
-                        <div className="w-8 h-8 rounded-full bg-purple-100 flex items-center justify-center text-purple-600">
-                          {getActivityIcon(activity.activity_type)}
-                        </div>
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm text-gray-900 mb-1">{getActivityMessage(activity)}</p>
-                        <div className="flex items-center gap-2">
-                          <Badge variant="outline" className="text-xs">
-                            {activity.activity_type}
-                          </Badge>
-                          <span className="text-xs text-gray-500">
-                            {formatDistanceToNow(new Date(activity.created_at), { addSuffix: true })}
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
+              {dateActivities.map(renderActivityCard)}
             </div>
           </div>
         ))}

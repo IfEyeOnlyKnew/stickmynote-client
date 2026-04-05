@@ -24,7 +24,7 @@ export function AdaptiveContainer({
   className,
   maxWidth = "lg",
   padded = true,
-}: AdaptiveContainerProps) {
+}: Readonly<AdaptiveContainerProps>) {
   return (
     <div
       className={cn(

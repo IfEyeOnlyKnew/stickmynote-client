@@ -10,7 +10,7 @@ interface ConfigCheckResultsProps {
   checks: ConfigCheck[]
 }
 
-export function ConfigCheckResults({ checks }: ConfigCheckResultsProps) {
+export function ConfigCheckResults({ checks }: Readonly<ConfigCheckResultsProps>) {
   const getStatusIcon = (status: ConfigCheck["status"]) => {
     switch (status) {
       case "success":
@@ -68,15 +68,15 @@ export function ConfigCheckResults({ checks }: ConfigCheckResultsProps) {
       </div>
 
       <div className="grid gap-4">
-        {checks.map((check, index) => (
+        {checks.map((check) => (
           <Card
-            key={index}
+            key={check.name}
             className={`border-l-4 ${
-              check.status === "success"
-                ? "border-l-green-500"
-                : check.status === "error"
-                  ? "border-l-red-500"
-                  : "border-l-yellow-500"
+              (() => {
+                if (check.status === "success") return "border-l-green-500"
+                if (check.status === "error") return "border-l-red-500"
+                return "border-l-yellow-500"
+              })()
             }`}
           >
             <CardContent className="pt-4">

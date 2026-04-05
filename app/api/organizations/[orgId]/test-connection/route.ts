@@ -3,7 +3,7 @@ import { createDatabaseClient } from "@/lib/database/database-adapter"
 
 export async function POST(request: Request, { params }: { params: Promise<{ orgId: string }> }) {
   try {
-    const { orgId } = await params
+    await params
     const db = await createDatabaseClient()
     const {
       data: { user },

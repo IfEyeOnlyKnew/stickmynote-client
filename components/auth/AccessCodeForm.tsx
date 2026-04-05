@@ -10,7 +10,7 @@ interface AccessCodeFormProps {
   onAccessCodeChange: (value: string) => void
 }
 
-export function AccessCodeForm({ accessCode, error, onAccessCodeChange }: AccessCodeFormProps) {
+export function AccessCodeForm({ accessCode, error, onAccessCodeChange }: Readonly<AccessCodeFormProps>) {
   return (
     <div className="space-y-6">
       <div className="text-center space-y-2">

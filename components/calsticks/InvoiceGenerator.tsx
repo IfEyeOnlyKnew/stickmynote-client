@@ -12,7 +12,6 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Checkbox } from "@/components/ui/checkbox"
 import { CalendarIcon, FileText } from "lucide-react"
 import { format } from "date-fns"
-import { formatDuration } from "@/lib/utils"
 import { toast } from "@/hooks/use-toast"
 
 interface TimeEntryForInvoice {
@@ -36,7 +35,7 @@ interface InvoiceGeneratorProps {
   onCreated: () => void
 }
 
-export function InvoiceGenerator({ isOpen, onClose, onCreated }: InvoiceGeneratorProps) {
+export function InvoiceGenerator({ isOpen, onClose, onCreated }: Readonly<InvoiceGeneratorProps>) {
   const [step, setStep] = useState(1)
   const [projects, setProjects] = useState<Project[]>([])
   const [selectedProjectId, setSelectedProjectId] = useState("")
@@ -233,11 +232,13 @@ export function InvoiceGenerator({ isOpen, onClose, onCreated }: InvoiceGenerato
         {/* Step 2: Review entries */}
         {step === 2 && (
           <div className="space-y-4">
-            {loading ? (
+            {loading && (
               <div className="text-center py-8 text-muted-foreground">Loading entries...</div>
-            ) : entries.length === 0 ? (
+            )}
+            {!loading && entries.length === 0 && (
               <div className="text-center py-8 text-muted-foreground">No approved billable entries found for this period</div>
-            ) : (
+            )}
+            {!loading && entries.length > 0 && (
               <>
                 <div className="text-sm text-muted-foreground">{selectedEntryIds.size} of {entries.length} entries selected</div>
                 <div className="space-y-2 max-h-60 overflow-y-auto">

@@ -12,7 +12,7 @@ export const dynamic = "force-dynamic"
 export async function GET(request: NextRequest) {
   const email = request.nextUrl.searchParams.get("email")
 
-  if (!email || !email.includes("@")) {
+  if (!email?.includes("@")) {
     return NextResponse.json({ method: "ldap" })
   }
 

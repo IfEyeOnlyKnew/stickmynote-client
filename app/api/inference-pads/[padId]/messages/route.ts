@@ -255,7 +255,7 @@ export async function GET(
 
     // Parse pagination params
     const { searchParams } = new URL(request.url)
-    const limitParam = Math.min(parseInt(searchParams.get("limit") || "50", 10), 100)
+    const limitParam = Math.min(Number.parseInt(searchParams.get("limit") || "50", 10), 100)
     const afterCursor = searchParams.get("after") // Message ID to fetch after
     const beforeCursor = searchParams.get("before") // Message ID to fetch before
 
@@ -401,7 +401,7 @@ export async function GET(
     // Determine pagination cursors
     const hasMore = filteredMessages.length === limitParam
     const nextCursor = filteredMessages.length > 0
-      ? filteredMessages[filteredMessages.length - 1].id
+      ? filteredMessages.at(-1)!.id
       : null
     const prevCursor = filteredMessages.length > 0
       ? filteredMessages[0].id

@@ -20,8 +20,8 @@ export async function GET(request: Request) {
     }
 
     const { searchParams } = new URL(request.url)
-    const limit = Math.min(parseInt(searchParams.get("limit") || "20", 10), 50)
-    const offset = parseInt(searchParams.get("offset") || "0", 10)
+    const limit = Math.min(Number.parseInt(searchParams.get("limit") || "20", 10), 50)
+    const offset = Number.parseInt(searchParams.get("offset") || "0", 10)
     const valueId = searchParams.get("valueId")
 
     let query = `

@@ -3,7 +3,7 @@
 
 import "server-only"
 import { db } from "@/lib/database/pg-client"
-import crypto from "crypto"
+import crypto from "node:crypto"
 
 export interface VerificationSession {
   id: string

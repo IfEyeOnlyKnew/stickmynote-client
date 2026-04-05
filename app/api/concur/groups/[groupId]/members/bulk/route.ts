@@ -13,6 +13,31 @@ const LOG_PREFIX = "[ConcurBulkMembers]"
 // POST - Bulk import members from CSV data (owners only)
 // ============================================================================
 
+async function processBulkMember(
+  db: any, serviceDb: any, email: string, groupId: string, orgId: string, addedBy: string,
+  results: { added: number; skipped: number; notFound: string[]; errors: string[] },
+): Promise<void> {
+  try {
+    const { data: targetUser } = await serviceDb.from("users").select("id").eq("email", email).maybeSingle()
+    if (!targetUser) { results.notFound.push(email); return }
+
+    const { data: orgMember } = await db.from("organization_members").select("id").eq("org_id", orgId).eq("user_id", targetUser.id).maybeSingle()
+    if (!orgMember) { results.notFound.push(email); return }
+
+    const { data: existing } = await db.from("concur_group_members").select("id").eq("group_id", groupId).eq("user_id", targetUser.id).maybeSingle()
+    if (existing) { results.skipped++; return }
+
+    const { error: insertError } = await db.from("concur_group_members").insert({
+      group_id: groupId, user_id: targetUser.id, org_id: orgId, role: "member", added_by: addedBy,
+    })
+
+    if (insertError) { results.errors.push(`Failed to add ${email}: ${insertError.message}`) }
+    else { results.added++ }
+  } catch {
+    results.errors.push(`Error processing ${email}`)
+  }
+}
+
 export async function POST(request: Request, { params }: { params: Promise<{ groupId: string }> }) {
   try {
     const { groupId } = await params
@@ -36,7 +61,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ gro
       .eq("org_id", orgContext.orgId)
       .maybeSingle()
 
-    if (!membership || membership.role !== "owner") {
+    if (membership?.role !== "owner") {
       return NextResponse.json({ error: "Only group owners can bulk import members" }, { status: 403 })
     }
 
@@ -55,69 +80,12 @@ export async function POST(request: Request, { params }: { params: Promise<{ gro
 
     for (const entry of members) {
       const email = (entry.email || entry)?.toString().trim().toLowerCase()
-      if (!email || !email.includes("@")) {
+      if (!email?.includes("@")) {
         results.errors.push(`Invalid email: ${email}`)
         continue
       }
 
-      try {
-        // Lookup user
-        const { data: targetUser } = await serviceDb
-          .from("users")
-          .select("id")
-          .eq("email", email)
-          .maybeSingle()
-
-        if (!targetUser) {
-          results.notFound.push(email)
-          continue
-        }
-
-        // Check org membership
-        const { data: orgMember } = await db
-          .from("organization_members")
-          .select("id")
-          .eq("org_id", orgContext.orgId)
-          .eq("user_id", targetUser.id)
-          .maybeSingle()
-
-        if (!orgMember) {
-          results.notFound.push(email)
-          continue
-        }
-
-        // Check if already member
-        const { data: existing } = await db
-          .from("concur_group_members")
-          .select("id")
-          .eq("group_id", groupId)
-          .eq("user_id", targetUser.id)
-          .maybeSingle()
-
-        if (existing) {
-          results.skipped++
-          continue
-        }
-
-        // Add member
-        const { error: insertError } = await db
-          .from("concur_group_members")
-          .insert({
-            group_id: groupId,
-            user_id: targetUser.id,
-            org_id: orgContext.orgId,
-            role: "member",
-            added_by: user.id,
-          })
-
-        if (insertError) {
-          results.errors.push(`Failed to add ${email}: ${insertError.message}`)
-        } else {
-          results.added++
-        }
-      } catch (err) {
-        results.errors.push(`Error processing ${email}`)
-      }
+      await processBulkMember(db, serviceDb, email, groupId, orgContext.orgId, user.id, results)
     }
 
     return NextResponse.json({

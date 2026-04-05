@@ -34,7 +34,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Strip HTML from content for analysis
-    const plainContent = (content || "").replace(/<[^>]*>/g, "").slice(0, 2000)
+    const plainContent = (content || "").replaceAll(/<[^>]*>/g, "").slice(0, 2000)
     const textForAnalysis = `Title: ${title || "Untitled"}\n\nContent: ${plainContent}`
 
     // Get existing tags for context

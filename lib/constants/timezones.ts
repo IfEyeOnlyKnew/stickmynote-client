@@ -150,7 +150,7 @@ export function getTimezoneAbbreviation(timezone: string): string {
     return tzPart?.value || timezone.split("/").pop() || ""
   } catch {
     // Fallback: extract city name from IANA identifier
-    return timezone.split("/").pop()?.replace(/_/g, " ") || ""
+    return timezone.split("/").pop()?.replaceAll("_", " ") || ""
   }
 }
 

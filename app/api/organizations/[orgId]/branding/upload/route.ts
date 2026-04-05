@@ -1,12 +1,12 @@
 import { NextResponse } from "next/server"
 import { createServiceDatabaseClient } from "@/lib/database/database-adapter"
 import { getCachedAuthUser } from "@/lib/auth/cached-auth"
-import { writeFile, mkdir } from "fs/promises"
-import path from "path"
+import { writeFile, mkdir } from "node:fs/promises"
+import path from "node:path"
 import { getUploadDir } from "@/lib/storage/upload-path"
 
 const MAX_FILE_SIZE = 5 * 1024 * 1024 // 5MB
-const ALLOWED_TYPES = ["image/png", "image/jpeg", "image/jpg", "image/webp", "image/svg+xml"]
+const ALLOWED_TYPES = new Set(["image/png", "image/jpeg", "image/jpg", "image/webp", "image/svg+xml"])
 
 // Helper to save file locally
 async function saveFile(file: File, filename: string): Promise<string> {
@@ -14,7 +14,7 @@ async function saveFile(file: File, filename: string): Promise<string> {
   const uploadDir = path.join(getUploadDir(), "branding")
   await mkdir(uploadDir, { recursive: true })
 
-  const localFilename = filename.replace(/\//g, "-")
+  const localFilename = filename.replaceAll("/", "-")
   const filePath = path.join(uploadDir, localFilename)
 
   const arrayBuffer = await file.arrayBuffer()
@@ -75,13 +75,13 @@ export async function POST(req: Request, { params }: { params: Promise<{ orgId: 
       return NextResponse.json({ error: "File too large. Max 5MB" }, { status: 400 })
     }
 
-    if (!ALLOWED_TYPES.includes(file.type)) {
+    if (!ALLOWED_TYPES.has(file.type)) {
       return NextResponse.json({ error: "Invalid file type. Use PNG, JPG, WEBP, or SVG" }, { status: 400 })
     }
 
     // Generate unique filename
     const timestamp = Date.now()
-    const sanitizedName = file.name.replace(/[^a-zA-Z0-9._-]/g, "_")
+    const sanitizedName = file.name.replaceAll(/[^a-zA-Z0-9._-]/g, "_")
     const filename = `orgs/${orgId}/branding/${type || "logo"}-${timestamp}-${sanitizedName}`
 
     // Upload to storage (Vercel Blob or local)

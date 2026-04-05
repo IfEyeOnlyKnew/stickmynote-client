@@ -17,7 +17,6 @@ import {
   Search,
   Copy,
   Trash2,
-  Edit3,
   LayoutGrid,
   List,
   Code2,
@@ -69,9 +68,9 @@ export default function TemplatesPage() {
 
   const fetchTemplates = useCallback(async () => {
     try {
-      const url = filterCategory !== "all"
-        ? `/api/pad-templates?category=${filterCategory}`
-        : "/api/pad-templates"
+      const url = filterCategory === "all"
+        ? "/api/pad-templates"
+        : `/api/pad-templates?category=${filterCategory}`
       const res = await fetch(url)
       if (res.ok) {
         const data = await res.json()
@@ -96,7 +95,7 @@ export default function TemplatesPage() {
         const data = await res.json()
         toast({ title: "Project created from template" })
         if (data.padId) {
-          window.location.href = `/paks`
+          globalThis.location.href = `/paks`
         }
       } else {
         throw new Error("Failed")
@@ -208,7 +207,7 @@ export default function TemplatesPage() {
       </div>
 
       {/* Templates */}
-      {loading ? (
+      {loading && (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {[1, 2, 3, 4, 5, 6].map((i) => (
             <Card key={i} className="animate-pulse">
@@ -216,7 +215,8 @@ export default function TemplatesPage() {
             </Card>
           ))}
         </div>
-      ) : filtered.length === 0 ? (
+      )}
+      {!loading && filtered.length === 0 && (
         <Card>
           <CardContent className="pt-6 text-center text-muted-foreground py-12">
             <LayoutTemplate className="h-12 w-12 mx-auto text-muted-foreground/50 mb-2" />
@@ -224,7 +224,8 @@ export default function TemplatesPage() {
             <p className="text-sm mt-1">Create your first template to speed up project setup</p>
           </CardContent>
         </Card>
-      ) : viewMode === "grid" ? (
+      )}
+      {!loading && filtered.length > 0 && viewMode === "grid" && (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {filtered.map((template) => {
             const Icon = CATEGORY_ICONS[template.category] || LayoutTemplate
@@ -246,7 +247,7 @@ export default function TemplatesPage() {
                     <p className="text-sm text-muted-foreground line-clamp-2">{template.description}</p>
                   )}
                   <div className="text-xs text-muted-foreground">
-                    Used {template.use_count} time{template.use_count !== 1 ? "s" : ""}
+                    Used {template.use_count} time{template.use_count === 1 ? "" : "s"}
                   </div>
                   <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
                     <Button size="sm" onClick={() => handleUseTemplate(template.id)}>
@@ -262,7 +263,8 @@ export default function TemplatesPage() {
             )
           })}
         </div>
-      ) : (
+      )}
+      {!loading && filtered.length > 0 && viewMode !== "grid" && (
         <div className="space-y-2">
           {filtered.map((template) => {
             const Icon = CATEGORY_ICONS[template.category] || LayoutTemplate

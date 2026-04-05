@@ -5,16 +5,16 @@ import { Card, CardContent } from "@/components/ui/card"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { MessageCircle, Heart, Send, ChevronDown } from "lucide-react"
+import { MessageCircle, Send, ChevronDown } from "lucide-react"
 import { formatDistanceToNow } from "date-fns"
-import type { RecognitionFeedItem, KudosComment, RecognitionValue } from "@/types/recognition"
+import type { RecognitionFeedItem, KudosComment } from "@/types/recognition"
 import { KUDOS_REACTION_TYPES } from "@/types/recognition"
 
 interface RecognitionFeedProps {
   filterValueId?: string | null
 }
 
-export function RecognitionFeed({ filterValueId }: RecognitionFeedProps) {
+export function RecognitionFeed({ filterValueId }: Readonly<RecognitionFeedProps>) {
   const [feedItems, setFeedItems] = useState<RecognitionFeedItem[]>([])
   const [loading, setLoading] = useState(true)
   const [hasMore, setHasMore] = useState(true)

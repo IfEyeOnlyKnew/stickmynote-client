@@ -8,7 +8,6 @@ import { requireOptionalString } from '@/lib/api/validate'
 export async function POST(request: NextRequest) {
   try {
     const session = await requireADSession(request)
-    const userId = session.user.id
     const orgId = session.user.org_id
     const body = await request.json()
     const q = requireOptionalString(body.q) || ''

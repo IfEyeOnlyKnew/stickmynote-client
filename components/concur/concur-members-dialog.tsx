@@ -31,7 +31,7 @@ interface ConcurMembersDialogProps {
   onClose: () => void
 }
 
-export function ConcurMembersDialog({ groupId, onClose }: ConcurMembersDialogProps) {
+export function ConcurMembersDialog({ groupId, onClose }: Readonly<ConcurMembersDialogProps>) {
   const { toast } = useToast()
   const [members, setMembers] = useState<GroupMember[]>([])
   const [loading, setLoading] = useState(true)
@@ -129,7 +129,7 @@ export function ConcurMembersDialog({ groupId, onClose }: ConcurMembersDialogPro
       const csvMembers = lines
         .filter((line) => line.trim())
         .map((line) => {
-          const parts = line.split(",").map((p) => p.trim().replace(/(^["'])|(["']$)/g, ""))
+          const parts = line.split(",").map((p) => p.trim().replaceAll(/(^["'])|(["']$)/g, ""))
           return { email: parts[0] }
         })
         .filter((m) => m.email?.includes("@"))
@@ -234,13 +234,15 @@ export function ConcurMembersDialog({ groupId, onClose }: ConcurMembersDialogPro
 
         {/* Members List */}
         <div className="mt-4 space-y-2">
-          {loading ? (
+          {loading && (
             <div className="flex items-center justify-center py-8">
               <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
             </div>
-          ) : members.length === 0 ? (
+          )}
+          {!loading && members.length === 0 && (
             <p className="text-center text-sm text-muted-foreground py-8">No members yet</p>
-          ) : (
+          )}
+          {!loading && members.length > 0 && (
             members.map((member) => (
               <div
                 key={member.id}

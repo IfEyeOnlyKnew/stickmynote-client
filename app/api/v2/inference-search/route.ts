@@ -144,7 +144,7 @@ export async function GET(request: NextRequest) {
         [stickIds, orgContext.orgId]
       )
       replyCountMap = Object.fromEntries(
-        replyCountsResult.rows.map((r: any) => [r.social_stick_id, parseInt(r.count)])
+        replyCountsResult.rows.map((r: any) => [r.social_stick_id, Number.parseInt(r.count)])
       )
     }
 

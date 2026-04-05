@@ -31,7 +31,7 @@ export async function GET(request: NextRequest) {
     }
 
     const { searchParams } = new URL(request.url)
-    const limit = parseInt(searchParams.get("limit") || "10", 10)
+    const limit = Number.parseInt(searchParams.get("limit") || "10", 10)
 
     // Fetch completed sprints
     const { data: sprints, error } = await db
@@ -104,7 +104,7 @@ export async function GET(request: NextRequest) {
     }
 
     const velocityTrend: VelocityTrend = {
-      sprints: sprintVelocities.reverse(), // Return chronological order
+      sprints: sprintVelocities.toReversed(), // Return chronological order
       averageVelocity,
       trend,
     }

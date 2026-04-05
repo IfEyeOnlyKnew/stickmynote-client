@@ -43,7 +43,7 @@ function SSOErrorContent() {
 
           <div className="flex flex-col gap-2">
             <Button
-              onClick={() => window.location.href = "/auth/login"}
+              onClick={() => globalThis.location.href = "/auth/login"}
               className="w-full"
             >
               <RefreshCw className="h-4 w-4 mr-2" />
@@ -51,7 +51,7 @@ function SSOErrorContent() {
             </Button>
             <Button
               variant="outline"
-              onClick={() => window.location.href = "/auth/login"}
+              onClick={() => globalThis.location.href = "/auth/login"}
               className="w-full"
             >
               <ArrowLeft className="h-4 w-4 mr-2" />

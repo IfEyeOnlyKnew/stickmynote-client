@@ -14,7 +14,7 @@ interface OrgBrandedHeaderProps {
  * Header component that displays organization branding
  * Shows logo and/or display name based on org settings
  */
-export function OrgBrandedHeader({ className = "", showLogo = true, showName = true }: OrgBrandedHeaderProps) {
+export function OrgBrandedHeader({ className = "", showLogo = true, showName = true }: Readonly<OrgBrandedHeaderProps>) {
   const { currentOrg } = useOrganization()
 
   const logoUrl = getOrgLogo(currentOrg, false)

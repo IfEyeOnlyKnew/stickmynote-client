@@ -15,7 +15,7 @@ export async function GET(
   try {
     const { padId } = await params
     const { searchParams } = new URL(request.url)
-    const limit = parseInt(searchParams.get('limit') || '20', 10)
+    const limit = Number.parseInt(searchParams.get('limit') || '20', 10)
 
     const authResult = await getCachedAuthUser()
     if (authResult.rateLimited) {
@@ -27,8 +27,6 @@ export async function GET(
     if (!authResult.user) {
       return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401 })
     }
-    const user = authResult.user
-
     const orgContext = await getOrgContext()
     if (!orgContext) {
       return new Response(JSON.stringify({ error: 'No organization context' }), { status: 403 })

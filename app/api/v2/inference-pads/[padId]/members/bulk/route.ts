@@ -141,7 +141,7 @@ export async function POST(
         invited,
         skipped,
         errors: errors.length > 0 ? errors : undefined,
-        message: `Added ${added} existing user${added !== 1 ? 's' : ''}, invited ${invited} new user${invited !== 1 ? 's' : ''}${skipped > 0 ? `, ${skipped} skipped` : ''}`,
+        message: `Added ${added} existing user${added === 1 ? '' : 's'}, invited ${invited} new user${invited === 1 ? '' : 's'}` + (skipped > 0 ? `, ${skipped} skipped` : ''),
       }),
       { status: 200 }
     )

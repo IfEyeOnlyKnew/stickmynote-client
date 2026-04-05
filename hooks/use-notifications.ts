@@ -46,7 +46,7 @@ const ACTION_TYPE_MAP: Record<string, string> = {
   reaction_added: "reacted to your content",
 } as const
 
-const REPLY_ACTION_TYPES = ["replied", "stick_replied"]
+const REPLY_ACTION_TYPES = new Set(["replied", "stick_replied"])
 
 // ============================================================================
 // Helpers
@@ -59,7 +59,7 @@ function activityToNotification(activity: Activity): NotificationWithUser {
   return {
     id: activity.id,
     user_id: activity.user_id,
-    type: REPLY_ACTION_TYPES.includes(activity.action_type) ? "reply" : "pad_update",
+    type: REPLY_ACTION_TYPES.has(activity.action_type) ? "reply" : "pad_update",
     title: activity.triggered_by_user?.full_name || "Someone",
     message: `${actionLabel}${topicSuffix}`,
     related_id: activity.note_id,
@@ -196,6 +196,17 @@ export function useNotifications() {
     }
   }, [])
 
+  // Extracted to reduce function nesting depth
+  const markNotificationReadLocally = useCallback((notificationId: string) => {
+    setState((prev) => ({
+      ...prev,
+      notifications: prev.notifications.map((n) =>
+        n.id === notificationId ? { ...n, read: true } : n
+      ),
+      unreadCount: Math.max(0, prev.unreadCount - 1),
+    }))
+  }, [])
+
   // WebSocket subscription for real-time push
   const { connected: wsConnected, subscribe } = useWebSocket()
 
@@ -207,18 +218,12 @@ export function useNotifications() {
         fetchNotifications()
       }),
       subscribe("notification.read", (payload: { id: string }) => {
-        setState((prev) => ({
-          ...prev,
-          notifications: prev.notifications.map((n) =>
-            n.id === payload.id ? { ...n, read: true } : n
-          ),
-          unreadCount: Math.max(0, prev.unreadCount - 1),
-        }))
+        markNotificationReadLocally(payload.id)
       }),
     ]
 
     return () => unsubs.forEach((unsub) => unsub())
-  }, [wsConnected, subscribe, fetchNotifications])
+  }, [wsConnected, subscribe, fetchNotifications, markNotificationReadLocally])
 
   // Initial fetch
   useEffect(() => {

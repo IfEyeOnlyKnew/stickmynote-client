@@ -17,8 +17,6 @@ export async function GET(request: NextRequest) {
     if (!authResult.user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
-    const user = authResult.user
-
     // Get organization context for tenant isolation
     const orgContext = await getOrgContext()
     if (!orgContext) {
@@ -50,7 +48,7 @@ export async function GET(request: NextRequest) {
     if (contentType.startsWith("application/x-encrypted") && isEncryptionEnabled()) {
       fileData = await decryptFileForOrg(fileData, orgContext.orgId)
       // Extract original content type
-      const match = contentType.match(/original=([^;]+)/)
+      const match = /original=([^;]+)/.exec(contentType)
       finalContentType = match ? match[1] : "application/octet-stream"
     }
 

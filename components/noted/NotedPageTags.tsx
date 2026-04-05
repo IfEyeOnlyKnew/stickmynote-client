@@ -11,7 +11,7 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover"
 import { cn } from "@/lib/utils"
-import { useNotedTags, type NotedTag } from "@/hooks/useNotedTags"
+import { useNotedTags } from "@/hooks/useNotedTags"
 
 const TAG_COLORS = [
   "#6b7280", "#ef4444", "#f97316", "#eab308",
@@ -24,7 +24,7 @@ interface NotedPageTagsProps {
   content: string
 }
 
-export function NotedPageTags({ pageId, title, content }: NotedPageTagsProps) {
+export function NotedPageTags({ pageId, title, content }: Readonly<NotedPageTagsProps>) {
   const {
     allTags, pageTags, suggestions, suggesting,
     fetchAllTags, fetchPageTags, addTagToPage,

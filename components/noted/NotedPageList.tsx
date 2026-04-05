@@ -52,7 +52,7 @@ export function NotedPageList({
   loadingMore = false,
   onLoadMore,
   onNewPage,
-}: NotedPageListProps) {
+}: Readonly<NotedPageListProps>) {
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null)
   const sentinelRef = useRef<HTMLDivElement>(null)
 
@@ -76,7 +76,7 @@ export function NotedPageList({
 
   const stripHtml = (html: string) => {
     if (!html) return ""
-    return html.replace(/<[^>]*>/g, "").slice(0, 100)
+    return html.replaceAll(/<[^>]*>/g, "").slice(0, 100)
   }
 
   return (
@@ -119,7 +119,9 @@ export function NotedPageList({
             {pages.map((page) => (
               <div
                 key={page.id}
+                tabIndex={0}
                 onClick={() => onSelectPage(page)}
+                onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") onSelectPage(page) }}
                 className={cn(
                   "group flex items-start gap-2 p-3 rounded-lg cursor-pointer transition-colors",
                   selectedPageId === page.id

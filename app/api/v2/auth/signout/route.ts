@@ -1,14 +1,13 @@
 // v2 Auth Signout API: production-quality, clear session
 import { type NextRequest } from 'next/server'
 import { cookies } from 'next/headers'
-import { handleApiError } from '@/lib/api/handle-api-error'
 
 export const dynamic = 'force-dynamic'
 
 // POST /api/v2/auth/signout - Clear user session
 export async function POST(_request: NextRequest) {
   try {
-    const cookieStore = await cookies()
+    const cookieStore = cookies()
 
     // Clear the JWT session cookie
     cookieStore.delete('jwt_session')

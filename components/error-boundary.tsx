@@ -30,7 +30,7 @@ export class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoun
     console.error("Error caught by ErrorBoundary:", error, errorInfo)
     
     // Try to log to our error_logs API endpoint
-    if (typeof window !== "undefined" && process.env.NODE_ENV === "production") {
+    if (typeof globalThis.window !== "undefined" && process.env.NODE_ENV === "production") {
       try {
         fetch("/api/log-error", {
           method: "POST",
@@ -40,7 +40,7 @@ export class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoun
             error_stack: error.stack,
             component_stack: errorInfo.componentStack,
             error_type: "react_error_boundary",
-            url: window.location.href,
+            url: globalThis.location.href,
           }),
         }).catch(() => {
           // Silently fail if error logging fails
@@ -78,7 +78,7 @@ export class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoun
               <Button
                 variant="outline"
                 onClick={() => {
-                  window.location.href = "/"
+                  globalThis.location.href = "/"
                 }}
               >
                 Go home

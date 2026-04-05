@@ -5,7 +5,7 @@ export const metadata = {
   description: "Browse and discover shared community sticks",
 }
 
-export default function PanelLayout({ children }: { children: React.ReactNode }) {
+export default function PanelLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
     <div className="flex h-screen overflow-hidden">
       <PanelSidebar />

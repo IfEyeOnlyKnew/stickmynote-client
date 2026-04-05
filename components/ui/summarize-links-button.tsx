@@ -21,7 +21,7 @@ export function SummarizeLinksButton({
   size = "sm",
   variant = "outline",
   showIcon = true,
-}: SummarizeLinksButtonProps) {
+}: Readonly<SummarizeLinksButtonProps>) {
   return (
     <Button
       variant={variant}

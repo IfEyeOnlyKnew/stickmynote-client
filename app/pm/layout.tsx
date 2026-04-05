@@ -5,7 +5,7 @@ export const metadata = {
   description: "Timesheets, invoices, budget, portfolio, goals, templates, and forms",
 }
 
-export default function PMLayout({ children }: { children: React.ReactNode }) {
+export default function PMLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
     <div className="flex h-screen overflow-hidden">
       <PMSidebar />

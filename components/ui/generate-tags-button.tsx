@@ -21,7 +21,7 @@ export function GenerateTagsButton({
   size = "sm",
   variant = "outline",
   showIcon = true,
-}: GenerateTagsButtonProps) {
+}: Readonly<GenerateTagsButtonProps>) {
   return (
     <Button
       variant={variant}

@@ -16,7 +16,7 @@ interface SignUpFormProps {
   isLoading: boolean
 }
 
-export function SignUpForm({ onSubmit, onSuccess, isLoading }: SignUpFormProps) {
+export function SignUpForm({ onSubmit, onSuccess, isLoading }: Readonly<SignUpFormProps>) {
   const [formData, setFormData] = useState<SignUpData>({
     email: "",
     password: "",

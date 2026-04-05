@@ -164,7 +164,7 @@ export async function GET(request: NextRequest) {
 
     // Sort by created_at descending and limit to 50
     const sortedNotifications = notifications
-      .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+      .toSorted((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
       .slice(0, 50)
 
     return new Response(JSON.stringify({ notifications: sortedNotifications }), { status: 200 })

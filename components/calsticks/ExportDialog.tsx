@@ -246,9 +246,7 @@ export function ExportDialog({ open, onClose, calsticks, selectedPad }: ExportDi
       </html>
     `
 
-    printWindow.document.open()
-    printWindow.document.write(html) // Using document.write for print window content - standard pattern for popup printing
-    printWindow.document.close()
+    printWindow.document.documentElement.innerHTML = html
     setTimeout(() => {
       printWindow.print()
     }, 250)

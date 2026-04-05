@@ -23,7 +23,7 @@ export async function POST(request: NextRequest) {
 
     const { code } = await request.json()
 
-    if (!code || code.length !== 6) {
+    if (code?.length !== 6) {
       return NextResponse.json({ error: "Invalid code format" }, { status: 400 })
     }
 

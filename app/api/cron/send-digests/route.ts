@@ -219,7 +219,10 @@ export async function GET(request: Request) {
 
       try {
         const status = await processUserDigest(db, pref, now)
-        results[status === "sent" ? "sent" : status === "error" ? "errors" : "skipped"]++
+        let resultKey: "sent" | "errors" | "skipped" = "skipped"
+        if (status === "sent") resultKey = "sent"
+        else if (status === "error") resultKey = "errors"
+        results[resultKey]++
       } catch {
         results.errors++
       }

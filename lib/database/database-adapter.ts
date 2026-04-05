@@ -72,7 +72,7 @@ export interface AuthClient {
 
 // PostgreSQL Query Builder Implementation
 class PostgreSQLQueryBuilder implements QueryBuilder {
-  private table: string
+  private readonly table: string
   private selectColumns = "*"
   private selectCalled = false
   private selectOptions: SelectOptions = {}
@@ -313,7 +313,7 @@ class PostgreSQLQueryBuilder implements QueryBuilder {
       this.whereValues = [...values, ...this.whereValues]
       // Adjust paramIndex for WHERE clause
       this.whereConditions = this.whereConditions.map((cond) => {
-        return cond.replace(/\$(\d+)/g, (_, num) => `$${Number.parseInt(num) + values.length}`)
+        return cond.replaceAll(/\$(\d+)/g, (_, num) => `$${Number.parseInt(num) + values.length}`)
       })
     } else if (this.isDelete) {
       query = `DELETE FROM ${this.table}`
@@ -365,7 +365,7 @@ class PostgreSQLQueryBuilder implements QueryBuilder {
       if (this.selectOptions.count === "exact") {
         const countQuery = this.buildCountQuery()
         const countResult = await pgClient.query(countQuery, this.whereValues)
-        count = parseInt(countResult.rows[0]?.count || "0", 10)
+        count = Number.parseInt(countResult.rows[0]?.count || "0", 10)
       }
 
       return {
@@ -388,7 +388,7 @@ class PostgreSQLQueryBuilder implements QueryBuilder {
       if (this.selectOptions.count === "exact") {
         const countQuery = this.buildCountQuery()
         const countResult = await pgClient.query(countQuery, this.whereValues)
-        count = parseInt(countResult.rows[0]?.count || "0", 10)
+        count = Number.parseInt(countResult.rows[0]?.count || "0", 10)
       }
 
       return { data: result.rows[0] || null, error: null, count }
@@ -404,7 +404,7 @@ class PostgreSQLQueryBuilder implements QueryBuilder {
       if (this.selectOptions.count === "exact") {
         const countQuery = this.buildCountQuery()
         const countResult = await pgClient.query(countQuery, this.whereValues)
-        count = parseInt(countResult.rows[0]?.count || "0", 10)
+        count = Number.parseInt(countResult.rows[0]?.count || "0", 10)
       }
 
       // If head: true, don't fetch actual data

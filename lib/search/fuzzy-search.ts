@@ -10,7 +10,7 @@ export interface SearchResult<T> {
 
 export class FuzzySearch<T extends Record<string, any>> {
   private items: T[]
-  private searchFields: (keyof T)[]
+  private readonly searchFields: (keyof T)[]
 
   constructor(items: T[], searchFields: (keyof T)[]) {
     this.items = items

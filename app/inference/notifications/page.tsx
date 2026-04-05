@@ -148,11 +148,11 @@ export default function InferenceNotificationsPage() {
           <div>
             <h1 className="text-4xl font-bold text-gray-900 mb-2">Inference Notifications</h1>
             <p className="text-gray-600">
-              {loading
-                ? "Loading notifications..."
-                : unreadCount > 0
-                  ? `You have ${unreadCount} unread notification${pluralSuffix}`
-                  : "You're all caught up!"}
+              {(() => {
+                if (loading) return "Loading notifications..."
+                if (unreadCount > 0) return `You have ${unreadCount} unread notification${pluralSuffix}`
+                return "You're all caught up!"
+              })()}
             </p>
           </div>
           <div className="flex gap-2">

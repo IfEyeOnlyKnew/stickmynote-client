@@ -32,20 +32,25 @@ export function useNotesState(): UseNotesStateReturn {
   const [generatingTags, setGeneratingTags] = useState<string | null>(null)
   const [highestZIndex, setHighestZIndex] = useState(1)
 
+  const expireDeletedNote = useCallback(
+    (noteId: string) => {
+      setDeletedNotes((prev) => prev.filter((n) => n.id !== noteId))
+      setShowUndoBar((current) => {
+        const remaining = deletedNotes.filter((n) => n.id !== noteId)
+        return remaining.length > 0
+      })
+    },
+    [deletedNotes],
+  )
+
   const addToDeletedNotes = useCallback(
     (note: Note) => {
       setDeletedNotes((prev) => [...prev, note])
       setShowUndoBar(true)
 
-      setTimeout(() => {
-        setDeletedNotes((prev) => prev.filter((n) => n.id !== note.id))
-        setShowUndoBar((current) => {
-          const remaining = deletedNotes.filter((n) => n.id !== note.id)
-          return remaining.length > 0
-        })
-      }, 10000)
+      setTimeout(() => expireDeletedNote(note.id), 10000)
     },
-    [deletedNotes],
+    [expireDeletedNote],
   )
 
   const handleUndoDelete = useCallback(() => {

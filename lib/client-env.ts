@@ -13,7 +13,7 @@ export const isProduction = typeof process !== "undefined" && process.env.NODE_E
 
 // Get public environment variables safely
 export function getPublicEnv(key: string): string | undefined {
-  if (typeof window === "undefined") {
+  if (typeof globalThis.window === "undefined") {
     // Server-side
     return process.env[key]
   }

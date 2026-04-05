@@ -159,7 +159,9 @@ export const UnifiedNotePanel: React.FC = () => {
           <div className="mb-3 mt-3">
             <div className="flex flex-wrap gap-1">
               {note.hyperlinks.map((link, idx) => {
-                const linkUrl = typeof link === "string" ? link : typeof link?.url === "string" ? link.url : ""
+                let linkUrl = ""
+                if (typeof link === "string") linkUrl = link
+                else if (typeof link?.url === "string") linkUrl = link.url
 
                 let linkTitle = ""
                 if (typeof link === "string") {
@@ -170,7 +172,7 @@ export const UnifiedNotePanel: React.FC = () => {
                   } else if (typeof link.url === "string") {
                     linkTitle = link.url
                   } else {
-                    linkTitle = String(link.title || link.url || "Link")
+                    linkTitle = String(link.title ?? link.url ?? "Link")
                   }
                 }
 

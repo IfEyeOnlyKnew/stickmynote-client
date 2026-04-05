@@ -6,7 +6,7 @@ import { ChannelSidebar } from "@/components/channels/ChannelSidebar"
 import { CreateChannelModal } from "@/components/channels/CreateChannelModal"
 import { Loader2 } from "lucide-react"
 
-export default function ChannelsLayout({ children }: { children: React.ReactNode }) {
+export default function ChannelsLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   const { user, loading } = useUser()
   const [createChannelOpen, setCreateChannelOpen] = useState(false)
   const [refreshKey, setRefreshKey] = useState(0)

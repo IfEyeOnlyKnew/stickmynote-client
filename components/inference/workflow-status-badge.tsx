@@ -26,7 +26,7 @@ export function WorkflowStatusBadge({
   size = "default",
   showIcon = true,
   className,
-}: WorkflowStatusBadgeProps) {
+}: Readonly<WorkflowStatusBadgeProps>) {
   const config = WORKFLOW_STATUSES[status]
 
   return (

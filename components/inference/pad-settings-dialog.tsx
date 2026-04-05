@@ -32,7 +32,7 @@ interface PadSettingsDialogProps {
   onUpdate: () => void
 }
 
-export function PadSettingsDialog({ open, onOpenChange, pad, currentUserId, onUpdate }: PadSettingsDialogProps) {
+export function PadSettingsDialog({ open, onOpenChange, pad, currentUserId, onUpdate }: Readonly<PadSettingsDialogProps>) {
   const [name, setName] = useState(pad.name)
   const [description, setDescription] = useState(pad.description || "")
   const [isPublic, setIsPublic] = useState(pad.is_public)

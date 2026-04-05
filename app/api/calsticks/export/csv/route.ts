@@ -102,9 +102,9 @@ export async function GET() {
     tasksWithData.forEach((task: any) => {
       const row = [
         task.id,
-        `"${(task.stick?.topic || "").replace(/"/g, '""')}"`,
-        `"${(task.content || "").replace(/"/g, '""')}"`,
-        `"${(task.stick?.pad?.name || "").replace(/"/g, '""')}"`,
+        `"${(task.stick?.topic || "").replaceAll('"', '""')}"`,
+        `"${(task.content || "").replaceAll('"', '""')}"`,
+        `"${(task.stick?.pad?.name || "").replaceAll('"', '""')}"`,
         task.calstick_status || "todo",
         task.calstick_priority || "none",
         task.calstick_date ? new Date(task.calstick_date).toLocaleDateString() : "",

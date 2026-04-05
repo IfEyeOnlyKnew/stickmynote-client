@@ -303,7 +303,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
         return createRateLimitResponse()
       }
 
-      if (!user || user.id !== note.user_id) {
+      if (user?.id !== note.user_id) {
         return Errors.accessDeniedPrivate()
       }
     }
@@ -513,7 +513,7 @@ export async function DELETE(request: NextRequest) {
         .eq("id", existingReply.personal_stick_id)
         .maybeSingle()
 
-      if (!note || note.user_id !== user.id || note.org_id !== orgContext.orgId) {
+      if (note?.user_id !== user.id || note?.org_id !== orgContext.orgId) {
         return Errors.cannotDeleteOther()
       }
     }

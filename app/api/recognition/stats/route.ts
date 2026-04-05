@@ -66,12 +66,12 @@ export async function GET() {
     const settings = await getRecognitionSettings(orgId)
 
     return NextResponse.json({
-      kudos_received: parseInt(receivedResult.rows[0]?.cnt || "0", 10),
-      total_points: parseInt(receivedResult.rows[0]?.points || "0", 10),
-      kudos_given: parseInt(givenResult.rows[0]?.cnt || "0", 10),
-      badges_earned: parseInt(badgeResult.rows[0]?.cnt || "0", 10),
+      kudos_received: Number.parseInt(receivedResult.rows[0]?.cnt || "0", 10),
+      total_points: Number.parseInt(receivedResult.rows[0]?.points || "0", 10),
+      kudos_given: Number.parseInt(givenResult.rows[0]?.cnt || "0", 10),
+      badges_earned: Number.parseInt(badgeResult.rows[0]?.cnt || "0", 10),
       streaks,
-      today_given: parseInt(todayResult.rows[0]?.cnt || "0", 10),
+      today_given: Number.parseInt(todayResult.rows[0]?.cnt || "0", 10),
       daily_limit: settings.max_kudos_per_day,
     })
   } catch (error) {

@@ -3,7 +3,7 @@
 import { useMemo, useState, useCallback, useRef, useEffect } from "react"
 import { Gantt, type Task, ViewMode } from "gantt-task-react"
 import "gantt-task-react/dist/index.css"
-import { parseISO, addDays, format, differenceInDays, eachDayOfInterval, isToday } from "date-fns"
+import { parseISO, addDays, format, differenceInDays, eachDayOfInterval } from "date-fns"
 import { useToast } from "@/hooks/use-toast"
 import { Button } from "@/components/ui/button"
 import {
@@ -399,7 +399,7 @@ function calculateBaselineVariance(calsticks: CalStick[]): BaselineVariance[] {
 }
 
 // Custom tooltip for Gantt tasks - shows task details on hover
-function GanttTooltipContent({ task, calsticks: csData }: { task: Task; fontSize?: string; fontFamily?: string; calsticks: CalStick[] }) {
+function GanttTooltipContent({ task, calsticks: csData }: Readonly<{ task: Task; calsticks: CalStick[] }>) {
   const cs = csData.find((c) => c.id === task.id)
   if (!cs) return null
 
@@ -419,10 +419,12 @@ function GanttTooltipContent({ task, calsticks: csData }: { task: Task; fontSize
         {cs.calstick_priority && cs.calstick_priority !== "none" && (
           <Badge
             className={`text-xs ${
-              cs.calstick_priority === "urgent" ? "bg-red-500" :
-              cs.calstick_priority === "high" ? "bg-orange-500" :
-              cs.calstick_priority === "medium" ? "bg-yellow-500 text-black" :
-              "bg-gray-400"
+              (() => {
+                if (cs.calstick_priority === "urgent") return "bg-red-500"
+                if (cs.calstick_priority === "high") return "bg-orange-500"
+                if (cs.calstick_priority === "medium") return "bg-yellow-500 text-black"
+                return "bg-gray-400"
+              })()
             }`}
           >
             {cs.calstick_priority}
@@ -498,7 +500,9 @@ export default function GanttChart({ calsticks, dependencies = [], onTaskChange,
         const startDate = getCalstickStartDate(cs)
         const isMilestone = cs.calstick_is_milestone === true
 
-        const estimatedDays = isMilestone ? 0 : (cs.calstick_estimated_hours ? Math.max(1, Math.ceil(cs.calstick_estimated_hours / 8)) : 1)
+        let estimatedDays = 1
+        if (isMilestone) estimatedDays = 0
+        else if (cs.calstick_estimated_hours) estimatedDays = Math.max(1, Math.ceil(cs.calstick_estimated_hours / 8))
         const endDate = isMilestone ? startDate : addDays(startDate, estimatedDays)
 
         const pending = pendingUpdates.get(cs.id)
@@ -872,7 +876,7 @@ export default function GanttChart({ calsticks, dependencies = [], onTaskChange,
                       setViewMode(ZOOM_MODES[currentIndex + 1])
                     }
                   }}
-                  disabled={viewMode === ZOOM_MODES[ZOOM_MODES.length - 1] || showTableView}
+                  disabled={viewMode === ZOOM_MODES.at(-1) || showTableView}
                   aria-label="Zoom out"
                 >
                   <ZoomOut className="h-4 w-4" />
@@ -1311,7 +1315,7 @@ export default function GanttChart({ calsticks, dependencies = [], onTaskChange,
               columnWidth={getColumnWidth(viewMode)}
               todayColor="rgba(252, 211, 77, 0.4)"
               onDateChange={onTaskChange ? handleTaskChange : undefined}
-              TooltipContent={(props: { task: Task; fontSize: string; fontFamily: string }) => (
+              TooltipContent={(props: { task: Task }) => (
                 <GanttTooltipContent task={props.task} calsticks={calsticks} />
               )}
             />

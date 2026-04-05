@@ -84,7 +84,7 @@ export function MobileStickCard({
   onView,
   onPromoteReply,
   onNavigateToCalstick,
-}: MobileStickCardProps) {
+}: Readonly<MobileStickCardProps>) {
   const router = useRouter()
   const [chatModalOpen, setChatModalOpen] = useState(false)
   const [viewMode, setViewMode] = useState<'grouped' | 'timeline'>('grouped')
@@ -100,9 +100,9 @@ export function MobileStickCard({
   }
 
   // Filter replies by selected category
-  const filteredReplies = !selectedCategory
-    ? replies
-    : replies.filter(r => (r.category || "Default") === selectedCategory)
+  const filteredReplies = selectedCategory
+    ? replies.filter(r => (r.category || "Default") === selectedCategory)
+    : replies
 
   // Group replies by category
   const groupedReplies = new Map<string, Reply[]>()
@@ -161,7 +161,7 @@ export function MobileStickCard({
       <Card className="w-full max-w-full min-w-0 overflow-hidden">
         <CardContent className="p-4 space-y-3">
           {/* Header: Checkbox, Color bar, Topic, Expand */}
-          <div className="flex items-start gap-2" onClick={handleCardClick}>
+          <div className="flex items-start gap-2" tabIndex={0} onClick={handleCardClick} onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") handleCardClick?.(e as unknown as React.MouseEvent) }}>
             {onSelect && (
               <div onClick={(e) => e.stopPropagation()}>
                 <Checkbox
@@ -378,7 +378,7 @@ export function MobileStickCard({
                       const milestone = getMilestone(reply, index)
                       const replyDate = new Date(reply.created_at)
                       const prevDate = index > 0 ? new Date(timelineSortedReplies[index - 1].created_at) : null
-                      const showDateHeader = !prevDate || replyDate.toDateString() !== prevDate.toDateString()
+                      const showDateHeader = replyDate.toDateString() !== prevDate?.toDateString()
 
                       return (
                         <div key={reply.id}>

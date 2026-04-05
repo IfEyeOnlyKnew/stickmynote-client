@@ -1275,14 +1275,12 @@ body.fullscreen-modal-open .fixed:not([style*="z-index: 2147483647"]) {
 
 /* Avatar with Ring Effect */
 .panel-avatar-ring {
-  ring: 2px;
-  ring-color: rgba(102, 126, 234, 0.3);
-  ring-offset: 2px;
+  box-shadow: 0 0 0 2px rgba(102, 126, 234, 0.3), 0 0 0 4px white;
   transition: all 0.3s ease;
 }
 
 .panel-avatar-ring:hover {
-  ring-color: rgba(102, 126, 234, 0.6);
+  box-shadow: 0 0 0 2px rgba(102, 126, 234, 0.6), 0 0 0 4px white;
   transform: scale(1.05);
 }
 

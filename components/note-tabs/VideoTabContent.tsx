@@ -25,14 +25,14 @@ export function VideoTabContent({
   onVideoUrlChange,
   onAddVideo,
   onDeleteVideo,
-}: VideoTabContentProps) {
+}: Readonly<VideoTabContentProps>) {
   const normalizedVideos = videos.map((video) => {
     const normalized = normalizeVideoData(video)
     return normalized
   })
 
   const filteredVideos = normalizedVideos.filter((video): video is NonNullable<typeof video> => {
-    const isValid = video !== null && video.platform !== undefined && video.embed_id !== undefined
+    const isValid = video?.platform !== undefined && video?.embed_id !== undefined
     return isValid
   })
 

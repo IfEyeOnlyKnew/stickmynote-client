@@ -117,7 +117,7 @@ export function useUserStatus() {
   // Custom message
   const setCustomMessage = useCallback(
     (message: string, expiresInMinutes?: number) => {
-      const expiresAt = expiresInMinutes !== undefined ? calculateExpiration(expiresInMinutes) : null
+      const expiresAt = expiresInMinutes === undefined ? null : calculateExpiration(expiresInMinutes)
       return updateStatus({
         custom_message: message,
         custom_message_expires_at: expiresAt,
@@ -168,7 +168,7 @@ export function useUserStatus() {
       if (message !== undefined) {
         updates.custom_message = message || null
         updates.custom_message_expires_at =
-          messageExpiresInMinutes !== undefined ? calculateExpiration(messageExpiresInMinutes) : null
+          messageExpiresInMinutes === undefined ? null : calculateExpiration(messageExpiresInMinutes)
       }
 
       if (focusMode !== undefined) {

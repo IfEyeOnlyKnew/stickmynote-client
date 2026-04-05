@@ -9,8 +9,8 @@ interface CacheItem<T> {
 }
 
 class Cache {
-  private cache = new Map<string, CacheItem<any>>()
-  private maxSize = 1000
+  private readonly cache = new Map<string, CacheItem<any>>()
+  private readonly maxSize = 1000
   private cleanupInterval: NodeJS.Timeout | null = null
 
   constructor() {
@@ -120,7 +120,7 @@ class Cache {
    */
   invalidatePattern(pattern: string): number {
     let deletedCount = 0
-    const regex = new RegExp(pattern.replace(/\*/g, ".*"))
+    const regex = new RegExp(pattern.replaceAll("*", ".*"))
 
     for (const key of this.cache.keys()) {
       if (regex.test(key)) {
@@ -188,7 +188,7 @@ class Cache {
    * Get all keys matching a pattern
    */
   getKeysByPattern(pattern: string): string[] {
-    const regex = new RegExp(pattern.replace(/\*/g, ".*"))
+    const regex = new RegExp(pattern.replaceAll("*", ".*"))
     return Array.from(this.cache.keys()).filter((key) => regex.test(key))
   }
 

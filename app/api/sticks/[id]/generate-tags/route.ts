@@ -83,14 +83,12 @@ function generateSearchQueries(topic: string, content: string): string[] {
   const queries: string[] = []
 
   // Use topic as primary search query
-  if (topic && topic.trim()) {
-    queries.push(topic.trim())
-    queries.push(`${topic.trim()} tutorial`)
-    queries.push(`${topic.trim()} guide`)
+  if (topic?.trim()) {
+    queries.push(topic.trim(), `${topic.trim()} tutorial`, `${topic.trim()} guide`)
   }
 
   // Extract key phrases from content (first 100 chars)
-  if (content && content.trim()) {
+  if (content?.trim()) {
     const contentPreview = content.trim().substring(0, 100)
     // Get first sentence or phrase
     const firstPhrase = contentPreview.split(/[.!?]/)[0]?.trim()

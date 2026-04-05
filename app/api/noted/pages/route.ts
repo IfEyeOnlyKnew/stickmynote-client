@@ -5,6 +5,51 @@ import { getOrgContext } from "@/lib/auth/get-org-context"
 import { applyRateLimit } from "@/lib/rate-limiter-enhanced"
 import { db as pgClient } from "@/lib/database/pg-client"
 
+interface NotedPageOptions {
+  userId: string
+  orgId: string
+  title?: string
+  content?: string
+  groupId?: string
+  sourceContent?: string
+}
+
+async function createNotedPageFromStick(
+  db: any, stickId: string, opts: NotedPageOptions,
+): Promise<NextResponse> {
+  const { userId, orgId, title, content, groupId, sourceContent } = opts
+  const { data: existing } = await db.from("noted_pages").select("id").eq("stick_id", stickId).maybeSingle()
+  if (existing) return NextResponse.json({ data: existing, existing: true })
+
+  const { data: stick } = await db.from("paks_pad_sticks")
+    .select("id, topic, content, pad_id, user_id, org_id").eq("id", stickId).eq("org_id", orgId).maybeSingle()
+  if (!stick) return NextResponse.json({ error: "Stick not found" }, { status: 404 })
+
+  const result = await pgClient.query(
+    `INSERT INTO noted_pages (stick_id, user_id, org_id, title, content, group_id, is_personal, source_content) VALUES ($1, $2, $3, $4, $5, $6, false, $7) RETURNING *`,
+    [stickId, userId, orgId, title || stick.topic || "Untitled", content || stick.content || "", groupId || null, sourceContent || stick.content || ""],
+  )
+  return NextResponse.json({ data: result.rows[0] }, { status: 201 })
+}
+
+async function createNotedPageFromPersonalStick(
+  db: any, personalStickId: string, opts: NotedPageOptions,
+): Promise<NextResponse> {
+  const { userId, orgId, title, content, groupId, sourceContent } = opts
+  const { data: existing } = await db.from("noted_pages").select("id").eq("personal_stick_id", personalStickId).maybeSingle()
+  if (existing) return NextResponse.json({ data: existing, existing: true })
+
+  const { data: pStick } = await db.from("personal_sticks")
+    .select("id, topic, content, user_id").eq("id", personalStickId).eq("user_id", userId).maybeSingle()
+  if (!pStick) return NextResponse.json({ error: "Personal stick not found" }, { status: 404 })
+
+  const result = await pgClient.query(
+    `INSERT INTO noted_pages (personal_stick_id, user_id, org_id, title, content, group_id, is_personal, source_content) VALUES ($1, $2, $3, $4, $5, $6, true, $7) RETURNING *`,
+    [personalStickId, userId, orgId, title || pStick.topic || "Untitled", content || pStick.content || "", groupId || null, sourceContent || pStick.content || ""],
+  )
+  return NextResponse.json({ data: result.rows[0] }, { status: 201 })
+}
+
 async function safeRateLimit(request: NextRequest, userId: string, action: string) {
   try {
     const res = await applyRateLimit(request, userId, action)
@@ -26,8 +71,8 @@ export async function GET(request: NextRequest) {
 
     const groupId = request.nextUrl.searchParams.get("group_id")
     const search = request.nextUrl.searchParams.get("search")
-    const limit = Math.min(parseInt(request.nextUrl.searchParams.get("limit") || "30", 10), 100)
-    const offset = Math.max(parseInt(request.nextUrl.searchParams.get("offset") || "0", 10), 0)
+    const limit = Math.min(Number.parseInt(request.nextUrl.searchParams.get("limit") || "30", 10), 100)
+    const offset = Math.max(Number.parseInt(request.nextUrl.searchParams.get("offset") || "0", 10), 0)
 
     // Permission-aware query: personal pages only for creator,
     // shared pad pages only for pad members
@@ -108,7 +153,7 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json()
-    const { stick_id, personal_stick_id, title, content, group_id, is_personal, source_content } = body
+    const { stick_id, personal_stick_id, title, content, group_id, source_content } = body
 
     // Allow standalone page creation (from template or blank)
     if (!stick_id && !personal_stick_id) {
@@ -123,87 +168,14 @@ export async function POST(request: NextRequest) {
 
     const db = await createServiceDatabaseClient()
 
-    // Check if a Noted page already exists for this stick
+    const pageOpts: NotedPageOptions = { userId: user.id, orgId: orgContext.orgId, title, content, groupId: group_id, sourceContent: source_content }
+
     if (stick_id) {
-      const { data: existing } = await db
-        .from("noted_pages")
-        .select("id")
-        .eq("stick_id", stick_id)
-        .maybeSingle()
-
-      if (existing) {
-        return NextResponse.json({ data: existing, existing: true })
-      }
-
-      // Verify user has access to the stick
-      const { data: stick } = await db
-        .from("paks_pad_sticks")
-        .select("id, topic, content, pad_id, user_id, org_id")
-        .eq("id", stick_id)
-        .eq("org_id", orgContext.orgId)
-        .maybeSingle()
-
-      if (!stick) {
-        return NextResponse.json({ error: "Stick not found" }, { status: 404 })
-      }
-
-      const result = await pgClient.query(
-        `INSERT INTO noted_pages (stick_id, user_id, org_id, title, content, group_id, is_personal, source_content)
-         VALUES ($1, $2, $3, $4, $5, $6, false, $7)
-         RETURNING *`,
-        [
-          stick_id,
-          user.id,
-          orgContext.orgId,
-          title || stick.topic || "Untitled",
-          content || stick.content || "",
-          group_id || null,
-          source_content || stick.content || "",
-        ]
-      )
-
-      return NextResponse.json({ data: result.rows[0] }, { status: 201 })
+      return createNotedPageFromStick(db, stick_id, pageOpts)
     }
 
     if (personal_stick_id) {
-      const { data: existing } = await db
-        .from("noted_pages")
-        .select("id")
-        .eq("personal_stick_id", personal_stick_id)
-        .maybeSingle()
-
-      if (existing) {
-        return NextResponse.json({ data: existing, existing: true })
-      }
-
-      // Verify user owns the personal stick
-      const { data: pStick } = await db
-        .from("personal_sticks")
-        .select("id, topic, content, user_id")
-        .eq("id", personal_stick_id)
-        .eq("user_id", user.id)
-        .maybeSingle()
-
-      if (!pStick) {
-        return NextResponse.json({ error: "Personal stick not found" }, { status: 404 })
-      }
-
-      const result = await pgClient.query(
-        `INSERT INTO noted_pages (personal_stick_id, user_id, org_id, title, content, group_id, is_personal, source_content)
-         VALUES ($1, $2, $3, $4, $5, $6, true, $7)
-         RETURNING *`,
-        [
-          personal_stick_id,
-          user.id,
-          orgContext.orgId,
-          title || pStick.topic || "Untitled",
-          content || pStick.content || "",
-          group_id || null,
-          source_content || pStick.content || "",
-        ]
-      )
-
-      return NextResponse.json({ data: result.rows[0] }, { status: 201 })
+      return createNotedPageFromPersonalStick(db, personal_stick_id, pageOpts)
     }
 
     return NextResponse.json({ error: "Invalid request" }, { status: 400 })

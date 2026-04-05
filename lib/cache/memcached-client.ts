@@ -8,7 +8,7 @@ import memjs from "memjs"
  */
 class MemcachedCache {
   private client: memjs.Client | null = null
-  private fallbackMap = new Map<string, { value: string; expiresAt: number | null }>()
+  private readonly fallbackMap = new Map<string, { value: string; expiresAt: number | null }>()
   private isAvailable = false
 
   constructor() {

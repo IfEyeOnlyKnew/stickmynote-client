@@ -48,7 +48,7 @@ export function NotificationBell() {
                     <span className="text-sm font-medium">Focus Mode is on</span>
                   </div>
                   <p className="text-xs text-red-600 dark:text-red-400 mt-0.5">
-                    Notification badges are hidden. You have {totalCount} notification{totalCount !== 1 ? "s" : ""}.
+                    Notification badges are hidden. You have {totalCount} notification{totalCount === 1 ? "" : "s"}.
                   </p>
                 </div>
                 <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">

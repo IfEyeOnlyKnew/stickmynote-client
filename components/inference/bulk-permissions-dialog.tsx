@@ -26,7 +26,7 @@ interface BulkPermissionsDialogProps {
   onComplete: () => void
 }
 
-export function BulkPermissionsDialog({ open, onOpenChange, members, padId, onComplete }: BulkPermissionsDialogProps) {
+export function BulkPermissionsDialog({ open, onOpenChange, members, padId, onComplete }: Readonly<BulkPermissionsDialogProps>) {
   const [selectedMembers, setSelectedMembers] = useState<Set<string>>(new Set())
   const [permissions, setPermissions] = useState<MemberPermissions>({
     can_create_sticks: true,
@@ -155,14 +155,13 @@ export function BulkPermissionsDialog({ open, onOpenChange, members, padId, onCo
             Cancel
           </Button>
           <Button onClick={applyPermissions} disabled={selectedMembers.size === 0 || isApplying}>
-            {isApplying ? (
+            {isApplying && (
               <>
                 <Loader2 className="h-4 w-4 mr-2 animate-spin" />
                 Applying...
               </>
-            ) : (
-              `Apply to ${selectedMembers.size} Member${selectedMembers.size !== 1 ? "s" : ""}`
             )}
+            {!isApplying && `Apply to ${selectedMembers.size} Member${selectedMembers.size !== 1 ? "s" : ""}`}
           </Button>
         </DialogFooter>
       </DialogContent>

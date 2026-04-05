@@ -23,7 +23,7 @@ export function NotedIcon({
   isPersonal = false,
   size = "sm",
   className,
-}: NotedIconProps) {
+}: Readonly<NotedIconProps>) {
   const router = useRouter()
   const { csrfToken } = useCSRF()
   const [loading, setLoading] = useState(false)

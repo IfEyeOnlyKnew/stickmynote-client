@@ -40,7 +40,7 @@ interface EnhancedInviteModalProps {
   trigger?: React.ReactNode
 }
 
-export function EnhancedInviteModal({ open, onOpenChange, teamId, onInviteSubmit, trigger }: EnhancedInviteModalProps) {
+export function EnhancedInviteModal({ open, onOpenChange, teamId, onInviteSubmit, trigger }: Readonly<EnhancedInviteModalProps>) {
   const [searchQuery, setSearchQuery] = useState("")
   const [searchResults, setSearchResults] = useState<User[]>([])
   const [savedEmails, setSavedEmails] = useState<SavedEmail[]>([])
@@ -261,7 +261,7 @@ export function EnhancedInviteModal({ open, onOpenChange, teamId, onInviteSubmit
 
   return (
     <>
-      {trigger && <div role="presentation" onClick={() => onOpenChange(true)} onKeyDown={(e) => e.key === "Enter" && onOpenChange(true)}>{trigger}</div>}
+      {trigger && <button type="button" className="appearance-none bg-transparent border-none p-0 cursor-pointer" onClick={() => onOpenChange(true)}>{trigger}</button>}
 
       <Dialog open={open} onOpenChange={onOpenChange}>
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-hidden">
@@ -309,17 +309,15 @@ export function EnhancedInviteModal({ open, onOpenChange, teamId, onInviteSubmit
                     </CardHeader>
                     <CardContent className="space-y-2 max-h-32 overflow-auto">
                       {searchResults.map((user) => (
-                        <div
+                        <button
                           key={user.id}
-                          role="button"
-                          tabIndex={0}
-                          className={`p-2 rounded cursor-pointer transition-colors ${
+                          type="button"
+                          className={`p-2 rounded cursor-pointer transition-colors w-full text-left ${
                             selectedUsers.find((u) => u.id === user.id)
                               ? "bg-blue-100 border border-blue-300"
                               : "hover:bg-gray-100 border border-transparent"
                           }`}
                           onClick={() => toggleUserSelection(user)}
-                          onKeyDown={(e) => e.key === "Enter" && toggleUserSelection(user)}
                         >
                           <div className="flex items-center justify-between">
                             <div>
@@ -328,7 +326,7 @@ export function EnhancedInviteModal({ open, onOpenChange, teamId, onInviteSubmit
                             </div>
                             {selectedUsers.find((u) => u.id === user.id) && <Check className="h-4 w-4 text-blue-600" />}
                           </div>
-                        </div>
+                        </button>
                       ))}
                     </CardContent>
                   </Card>
@@ -342,17 +340,15 @@ export function EnhancedInviteModal({ open, onOpenChange, teamId, onInviteSubmit
                     </CardHeader>
                     <CardContent className="space-y-2 max-h-40 overflow-auto">
                       {filteredSavedEmails.map((savedEmail) => (
-                        <div
+                        <button
                           key={savedEmail.id}
-                          role="button"
-                          tabIndex={0}
-                          className={`p-2 rounded cursor-pointer transition-colors ${
+                          type="button"
+                          className={`p-2 rounded cursor-pointer transition-colors w-full text-left ${
                             selectedEmails.includes(savedEmail.email)
                               ? "bg-green-100 border border-green-300"
                               : "hover:bg-gray-100 border border-transparent"
                           }`}
                           onClick={() => toggleEmailSelection(savedEmail.email)}
-                          onKeyDown={(e) => e.key === "Enter" && toggleEmailSelection(savedEmail.email)}
                         >
                           <div className="flex items-center justify-between">
                             <div>
@@ -361,7 +357,7 @@ export function EnhancedInviteModal({ open, onOpenChange, teamId, onInviteSubmit
                             </div>
                             {selectedEmails.includes(savedEmail.email) && <Check className="h-4 w-4 text-green-600" />}
                           </div>
-                        </div>
+                        </button>
                       ))}
                     </CardContent>
                   </Card>
@@ -432,7 +428,7 @@ export function EnhancedInviteModal({ open, onOpenChange, teamId, onInviteSubmit
                   </Button>
                   <Button onClick={handleSubmit} disabled={totalSelected === 0 || isLoading}>
                     {isLoading && "Sending..."}
-                    {!isLoading && `Send ${totalSelected} Invite${totalSelected !== 1 ? "s" : ""}`}
+                    {!isLoading && `Send ${totalSelected} Invite${totalSelected === 1 ? "" : "s"}`}
                   </Button>
                 </div>
               </div>

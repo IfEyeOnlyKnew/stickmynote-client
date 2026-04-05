@@ -2,12 +2,12 @@
 
 import type React from "react"
 
-import { useState, useEffect, useRef, useCallback } from "react"
+import { useState, useEffect, useRef } from "react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog"
 import { AuthFormModal } from "@/components/auth-form-modal"
-import { StickyNote, Search, Palette, Share2, Lock, Zap, Star, CheckCircle, Video, BrainCircuit, Maximize2, Sparkles, Trash2 } from "lucide-react"
+import { StickyNote, Search, Palette, Share2, Lock, Star, CheckCircle, Video, BrainCircuit, Maximize2, Sparkles, Trash2 } from "lucide-react"
 import Link from "next/link"
 import { Caveat, Inter } from "next/font/google"
 
@@ -65,12 +65,12 @@ function StickyNoteCard({
   rotate,
   children,
   className = "",
-}: {
+}: Readonly<{
   color: string
   rotate: string
   children: React.ReactNode
   className?: string
-}) {
+}>) {
   return (
     <div
       className={`relative p-6 rounded-[2px] shadow-[3px_4px_14px_rgba(0,0,0,0.2)] transition-all duration-300 hover:-translate-y-1 hover:shadow-[4px_6px_20px_rgba(0,0,0,0.28)] cursor-default ${rotate} ${className}`}
@@ -90,13 +90,8 @@ function StickyNoteCard({
 
 export default function HomePage() {
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false)
-  const [mounted, setMounted] = useState(false)
   const justOpenedRef = useRef(false)
   const typed = useTypewriter(typingSequences)
-
-  useEffect(() => {
-    setMounted(true)
-  }, [])
 
   const handleButtonClick = (e: React.MouseEvent<HTMLButtonElement>) => {
     e.preventDefault()
@@ -255,7 +250,7 @@ export default function HomePage() {
                       <div className="flex items-center justify-between mb-1">
                         <label className="text-xs font-medium text-gray-600">Topic</label>
                         <span className="text-[10px] text-gray-400">
-                          {typed.label === "Task" ? "22" : typed.label === "Video" ? "10" : typed.label === "Ask AI" ? "14" : "11"}/75
+                          {(() => { if (typed.label === "Task") return "22"; if (typed.label === "Video") return "10"; if (typed.label === "Ask AI") return "14"; return "11" })()}/75
                         </span>
                       </div>
                       <div className="border border-gray-200 rounded-md px-2 py-1.5 text-sm text-gray-800 bg-white">

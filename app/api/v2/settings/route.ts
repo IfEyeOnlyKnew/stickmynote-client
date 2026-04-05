@@ -1,7 +1,7 @@
 // v2 Settings API: production-quality, get/set user settings
 import { NextRequest } from 'next/server'
 import { requireADSession } from '@/lib/auth/ad-session'
-import { query, querySingle } from '@/lib/database/pg-helpers'
+import { querySingle } from '@/lib/database/pg-helpers'
 import { handleApiError } from '@/lib/api/handle-api-error'
 import { requireOptionalString } from '@/lib/api/validate'
 

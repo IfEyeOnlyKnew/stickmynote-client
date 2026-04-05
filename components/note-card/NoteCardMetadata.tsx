@@ -53,7 +53,9 @@ export const NoteCardMetadata: React.FC<NoteCardMetadataProps> = ({
         <div className="mb-3 mt-3">
           <div className="flex flex-wrap gap-1">
             {hyperlinks.map((link, idx) => {
-              const linkUrl = typeof link === "string" ? link : typeof link?.url === "string" ? link.url : ""
+              let linkUrl = ""
+              if (typeof link === "string") linkUrl = link
+              else if (typeof link?.url === "string") linkUrl = link.url
 
               let linkTitle = ""
               if (typeof link === "string") {

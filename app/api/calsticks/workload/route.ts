@@ -25,7 +25,7 @@ export async function GET(request: NextRequest) {
       .from("users")
       .select("id, full_name, email, hourly_rate_cents, capacity_hours_per_day")
 
-    if (usersError && usersError.code === "42703") {
+    if (usersError?.code === "42703") {
       const { data: basicUsers, error: basicUsersError } = await db.from("users").select("id, full_name, email")
 
       if (basicUsersError) {

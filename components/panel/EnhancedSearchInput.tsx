@@ -31,7 +31,7 @@ export function EnhancedSearchInput({
   placeholder = "Search shared topics, tags, or authors…",
   recentSearches = [],
   trendingTags = [],
-}: EnhancedSearchInputProps) {
+}: Readonly<EnhancedSearchInputProps>) {
   const [showSuggestions, setShowSuggestions] = useState(false)
   const [selectedIndex, setSelectedIndex] = useState(-1)
   const inputRef = useRef<HTMLInputElement>(null)
@@ -41,7 +41,22 @@ export function EnhancedSearchInput({
   const suggestions = useMemo(() => {
     const result: SearchSuggestion[] = []
 
-    if (!value.trim()) {
+    if (value.trim()) {
+      // Show autocomplete suggestions based on input
+      const lowerValue = value.toLowerCase()
+
+      // Filter trending tags that match
+      trendingTags
+        .filter((tag) => tag.toLowerCase().includes(lowerValue))
+        .slice(0, 3)
+        .forEach((tag) => {
+          result.push({
+            type: "tag",
+            value: tag,
+            label: tag,
+          })
+        })
+    } else {
       // Show recent searches when input is empty
       recentSearches.slice(0, 3).forEach((search) => {
         result.push({
@@ -60,21 +75,6 @@ export function EnhancedSearchInput({
           metadata: "Trending",
         })
       })
-    } else {
-      // Show autocomplete suggestions based on input
-      const lowerValue = value.toLowerCase()
-
-      // Filter trending tags that match
-      trendingTags
-        .filter((tag) => tag.toLowerCase().includes(lowerValue))
-        .slice(0, 3)
-        .forEach((tag) => {
-          result.push({
-            type: "tag",
-            value: tag,
-            label: tag,
-          })
-        })
     }
 
     return result
@@ -91,8 +91,8 @@ export function EnhancedSearchInput({
       }
     }
 
-    window.addEventListener("keydown", handleKeyPress)
-    return () => window.removeEventListener("keydown", handleKeyPress)
+    globalThis.addEventListener("keydown", handleKeyPress)
+    return () => globalThis.removeEventListener("keydown", handleKeyPress)
   }, [])
 
   // Handle arrow keys and enter in suggestions

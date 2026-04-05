@@ -93,7 +93,7 @@ export async function selectQuery<T = any>(
   const result = await db.query(query, values)
   
   if (options?.single) {
-    return result.rows[0] as any
+    return result.rows[0]
   }
   
   return result.rows
@@ -208,7 +208,7 @@ export async function countQuery(
   }
   
   const result = await db.query(query, values)
-  return parseInt(result.rows[0].count, 10)
+  return Number.parseInt(result.rows[0].count, 10)
 }
 
 // ============================================================================

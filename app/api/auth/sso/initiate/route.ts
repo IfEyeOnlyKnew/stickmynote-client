@@ -15,7 +15,7 @@ export async function POST(request: NextRequest) {
   try {
     const { email } = await request.json()
 
-    if (!email || !email.includes("@")) {
+    if (!email?.includes("@")) {
       return NextResponse.json({ error: "Valid email is required" }, { status: 400 })
     }
 
@@ -50,7 +50,7 @@ export async function POST(request: NextRequest) {
     )
 
     // Store code_verifier and state in a short-lived httpOnly cookie
-    const cookieStore = await cookies()
+    const cookieStore = cookies()
     cookieStore.set("sso_state", JSON.stringify({ codeVerifier, state }), {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",

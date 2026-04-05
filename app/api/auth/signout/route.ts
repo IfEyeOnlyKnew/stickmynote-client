@@ -10,7 +10,7 @@ export async function POST(request: NextRequest) {
     const session = await getSession()
     const { ipAddress, userAgent } = getRequestContext(request)
 
-    const cookieStore = await cookies()
+    const cookieStore = cookies()
 
     // Clear the JWT session cookie
     cookieStore.delete("jwt_session")

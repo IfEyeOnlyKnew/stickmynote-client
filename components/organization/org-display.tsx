@@ -9,7 +9,7 @@ interface OrgDisplayProps {
   className?: string
 }
 
-export function OrgDisplay({ showLogo = true, className = "" }: OrgDisplayProps) {
+export function OrgDisplay({ showLogo = true, className = "" }: Readonly<OrgDisplayProps>) {
   const { currentOrg, loading } = useOrganization()
 
   if (loading) {

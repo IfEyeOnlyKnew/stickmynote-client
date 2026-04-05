@@ -22,7 +22,7 @@ import { z } from "zod"
  * DO NOT import in client components or client-side code.
  */
 
-if (typeof window !== "undefined") {
+if (typeof globalThis.window !== "undefined") {
   throw new Error(
     "lib/env.ts should only be imported in server-side code. " +
       "Use process.env.NEXT_PUBLIC_* directly in client components.",
@@ -215,7 +215,7 @@ export function getEnvVar(key: keyof Env, fallback?: string): string {
     console.warn(`⚠️  Environment variable ${key} is not set, using empty string`)
     return ""
   }
-  return value as string
+  return value
 }
 
 export function hasEnvVar(key: keyof Env): boolean {

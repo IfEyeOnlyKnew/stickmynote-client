@@ -58,14 +58,13 @@ export function PermissionBasedStickFullscreen({
   onUpdate,
   onDelete,
   stickType,
-}: PermissionBasedStickFullscreenProps) {
+}: Readonly<PermissionBasedStickFullscreenProps>) {
   const [editedStick, setEditedStick] = useState<ExtendedStick>({
     ...stick,
     topic: stick.topic || "",
     tags: [],
   })
   const [replies, setReplies] = useState<any[]>([])
-  const [loading, setLoading] = useState(false)
   const [isGeneratingTags, setIsGeneratingTags] = useState(false)
   const [isSummarizingLinks, setIsSummarizingLinks] = useState(false)
 
@@ -196,7 +195,9 @@ export function PermissionBasedStickFullscreen({
         }))
 
         if (showToast) {
-          const updateType = updates.topic !== undefined ? "Topic" : updates.content !== undefined ? "Content" : "Stick"
+          let updateType = "Stick"
+          if (updates.topic !== undefined) updateType = "Topic"
+          else if (updates.content !== undefined) updateType = "Content"
           toast({
             title: `${updateType} Saved`,
             description: `Your ${updateType.toLowerCase()} has been updated successfully.`,
@@ -276,7 +277,7 @@ export function PermissionBasedStickFullscreen({
           hyperlinks: data.hyperlinks,
         }))
 
-        window.dispatchEvent(new CustomEvent("refreshStickTabs"))
+        globalThis.dispatchEvent(new CustomEvent("refreshStickTabs"))
 
         toast({
           title: "Tags Generated",
@@ -315,7 +316,7 @@ export function PermissionBasedStickFullscreen({
       if (response.ok) {
         const data = await response.json()
 
-        window.dispatchEvent(new CustomEvent("refreshStickTabs"))
+        globalThis.dispatchEvent(new CustomEvent("refreshStickTabs"))
 
         toast({
           title: "Links Summarized",
@@ -476,51 +477,6 @@ export function PermissionBasedStickFullscreen({
     }
   }
 
-  const handleExportAll = async () => {
-    if (!permissions.canEdit && !permissions.canAdmin) return
-
-    setIsExporting(true)
-
-    try {
-      const response = await fetch(`/api/sticks/${stick.id}/export`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ tone: selectedTone }),
-      })
-
-      if (response.ok) {
-        const data = await response.json()
-
-        window.dispatchEvent(new CustomEvent("refreshStickTabs"))
-
-        toast({
-          title: "Export Complete!",
-          description: "Your stick export has been generated and is available in the Details tab.",
-          variant: "default",
-        })
-
-        console.log("Export file available at:", data.exportUrl)
-      } else {
-        const errorData = await response.json().catch(() => ({ error: "Unknown error" }))
-        toast({
-          title: "Export Failed",
-          description: errorData.error || "Failed to export stick. Please try again.",
-          variant: "destructive",
-        })
-      }
-    } catch (error) {
-      console.error("Error exporting stick:", error)
-
-      toast({
-        title: "Export Failed",
-        description: "An error occurred while exporting. Please try again.",
-        variant: "destructive",
-      })
-    } finally {
-      setIsExporting(false)
-    }
-  }
-
   const handleGenerateSummary = async (tone: string) => {
     if (!permissions.canEdit && !permissions.canAdmin) return
 
@@ -541,7 +497,7 @@ export function PermissionBasedStickFullscreen({
           `Summary generated and exported as ${data.filename}. Check the Details tab for the download link.`,
         )
 
-        window.dispatchEvent(new CustomEvent("refreshStickTabs"))
+        globalThis.dispatchEvent(new CustomEvent("refreshStickTabs"))
 
         toast({
           title: "Summary Generated!",
@@ -632,13 +588,13 @@ export function PermissionBasedStickFullscreen({
 
   const handleDetailsChange = async (details: string) => {
     await handleStickUpdate({ details }, false) // Don't show toast for auto-saved details
-    window.dispatchEvent(new CustomEvent("refreshStickTabs"))
+    globalThis.dispatchEvent(new CustomEvent("refreshStickTabs"))
   }
 
   return (
-    <div
-      className="fixed inset-0 bg-black/50 z-50 overflow-hidden"
-      role="dialog"
+    <dialog
+      open
+      className="fixed inset-0 bg-black/50 z-50 overflow-hidden m-0 p-0 border-none max-w-none max-h-none w-full h-full"
       aria-modal="true"
     >
       <div className="h-full w-full flex flex-col lg:flex-row lg:gap-4 lg:p-4 overflow-hidden p-2 gap-2">
@@ -651,7 +607,7 @@ export function PermissionBasedStickFullscreen({
                 {!permissions.canAdmin && !permissions.canEdit && "View"}
               </Badge>
               {permissions.canEdit && (
-                <div className="flex items-center gap-1 sm:gap-2 ml-1 sm:ml-2 min-w-0" role="presentation" onClick={(e) => e.stopPropagation()} onKeyDown={(e) => e.stopPropagation()}>
+                <div className="flex items-center gap-1 sm:gap-2 ml-1 sm:ml-2 min-w-0" aria-hidden="true" onClick={(e) => e.stopPropagation()} onKeyDown={(e) => e.stopPropagation()}>
                   <Checkbox
                     id="quickstick"
                     checked={isQuickStick}
@@ -789,6 +745,6 @@ export function PermissionBasedStickFullscreen({
         stickId={stick.id}
         stickType="pad"
       />
-    </div>
+    </dialog>
   )
 }

@@ -1,6 +1,6 @@
 import { db as pgClient } from "@/lib/database/pg-client"
-import { publishToUser, publishToUsers } from "@/lib/ws/publish-event"
-import type { RecognitionSettings, DEFAULT_RECOGNITION_SETTINGS } from "@/types/recognition"
+import { publishToUser } from "@/lib/ws/publish-event"
+import type { RecognitionSettings } from "@/types/recognition"
 
 /**
  * Get recognition settings for an organization (from organizations.settings JSONB)
@@ -41,7 +41,7 @@ export async function getKudosGivenToday(userId: string, orgId: string): Promise
      AND created_at >= CURRENT_DATE AND created_at < CURRENT_DATE + INTERVAL '1 day'`,
     [userId, orgId]
   )
-  return parseInt(result.rows?.[0]?.cnt || "0", 10)
+  return Number.parseInt(result.rows?.[0]?.cnt || "0", 10)
 }
 
 /**
@@ -217,13 +217,13 @@ async function checkAutoBadges(userIds: string[], orgId: string) {
              WHERE kr.user_id = $1 AND k.org_id = $2`,
             [userId, orgId]
           )
-          shouldAward = parseInt(countResult.rows[0].cnt, 10) >= badge.criteria_threshold
+          shouldAward = Number.parseInt(countResult.rows[0].cnt, 10) >= badge.criteria_threshold
         } else if (badge.criteria_type === "kudos_given") {
           const countResult = await pgClient.query(
             `SELECT COUNT(*) AS cnt FROM kudos WHERE giver_id = $1 AND org_id = $2`,
             [userId, orgId]
           )
-          shouldAward = parseInt(countResult.rows[0].cnt, 10) >= badge.criteria_threshold
+          shouldAward = Number.parseInt(countResult.rows[0].cnt, 10) >= badge.criteria_threshold
         } else if (badge.criteria_type === "streak") {
           const streakResult = await pgClient.query(
             `SELECT current_streak FROM recognition_streaks

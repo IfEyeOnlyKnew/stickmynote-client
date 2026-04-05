@@ -29,10 +29,10 @@ interface PermissionPresetsManagerProps {
   onApplyPreset: (permissions: MemberPermissions) => void
 }
 
-export function PermissionPresetsManager({ onApplyPreset }: PermissionPresetsManagerProps) {
+export function PermissionPresetsManager({ onApplyPreset }: Readonly<PermissionPresetsManagerProps>) {
   const [presets, setPresets] = useState<PermissionPreset[]>([])
   const [dialogOpen, setDialogOpen] = useState(false)
-  const [editingPreset, setEditingPreset] = useState<PermissionPreset | null>(null)
+  const [, setEditingPreset] = useState<PermissionPreset | null>(null)
   const [presetName, setPresetName] = useState("")
   const [presetDescription, setPresetDescription] = useState("")
 
@@ -111,7 +111,7 @@ export function PermissionPresetsManager({ onApplyPreset }: PermissionPresetsMan
                         .filter(([_, value]) => value)
                         .map(([key]) => (
                           <Badge key={key} variant="secondary" className="text-xs">
-                            {key.replace("can_", "").replace(/_/g, " ")}
+                            {key.replace("can_", "").replaceAll("_", " ")}
                           </Badge>
                         ))}
                     </div>

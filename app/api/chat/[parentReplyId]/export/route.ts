@@ -2,7 +2,6 @@ import { type NextRequest, NextResponse } from "next/server"
 import { createServiceDatabaseClient, type DatabaseClient } from "@/lib/database/database-adapter"
 import { validateCSRFMiddleware } from "@/lib/csrf"
 import { getCachedAuthUser, createRateLimitResponse, createUnauthorizedResponse } from "@/lib/auth/cached-auth"
-import { getOrgContext } from "@/lib/auth/get-org-context"
 import { put } from "@/lib/storage/local-storage"
 import { generateText as aiGenerateText, isAIAvailable } from "@/lib/ai/ai-provider"
 
@@ -128,7 +127,7 @@ async function fetchThreadContext(
       id: reply.id,
       content: reply.content,
       created_at: reply.created_at,
-      user: userData || undefined,
+      user: userData ?? undefined,
     })
 
     currentReplyId = reply.parent_reply_id
@@ -231,7 +230,7 @@ export async function POST(
 
   try {
     const { parentReplyId } = await params
-    const { noteId, context: noteContext } = await request.json()
+    const { noteId } = await request.json()
 
     if (!noteId) {
       return NextResponse.json({ error: "Note ID is required" }, { status: 400 })

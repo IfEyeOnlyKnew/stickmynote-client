@@ -10,7 +10,7 @@ interface SettingSwitchProps {
   onCheckedChange: (checked: boolean) => void
 }
 
-export function SettingSwitch({ id, label, description, checked, onCheckedChange }: SettingSwitchProps) {
+export function SettingSwitch({ id, label, description, checked, onCheckedChange }: Readonly<SettingSwitchProps>) {
   return (
     <div className="flex items-center justify-between">
       <div className="space-y-0.5">

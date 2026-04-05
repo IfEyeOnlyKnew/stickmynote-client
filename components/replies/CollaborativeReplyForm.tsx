@@ -36,7 +36,6 @@ export const CollaborativeReplyForm: React.FC<CollaborativeReplyFormProps> = ({
     return (
       <div
         className="reply-form-container space-y-3 p-4 bg-white rounded-md border-2 border-blue-300 shadow-lg"
-        role="presentation"
         onClick={(e) => e.stopPropagation()}
         onKeyDown={(e) => e.stopPropagation()}
       >

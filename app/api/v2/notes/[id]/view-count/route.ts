@@ -21,7 +21,7 @@ export async function GET(
       [noteId]
     )
 
-    const count = parseInt(result.rows[0]?.count || '0', 10)
+    const count = Number.parseInt(result.rows[0]?.count || '0', 10)
 
     return new Response(JSON.stringify({ count }), { status: 200 })
   } catch (error) {

@@ -5,7 +5,7 @@ export const metadata = {
   description: "Your personal sticks dashboard",
 }
 
-export default function PersonalLayout({ children }: { children: React.ReactNode }) {
+export default function PersonalLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
     <div className="flex h-screen overflow-hidden">
       <PanelSidebar />

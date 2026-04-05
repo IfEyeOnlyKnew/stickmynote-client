@@ -148,7 +148,7 @@ export async function GET(request: NextRequest) {
       [user.id]
     )
 
-    const count = parseInt(countResult.rows[0]?.count || '0')
+    const count = Number.parseInt(countResult.rows[0]?.count || '0')
 
     return new Response(
       JSON.stringify({

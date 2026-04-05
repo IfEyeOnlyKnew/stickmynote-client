@@ -22,7 +22,7 @@ interface CreateConcurGroupDialogProps {
   onCreated: () => void
 }
 
-export function CreateConcurGroupDialog({ onClose, onCreated }: CreateConcurGroupDialogProps) {
+export function CreateConcurGroupDialog({ onClose, onCreated }: Readonly<CreateConcurGroupDialogProps>) {
   const { toast } = useToast()
   const [name, setName] = useState("")
   const [description, setDescription] = useState("")

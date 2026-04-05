@@ -26,7 +26,7 @@ export function StickActions({
   onStickNew,
   onCancelEdit,
   onStickEdit,
-}: StickActionsProps) {
+}: Readonly<StickActionsProps>) {
   if (!canEdit) return null
 
   if (isNew) {

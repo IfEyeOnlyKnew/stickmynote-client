@@ -207,128 +207,141 @@ export async function generateText(options: GenerateTextOptions): Promise<{ text
   const provider = getActiveProvider()
 
   if (provider === "ollama" && config.ollama) {
-    // Try direct Ollama API first (more reliable than AI SDK for some versions)
-    const ollamaUrl = `${config.ollama.baseURL}/api/generate`
-    try {
-      console.log("[ai-provider] Using direct Ollama API at:", ollamaUrl)
-      console.log("[ai-provider] Model:", config.ollama.model)
-
-      const controller = new AbortController()
-      const timeoutId = setTimeout(() => controller.abort(), AI_TIMEOUT_MS)
-
-      const response = await fetch(ollamaUrl, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          model: config.ollama.model,
-          prompt: options.systemPrompt
-            ? `${options.systemPrompt}\n\n${options.prompt}`
-            : options.prompt,
-          stream: false,
-          options: {
-            num_predict: options.maxTokens || 500,
-            temperature: options.temperature || 0.7,
-          },
-        }),
-        signal: controller.signal,
-        cache: "no-store" as RequestCache,
-      })
-
-      clearTimeout(timeoutId)
-
-      if (!response.ok) {
-        const errorText = await response.text()
-        throw new Error(`Ollama API error: ${response.status} - ${errorText}`)
-      }
-
-      const data = await response.json()
-      console.log("[ai-provider] Ollama direct API returned successfully")
-      return { text: data.response || "", provider: "ollama" }
-    } catch (directError: any) {
-      // Detailed error logging
-      const errorName = directError?.name || "Unknown"
-      const errorMessage = directError?.message || "No message"
-      const errorCause = directError?.cause ? JSON.stringify(directError.cause) : "No cause"
-      console.error("[ai-provider] Direct Ollama API failed:")
-      console.error("  - URL:", ollamaUrl)
-      console.error("  - Error name:", errorName)
-      console.error("  - Error message:", errorMessage)
-      console.error("  - Error cause:", errorCause)
-      console.error("  - Full error:", directError)
-
-      // Fallback to AI SDK
-      console.log("[ai-provider] Falling back to AI SDK...")
-      try {
-        const ollama = createOllama({
-          baseURL: config.ollama.baseURL,
-        })
-
-        const generatePromise = aiGenerateText({
-          model: ollama(config.ollama.model) as any,
-          prompt: options.prompt,
-          maxOutputTokens: options.maxTokens,
-          temperature: options.temperature,
-          system: options.systemPrompt,
-        })
-
-        const result = await withTimeout(
-          generatePromise,
-          AI_TIMEOUT_MS,
-          `Ollama request timed out after ${AI_TIMEOUT_MS / 1000}s - server may be slow or unreachable at ${config.ollama.baseURL}`
-        )
-
-        return { text: result.text, provider: "ollama" }
-      } catch (sdkError) {
-        console.error("[ai-provider] AI SDK also failed:", sdkError)
-        throw directError // Throw the original direct API error
-      }
-    }
+    return generateWithOllama(options, config.ollama)
   }
 
   if (provider === "azure" && config.azure) {
-    // Build Azure configuration - supports custom endpoints for private endpoints
-    const azureConfig: Parameters<typeof createAzure>[0] = {
-      apiKey: config.azure.apiKey,
-    }
-
-    // If custom endpoint is provided (for private endpoints), use it
-    // Otherwise, use resourceName to build the standard Azure endpoint
-    if (config.azure.endpoint) {
-      azureConfig.baseURL = config.azure.endpoint
-    } else {
-      azureConfig.resourceName = config.azure.resourceName
-    }
-
-    const azure = createAzure(azureConfig)
-
-    const result = await aiGenerateText({
-      model: azure(config.azure.deploymentName) as any,
-      prompt: options.prompt,
-      maxOutputTokens: options.maxTokens,
-      temperature: options.temperature,
-      system: options.systemPrompt,
-    })
-
-    return { text: result.text, provider: "azure" }
+    return generateWithAzure(options, config.azure)
   }
 
   if (provider === "anthropic" && config.anthropic) {
-    const anthropic = createAnthropic({
-      apiKey: config.anthropic.apiKey,
-    })
-
-    const result = await aiGenerateText({
-      model: anthropic(config.anthropic.model || "claude-sonnet-4-20250514") as any,
-      prompt: options.prompt,
-      maxOutputTokens: options.maxTokens,
-      temperature: options.temperature,
-      system: options.systemPrompt,
-    })
-
-    return { text: result.text, provider: "anthropic" }
+    return generateWithAnthropic(options, config.anthropic)
   }
 
   throw new Error("No AI provider available")
+}
+
+async function generateWithOllama(
+  options: GenerateTextOptions,
+  ollamaConfig: { baseURL: string; model: string },
+): Promise<{ text: string; provider: AIProvider }> {
+  const ollamaUrl = `${ollamaConfig.baseURL}/api/generate`
+  try {
+    return await callOllamaDirectAPI(options, ollamaUrl, ollamaConfig.model)
+  } catch (directError: any) {
+    logOllamaError(directError, ollamaUrl)
+    return callOllamaSDKFallback(options, ollamaConfig, directError)
+  }
+}
+
+async function callOllamaDirectAPI(
+  options: GenerateTextOptions,
+  ollamaUrl: string,
+  model: string,
+): Promise<{ text: string; provider: AIProvider }> {
+  console.log("[ai-provider] Using direct Ollama API at:", ollamaUrl)
+
+  const controller = new AbortController()
+  const timeoutId = setTimeout(() => controller.abort(), AI_TIMEOUT_MS)
+
+  const response = await fetch(ollamaUrl, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      model,
+      prompt: options.systemPrompt ? `${options.systemPrompt}\n\n${options.prompt}` : options.prompt,
+      stream: false,
+      options: { num_predict: options.maxTokens || 500, temperature: options.temperature || 0.7 },
+    }),
+    signal: controller.signal,
+    cache: "no-store" as RequestCache,
+  })
+
+  clearTimeout(timeoutId)
+
+  if (!response.ok) {
+    const errorText = await response.text()
+    throw new Error(`Ollama API error: ${response.status} - ${errorText}`)
+  }
+
+  const data = await response.json()
+  console.log("[ai-provider] Ollama direct API returned successfully")
+  return { text: data.response || "", provider: "ollama" }
+}
+
+function logOllamaError(error: any, ollamaUrl: string): void {
+  console.error("[ai-provider] Direct Ollama API failed:")
+  console.error("  - URL:", ollamaUrl)
+  console.error("  - Error:", error?.message || "No message")
+  console.error("  - Full error:", error)
+}
+
+async function callOllamaSDKFallback(
+  options: GenerateTextOptions,
+  ollamaConfig: { baseURL: string; model: string },
+  directError: any,
+): Promise<{ text: string; provider: AIProvider }> {
+  console.log("[ai-provider] Falling back to AI SDK...")
+  try {
+    const ollama = createOllama({ baseURL: ollamaConfig.baseURL })
+
+    const result = await withTimeout(
+      aiGenerateText({
+        model: ollama(ollamaConfig.model) as any,
+        prompt: options.prompt,
+        maxOutputTokens: options.maxTokens,
+        temperature: options.temperature,
+        system: options.systemPrompt,
+      }),
+      AI_TIMEOUT_MS,
+      `Ollama request timed out after ${AI_TIMEOUT_MS / 1000}s - server may be slow or unreachable at ${ollamaConfig.baseURL}`,
+    )
+
+    return { text: result.text, provider: "ollama" }
+  } catch (sdkError) {
+    console.error("[ai-provider] AI SDK also failed:", sdkError)
+    throw directError
+  }
+}
+
+async function generateWithAzure(
+  options: GenerateTextOptions,
+  azureConfig: { apiKey: string; endpoint?: string; resourceName?: string; deploymentName: string },
+): Promise<{ text: string; provider: AIProvider }> {
+  const config: Parameters<typeof createAzure>[0] = { apiKey: azureConfig.apiKey }
+
+  if (azureConfig.endpoint) {
+    config.baseURL = azureConfig.endpoint
+  } else {
+    config.resourceName = azureConfig.resourceName
+  }
+
+  const azure = createAzure(config)
+  const result = await aiGenerateText({
+    model: azure(azureConfig.deploymentName) as any,
+    prompt: options.prompt,
+    maxOutputTokens: options.maxTokens,
+    temperature: options.temperature,
+    system: options.systemPrompt,
+  })
+
+  return { text: result.text, provider: "azure" }
+}
+
+async function generateWithAnthropic(
+  options: GenerateTextOptions,
+  anthropicConfig: { apiKey: string; model?: string },
+): Promise<{ text: string; provider: AIProvider }> {
+  const anthropic = createAnthropic({ apiKey: anthropicConfig.apiKey })
+  const result = await aiGenerateText({
+    model: anthropic(anthropicConfig.model || "claude-sonnet-4-20250514") as any,
+    prompt: options.prompt,
+    maxOutputTokens: options.maxTokens,
+    temperature: options.temperature,
+    system: options.systemPrompt,
+  })
+
+  return { text: result.text, provider: "anthropic" }
 }
 
 /**

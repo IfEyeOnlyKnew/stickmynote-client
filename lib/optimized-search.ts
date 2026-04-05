@@ -78,7 +78,7 @@ export interface SearchResult {
 }
 
 export class OptimizedSearch {
-  private static DEFAULT_LIMIT = 20
+  private static readonly DEFAULT_LIMIT = 20
 
   static async searchCommunityNotes(searchTerm: string, options: SearchOptions = {}): Promise<SearchResult> {
     const { page = 1, limit = this.DEFAULT_LIMIT } = options

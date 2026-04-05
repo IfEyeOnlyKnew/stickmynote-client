@@ -127,7 +127,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ gro
 
     // Check caller is owner
     const membership = await checkGroupMembership(db, groupId, user.id, orgContext.orgId)
-    if (!membership || membership.role !== "owner") return Errors.ownersOnly()
+    if (membership?.role !== "owner") return Errors.ownersOnly()
 
     const { email, role } = await request.json()
     if (!email?.trim()) return Errors.emailRequired()

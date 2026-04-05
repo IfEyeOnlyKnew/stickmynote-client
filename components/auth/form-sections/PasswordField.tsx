@@ -2,7 +2,6 @@
 import { PasswordField as ReusablePasswordField } from "@/components/forms/PasswordField"
 
 interface PasswordFieldProps {
-  id: string
   label: string
   placeholder: string
   value: string
@@ -10,9 +9,6 @@ interface PasswordFieldProps {
   required?: boolean
   disabled?: boolean
   autoComplete?: string
-  minLength?: number
-  showPassword?: boolean
-  onToggleVisibility?: () => void
 }
 
 export function PasswordField({
@@ -23,7 +19,7 @@ export function PasswordField({
   required = false,
   disabled = false,
   autoComplete,
-}: PasswordFieldProps) {
+}: Readonly<PasswordFieldProps>) {
   return (
     <ReusablePasswordField
       label={label}

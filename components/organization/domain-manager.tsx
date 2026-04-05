@@ -37,7 +37,7 @@ interface DomainManagerProps {
   canManage: boolean
 }
 
-export function DomainManager({ orgId, canManage }: DomainManagerProps) {
+export function DomainManager({ orgId, canManage }: Readonly<DomainManagerProps>) {
   const [domains, setDomains] = useState<Domain[]>([])
   const [loading, setLoading] = useState(true)
   const [adding, setAdding] = useState(false)

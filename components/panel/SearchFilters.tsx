@@ -27,7 +27,7 @@ export function SearchFiltersPanel({
   onChange,
   availableTags = [],
   availableColors = ["yellow", "pink", "blue", "green", "purple", "orange"],
-}: SearchFiltersProps) {
+}: Readonly<SearchFiltersProps>) {
   const [open, setOpen] = useState(false)
 
   const activeFilterCount = [

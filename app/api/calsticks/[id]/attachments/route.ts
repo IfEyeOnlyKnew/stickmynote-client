@@ -34,7 +34,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       .eq("org_id", orgContext.orgId)
       .maybeSingle()
 
-    if (!calstick || calstick.user_id !== user.id) {
+    if (calstick?.user_id !== user.id) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 })
     }
 
@@ -86,7 +86,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       .eq("org_id", orgContext.orgId)
       .maybeSingle()
 
-    if (!calstick || calstick.user_id !== user.id) {
+    if (calstick?.user_id !== user.id) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 })
     }
 

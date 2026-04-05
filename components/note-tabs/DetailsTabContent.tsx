@@ -198,15 +198,16 @@ export const DetailsTabContent = memo(function DetailsTabContent({
               >
                 <div className="flex-1">
                   <div className="text-sm font-medium text-gray-900">
-                    {exportLink.type === "link_summary"
-                      ? "Link Summary Report"
-                      : exportLink.type === "chat_export"
-                        ? "Chat Conversation Export"
-                        : exportLink.type === "reply-summary"
-                          ? "Stick Replies Export"
-                          : exportLink.type?.startsWith("reply-summary-")
-                            ? `${exportLink.type.replace("reply-summary-", "").charAt(0).toUpperCase() + exportLink.type.replace("reply-summary-", "").slice(1)} Stick Replies Export`
-                            : "Complete Note Export"}
+                    {(() => {
+                      if (exportLink.type === "link_summary") return "Link Summary Report"
+                      if (exportLink.type === "chat_export") return "Chat Conversation Export"
+                      if (exportLink.type === "reply-summary") return "Stick Replies Export"
+                      if (exportLink.type?.startsWith("reply-summary-")) {
+                        const suffix = exportLink.type.replace("reply-summary-", "")
+                        return `${suffix.charAt(0).toUpperCase() + suffix.slice(1)} Stick Replies Export`
+                      }
+                      return "Complete Note Export"
+                    })()}
                   </div>
                   <div className="text-xs text-gray-500">
                     Generated on {new Date(exportLink.created_at).toLocaleDateString()} at{" "}
@@ -226,7 +227,7 @@ export const DetailsTabContent = memo(function DetailsTabContent({
                       variant="outline"
                       size="sm"
                       onClick={async () => {
-                        if (!window.confirm("Delete this export file? This action cannot be undone.")) return
+                        if (!globalThis.confirm("Delete this export file? This action cannot be undone.")) return
 
                         try {
                           const response = await fetch("/api/delete-export", {
@@ -246,7 +247,7 @@ export const DetailsTabContent = memo(function DetailsTabContent({
                           }
 
                           await new Promise((resolve) => setTimeout(resolve, 500))
-                          await onRefreshTabs()
+                          onRefreshTabs()
 
                           toast({
                             title: "Export deleted",
@@ -285,9 +286,9 @@ export const DetailsTabContent = memo(function DetailsTabContent({
             Saved AI Answers
           </span>
           <div className="space-y-3">
-            {aiAnswers.map((aiAnswer: any, index: number) => (
+            {aiAnswers.map((aiAnswer: any) => (
               <div
-                key={`ai-answer-${index}`}
+                key={`ai-answer-${aiAnswer.created_at}`}
                 className="p-3 bg-purple-50 border border-purple-200 rounded-md"
               >
                 <div className="text-xs text-purple-600 font-medium mb-1">Question:</div>

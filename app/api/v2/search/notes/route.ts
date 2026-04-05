@@ -11,8 +11,8 @@ export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url)
     const query = searchParams.get('query') || ''
-    const limit = Math.min(parseInt(searchParams.get('limit') || '20'), 100)
-    const offset = Math.max(parseInt(searchParams.get('offset') || '0'), 0)
+    const limit = Math.min(Number.parseInt(searchParams.get('limit') || '20'), 100)
+    const offset = Math.max(Number.parseInt(searchParams.get('offset') || '0'), 0)
     const fuzzy = searchParams.get('fuzzy') !== 'false'
     const filter = (searchParams.get('filter') || 'all') as 'all' | 'personal' | 'shared'
 

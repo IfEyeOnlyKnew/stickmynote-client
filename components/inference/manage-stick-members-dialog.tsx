@@ -47,7 +47,7 @@ export function ManageStickMembersDialog({
   stickId,
   stickTopic,
   padId,
-}: ManageStickMembersDialogProps) {
+}: Readonly<ManageStickMembersDialogProps>) {
   const [members, setMembers] = useState<StickMember[]>([])
   const [email, setEmail] = useState("")
   const [selectedRole, setSelectedRole] = useState("contributor")

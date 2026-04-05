@@ -21,13 +21,13 @@ interface TemplatePickerProps {
   onTemplateSelect: (template: StickTemplate) => void
 }
 
-export function TemplatePicker({ onTemplateSelect }: TemplatePickerProps) {
+export function TemplatePicker({ onTemplateSelect }: Readonly<TemplatePickerProps>) {
   const [templates, setTemplates] = useState<StickTemplate[]>([])
   const [categories, setCategories] = useState<Record<string, number>>({})
   const [selectedCategory, setSelectedCategory] = useState<string>("all")
   const [searchQuery, setSearchQuery] = useState("")
   const [open, setOpen] = useState(false)
-  const [loading, setLoading] = useState(false)
+  const [, setLoading] = useState(false)
 
   useEffect(() => {
     if (open) {
@@ -167,10 +167,10 @@ export function TemplatePicker({ onTemplateSelect }: TemplatePickerProps) {
 function TemplateCard({
   template,
   onSelect,
-}: {
+}: Readonly<{
   template: StickTemplate
   onSelect: (template: StickTemplate) => void
-}) {
+}>) {
   return (
     <Card
       className="cursor-pointer hover:shadow-lg hover:border-purple-300 transition-all duration-200 group"

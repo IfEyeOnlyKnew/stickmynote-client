@@ -53,7 +53,7 @@ export async function PATCH(
       .eq("org_id", orgContext.orgId)
       .maybeSingle()
 
-    if (!callerMembership || callerMembership.role !== "owner") {
+    if (callerMembership?.role !== "owner") {
       return NextResponse.json({ error: "Only group owners can change member roles" }, { status: 403 })
     }
 
@@ -112,7 +112,7 @@ export async function DELETE(
       .eq("org_id", orgContext.orgId)
       .maybeSingle()
 
-    if (!callerMembership || callerMembership.role !== "owner") {
+    if (callerMembership?.role !== "owner") {
       return NextResponse.json({ error: "Only group owners can remove members" }, { status: 403 })
     }
 

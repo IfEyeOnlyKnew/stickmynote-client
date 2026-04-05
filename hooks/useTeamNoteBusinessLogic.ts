@@ -312,8 +312,8 @@ export function useTeamNoteBusinessLogic({
       const data = await response.json()
 
       if (data.success) {
-        if (typeof window !== "undefined" && (window as any).refreshTeamNoteTabs) {
-          await (window as any).refreshTeamNoteTabs()
+        if (typeof globalThis.window !== "undefined" && (globalThis as any).refreshTeamNoteTabs) {
+          await (globalThis as any).refreshTeamNoteTabs()
         }
         setError("Export completed! Check the Details tab for the download link.")
       }

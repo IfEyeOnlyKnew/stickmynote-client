@@ -19,14 +19,25 @@ const globalHandlers = new Map<string, Set<EventHandler>>()
 const globalListeners = new Set<() => void>()
 
 function getWsUrl(): string {
-  if (typeof window === "undefined") return ""
-  const protocol = window.location.protocol === "https:" ? "wss:" : "ws:"
-  return `${protocol}//${window.location.host}/ws`
+  if (typeof globalThis.window === "undefined") return ""
+  const protocol = globalThis.location.protocol === "https:" ? "wss:" : "ws:"
+  return `${protocol}//${globalThis.location.host}/ws`
 }
 
 function notifyListeners() {
   for (const listener of globalListeners) {
     listener()
+  }
+}
+
+function dispatchToWildcardHandlers(type: string, payload: unknown) {
+  for (const [pattern, handlers] of globalHandlers) {
+    if (!pattern.endsWith(".*")) continue
+    const prefix = pattern.slice(0, -2)
+    if (!type.startsWith(prefix + ".") || pattern === type) continue
+    for (const handler of handlers) {
+      handler(payload)
+    }
   }
 }
 
@@ -44,23 +55,14 @@ function handleMessage(event: MessageEvent) {
     }
 
     // Dispatch to wildcard handlers (e.g., "chat_request.*" matches "chat_request.new")
-    for (const [pattern, handlers] of globalHandlers) {
-      if (pattern.endsWith(".*")) {
-        const prefix = pattern.slice(0, -2)
-        if (data.type.startsWith(prefix + ".") && pattern !== data.type) {
-          for (const handler of handlers) {
-            handler(data.payload)
-          }
-        }
-      }
-    }
+    dispatchToWildcardHandlers(data.type, data.payload)
   } catch {
     // Ignore malformed messages
   }
 }
 
 function connect() {
-  if (typeof window === "undefined") return
+  if (typeof globalThis.window === "undefined") return
   if (globalWs && (globalWs.readyState === WebSocket.OPEN || globalWs.readyState === WebSocket.CONNECTING)) return
 
   const url = getWsUrl()

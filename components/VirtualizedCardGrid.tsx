@@ -31,7 +31,7 @@ export function VirtualizedCardGrid<T extends { id: string }>({
   emptyState,
   className = "",
   columns = { default: 1, md: 2, lg: 3 },
-}: VirtualizedCardGridProps<T>) {
+}: Readonly<VirtualizedCardGridProps<T>>) {
   const observerRef = useRef<IntersectionObserver | null>(null)
   const loadMoreTriggerRef = useRef<HTMLDivElement>(null)
 
@@ -66,7 +66,7 @@ export function VirtualizedCardGrid<T extends { id: string }>({
     return <div className={className}>{emptyState}</div>
   }
 
-  const gridCols = `grid-cols-${columns.default} ${columns.md ? `md:grid-cols-${columns.md}` : ""} ${columns.lg ? `lg:grid-cols-${columns.lg}` : ""}`
+  const gridCols = "grid-cols-" + columns.default + (columns.md ? " md:grid-cols-" + columns.md : "") + (columns.lg ? " lg:grid-cols-" + columns.lg : "")
 
   return (
     <div className={className}>
@@ -89,13 +89,13 @@ export function VirtualizedCardGrid<T extends { id: string }>({
 export function CardGridSkeleton({
   count = 6,
   columns = { default: 1, md: 2, lg: 3 },
-}: { count?: number; columns?: { default: number; md?: number; lg?: number } }) {
-  const gridCols = `grid-cols-${columns.default} ${columns.md ? `md:grid-cols-${columns.md}` : ""} ${columns.lg ? `lg:grid-cols-${columns.lg}` : ""}`
+}: Readonly<{ count?: number; columns?: { default: number; md?: number; lg?: number } }>) {
+  const gridCols = "grid-cols-" + columns.default + (columns.md ? " md:grid-cols-" + columns.md : "") + (columns.lg ? " lg:grid-cols-" + columns.lg : "")
 
   return (
     <div className={`grid ${gridCols} gap-6`}>
       {Array.from({ length: count }).map((_, i) => (
-        <Card key={i}>
+        <Card key={`skeleton-${i}`}>
           <CardHeader>
             <Skeleton className="h-6 w-3/4" />
             <Skeleton className="h-4 w-1/2 mt-2" />

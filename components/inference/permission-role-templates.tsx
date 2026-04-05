@@ -85,7 +85,7 @@ interface PermissionRoleTemplatesProps {
   currentPermissions?: MemberPermissions
 }
 
-export function PermissionRoleTemplates({ onSelectTemplate, currentPermissions }: PermissionRoleTemplatesProps) {
+export function PermissionRoleTemplates({ onSelectTemplate, currentPermissions }: Readonly<PermissionRoleTemplatesProps>) {
   const isTemplateActive = (template: RoleTemplate) => {
     if (!currentPermissions) return false
     return Object.keys(template.permissions).every(
@@ -128,7 +128,7 @@ export function PermissionRoleTemplates({ onSelectTemplate, currentPermissions }
                     <div key={key} className="flex items-center text-xs">
                       <div className={`h-2 w-2 rounded-full mr-2 ${value ? "bg-green-500" : "bg-gray-300"}`} />
                       <span className={value ? "text-foreground" : "text-muted-foreground"}>
-                        {key.replace("can_", "").replace(/_/g, " ")}
+                        {key.replace("can_", "").replaceAll("_", " ")}
                       </span>
                     </div>
                   ))}

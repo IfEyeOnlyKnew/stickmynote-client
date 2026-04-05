@@ -25,7 +25,7 @@ interface AdminManagerProps {
   isOwner: boolean
 }
 
-export function AdminManager({ padId, currentUserId, isOwner }: AdminManagerProps) {
+export function AdminManager({ padId, currentUserId, isOwner }: Readonly<AdminManagerProps>) {
   const { toast } = useToast()
   const [members, setMembers] = useState<Member[]>([])
   const [loading, setLoading] = useState(true)

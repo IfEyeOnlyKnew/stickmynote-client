@@ -38,7 +38,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     )
 
     const calstick = calstickResult.rows[0]
-    if (!calstick || calstick.user_id !== user.id) {
+    if (calstick?.user_id !== user.id) {
       return new Response(JSON.stringify({ error: 'Forbidden' }), { status: 403 })
     }
 
@@ -84,7 +84,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     )
 
     const calstick = calstickResult.rows[0]
-    if (!calstick || calstick.user_id !== user.id) {
+    if (calstick?.user_id !== user.id) {
       return new Response(JSON.stringify({ error: 'Forbidden' }), { status: 403 })
     }
 

@@ -51,7 +51,7 @@ interface GroupedNotification {
   activityTypes: Set<string>
 }
 
-export function NotificationsModal({ open, onOpenChange }: NotificationsModalProps) {
+export function NotificationsModal({ open, onOpenChange }: Readonly<NotificationsModalProps>) {
   const { notifications, loading, markAsRead, markAllAsRead, deleteNotification } = useInferenceNotifications()
   const [showPreferences, setShowPreferences] = useState(false)
   const [selectedStickId, setSelectedStickId] = useState<string | null>(null)
@@ -179,18 +179,18 @@ export function NotificationsModal({ open, onOpenChange }: NotificationsModalPro
 
   const getGroupSummary = (group: GroupedNotification) => {
     const count = group.notifications.length
-    const types = Array.from(group.activityTypes)
+    const types = group.activityTypes
 
     if (count === 1) {
       const n = group.notifications[0]
       const userName = n.users?.full_name || n.users?.email?.split("@")[0] || "Someone"
-      if (types.includes("stick_replied") || types.includes("note_replied")) {
+      if (types.has("stick_replied") || types.has("note_replied")) {
         return `${userName} replied`
       }
-      if (types.includes("stick_created") || types.includes("note_created")) {
+      if (types.has("stick_created") || types.has("note_created")) {
         return `${userName} created a stick`
       }
-      if (types.includes("member_added") || types.includes("pad_member_added")) {
+      if (types.has("member_added") || types.has("pad_member_added")) {
         return `${userName} added you`
       }
       return `${userName} performed an action`
@@ -230,7 +230,6 @@ export function NotificationsModal({ open, onOpenChange }: NotificationsModalPro
         <CardContent className="p-0">
           {/* Group header */}
           <div
-            role="button"
             tabIndex={0}
             className="flex items-center gap-3 p-4 cursor-pointer hover:bg-gray-50"
             onClick={() => group.notifications.length > 1 && toggleGroup(group.key)}
@@ -316,15 +315,13 @@ export function NotificationsModal({ open, onOpenChange }: NotificationsModalPro
                 const isRead = notification.metadata?.read
 
                 return (
-                  <div
+                  <button
                     key={notification.id}
-                    role="button"
-                    tabIndex={0}
-                    className={`flex items-center gap-3 px-4 py-3 border-b last:border-b-0 cursor-pointer hover:bg-gray-100 ${
-                      !isRead ? "bg-blue-50/30" : ""
+                    type="button"
+                    className={`flex items-center gap-3 px-4 py-3 border-b last:border-b-0 cursor-pointer hover:bg-gray-100 w-full text-left ${
+                      isRead ? "" : "bg-blue-50/30"
                     }`}
                     onClick={() => handleNotificationClick(notification)}
-                    onKeyDown={(e) => e.key === "Enter" && handleNotificationClick(notification)}
                   >
                     <div className="w-5" /> {/* Spacer for alignment */}
                     <div className="flex-1 min-w-0">
@@ -339,7 +336,7 @@ export function NotificationsModal({ open, onOpenChange }: NotificationsModalPro
                       </span>
                     </div>
                     {!isRead && <div className="w-2 h-2 rounded-full bg-blue-500 shrink-0" />}
-                  </div>
+                  </button>
                 )
               })}
             </div>

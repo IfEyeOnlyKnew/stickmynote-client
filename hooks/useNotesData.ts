@@ -428,6 +428,68 @@ export function useNotesData(userId: string | null, shouldLoad = true): UseNotes
     lastSyncRef.current = new Date().toISOString()
   }, [allNotes])
 
+  // Extracted state updater for delta sync — avoids deeply nested functions
+  const applyDeltaSync = useCallback((updated: any[] | undefined, deleted: string[] | undefined) => {
+    setAllNotes((prev) => {
+      let next = prev
+
+      // Remove deleted notes
+      if (deleted?.length) {
+        const deletedSet = new Set(deleted)
+        next = next.filter((n) => !deletedSet.has(n.id))
+      }
+
+      // Apply updates and inserts
+      if (updated?.length) {
+        const existingIds = new Set(next.map((n) => n.id))
+        for (const raw of updated) {
+          if (existingIds.has(raw.id)) {
+            next = next.map((n) =>
+              n.id === raw.id
+                ? {
+                    ...n,
+                    topic: raw.topic || "",
+                    title: raw.topic || "",
+                    content: raw.content || "",
+                    color: raw.color || n.color,
+                    position_x: raw.position_x ?? n.position_x,
+                    position_y: raw.position_y ?? n.position_y,
+                    is_shared: Boolean(raw.is_shared),
+                    updated_at: raw.updated_at || n.updated_at,
+                  }
+                : n
+            )
+          } else {
+            next = [
+              {
+                id: raw.id,
+                topic: raw.topic || "",
+                title: raw.topic || "",
+                content: raw.content || "",
+                color: raw.color || "#fef3c7",
+                position_x: raw.position_x || 0,
+                position_y: raw.position_y || 0,
+                is_shared: Boolean(raw.is_shared),
+                hyperlinks: [],
+                tags: [],
+                videos: [],
+                images: [],
+                created_at: raw.created_at || new Date().toISOString(),
+                updated_at: raw.updated_at || new Date().toISOString(),
+                user_id: raw.user_id,
+                replies: [],
+                z_index: 1,
+              },
+              ...next,
+            ]
+          }
+        }
+      }
+
+      return next
+    })
+  }, [setAllNotes])
+
   useEffect(() => {
     if (!userId) return
 
@@ -442,66 +504,7 @@ export function useNotesData(userId: string | null, shouldLoad = true): UseNotes
         const { updated, deleted, serverTime } = await res.json()
 
         if (updated?.length > 0 || deleted?.length > 0) {
-          setAllNotes((prev) => {
-            let next = prev
-
-            // Remove deleted notes
-            if (deleted?.length > 0) {
-              const deletedSet = new Set(deleted)
-              next = next.filter((n) => !deletedSet.has(n.id))
-            }
-
-            // Apply updates and inserts
-            if (updated?.length > 0) {
-              const existingIds = new Set(next.map((n) => n.id))
-              for (const raw of updated) {
-                if (existingIds.has(raw.id)) {
-                  // Update existing note
-                  next = next.map((n) =>
-                    n.id === raw.id
-                      ? {
-                          ...n,
-                          topic: raw.topic || "",
-                          title: raw.topic || "",
-                          content: raw.content || "",
-                          color: raw.color || n.color,
-                          position_x: raw.position_x ?? n.position_x,
-                          position_y: raw.position_y ?? n.position_y,
-                          is_shared: Boolean(raw.is_shared),
-                          updated_at: raw.updated_at || n.updated_at,
-                        }
-                      : n
-                  )
-                } else {
-                  // New note created while away
-                  next = [
-                    {
-                      id: raw.id,
-                      topic: raw.topic || "",
-                      title: raw.topic || "",
-                      content: raw.content || "",
-                      color: raw.color || "#fef3c7",
-                      position_x: raw.position_x || 0,
-                      position_y: raw.position_y || 0,
-                      is_shared: Boolean(raw.is_shared),
-                      hyperlinks: [],
-                      tags: [],
-                      videos: [],
-                      images: [],
-                      created_at: raw.created_at || new Date().toISOString(),
-                      updated_at: raw.updated_at || new Date().toISOString(),
-                      user_id: raw.user_id,
-                      replies: [],
-                      z_index: 1,
-                    },
-                    ...next,
-                  ]
-                }
-              }
-            }
-
-            return next
-          })
+          applyDeltaSync(updated, deleted)
         }
 
         if (serverTime) {
@@ -514,75 +517,76 @@ export function useNotesData(userId: string | null, shouldLoad = true): UseNotes
 
     document.addEventListener("visibilitychange", handleVisibilityChange)
     return () => document.removeEventListener("visibilitychange", handleVisibilityChange)
-  }, [userId])
+  }, [userId, applyDeltaSync])
 
   // ---- Real-time sync via WebSocket ----
   const { subscribe } = useWebSocket()
 
+  // Extracted WebSocket handlers to reduce nesting depth
+  const handleWsNoteCreated = useCallback((note: any) => {
+    if (!note?.id) return
+    setAllNotes((prev) => {
+      if (prev.some((n) => n.id === note.id)) return prev
+      const newNote: Note = {
+        id: note.id,
+        topic: note.topic || "",
+        title: note.topic || "",
+        content: note.content || "",
+        color: note.color || "#fef3c7",
+        position_x: note.position_x || 0,
+        position_y: note.position_y || 0,
+        is_shared: Boolean(note.is_shared),
+        hyperlinks: [],
+        tags: [],
+        videos: [],
+        images: [],
+        created_at: note.created_at || new Date().toISOString(),
+        updated_at: note.updated_at || new Date().toISOString(),
+        user_id: note.user_id,
+        replies: [],
+        z_index: 1,
+      }
+      return [newNote, ...prev]
+    })
+  }, [setAllNotes])
+
+  const handleWsNoteUpdated = useCallback((data: any) => {
+    if (!data?.id) return
+    setAllNotes((prev) =>
+      prev.map((n) => {
+        if (n.id !== data.id) return n
+        return {
+          ...n,
+          ...(data.topic !== undefined && { topic: data.topic, title: data.topic }),
+          ...(data.content !== undefined && { content: data.content }),
+          ...(data.color !== undefined && { color: data.color }),
+          ...(data.position_x !== undefined && { position_x: data.position_x }),
+          ...(data.position_y !== undefined && { position_y: data.position_y }),
+          ...(data.is_shared !== undefined && { is_shared: Boolean(data.is_shared) }),
+          updated_at: data.updated_at || new Date().toISOString(),
+        }
+      })
+    )
+  }, [setAllNotes])
+
+  const handleWsNoteDeleted = useCallback((data: any) => {
+    if (!data?.id) return
+    setAllNotes((prev) => prev.filter((n) => n.id !== data.id))
+  }, [setAllNotes])
+
   useEffect(() => {
     if (!userId) return
 
-    // Listen for notes created in other sessions
-    const unsubCreated = subscribe("note.created", (note: any) => {
-      if (!note?.id) return
-      setAllNotes((prev) => {
-        // Avoid duplicates (the session that created it already has it)
-        if (prev.some((n) => n.id === note.id)) return prev
-        const newNote: Note = {
-          id: note.id,
-          topic: note.topic || "",
-          title: note.topic || "",
-          content: note.content || "",
-          color: note.color || "#fef3c7",
-          position_x: note.position_x || 0,
-          position_y: note.position_y || 0,
-          is_shared: Boolean(note.is_shared),
-          hyperlinks: [],
-          tags: [],
-          videos: [],
-          images: [],
-          created_at: note.created_at || new Date().toISOString(),
-          updated_at: note.updated_at || new Date().toISOString(),
-          user_id: note.user_id,
-          replies: [],
-          z_index: 1,
-        }
-        return [newNote, ...prev]
-      })
-    })
-
-    // Listen for notes updated in other sessions
-    const unsubUpdated = subscribe("note.updated", (data: any) => {
-      if (!data?.id) return
-      setAllNotes((prev) =>
-        prev.map((n) => {
-          if (n.id !== data.id) return n
-          return {
-            ...n,
-            ...(data.topic !== undefined && { topic: data.topic, title: data.topic }),
-            ...(data.content !== undefined && { content: data.content }),
-            ...(data.color !== undefined && { color: data.color }),
-            ...(data.position_x !== undefined && { position_x: data.position_x }),
-            ...(data.position_y !== undefined && { position_y: data.position_y }),
-            ...(data.is_shared !== undefined && { is_shared: Boolean(data.is_shared) }),
-            updated_at: data.updated_at || new Date().toISOString(),
-          }
-        })
-      )
-    })
-
-    // Listen for notes deleted in other sessions
-    const unsubDeleted = subscribe("note.deleted", (data: any) => {
-      if (!data?.id) return
-      setAllNotes((prev) => prev.filter((n) => n.id !== data.id))
-    })
+    const unsubCreated = subscribe("note.created", handleWsNoteCreated)
+    const unsubUpdated = subscribe("note.updated", handleWsNoteUpdated)
+    const unsubDeleted = subscribe("note.deleted", handleWsNoteDeleted)
 
     return () => {
       unsubCreated()
       unsubUpdated()
       unsubDeleted()
     }
-  }, [userId, subscribe])
+  }, [userId, subscribe, handleWsNoteCreated, handleWsNoteUpdated, handleWsNoteDeleted])
 
   return {
     allNotes,

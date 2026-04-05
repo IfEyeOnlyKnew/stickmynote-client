@@ -9,7 +9,7 @@ export function SWUpdateNotification() {
   const [registration, setRegistration] = useState<ServiceWorkerRegistration | null>(null)
 
   useEffect(() => {
-    if (typeof window === "undefined" || !("serviceWorker" in navigator)) return
+    if (typeof globalThis.window === "undefined" || !("serviceWorker" in navigator)) return
     if (process.env.NODE_ENV !== "production") return
 
     // Listen for SW update messages
@@ -21,22 +21,24 @@ export function SWUpdateNotification() {
     navigator.serviceWorker.addEventListener("message", handleMessage)
 
     // Also check for waiting SW on registration
+    const handleUpdateFound = (reg: ServiceWorkerRegistration) => {
+      const newWorker = reg.installing
+      if (newWorker) {
+        newWorker.addEventListener("statechange", () => {
+          if (newWorker.state === "installed" && navigator.serviceWorker.controller) {
+            setShowUpdate(true)
+          }
+        })
+      }
+    }
+
     navigator.serviceWorker.getRegistration().then((reg) => {
       if (reg) {
         setRegistration(reg)
         if (reg.waiting) {
           setShowUpdate(true)
         }
-        reg.addEventListener("updatefound", () => {
-          const newWorker = reg.installing
-          if (newWorker) {
-            newWorker.addEventListener("statechange", () => {
-              if (newWorker.state === "installed" && navigator.serviceWorker.controller) {
-                setShowUpdate(true)
-              }
-            })
-          }
-        })
+        reg.addEventListener("updatefound", () => handleUpdateFound(reg))
       }
     })
 
@@ -57,7 +59,7 @@ export function SWUpdateNotification() {
     if (registration?.waiting) {
       registration.waiting.postMessage({ type: "SKIP_WAITING" })
     }
-    window.location.reload()
+    globalThis.location.reload()
   }, [registration])
 
   if (!showUpdate) return null

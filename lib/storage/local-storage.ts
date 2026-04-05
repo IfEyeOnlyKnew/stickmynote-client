@@ -1,6 +1,6 @@
-import { promises as fs } from "fs"
-import path from "path"
-import { randomUUID } from "crypto"
+import { promises as fs } from "node:fs"
+import path from "node:path"
+import { randomUUID } from "node:crypto"
 
 interface UploadResult {
   url: string
@@ -10,8 +10,8 @@ interface UploadResult {
 }
 
 class LocalFileStorage {
-  private baseDir: string
-  private baseUrl: string
+  private readonly baseDir: string
+  private readonly baseUrl: string
 
   constructor() {
     // Windows Server path: C:\inetpub\stickmynote\uploads
@@ -29,7 +29,7 @@ class LocalFileStorage {
 
   private sanitizeFilename(filename: string): string {
     // Remove or replace invalid Windows filename characters
-    return filename.replace(/[<>:"|?*]/g, "_").replace(/\\/g, "_")
+    return filename.replaceAll(/[<>:"|?*]/g, "_").replaceAll("\\", "_")
   }
 
   private getOrgDirectory(orgId: string): string {
@@ -54,7 +54,7 @@ class LocalFileStorage {
       await fs.writeFile(filePath, file)
 
       const stat = await fs.stat(filePath)
-      const relativePath = path.relative(this.baseDir, filePath).replace(/\\/g, "/")
+      const relativePath = path.relative(this.baseDir, filePath).replaceAll("\\", "/")
       const url = `/uploads/${relativePath}`
 
       console.log(`[Storage] File uploaded: ${filePath}`)
@@ -167,7 +167,7 @@ export async function put(
   let actualFilename = filename
 
   // Check if filename contains org prefix
-  const orgMatch = filename.match(/^orgs\/([^/]+)\/(.+)$/)
+  const orgMatch = /^orgs\/([^/]+)\/(.+)$/.exec(filename)
   if (orgMatch) {
     orgId = orgMatch[1]
     actualFilename = orgMatch[2]

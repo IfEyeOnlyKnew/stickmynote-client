@@ -60,7 +60,7 @@ export async function GET(
        WHERE social_pad_id = $1 AND org_id = $2`,
       [padId, orgContext.orgId]
     )
-    const totalSticks = parseInt(sticksResult.rows[0]?.count || '0', 10)
+    const totalSticks = Number.parseInt(sticksResult.rows[0]?.count || '0', 10)
 
     // Get stick IDs for related queries
     const stickIdsResult = await db.query(
@@ -77,7 +77,7 @@ export async function GET(
          WHERE social_stick_id = ANY($1) AND org_id = $2`,
         [stickIds, orgContext.orgId]
       )
-      totalReplies = parseInt(repliesResult.rows[0]?.count || '0', 10)
+      totalReplies = Number.parseInt(repliesResult.rows[0]?.count || '0', 10)
     }
 
     // Get total reactions
@@ -87,7 +87,7 @@ export async function GET(
         `SELECT COUNT(*) as count FROM stick_reactions WHERE stick_id = ANY($1)`,
         [stickIds]
       )
-      totalReactions = parseInt(reactionsResult.rows[0]?.count || '0', 10)
+      totalReactions = Number.parseInt(reactionsResult.rows[0]?.count || '0', 10)
     }
 
     // Get total members
@@ -96,7 +96,7 @@ export async function GET(
        WHERE social_pad_id = $1 AND accepted = true AND org_id = $2`,
       [padId, orgContext.orgId]
     )
-    const totalMembers = parseInt(membersResult.rows[0]?.count || '0', 10)
+    const totalMembers = Number.parseInt(membersResult.rows[0]?.count || '0', 10)
 
     // Get sticks this week
     const oneWeekAgo = new Date()
@@ -107,7 +107,7 @@ export async function GET(
        WHERE social_pad_id = $1 AND org_id = $2 AND created_at >= $3`,
       [padId, orgContext.orgId, oneWeekAgo.toISOString()]
     )
-    const sticksThisWeek = parseInt(sticksWeekResult.rows[0]?.count || '0', 10)
+    const sticksThisWeek = Number.parseInt(sticksWeekResult.rows[0]?.count || '0', 10)
 
     // Get sticks this month
     const oneMonthAgo = new Date()
@@ -118,7 +118,7 @@ export async function GET(
        WHERE social_pad_id = $1 AND org_id = $2 AND created_at >= $3`,
       [padId, orgContext.orgId, oneMonthAgo.toISOString()]
     )
-    const sticksThisMonth = parseInt(sticksMonthResult.rows[0]?.count || '0', 10)
+    const sticksThisMonth = Number.parseInt(sticksMonthResult.rows[0]?.count || '0', 10)
 
     // Get top contributors
     const contributorsResult = await db.query(
@@ -136,7 +136,7 @@ export async function GET(
       user_id: c.user_id,
       full_name: c.full_name,
       email: c.email,
-      stick_count: parseInt(c.stick_count, 10),
+      stick_count: Number.parseInt(c.stick_count, 10),
       reply_count: 0, // Could add this with a more complex query
     }))
 

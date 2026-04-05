@@ -29,12 +29,12 @@ export function OptimisticSearchResultCard({
   searchTerm,
   onOpen,
   currentUserId,
-}: OptimisticSearchResultCardProps) {
+}: Readonly<OptimisticSearchResultCardProps>) {
   const { toast } = useToast()
 
   const [isHovered, setIsHovered] = useState(false)
   const [viewCount, setViewCount] = useState<number>(0)
-  const [isLoadingCounts, setIsLoadingCounts] = useState(true)
+  const [, setIsLoadingCounts] = useState(true)
   const fetchedRef = useRef(false)
   const pendingActionRef = useRef(false)
 
@@ -86,7 +86,8 @@ export function OptimisticSearchResultCard({
             }))
           }
         }
-      } catch (error) {
+      } catch {
+        // Non-critical — counts and bookmark state fall back to defaults
       } finally {
         setIsLoadingCounts(false)
       }
@@ -168,17 +169,17 @@ export function OptimisticSearchResultCard({
           variant: "destructive",
         })
         setOptimisticState((prev) => ({ ...prev, isBookmarked: !newIsBookmarked }))
-      } else if (!response.ok) {
+      } else if (response.ok) {
+        toast({
+          title: newIsBookmarked ? "Bookmarked" : "Removed bookmark",
+          description: newIsBookmarked ? "Note saved to your bookmarks" : "Note removed from bookmarks",
+        })
+      } else {
         setOptimisticState((prev) => ({ ...prev, isBookmarked: !newIsBookmarked }))
         toast({
           title: "Error",
           description: "Failed to update bookmark",
           variant: "destructive",
-        })
-      } else {
-        toast({
-          title: newIsBookmarked ? "Bookmarked" : "Removed bookmark",
-          description: newIsBookmarked ? "Note saved to your bookmarks" : "Note removed from bookmarks",
         })
       }
     } catch (error) {
@@ -192,7 +193,7 @@ export function OptimisticSearchResultCard({
 
   const handleCopy = (e: React.MouseEvent) => {
     e.stopPropagation()
-    const noteUrl = `${window.location.origin}/personal/${note.id}`
+    const noteUrl = `${globalThis.location.origin}/personal/${note.id}`
     navigator.clipboard.writeText(noteUrl)
     toast({
       title: "Link copied",
@@ -216,11 +217,11 @@ export function OptimisticSearchResultCard({
       <>
         {parts.map((part, i) =>
           part.toLowerCase() === term.toLowerCase() ? (
-            <mark key={i} className="bg-yellow-200 text-gray-900 font-semibold px-0.5 rounded">
+            <mark key={`highlight-${i}`} className="bg-yellow-200 text-gray-900 font-semibold px-0.5 rounded">
               {part}
             </mark>
           ) : (
-            part
+            <span key={`text-${i}`}>{part}</span>
           ),
         )}
       </>
@@ -228,7 +229,7 @@ export function OptimisticSearchResultCard({
   }
 
   const getExcerpt = (content: string) => {
-    const text = content.replace(/<[^>]*>/g, "").trim()
+    const text = content.replaceAll(/<[^>]*>/g, "").trim()
     return text.length > 100 ? text.substring(0, 100) + "..." : text
   }
 

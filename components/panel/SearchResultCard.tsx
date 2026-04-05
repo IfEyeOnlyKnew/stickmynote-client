@@ -16,9 +16,8 @@ interface SearchResultCardProps {
   currentUserId?: string
 }
 
-export function SearchResultCard({ note, searchTerm, onOpen, currentUserId }: SearchResultCardProps) {
+export function SearchResultCard({ note, searchTerm, onOpen, currentUserId }: Readonly<SearchResultCardProps>) {
   const [isHovered, setIsHovered] = useState(false)
-  const [showPreview, setShowPreview] = useState(false)
 
   // Highlight matched terms in text
   const highlightText = (text: string, term?: string) => {
@@ -29,11 +28,11 @@ export function SearchResultCard({ note, searchTerm, onOpen, currentUserId }: Se
       <>
         {parts.map((part, i) =>
           part.toLowerCase() === term.toLowerCase() ? (
-            <mark key={i} className="bg-yellow-200 text-gray-900 font-semibold px-0.5 rounded">
+            <mark key={`highlight-${i}`} className="bg-yellow-200 text-gray-900 font-semibold px-0.5 rounded">
               {part}
             </mark>
           ) : (
-            part
+            <span key={`text-${i}`}>{part}</span>
           ),
         )}
       </>
@@ -42,7 +41,7 @@ export function SearchResultCard({ note, searchTerm, onOpen, currentUserId }: Se
 
   // Get excerpt from content (first 100 chars)
   const getExcerpt = (content: string) => {
-    const text = content.replace(/<[^>]*>/g, "").trim()
+    const text = content.replaceAll(/<[^>]*>/g, "").trim()
     return text.length > 100 ? text.substring(0, 100) + "..." : text
   }
 
@@ -96,7 +95,7 @@ export function SearchResultCard({ note, searchTerm, onOpen, currentUserId }: Se
                 className="h-8 w-8 p-0 bg-white/80 hover:bg-white shadow-sm"
                 onClick={(e) => {
                   e.stopPropagation()
-                  const noteUrl = `${window.location.origin}/personal/${note.id}`
+                  const noteUrl = `${globalThis.location.origin}/personal/${note.id}`
                   navigator.clipboard.writeText(noteUrl)
                 }}
                 title="Copy link to clipboard"

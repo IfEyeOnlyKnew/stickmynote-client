@@ -111,7 +111,7 @@ export default function ConcurSticksPage() {
     else setLoadingMore(true)
 
     try {
-      const url = new URL("/api/concur/sticks", window.location.origin)
+      const url = new URL("/api/concur/sticks", globalThis.location.origin)
       url.searchParams.set("limit", String(PAGE_SIZE))
       if (cursor) url.searchParams.set("cursor", cursor)
 
@@ -203,11 +203,12 @@ export default function ConcurSticksPage() {
 
       {/* Content */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6">
-        {loading ? (
+        {loading && (
           <div className="flex items-center justify-center py-20">
             <Loader2 className="h-8 w-8 animate-spin text-indigo-600" />
           </div>
-        ) : sticks.length === 0 ? (
+        )}
+        {!loading && sticks.length === 0 && (
           <div className="text-center py-20">
             <MessageCircle className="h-16 w-16 mx-auto mb-4 text-muted-foreground/30" />
             <h2 className="text-xl font-semibold text-muted-foreground">No Sticks Yet</h2>
@@ -215,7 +216,8 @@ export default function ConcurSticksPage() {
               Posts from your Concur groups will appear here.
             </p>
           </div>
-        ) : (
+        )}
+        {!loading && sticks.length > 0 && (
           <>
             <div className="space-y-6">
               {dateGroups.map((group) => (
@@ -226,7 +228,7 @@ export default function ConcurSticksPage() {
                       <Calendar className="h-4 w-4" />
                       {group.label}
                       <span className="text-xs font-normal">
-                        ({group.sticks.length} stick{group.sticks.length !== 1 ? "s" : ""})
+                        ({group.sticks.length} stick{group.sticks.length === 1 ? "" : "s"})
                       </span>
                     </h2>
                   </div>
@@ -282,7 +284,7 @@ export default function ConcurSticksPage() {
 // Feed Stick Card
 // ============================================================================
 
-function FeedStickCard({ stick, onClick }: { stick: FeedStick; onClick: () => void }) {
+function FeedStickCard({ stick, onClick }: Readonly<{ stick: FeedStick; onClick: () => void }>) {
   return (
     <Card
       className="cursor-pointer hover:shadow-md hover:border-indigo-200 transition-all duration-200 overflow-hidden"

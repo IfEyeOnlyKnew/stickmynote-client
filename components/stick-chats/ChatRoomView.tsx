@@ -25,7 +25,6 @@ import { useUserPresence } from "@/hooks/usePresence"
 import type {
   StickChatWithDetails,
   StickChatMessageWithUser,
-  StickChatMemberWithUser,
 } from "@/types/stick-chat"
 import { getChatDisplayName, isChatExpiringSoon, getDaysUntilExpiry } from "@/types/stick-chat"
 
@@ -100,6 +99,14 @@ export const ChatRoomView: React.FC<ChatRoomViewProps> = ({
     [chat.id, cursor]
   )
 
+  // Extracted handler to reduce function nesting depth
+  const handleWsMessageEdited = useCallback((payload: any) => {
+    if (payload.chatId !== chat.id) return
+    setMessages((prev) =>
+      prev.map((m) => (m.id === payload.message.id ? payload.message : m))
+    )
+  }, [chat.id])
+
   // Initial fetch + WebSocket for real-time updates
   useEffect(() => {
     fetchMessages()
@@ -110,19 +117,13 @@ export const ChatRoomView: React.FC<ChatRoomViewProps> = ({
         setMessages((prev) => [...prev, payload.message])
       }
     })
-    const unsubEdit = subscribe("chat.message_edited", (payload: any) => {
-      if (payload.chatId === chat.id) {
-        setMessages((prev) =>
-          prev.map((m) => (m.id === payload.message.id ? payload.message : m))
-        )
-      }
-    })
+    const unsubEdit = subscribe("chat.message_edited", handleWsMessageEdited)
 
     return () => {
       unsubMessage()
       unsubEdit()
     }
-  }, [chat.id]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [chat.id, handleWsMessageEdited]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Auto-scroll to bottom on new messages
   useEffect(() => {
@@ -239,7 +240,7 @@ export const ChatRoomView: React.FC<ChatRoomViewProps> = ({
               <h1 className="font-semibold text-lg text-gray-900">{displayName}</h1>
               <p className="text-sm text-gray-500">
                 {chat.members?.length || 1} member
-                {(chat.members?.length || 1) !== 1 ? "s" : ""}
+                {(chat.members?.length || 1) === 1 ? "" : "s"}
                 {onlineCount > 0 && (
                   <span className="ml-2 text-green-600">
                     • {onlineCount} online
@@ -339,16 +340,18 @@ export const ChatRoomView: React.FC<ChatRoomViewProps> = ({
           </div>
         )}
 
-        {isLoading ? (
+        {isLoading && (
           <div className="flex items-center justify-center py-12">
             <Loader2 className="w-8 h-8 animate-spin text-gray-400" />
           </div>
-        ) : messages.length === 0 ? (
+        )}
+        {!isLoading && messages.length === 0 && (
           <div className="flex flex-col items-center justify-center py-12 text-gray-500">
             <p className="text-lg font-medium">No messages yet</p>
             <p className="text-sm mt-1">Start the conversation below</p>
           </div>
-        ) : (
+        )}
+        {!isLoading && messages.length > 0 && (
           messages.map((msg) => {
             const isOwnMessage = msg.user_id === currentUserId
             const displayName = getDisplayName(msg)

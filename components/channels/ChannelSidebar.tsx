@@ -11,7 +11,6 @@ import {
   Plus,
   ChevronDown,
   ChevronRight,
-  Settings,
   Lock,
   Users,
   MessageSquare,
@@ -28,7 +27,7 @@ interface ChannelSidebarProps {
   onCreateCategory?: () => void
 }
 
-export function ChannelSidebar({ orgId, currentUserId, onCreateChannel, onCreateCategory }: ChannelSidebarProps) {
+export function ChannelSidebar({ orgId, currentUserId, onCreateChannel, onCreateCategory }: Readonly<ChannelSidebarProps>) {
   const router = useRouter()
   const pathname = usePathname()
   const { connected, subscribe } = useWebSocket()
@@ -58,24 +57,26 @@ export function ChannelSidebar({ orgId, currentUserId, onCreateChannel, onCreate
     fetchChannels()
   }, [fetchChannels])
 
+  // Extracted handler to reduce function nesting depth
+  const handleWsChatMessage = useCallback((payload: any) => {
+    setChannels((prev) =>
+      prev.map((ch) =>
+        ch.id === payload.chatId
+          ? { ...ch, unread_count: (ch.unread_count || 0) + 1 }
+          : ch
+      )
+    )
+  }, [])
+
   // Listen for real-time updates
   useEffect(() => {
     const unsubs = [
-      subscribe("chat.message", (payload: any) => {
-        // Update unread count for the channel
-        setChannels((prev) =>
-          prev.map((ch) =>
-            ch.id === payload.chatId
-              ? { ...ch, unread_count: (ch.unread_count || 0) + 1 }
-              : ch
-          )
-        )
-      }),
+      subscribe("chat.message", handleWsChatMessage),
       subscribe("voice.joined", () => fetchChannels()),
       subscribe("voice.left", () => fetchChannels()),
     ]
     return () => unsubs.forEach((u) => u())
-  }, [subscribe, fetchChannels])
+  }, [subscribe, fetchChannels, handleWsChatMessage])
 
   const toggleCategory = (categoryId: string) => {
     setCollapsedCategories((prev) => {
@@ -127,11 +128,13 @@ export function ChannelSidebar({ orgId, currentUserId, onCreateChannel, onCreate
             : "text-gray-600 hover:bg-gray-100 hover:text-gray-900"
         }`}
       >
-        {isVoice ? (
+        {isVoice && (
           <Volume2 className="w-4 h-4 flex-shrink-0 text-green-600" />
-        ) : isPrivate ? (
+        )}
+        {!isVoice && isPrivate && (
           <Lock className="w-4 h-4 flex-shrink-0 text-gray-400" />
-        ) : (
+        )}
+        {!isVoice && !isPrivate && (
           <Hash className="w-4 h-4 flex-shrink-0 text-gray-400" />
         )}
 

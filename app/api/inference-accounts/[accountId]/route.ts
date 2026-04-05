@@ -25,7 +25,7 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
       .eq("id", accountId)
       .maybeSingle()
 
-    if (!account || account.owner_id !== user.id) {
+    if (account?.owner_id !== user.id) {
       return NextResponse.json({ error: "Account not found or unauthorized" }, { status: 404 })
     }
 

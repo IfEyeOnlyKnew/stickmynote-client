@@ -298,11 +298,13 @@ export const ReplyCard = memo(function ReplyCard({
                                 : "border-purple-400 bg-purple-50 text-purple-700"
                             }`}
                           >
-                            {isCheckingSync ? (
+                            {isCheckingSync && (
                               <RefreshCw className="h-2.5 w-2.5 animate-spin" />
-                            ) : hasCalstickChanges ? (
+                            )}
+                            {!isCheckingSync && hasCalstickChanges && (
                               <AlertCircle className="h-2.5 w-2.5" />
-                            ) : (
+                            )}
+                            {!isCheckingSync && !hasCalstickChanges && (
                               <CheckSquare className="h-2.5 w-2.5" />
                             )}
                             CalStick
@@ -386,7 +388,7 @@ export const ReplyCard = memo(function ReplyCard({
 
             {/* Reply content */}
             {isEditing ? (
-              <div className="space-y-2" onClick={(e) => e.stopPropagation()}>
+              <div className="space-y-2" onClick={(e) => e.stopPropagation()} onKeyDown={(e) => e.stopPropagation()}>
                 <Textarea
                   value={editContent}
                   onChange={(e) => setEditContent(e.target.value)}

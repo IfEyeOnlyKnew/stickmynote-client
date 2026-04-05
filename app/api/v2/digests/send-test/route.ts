@@ -137,7 +137,7 @@ export async function POST(request: NextRequest) {
 
     const result = await sendEmail({
       to: profile.email,
-      subject: `[Test] Your ${frequency === 'daily' ? 'Daily' : 'Weekly'} Digest - ${notifications.length} update${notifications.length !== 1 ? 's' : ''}`,
+      subject: `[Test] Your ${frequency === 'daily' ? 'Daily' : 'Weekly'} Digest - ${notifications.length} update${notifications.length === 1 ? '' : 's'}`,
       html,
       text,
     })

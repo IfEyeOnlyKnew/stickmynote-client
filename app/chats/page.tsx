@@ -145,7 +145,7 @@ export default function ChatsPage() {
             <div>
               <h1 className="text-2xl font-bold text-gray-900">Chats Hub</h1>
               <p className="text-sm text-gray-500">
-                {chats.length} active chat{chats.length !== 1 ? "s" : ""}
+                {chats.length} active chat{chats.length === 1 ? "" : "s"}
               </p>
             </div>
           </div>
@@ -178,29 +178,31 @@ export default function ChatsPage() {
         </Tabs>
 
         {/* Chats Grid */}
-        {isLoading ? (
+        {isLoading && (
           <div className="flex items-center justify-center py-16">
             <Loader2 className="w-8 h-8 animate-spin text-gray-400" />
           </div>
-        ) : chats.length === 0 ? (
+        )}
+        {!isLoading && chats.length === 0 && (
           <div className="text-center py-16">
             <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
               <MessagesSquare className="w-8 h-8 text-gray-400" />
             </div>
             <h2 className="text-xl font-semibold text-gray-900 mb-2">No chats yet</h2>
             <p className="text-gray-500 mb-6">
-              {filter === "all"
-                ? "Start a new chat or open a chat from a stick"
-                : filter === "groups"
-                ? "No group chats yet"
-                : "No direct messages yet"}
+              {(() => {
+                if (filter === "all") return "Start a new chat or open a chat from a stick"
+                if (filter === "groups") return "No group chats yet"
+                return "No direct messages yet"
+              })()}
             </p>
             <Button onClick={() => setCreateModalOpen(true)}>
               <Plus className="w-4 h-4 mr-2" />
               Start a Chat
             </Button>
           </div>
-        ) : (
+        )}
+        {!isLoading && chats.length > 0 && (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
             {chats.map((chat) => (
               <ChatCard

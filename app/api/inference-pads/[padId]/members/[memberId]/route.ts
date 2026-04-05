@@ -24,7 +24,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
       .eq("user_id", user.id)
       .maybeSingle()
 
-    if (!membership || membership.admin_level !== "owner") {
+    if (membership?.admin_level !== "owner") {
       return NextResponse.json({ error: "Only owners can modify admin permissions" }, { status: 403 })
     }
 
@@ -85,7 +85,7 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
       .eq("user_id", user.id)
       .maybeSingle()
 
-    if (!membership || membership.admin_level !== "owner") {
+    if (membership?.admin_level !== "owner") {
       return NextResponse.json({ error: "Only owners can remove members" }, { status: 403 })
     }
 

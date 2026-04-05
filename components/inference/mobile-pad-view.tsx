@@ -42,7 +42,7 @@ export function MobilePadView({
   onStickToggle,
   expandedSticks = new Set(),
   replies = {},
-}: MobilePadViewProps) {
+}: Readonly<MobilePadViewProps>) {
   const router = useRouter()
 
   return (

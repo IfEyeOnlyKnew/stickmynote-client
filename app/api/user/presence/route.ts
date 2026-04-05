@@ -89,6 +89,36 @@ export async function POST(request: NextRequest) {
  * Query params:
  *   - ids: comma-separated list of user IDs (max 100)
  */
+function parseCachedPresence(cached: string | null): { isOnline: boolean; lastSeenAt: string | null } {
+  if (!cached) return { isOnline: false, lastSeenAt: null }
+  try {
+    const data = JSON.parse(cached)
+    return { isOnline: true, lastSeenAt: data.lastSeenAt }
+  } catch {
+    return { isOnline: true, lastSeenAt: null }
+  }
+}
+
+async function resolvePresence(userIds: string[]): Promise<Record<string, { isOnline: boolean; lastSeenAt: string | null }>> {
+  const presence: Record<string, { isOnline: boolean; lastSeenAt: string | null }> = {}
+  const offlineIds: string[] = []
+
+  for (const userId of userIds) {
+    const cached = await cache.get(`presence:${userId}`)
+    presence[userId] = parseCachedPresence(cached)
+    if (!cached) offlineIds.push(userId)
+  }
+
+  if (offlineIds.length > 0) {
+    const result = await db.query(`SELECT id, last_seen_at FROM users WHERE id = ANY($1)`, [offlineIds])
+    for (const row of result.rows) {
+      if (presence[row.id]) presence[row.id].lastSeenAt = row.last_seen_at
+    }
+  }
+
+  return presence
+}
+
 export async function GET(request: NextRequest) {
   try {
     const { user, error: authError } = await getCachedAuthUser()
@@ -118,38 +148,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "Maximum 100 user IDs allowed" }, { status: 400 })
     }
 
-    // Check Memcached for each user's presence
-    const presence: Record<string, { isOnline: boolean; lastSeenAt: string | null }> = {}
-    const offlineIds: string[] = []
-
-    for (const userId of userIds) {
-      const cached = await cache.get(`presence:${userId}`)
-      if (cached) {
-        try {
-          const data = JSON.parse(cached)
-          presence[userId] = { isOnline: true, lastSeenAt: data.lastSeenAt }
-        } catch {
-          presence[userId] = { isOnline: true, lastSeenAt: null }
-        }
-      } else {
-        presence[userId] = { isOnline: false, lastSeenAt: null }
-        offlineIds.push(userId)
-      }
-    }
-
-    // Batch-fetch last_seen_at from PostgreSQL for offline users
-    if (offlineIds.length > 0) {
-      const result = await db.query(
-        `SELECT id, last_seen_at FROM users WHERE id = ANY($1)`,
-        [offlineIds]
-      )
-      for (const row of result.rows) {
-        if (presence[row.id]) {
-          presence[row.id].lastSeenAt = row.last_seen_at
-        }
-      }
-    }
-
+    const presence = await resolvePresence(userIds)
     return NextResponse.json({ presence })
   } catch (error) {
     console.error("[Presence] GET error:", error)

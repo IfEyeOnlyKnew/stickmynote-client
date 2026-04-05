@@ -121,7 +121,7 @@ export function useStickMediaUploadBase<T extends MediaItem>({
   }
 
   const handleDelete = async (itemId: string): Promise<void> => {
-    if (!window.confirm(`Delete this ${tabName.toLowerCase().slice(0, -1)}?`)) return
+    if (!globalThis.confirm(`Delete this ${tabName.toLowerCase().slice(0, -1)}?`)) return
 
     try {
       console.log("[v0] Deleting stick media item:", { stickId, tabType, itemId })

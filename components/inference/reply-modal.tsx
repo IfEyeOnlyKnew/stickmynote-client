@@ -44,7 +44,7 @@ export function ReplyModal({
   title = "Add Reply",
   suggestedCategory,
   guidedPrompts,
-}: ReplyModalProps) {
+}: Readonly<ReplyModalProps>) {
   const [content, setContent] = useState("")
   const [category, setCategory] = useState("Default")
   const [submitting, setSubmitting] = useState(false)

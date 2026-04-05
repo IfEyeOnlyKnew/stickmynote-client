@@ -93,7 +93,7 @@ export async function POST(request: NextRequest) {
       .from("invoices")
       .select("id", { count: "exact", head: true })
 
-    const seq = ((countResult as any)?.length || 0) + 1
+    const seq = (countResult?.length || 0) + 1
     const invoiceNumber = `INV-${year}-${String(seq).padStart(3, "0")}`
 
     // Calculate totals

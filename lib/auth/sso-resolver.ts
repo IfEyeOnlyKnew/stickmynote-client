@@ -18,7 +18,7 @@ export interface AuthMethodResolution {
 export async function resolveAuthMethod(email: string): Promise<AuthMethodResolution> {
   const defaultResult: AuthMethodResolution = { method: "ldap" }
 
-  if (!email || !email.includes("@")) {
+  if (!email?.includes("@")) {
     return defaultResult
   }
 

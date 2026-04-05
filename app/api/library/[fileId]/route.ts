@@ -3,8 +3,8 @@ import { db } from "@/lib/database/pg-client"
 import { getOrgContext } from "@/lib/auth/get-org-context"
 import { getCachedAuthUser, createRateLimitResponse, createUnauthorizedResponse } from "@/lib/auth/cached-auth"
 import { checkStickLibraryPermissions } from "@/lib/library/library-permissions"
-import { promises as fs } from "fs"
-import path from "path"
+import { promises as fs } from "node:fs"
+import path from "node:path"
 
 /**
  * DELETE /api/library/[fileId] - Delete a file from a stick's folder

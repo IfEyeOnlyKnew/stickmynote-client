@@ -23,7 +23,7 @@ interface CreateChannelModalProps {
   onCreated?: () => void
 }
 
-export function CreateChannelModal({ open, onOpenChange, onCreated }: CreateChannelModalProps) {
+export function CreateChannelModal({ open, onOpenChange, onCreated }: Readonly<CreateChannelModalProps>) {
   const { csrfToken } = useCSRF()
   const [name, setName] = useState("")
   const [description, setDescription] = useState("")
@@ -64,7 +64,7 @@ export function CreateChannelModal({ open, onOpenChange, onCreated }: CreateChan
           visibility,
           description: description.trim() || undefined,
           topic: topic.trim() || undefined,
-          category_id: categoryId !== "__none" ? categoryId : undefined,
+          category_id: categoryId === "__none" ? undefined : categoryId,
         }),
       })
 
@@ -131,7 +131,7 @@ export function CreateChannelModal({ open, onOpenChange, onCreated }: CreateChan
               <Input
                 id="channel-name"
                 value={name}
-                onChange={(e) => setName(e.target.value.toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, ""))}
+                onChange={(e) => setName(e.target.value.toLowerCase().replaceAll(/\s+/g, "-").replaceAll(/[^a-z0-9-]/g, ""))}
                 placeholder="e.g. general"
                 maxLength={80}
                 autoFocus

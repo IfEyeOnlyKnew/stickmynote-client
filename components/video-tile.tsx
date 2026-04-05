@@ -21,7 +21,7 @@ export function VideoTile({
   participant,
   isLocal = false,
   isActiveSpeaker = false,
-}: VideoTileProps) {
+}: Readonly<VideoTileProps>) {
   const videoRef = useRef<HTMLVideoElement>(null)
   const audioRef = useRef<HTMLAudioElement>(null)
 

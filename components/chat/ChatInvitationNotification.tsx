@@ -26,7 +26,7 @@ export function ChatInvitationNotification({
   open,
   onOpenChange,
   onRespond,
-}: ChatInvitationNotificationProps) {
+}: Readonly<ChatInvitationNotificationProps>) {
   const [isResponding, setIsResponding] = useState(false)
   const [responseStatus, setResponseStatus] = useState<ChatRequestStatus | null>(null)
   const [showMeetingInput, setShowMeetingInput] = useState(false)
@@ -45,11 +45,12 @@ export function ChatInvitationNotification({
     .toUpperCase()
     .slice(0, 2)
 
-  const replyPreview = request.parent_reply?.content
-    ? request.parent_reply.content.length > 100
+  let replyPreview = "a discussion thread"
+  if (request.parent_reply?.content) {
+    replyPreview = request.parent_reply.content.length > 100
       ? request.parent_reply.content.slice(0, 100) + "..."
       : request.parent_reply.content
-    : "a discussion thread"
+  }
 
   const handleRespond = async (status: ChatRequestStatus, message?: string) => {
     setIsResponding(true)

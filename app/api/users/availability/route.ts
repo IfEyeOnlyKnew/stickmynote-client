@@ -13,6 +13,78 @@ export const dynamic = "force-dynamic"
 //   - end: ISO date string for range end
 // ----------------------------------------------------------------------------
 
+interface BusyTime {
+  id: string
+  title: string
+  start_time: string
+  end_time: string
+  is_organizer: boolean
+}
+
+function groupBusyTimesByUser(
+  rows: any[],
+  requestedEmails: string[],
+): Record<string, BusyTime[]> {
+  const result: Record<string, BusyTime[]> = {}
+
+  for (const row of rows) {
+    const affectedEmails = collectAffectedEmails(row)
+    const relevantEmails = requestedEmails.length > 0
+      ? affectedEmails.filter((e) => requestedEmails.includes(e))
+      : affectedEmails
+
+    for (const email of relevantEmails) {
+      if (!result[email]) result[email] = []
+      const exists = result[email].some((bt) => bt.id === row.id)
+      if (exists) continue
+      result[email].push({
+        id: row.id,
+        title: row.title,
+        start_time: row.start_time,
+        end_time: row.end_time,
+        is_organizer: row.organizer_email?.toLowerCase() === email,
+      })
+    }
+  }
+
+  return result
+}
+
+function addUserFilter(
+  conditions: string[],
+  values: any[],
+  paramIndex: number,
+  userIds: string[],
+  emails: string[],
+): number {
+  if (userIds.length > 0) {
+    const placeholders = userIds.map((_, i) => `$${paramIndex + i}`).join(", ")
+    conditions.push(`(m.organizer_id IN (${placeholders}) OR ma.user_id IN (${placeholders}))`)
+    values.push(...userIds, ...userIds)
+    return paramIndex + userIds.length * 2
+  }
+
+  if (emails.length > 0) {
+    const placeholders = emails.map((_, i) => `$${paramIndex + i}`).join(", ")
+    conditions.push(`(
+      ma.email IN (${placeholders})
+      OR m.organizer_id IN (SELECT id FROM users WHERE LOWER(email) IN (${placeholders}))
+      OR ma.user_id IN (SELECT id FROM users WHERE LOWER(email) IN (${placeholders}))
+    )`)
+    values.push(...emails, ...emails, ...emails)
+    return paramIndex + emails.length * 3
+  }
+
+  return paramIndex
+}
+
+function collectAffectedEmails(row: any): string[] {
+  const emails: string[] = []
+  if (row.organizer_email) emails.push(row.organizer_email.toLowerCase())
+  if (row.attendee_email) emails.push(row.attendee_email.toLowerCase())
+  return emails
+}
+
 export async function GET(request: NextRequest) {
   try {
     const { user, error: authError } = await getCachedAuthUser()
@@ -66,22 +138,7 @@ export async function GET(request: NextRequest) {
     conditions.push(`m.status IN ('scheduled', 'in_progress')`)
 
     // User filter - either by user_id in meeting_attendees or organizer_id
-    if (userIds.length > 0) {
-      const userIdPlaceholders = userIds.map((_, i) => `$${paramIndex + i}`).join(", ")
-      conditions.push(`(m.organizer_id IN (${userIdPlaceholders}) OR ma.user_id IN (${userIdPlaceholders}))`)
-      values.push(...userIds, ...userIds)
-      paramIndex += userIds.length * 2
-    } else if (emails.length > 0) {
-      // Look up user IDs from emails first, then also check meeting_attendees.email
-      const emailPlaceholders = emails.map((_, i) => `$${paramIndex + i}`).join(", ")
-      conditions.push(`(
-        ma.email IN (${emailPlaceholders})
-        OR m.organizer_id IN (SELECT id FROM users WHERE LOWER(email) IN (${emailPlaceholders}))
-        OR ma.user_id IN (SELECT id FROM users WHERE LOWER(email) IN (${emailPlaceholders}))
-      )`)
-      values.push(...emails, ...emails, ...emails)
-      paramIndex += emails.length * 3
-    }
+    paramIndex = addUserFilter(conditions, values, paramIndex, userIds, emails)
 
     const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : ""
 
@@ -105,55 +162,7 @@ export async function GET(request: NextRequest) {
 
     const result = await db.query(query, values)
 
-    // Group busy times by user email
-    const busyTimesByUser: Record<string, Array<{
-      id: string
-      title: string
-      start_time: string
-      end_time: string
-      is_organizer: boolean
-    }>> = {}
-
-    for (const row of result.rows || []) {
-      // Determine which user(s) this meeting affects
-      const affectedEmails: string[] = []
-
-      // Check organizer
-      if (row.organizer_email) {
-        affectedEmails.push(row.organizer_email.toLowerCase())
-      }
-
-      // Check attendee
-      if (row.attendee_email) {
-        affectedEmails.push(row.attendee_email.toLowerCase())
-      }
-
-      // Filter to only requested emails/users
-      const relevantEmails = affectedEmails.filter((email) => {
-        if (emails.length > 0) {
-          return emails.includes(email)
-        }
-        return true // If using user_ids, include all
-      })
-
-      for (const email of relevantEmails) {
-        if (!busyTimesByUser[email]) {
-          busyTimesByUser[email] = []
-        }
-
-        // Avoid duplicates
-        const exists = busyTimesByUser[email].some((bt) => bt.id === row.id)
-        if (!exists) {
-          busyTimesByUser[email].push({
-            id: row.id,
-            title: row.title,
-            start_time: row.start_time,
-            end_time: row.end_time,
-            is_organizer: row.organizer_email?.toLowerCase() === email,
-          })
-        }
-      }
-    }
+    const busyTimesByUser = groupBusyTimesByUser(result.rows || [], emails)
 
     return NextResponse.json({
       availability: busyTimesByUser,

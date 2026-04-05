@@ -500,7 +500,7 @@ export const ThreadedReplies: React.FC<ThreadedRepliesProps> = ({
           Replies ({totalReplyCount})
           {enableThreading && threadedReplies.length > 0 && (
             <span className="text-xs text-gray-500 ml-2">
-              {threadedReplies.length} thread{threadedReplies.length !== 1 ? "s" : ""}
+              {threadedReplies.length} thread{threadedReplies.length === 1 ? "" : "s"}
             </span>
           )}
         </h3>

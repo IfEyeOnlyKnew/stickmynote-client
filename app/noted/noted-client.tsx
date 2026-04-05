@@ -21,7 +21,7 @@ interface NotedClientProps {
   userId: string
 }
 
-export function NotedClient({ userId }: NotedClientProps) {
+export function NotedClient({ userId }: Readonly<NotedClientProps>) {
   const searchParams = useSearchParams()
   const pageIdParam = searchParams.get("page")
 

@@ -29,7 +29,7 @@ interface AccessiblePad {
   href: string
 }
 
-export function BreadcrumbNav({ items }: BreadcrumbNavProps) {
+export function BreadcrumbNav({ items }: Readonly<BreadcrumbNavProps>) {
   const [pads, setPads] = useState<AccessiblePad[]>([])
   const [loading, setLoading] = useState(false)
   const [hasMore, setHasMore] = useState(true)
@@ -93,7 +93,7 @@ export function BreadcrumbNav({ items }: BreadcrumbNavProps) {
   return (
     <nav className="flex items-center space-x-1 text-sm text-gray-600 mb-6">
       {items.map((item, index) => (
-        <div key={index} className="flex items-center">
+        <div key={item.label} className="flex items-center">
           {index > 0 && <ChevronRight className="h-4 w-4 mx-1 text-gray-400" />}
 
           {item.showPadDropdown ? (
@@ -152,7 +152,8 @@ export function BreadcrumbNav({ items }: BreadcrumbNavProps) {
                 </ScrollArea>
               </DropdownMenuContent>
             </DropdownMenu>
-          ) : (item.href || item.onClick) && !item.current ? (
+          ) : null}
+          {!item.showPadDropdown && (item.href || item.onClick) && !item.current && (
             item.href ? (
               <Link href={item.href}>
                 <Button
@@ -173,7 +174,8 @@ export function BreadcrumbNav({ items }: BreadcrumbNavProps) {
                 {item.label}
               </Button>
             )
-          ) : (
+          )}
+          {!item.showPadDropdown && !((item.href || item.onClick) && !item.current) && (
             <span className={`font-semibold ${item.current ? "text-purple-600" : "text-gray-900"}`}>{item.label}</span>
           )}
         </div>

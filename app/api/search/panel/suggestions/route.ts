@@ -31,7 +31,7 @@ export async function GET() {
       if (recentData) {
         // Remove duplicates and limit to 5
         const queries: string[] = recentData.map((item) => String(item.query || '')).filter((q) => q.length > 0)
-        recentSearches = Array.from(new Set(queries)).slice(0, 5) as string[]
+        recentSearches = Array.from(new Set(queries)).slice(0, 5)
       }
     } catch (error) {
       console.log("[v0] search_history table error:", error)

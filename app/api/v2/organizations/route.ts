@@ -38,8 +38,8 @@ export async function POST(request: NextRequest) {
     // Generate slug from name
     const slug = name
       .toLowerCase()
-      .replace(/[^a-z0-9]+/g, "-")
-      .replace(/^-|-$/g, "") +
+      .replaceAll(/[^a-z0-9]+/g, "-")
+      .replaceAll(/^-|-$/g, "") +
       "-" +
       Math.random().toString(36).substring(2, 7)
     

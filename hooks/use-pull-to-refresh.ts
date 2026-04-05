@@ -55,7 +55,7 @@ export function usePullToRefresh<T extends HTMLElement = HTMLElement>(options: P
   }, [pulling, pullDistance, threshold, refreshing, onRefresh])
 
   useEffect(() => {
-    if (touchOnly && !("ontouchstart" in window)) return
+    if (touchOnly && !("ontouchstart" in globalThis)) return
 
     const el = ref.current
     if (!el) return

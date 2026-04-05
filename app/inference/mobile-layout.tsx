@@ -40,10 +40,10 @@ interface Reply {
 
 export default function MobileInferenceLayout() {
   const router = useRouter()
-  const [publicPads, setPublicPads] = useState<Pad[]>([])
-  const [privatePads, setPrivatePads] = useState<Pad[]>([])
-  const [publicSticksByPad, setPublicSticksByPad] = useState<Record<string, Stick[]>>({})
-  const [privateSticksByPad, setPrivateSticksByPad] = useState<Record<string, Stick[]>>({})
+  const [publicPads] = useState<Pad[]>([])
+  const [privatePads] = useState<Pad[]>([])
+  const [publicSticksByPad] = useState<Record<string, Stick[]>>({})
+  const [privateSticksByPad] = useState<Record<string, Stick[]>>({})
   const [expandedSticks, setExpandedSticks] = useState<Set<string>>(new Set())
   const [replies, setReplies] = useState<Record<string, Reply[]>>({})
   const [loading, setLoading] = useState(true)

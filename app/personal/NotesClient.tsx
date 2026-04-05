@@ -58,7 +58,6 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 
@@ -315,6 +314,27 @@ export function NotesClient({ initialNotes, userId, stats }: Readonly<NotesClien
     [userId, setAllNotes],
   )
 
+  // Extracted state updaters to reduce function nesting depth
+  const updateNoteReply = useCallback((replyId: string, updatedReply: any) => {
+    setAllNotes((prev) =>
+      prev.map((note) => ({
+        ...note,
+        replies: (note.replies || []).map((r) =>
+          r.id === replyId ? { ...r, ...updatedReply } : r
+        ),
+      }))
+    )
+  }, [setAllNotes])
+
+  const removeNoteReply = useCallback((replyId: string) => {
+    setAllNotes((prev) =>
+      prev.map((note) => ({
+        ...note,
+        replies: (note.replies || []).filter((r) => r.id !== replyId),
+      }))
+    )
+  }, [setAllNotes])
+
   // Reply handlers - inline to match /panel implementation
   const handleAddReply = useCallback(async (noteId: string, content: string, color?: string, parentReplyId?: string | null): Promise<void> => {
     console.log("[Personal handleAddReply] Called with:", { noteId, content: content.substring(0, 30), color, parentReplyId })
@@ -368,19 +388,12 @@ export function NotesClient({ initialNotes, userId, stats }: Readonly<NotesClien
       }
 
       const { reply: updatedReply } = await response.json()
-      setAllNotes((prev) =>
-        prev.map((note) => ({
-          ...note,
-          replies: (note.replies || []).map((r) =>
-            r.id === replyId ? { ...r, ...updatedReply } : r
-          ),
-        }))
-      )
+      updateNoteReply(replyId, updatedReply)
     } catch (error) {
       console.error("Error editing reply:", error)
       throw error
     }
-  }, [setAllNotes])
+  }, [updateNoteReply])
 
   const handleDeleteReply = useCallback(async (noteId: string, replyId: string): Promise<void> => {
     try {
@@ -399,17 +412,12 @@ export function NotesClient({ initialNotes, userId, stats }: Readonly<NotesClien
         throw new Error(errorData.error || "Failed to delete reply")
       }
 
-      setAllNotes((prev) =>
-        prev.map((note) => ({
-          ...note,
-          replies: (note.replies || []).filter((r) => r.id !== replyId),
-        }))
-      )
+      removeNoteReply(replyId)
     } catch (error) {
       console.error("Error deleting reply:", error)
       throw error
     }
-  }, [setAllNotes])
+  }, [removeNoteReply])
 
   // Mark client-side readiness
   useEffect(() => {
@@ -633,11 +641,11 @@ export function NotesClient({ initialNotes, userId, stats }: Readonly<NotesClien
               <div className="text-6xl mb-4">📝</div>
               <h3 className="text-lg font-medium mb-2">No notes found</h3>
               <p className="text-sm">
-                {groupsHook.selectedGroupId
-                  ? "No sticks in this group yet. Open a stick and add it to this group."
-                  : searchTerm
-                    ? "Try adjusting your search or filter"
-                    : "Create your first note to get started!"}
+                {(() => {
+                  if (groupsHook.selectedGroupId) return "No sticks in this group yet. Open a stick and add it to this group."
+                  if (searchTerm) return "Try adjusting your search or filter"
+                  return "Create your first note to get started!"
+                })()}
               </p>
             </div>
           ) : (

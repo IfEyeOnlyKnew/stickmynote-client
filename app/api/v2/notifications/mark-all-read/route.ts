@@ -19,8 +19,6 @@ export async function POST(request: NextRequest) {
     if (!authResult.user) {
       return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401 })
     }
-    const user = authResult.user
-
     // Get all unread activities
     const activitiesResult = await db.query(
       `SELECT id, metadata FROM personal_sticks_activities

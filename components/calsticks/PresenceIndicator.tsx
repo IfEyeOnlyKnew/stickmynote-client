@@ -9,7 +9,7 @@ interface PresenceIndicatorProps {
   currentUserId: string
 }
 
-export function PresenceIndicator({ activeUsers, currentTaskId, currentUserId }: PresenceIndicatorProps) {
+export function PresenceIndicator({ activeUsers, currentTaskId, currentUserId }: Readonly<PresenceIndicatorProps>) {
   const usersOnThisTask = Array.from(activeUsers.values()).filter(
     (user) => currentTaskId && user.taskId === currentTaskId && user.userId !== currentUserId,
   )

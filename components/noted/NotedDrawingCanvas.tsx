@@ -51,7 +51,7 @@ export function NotedDrawingCanvas({
   onClose,
   onSave,
   initialImage,
-}: NotedDrawingCanvasProps) {
+}: Readonly<NotedDrawingCanvasProps>) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const [activeTool, setActiveTool] = useState<Tool>("pen")
   const [activeColor, setActiveColor] = useState("#000000")
@@ -78,7 +78,7 @@ export function NotedDrawingCanvas({
     ctx.fillRect(0, 0, canvas.width, canvas.height)
 
     if (initialImage) {
-      const img = new window.Image()
+      const img = new globalThis.Image()
       img.onload = () => {
         ctx.drawImage(img, 0, 0, canvas.width, canvas.height)
         saveToHistory()

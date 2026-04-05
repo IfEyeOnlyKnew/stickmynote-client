@@ -317,8 +317,8 @@ export function isWithinOfficeHours(settings: PadChatSettings): boolean {
   })
 
   const parts = formatter.formatToParts(now)
-  const hour = parseInt(parts.find((p) => p.type === "hour")?.value || "0")
-  const minute = parseInt(parts.find((p) => p.type === "minute")?.value || "0")
+  const hour = Number.parseInt(parts.find((p) => p.type === "hour")?.value || "0")
+  const minute = Number.parseInt(parts.find((p) => p.type === "minute")?.value || "0")
   const weekdayStr = parts.find((p) => p.type === "weekday")?.value || "Mon"
 
   // Convert weekday string to number (1=Mon, 7=Sun)

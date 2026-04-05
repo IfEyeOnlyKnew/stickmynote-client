@@ -14,7 +14,7 @@ interface PadSummaryModalProps {
   trigger: React.ReactNode
 }
 
-export function PadSummaryModal({ padId, padName, trigger }: PadSummaryModalProps) {
+export function PadSummaryModal({ padId, padName, trigger }: Readonly<PadSummaryModalProps>) {
   const [isOpen, setIsOpen] = useState(false)
   const [loading, setLoading] = useState(false)
   const [summary, setSummary] = useState<string | null>(null)
@@ -48,22 +48,16 @@ export function PadSummaryModal({ padId, padName, trigger }: PadSummaryModalProp
 
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
-      <div
-        role="button"
-        tabIndex={0}
+      <button
+        type="button"
         onClick={() => {
           setIsOpen(true)
           if (!summary) handleGenerateSummary()
         }}
-        onKeyDown={(e) => {
-          if (e.key === "Enter") {
-            setIsOpen(true)
-            if (!summary) handleGenerateSummary()
-          }
-        }}
+        className="appearance-none bg-transparent border-none p-0 cursor-pointer"
       >
         {trigger}
-      </div>
+      </button>
       <DialogContent className="sm:max-w-[600px]">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">

@@ -56,7 +56,7 @@ export function DiscussionTemplatePicker({
   onOpenChange,
   onSelect,
   currentTemplateId,
-}: DiscussionTemplatePickerProps) {
+}: Readonly<DiscussionTemplatePickerProps>) {
   const [templates, setTemplates] = useState<DiscussionTemplate[]>([])
   const [loading, setLoading] = useState(false)
   const [selecting, setSelecting] = useState<string | null>(null)
@@ -165,6 +165,7 @@ export function DiscussionTemplatePicker({
                     return (
                       <div
                         key={template.id}
+                        tabIndex={0}
                         className={cn(
                           "p-4 rounded-lg border-2 cursor-pointer transition-all",
                           "hover:shadow-md",
@@ -173,6 +174,7 @@ export function DiscussionTemplatePicker({
                             : "border-gray-200 hover:border-gray-300"
                         )}
                         onClick={() => !isSelecting && handleSelect(template)}
+                        onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { if (!isSelecting) handleSelect(template) } }}
                       >
                         <div className="flex items-start justify-between">
                           <div className="flex items-start gap-3">
@@ -216,9 +218,9 @@ export function DiscussionTemplatePicker({
 
                               {/* Required Categories Preview */}
                               <div className="flex flex-wrap gap-1.5 mt-2">
-                                {template.required_categories.map((req, idx) => (
+                                {template.required_categories.map((req) => (
                                   <Badge
-                                    key={idx}
+                                    key={req.category}
                                     variant="outline"
                                     className="text-xs bg-white"
                                   >
@@ -240,13 +242,11 @@ export function DiscussionTemplatePicker({
                               handleSelect(template)
                             }}
                           >
-                            {isSelecting ? (
+                            {isSelecting && (
                               <Loader2 className="h-4 w-4 animate-spin" />
-                            ) : isSelected ? (
-                              "Reapply"
-                            ) : (
-                              "Apply"
                             )}
+                            {!isSelecting && isSelected && "Reapply"}
+                            {!isSelecting && !isSelected && "Apply"}
                           </Button>
                         </div>
                       </div>

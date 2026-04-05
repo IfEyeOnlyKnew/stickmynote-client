@@ -24,7 +24,7 @@ interface Stats {
   recentActivity: Array<{ query: string; created_at: string; results_count: number }>
 }
 
-export function SearchStatsDialog({ open, onOpenChange, userId }: SearchStatsDialogProps) {
+export function SearchStatsDialog({ open, onOpenChange, userId }: Readonly<SearchStatsDialogProps>) {
   const [stats, setStats] = useState<Stats | null>(null)
   const [loading, setLoading] = useState(true)
 
@@ -62,7 +62,7 @@ export function SearchStatsDialog({ open, onOpenChange, userId }: SearchStatsDia
           <DialogDescription>Insights and analytics for search activity and community engagement</DialogDescription>
         </DialogHeader>
 
-        {loading ? (
+        {loading && (
           <div className="space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               {[1, 2, 3].map((i) => (
@@ -78,7 +78,8 @@ export function SearchStatsDialog({ open, onOpenChange, userId }: SearchStatsDia
             </div>
             <Skeleton className="h-64 w-full" />
           </div>
-        ) : stats ? (
+        )}
+        {!loading && stats && (
           <div className="space-y-6">
             {/* Key Metrics */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -136,7 +137,7 @@ export function SearchStatsDialog({ open, onOpenChange, userId }: SearchStatsDia
                   {stats.popularQueries.length > 0 ? (
                     <div className="space-y-3">
                       {stats.popularQueries.map((item, index) => (
-                        <div key={index} className="flex items-center justify-between">
+                        <div key={item.query} className="flex items-center justify-between">
                           <div className="flex items-center gap-2">
                             <span className="flex items-center justify-center w-6 h-6 rounded-full bg-indigo-100 text-indigo-600 text-xs font-bold">
                               {index + 1}
@@ -167,9 +168,9 @@ export function SearchStatsDialog({ open, onOpenChange, userId }: SearchStatsDia
                 <CardContent>
                   {stats.trendingTags.length > 0 ? (
                     <div className="flex flex-wrap gap-2">
-                      {stats.trendingTags.map((item, index) => (
+                      {stats.trendingTags.map((item) => (
                         <Badge
-                          key={index}
+                          key={item.tag}
                           variant="outline"
                           className="border-purple-300 text-purple-700 hover:bg-purple-50"
                         >
@@ -197,9 +198,9 @@ export function SearchStatsDialog({ open, onOpenChange, userId }: SearchStatsDia
               <CardContent>
                 {stats.recentActivity.length > 0 ? (
                   <div className="space-y-2">
-                    {stats.recentActivity.map((item, index) => (
+                    {stats.recentActivity.map((item) => (
                       <div
-                        key={index}
+                        key={`${item.query}-${item.created_at}`}
                         className="flex items-center justify-between py-2 px-3 rounded-lg hover:bg-gray-50 transition-colors"
                       >
                         <div className="flex items-center gap-3">
@@ -220,7 +221,8 @@ export function SearchStatsDialog({ open, onOpenChange, userId }: SearchStatsDia
               </CardContent>
             </Card>
           </div>
-        ) : (
+        )}
+        {!loading && !stats && (
           <div className="text-center py-8">
             <p className="text-gray-500">Failed to load statistics</p>
           </div>

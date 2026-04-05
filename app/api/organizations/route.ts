@@ -84,8 +84,8 @@ export async function POST(req: Request) {
     // Generate unique slug
     const baseSlug = name
       .toLowerCase()
-      .replace(/[^a-z0-9]+/g, "-")
-      .replace(/^-|-$/g, "")
+      .replaceAll(/[^a-z0-9]+/g, "-")
+      .replaceAll(/^-|-$/g, "")
     const slug = `${baseSlug}-${Math.random().toString(36).substring(2, 7)}`
 
     // Create organization and add owner in a transaction

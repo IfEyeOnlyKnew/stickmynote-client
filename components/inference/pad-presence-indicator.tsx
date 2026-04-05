@@ -33,7 +33,7 @@ export function PadPresenceIndicator({
   members,
   currentUserId,
   maxDisplay = 5,
-}: PadPresenceIndicatorProps) {
+}: Readonly<PadPresenceIndicatorProps>) {
   // Get member IDs for presence tracking
   const memberIds = useMemo(() => {
     return members.map((m) => m.user_id)

@@ -32,7 +32,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       .eq("org_id", orgContext.orgId)
       .maybeSingle()
 
-    if (!stick || stick.user_id !== user.id) {
+    if (stick?.user_id !== user.id) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 403 })
     }
 

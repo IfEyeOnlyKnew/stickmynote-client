@@ -20,7 +20,7 @@ export async function GET(
        WHERE reply_id = $1 AND reaction_type = 'like'`,
       [replyId]
     )
-    const likeCount = parseInt(countResult.rows[0]?.count || '0', 10)
+    const likeCount = Number.parseInt(countResult.rows[0]?.count || '0', 10)
 
     // Check if current user liked
     const authResult = await getCachedAuthUser()

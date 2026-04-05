@@ -34,7 +34,6 @@ import {
 } from "@/components/ui/command"
 import {
   Settings,
-  Users,
   Bell,
   Clock,
   Bot,
@@ -44,9 +43,7 @@ import {
   Trash2,
   Crown,
   Loader2,
-  X,
   Check,
-  Search,
   AlertTriangle,
   Calendar,
 } from "lucide-react"
@@ -110,7 +107,7 @@ export function PadChatSettingsDialog({
   padName,
   isOwner,
   currentUserId,
-}: PadChatSettingsDialogProps) {
+}: Readonly<PadChatSettingsDialogProps>) {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
@@ -172,9 +169,9 @@ export function PadChatSettingsDialog({
         if (response.ok) {
           const data = await response.json()
           // Filter out users who are already moderators
+          const moderatorIds = new Set(moderators.map((mod) => mod.user_id))
           const available = (data.members || []).filter(
-            (member: { user_id: string }) =>
-              !moderators.some((mod) => mod.user_id === member.user_id)
+            (member: { user_id: string }) => !moderatorIds.has(member.user_id)
           )
           setSearchResults(available)
         }
@@ -515,7 +512,7 @@ export function PadChatSettingsDialog({
                       <Select
                         value={String(settings?.message_retention_days ?? 30)}
                         onValueChange={(value) =>
-                          setSettings((s) => (s ? { ...s, message_retention_days: parseInt(value) } : s))
+                          setSettings((s) => (s ? { ...s, message_retention_days: Number.parseInt(value) } : s))
                         }
                       >
                         <SelectTrigger>
@@ -1009,17 +1006,19 @@ export function PadChatSettingsDialog({
             disabled={saving}
             className={saved ? "bg-green-600 hover:bg-green-600" : ""}
           >
-            {saving ? (
+            {saving && (
               <>
                 <Loader2 className="h-4 w-4 mr-2 animate-spin" />
                 Saving...
               </>
-            ) : saved ? (
+            )}
+            {!saving && saved && (
               <>
                 <Check className="h-4 w-4 mr-2" />
                 Saved!
               </>
-            ) : (
+            )}
+            {!saving && !saved && (
               <>
                 <Check className="h-4 w-4 mr-2" />
                 Save

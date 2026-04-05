@@ -5,12 +5,11 @@ import { useRouter } from "next/navigation"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Sparkles, Trophy, Award, Heart, Plus, Settings } from "lucide-react"
+import { Sparkles, Trophy, Award, Heart, Plus } from "lucide-react"
 import { useUser } from "@/contexts/user-context"
 import { useOrganization } from "@/contexts/organization-context"
 import { UserMenu } from "@/components/user-menu"
 import { BreadcrumbNav } from "@/components/breadcrumb-nav"
-import { OrgBrandedHeader } from "@/components/organization/org-branded-header"
 import { GiveKudosModal } from "@/components/recognition/give-kudos-modal"
 import { RecognitionFeed } from "@/components/recognition/recognition-feed"
 import { RecognitionStats } from "@/components/recognition/recognition-stats"
@@ -137,7 +136,7 @@ export default function RecognitionPage() {
                       <button
                         onClick={() => { setFilterValueId(null); setFeedKey(k => k + 1) }}
                         className={`w-full text-left px-3 py-2 rounded-md text-sm transition-colors ${
-                          !filterValueId ? "bg-gray-100 font-medium" : "hover:bg-gray-50"
+                          filterValueId ? "hover:bg-gray-50" : "bg-gray-100 font-medium"
                         }`}
                       >
                         All Values

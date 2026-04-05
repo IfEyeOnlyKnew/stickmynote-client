@@ -6,11 +6,8 @@ import {
   getOrgChannels,
   createChannel,
   getChannelCategories,
-  createChannelCategory,
-  updateChannelCategory,
-  deleteChannelCategory,
 } from "@/lib/database/stick-chat-queries"
-import type { CreateStickChatRequest, CreateCategoryRequest } from "@/types/stick-chat"
+import type { CreateStickChatRequest } from "@/types/stick-chat"
 
 /**
  * CHANNELS API

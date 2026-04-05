@@ -6,7 +6,7 @@ import { Badge } from "@/components/ui/badge"
 import { useRouter } from 'next/navigation'
 import Image from "next/image"
 import Link from "next/link"
-import { ArrowLeft, Lightbulb, Users, Zap, Shield, Heart, Github, Mail, Globe, Sparkles, MessageCircle, Share2, Search, Palette, Move, Clock } from 'lucide-react'
+import { ArrowLeft, Lightbulb, Users, Zap, Shield, Heart, ExternalLink, Mail, Globe, Sparkles, MessageCircle, Share2, Search, Palette, Move, Clock } from 'lucide-react'
 import { BreadcrumbNav } from "@/components/breadcrumb-nav"
 
 export default function AboutPage() {
@@ -143,8 +143,8 @@ export default function AboutPage() {
           </CardHeader>
           <CardContent>
             <div className="grid md:grid-cols-2 gap-4">
-              {features.map((feature, index) => (
-                <div key={index} className="flex gap-3 p-4 rounded-lg bg-gray-50 hover:bg-gray-100 transition-colors">
+              {features.map((feature) => (
+                <div key={feature.title} className="flex gap-3 p-4 rounded-lg bg-gray-50 hover:bg-gray-100 transition-colors">
                   <div className="flex-shrink-0 w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center text-blue-600">
                     {feature.icon}
                   </div>
@@ -227,8 +227,8 @@ export default function AboutPage() {
           </CardHeader>
           <CardContent>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-              {techStack.map((tech, index) => (
-                <div key={index} className="text-center">
+              {techStack.map((tech) => (
+                <div key={tech.name} className="text-center">
                   <Badge variant="secondary" className="mb-1">
                     {tech.name}
                   </Badge>
@@ -380,7 +380,7 @@ export default function AboutPage() {
                   support@stickmynote.com
                 </Button>
                 <Button variant="outline" className="flex items-center gap-2 bg-transparent">
-                  <Github className="w-4 h-4" />
+                  <ExternalLink className="w-4 h-4" />
                   GitHub
                 </Button>
               </div>

@@ -21,7 +21,7 @@ interface DataManagementSettingsProps {
   onDeleteAccount: () => void
 }
 
-export function DataManagementSettings({ onExportData, onDeleteAccount }: DataManagementSettingsProps) {
+export function DataManagementSettings({ onExportData, onDeleteAccount }: Readonly<DataManagementSettingsProps>) {
   return (
     <Card>
       <CardHeader>

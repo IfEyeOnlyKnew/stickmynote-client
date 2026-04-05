@@ -25,7 +25,7 @@ export async function GET() {
       .order("display_order", { ascending: true })
 
     // If table doesn't exist, return empty array instead of error
-    if (error && error.code === "PGRST205") {
+    if (error?.code === "PGRST205") {
       console.log("[v0] Categories table not found, returning empty array")
       return NextResponse.json({ categories: [] })
     }

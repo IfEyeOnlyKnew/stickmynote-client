@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect, useCallback } from "react"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -15,7 +15,6 @@ import { toast } from "@/hooks/use-toast"
 import {
   ClipboardList,
   Plus,
-  ExternalLink,
   Copy,
   Trash2,
   FileText,
@@ -156,7 +155,7 @@ export default function FormsPage() {
 
   const copyLink = (form: IntakeForm) => {
     const token = form.share_token || form.token
-    const url = `${window.location.origin}/intake/${token}`
+    const url = `${globalThis.location.origin}/intake/${token}`
     navigator.clipboard.writeText(url)
     toast({ title: "Link copied to clipboard" })
   }
@@ -206,7 +205,7 @@ export default function FormsPage() {
       </div>
 
       {/* Forms List */}
-      {loading ? (
+      {loading && (
         <div className="space-y-3">
           {[1, 2, 3].map((i) => (
             <Card key={i} className="animate-pulse">
@@ -214,7 +213,8 @@ export default function FormsPage() {
             </Card>
           ))}
         </div>
-      ) : forms.length === 0 ? (
+      )}
+      {!loading && forms.length === 0 && (
         <Card>
           <CardContent className="pt-6 text-center text-muted-foreground py-12">
             <ClipboardList className="h-12 w-12 mx-auto text-muted-foreground/50 mb-2" />
@@ -222,7 +222,8 @@ export default function FormsPage() {
             <p className="text-sm mt-1">Create an intake form to collect work requests from your team or external clients</p>
           </CardContent>
         </Card>
-      ) : (
+      )}
+      {!loading && forms.length > 0 && (
         <div className="space-y-3">
           {forms.map((form) => (
             <Card key={form.id} className="hover:border-primary/50 transition-colors">
@@ -232,8 +233,8 @@ export default function FormsPage() {
                     <div className="flex items-center gap-2 mb-1">
                       <FileText className="h-4 w-4 text-primary/70 shrink-0" />
                       <h3 className="font-semibold truncate">{form.title}</h3>
-                      <Badge variant={form.is_active !== false ? "default" : "secondary"} className="text-xs">
-                        {form.is_active !== false ? "Active" : "Inactive"}
+                      <Badge variant={form.is_active === false ? "secondary" : "default"} className="text-xs">
+                        {form.is_active === false ? "Inactive" : "Active"}
                       </Badge>
                     </div>
                     {form.description && (
@@ -242,7 +243,7 @@ export default function FormsPage() {
                     <div className="flex items-center gap-4 text-xs text-muted-foreground">
                       <span className="flex items-center gap-1">
                         <CheckCircle2 className="h-3 w-3" />
-                        {form.submission_count || 0} submission{(form.submission_count || 0) !== 1 ? "s" : ""}
+                        {form.submission_count || 0} submission{(form.submission_count || 0) === 1 ? "" : "s"}
                       </span>
                       <span className="flex items-center gap-1">
                         <Clock className="h-3 w-3" />
@@ -428,7 +429,7 @@ function FieldBuilderDialog({
           )}
 
           {fields.map((field, index) => (
-            <Card key={index} className="border">
+            <Card key={field.field_name} className="border">
               <CardContent className="pt-4 pb-3">
                 <div className="flex items-start gap-3">
                   <div className="flex flex-col gap-1 pt-1">
@@ -461,7 +462,7 @@ function FieldBuilderDialog({
                           value={field.field_label}
                           onChange={(e) => {
                             const label = e.target.value
-                            const name = label.toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_|_$/g, "")
+                            const name = label.toLowerCase().replaceAll(/[^a-z0-9]+/g, "_").replaceAll(/^_|_$/g, "")
                             updateField(index, { field_label: label, field_name: name || `field_${index}` })
                           }}
                           placeholder="Field label"

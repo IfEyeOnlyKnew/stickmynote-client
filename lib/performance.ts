@@ -11,18 +11,18 @@ class PerformanceMonitor {
   private observers: PerformanceObserver[] = [];
 
   constructor() {
-    if (typeof window !== "undefined") {
+    if (typeof globalThis.window !== "undefined") {
       this.initializeWebVitals();
     }
   }
 
   private initializeWebVitals() {
     // Core Web Vitals monitoring
-    if ("PerformanceObserver" in window) {
+    if ("PerformanceObserver" in globalThis) {
       // Largest Contentful Paint
       const lcpObserver = new PerformanceObserver((list) => {
         const entries = list.getEntries();
-        const lastEntry = entries[entries.length - 1] as any;
+        const lastEntry = entries.at(-1) as any;
         this.recordMetric("LCP", lastEntry.startTime, {
           element: lastEntry.element?.tagName,
           url: lastEntry.url,

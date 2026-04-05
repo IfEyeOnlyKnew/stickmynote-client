@@ -6,6 +6,25 @@ import { createVideoRoom, deleteVideoRoom } from "@/lib/livekit/rooms"
 
 export const dynamic = "force-dynamic"
 
+async function checkInviteDLP(inviteEmails: string[], userId: string): Promise<NextResponse | null> {
+  if (inviteEmails.length === 0) return null
+  const orgContext = await getOrgContext()
+  if (!orgContext) return null
+
+  for (const email of inviteEmails) {
+    const dlpResult = await checkDLPPolicy({
+      orgId: orgContext.orgId,
+      action: "invite_external",
+      userId,
+      targetEmail: email,
+    })
+    if (!dlpResult.allowed) {
+      return NextResponse.json({ error: dlpResult.reason }, { status: 403 })
+    }
+  }
+  return null
+}
+
 // GET - Fetch all rooms for the current user
 export async function GET() {
   try {
@@ -58,22 +77,8 @@ export async function POST(request: NextRequest) {
     const { data: userProfile } = await db.from("users").select("email, username").eq("id", user.id).single()
 
     // DLP check for external video invites
-    if (inviteEmails.length > 0) {
-      const orgContext = await getOrgContext()
-      if (orgContext) {
-        for (const email of inviteEmails) {
-          const dlpResult = await checkDLPPolicy({
-            orgId: orgContext.orgId,
-            action: "invite_external",
-            userId: user.id,
-            targetEmail: email,
-          })
-          if (!dlpResult.allowed) {
-            return NextResponse.json({ error: dlpResult.reason }, { status: 403 })
-          }
-        }
-      }
-    }
+    const dlpBlock = await checkInviteDLP(inviteEmails, user.id)
+    if (dlpBlock) return dlpBlock
 
     // Create room via LiveKit
     const room = await createVideoRoom(name, user.id)

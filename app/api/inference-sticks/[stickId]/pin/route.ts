@@ -76,9 +76,9 @@ export async function POST(request: Request, { params }: { params: Promise<{ sti
       .from("social_sticks")
       .update({
         is_pinned: !stick.is_pinned,
-        pinned_at: !stick.is_pinned ? new Date().toISOString() : null,
-        pinned_by: !stick.is_pinned ? user.id : null,
-        pin_order: !stick.is_pinned ? nextPinOrder : null,
+        pinned_at: stick.is_pinned ? null : new Date().toISOString(),
+        pinned_by: stick.is_pinned ? null : user.id,
+        pin_order: stick.is_pinned ? null : nextPinOrder,
       })
       .eq("id", stickId)
       .eq("org_id", orgContext.orgId)
@@ -123,7 +123,7 @@ export async function PUT(request: Request, { params }: { params: Promise<{ stic
       .eq("org_id", orgContext.orgId)
       .maybeSingle()
 
-    if (!stick || !stick.is_pinned) {
+    if (!stick?.is_pinned) {
       return NextResponse.json({ error: "Stick not found or not pinned" }, { status: 404 })
     }
 

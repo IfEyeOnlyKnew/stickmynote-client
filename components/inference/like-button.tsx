@@ -11,7 +11,7 @@ interface LikeButtonProps {
   size?: "sm" | "md" | "lg"
 }
 
-export function LikeButton({ likeCount, isLiked, onToggleLike, size = "md" }: LikeButtonProps) {
+export function LikeButton({ likeCount, isLiked, onToggleLike, size = "md" }: Readonly<LikeButtonProps>) {
   const sizeClasses = {
     sm: "h-7 w-auto px-2 text-xs",
     md: "h-8 w-auto px-3 text-sm",

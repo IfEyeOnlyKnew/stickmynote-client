@@ -28,7 +28,7 @@ export async function GET(request: NextRequest) {
     }
 
     const { searchParams } = new URL(request.url)
-    const limit = parseInt(searchParams.get('limit') || '50')
+    const limit = Number.parseInt(searchParams.get('limit') || '50')
     const unreadOnly = searchParams.get('unread') === 'true'
 
     let queryStr = `SELECT * FROM notifications WHERE user_id = $1 AND org_id = $2`

@@ -65,10 +65,10 @@ export default function ResetPasswordConfirmPage() {
 
       const data = await response.json()
 
-      if (!response.ok) {
-        setFieldError("password", data.error || "Failed to update password")
-      } else {
+      if (response.ok) {
         router.push("/auth/login?message=Password updated successfully")
+      } else {
+        setFieldError("password", data.error || "Failed to update password")
       }
     } catch (err) {
       setFieldError("password", "An unexpected error occurred. Please try again.")

@@ -17,7 +17,7 @@ interface RelatedSticksSidebarProps {
   stickId: string
 }
 
-export function RelatedSticksSidebar({ stickId }: RelatedSticksSidebarProps) {
+export function RelatedSticksSidebar({ stickId }: Readonly<RelatedSticksSidebarProps>) {
   const router = useRouter()
   const [relatedSticks, setRelatedSticks] = useState<RelatedStick[]>([])
   const [loading, setLoading] = useState(true)
@@ -80,18 +80,16 @@ export function RelatedSticksSidebar({ stickId }: RelatedSticksSidebarProps) {
       </CardHeader>
       <CardContent className="space-y-3">
         {relatedSticks.map((stick) => (
-          <div
+          <button
             key={stick.id}
-            role="button"
-            tabIndex={0}
-            className="p-3 rounded-lg border cursor-pointer hover:bg-accent transition-colors"
+            type="button"
+            className="p-3 rounded-lg border cursor-pointer hover:bg-accent transition-colors w-full text-left"
             style={{ backgroundColor: stick.color }}
             onClick={() => router.push(`/inference/sticks/${stick.id}`)}
-            onKeyDown={(e) => e.key === "Enter" && router.push(`/inference/sticks/${stick.id}`)}
           >
             <h4 className="font-medium text-sm line-clamp-1">{stick.topic}</h4>
             <p className="text-xs text-muted-foreground line-clamp-2 mt-1">{stick.content}</p>
-          </div>
+          </button>
         ))}
       </CardContent>
     </Card>

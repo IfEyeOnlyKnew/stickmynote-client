@@ -67,7 +67,11 @@ export function useSystemConfig() {
       // Add overall status
       configChecks.push({
         name: "Overall Status",
-        status: data.status === "healthy" ? "success" : data.status === "degraded" ? "warning" : "error",
+        status: (() => {
+          if (data.status === "healthy") return "success" as const
+          if (data.status === "degraded") return "warning" as const
+          return "error" as const
+        })(),
         message: `System is ${data.status}`,
         details: { timestamp: data.timestamp }
       })

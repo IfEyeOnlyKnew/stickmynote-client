@@ -110,7 +110,7 @@ async function fetchUserMemberships(
  */
 export async function getCurrentOrgId(): Promise<string | undefined> {
   try {
-    const cookieStore = await cookies()
+    const cookieStore = cookies()
     return cookieStore.get(CURRENT_ORG_COOKIE)?.value ?? undefined
   } catch (error) {
     console.error("[SERVER] getCurrentOrgId: Error reading cookies:", error)

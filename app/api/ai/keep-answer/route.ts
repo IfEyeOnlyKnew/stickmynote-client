@@ -10,6 +10,38 @@ interface AIAnswer {
   created_at: string
 }
 
+function parseTabData(tabData: any): Record<string, any> {
+  try {
+    if (typeof tabData === "string") return JSON.parse(tabData)
+    if (tabData && typeof tabData === "object") return tabData
+    return {}
+  } catch {
+    return {}
+  }
+}
+
+async function upsertAIAnswer(
+  serviceDb: any, existingTab: any, stickId: string, noteOwnerId: string, aiAnswer: AIAnswer,
+): Promise<boolean> {
+  if (existingTab) {
+    const currentData = parseTabData(existingTab.tab_data)
+    const newTabData = { ...currentData, ai_answers: [...(currentData.ai_answers || []), aiAnswer] }
+    const { error } = await serviceDb.from("personal_sticks_tabs")
+      .update({ tab_data: newTabData, updated_at: new Date().toISOString() })
+      .eq("id", existingTab.id)
+    if (error) { console.error("Error updating tab:", error); return true }
+  } else {
+    const { error } = await serviceDb.from("personal_sticks_tabs").insert({
+      personal_stick_id: stickId, user_id: noteOwnerId,
+      tab_type: "details", tab_name: "Details",
+      tab_content: "Note details and AI answers",
+      tab_data: { ai_answers: [aiAnswer] }, tab_order: 3,
+    })
+    if (error) { console.error("Error inserting tab:", error); return true }
+  }
+  return false
+}
+
 export async function POST(request: Request) {
   try {
     const db = await createDatabaseClient()
@@ -63,50 +95,9 @@ export async function POST(request: Request) {
       .eq("tab_type", "details")
       .maybeSingle()
 
-    if (existingTab) {
-      // Update existing tab - add to ai_answers array
-      let currentData: { ai_answers?: AIAnswer[]; [key: string]: any } = {}
-      try {
-        if (typeof existingTab.tab_data === "string") {
-          currentData = JSON.parse(existingTab.tab_data)
-        } else if (existingTab.tab_data && typeof existingTab.tab_data === "object") {
-          currentData = existingTab.tab_data
-        }
-      } catch {
-        currentData = {}
-      }
-
-      const updatedAnswers = [...(currentData.ai_answers || []), aiAnswer]
-      const newTabData = { ...currentData, ai_answers: updatedAnswers }
-
-      const { error: updateError } = await serviceDb
-        .from("personal_sticks_tabs")
-        .update({
-          tab_data: newTabData,
-          updated_at: new Date().toISOString(),
-        })
-        .eq("id", existingTab.id)
-
-      if (updateError) {
-        console.error("Error updating tab:", updateError)
-        return NextResponse.json({ error: "Failed to save answer" }, { status: 500 })
-      }
-    } else {
-      // Create new details tab for the note owner
-      const { error: insertError } = await serviceDb.from("personal_sticks_tabs").insert({
-        personal_stick_id: stickId,
-        user_id: noteOwnerId,
-        tab_type: "details",
-        tab_name: "Details",
-        tab_content: "Note details and AI answers",
-        tab_data: { ai_answers: [aiAnswer] },
-        tab_order: 3,
-      })
-
-      if (insertError) {
-        console.error("Error inserting tab:", insertError)
-        return NextResponse.json({ error: "Failed to save answer" }, { status: 500 })
-      }
+    const upsertError = await upsertAIAnswer(serviceDb, existingTab, stickId, noteOwnerId, aiAnswer)
+    if (upsertError) {
+      return NextResponse.json({ error: "Failed to save answer" }, { status: 500 })
     }
 
     // Also log to ai_answer_sessions if table exists (for analytics)

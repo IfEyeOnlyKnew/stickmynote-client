@@ -32,7 +32,7 @@ export function DayView({
   onStickClick,
   onUpdateDate,
   onUpdateTime,
-}: DayViewProps) {
+}: Readonly<DayViewProps>) {
   const [activeId, setActiveId] = useState<string | null>(null)
 
   const sensors = useSensors(

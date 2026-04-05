@@ -19,12 +19,12 @@ export function KeyboardDetector() {
       document.body.classList.remove("using-keyboard")
     }
 
-    window.addEventListener("keydown", handleKeyDown)
-    window.addEventListener("mousedown", handleMouseDown)
+    globalThis.addEventListener("keydown", handleKeyDown)
+    globalThis.addEventListener("mousedown", handleMouseDown)
 
     return () => {
-      window.removeEventListener("keydown", handleKeyDown)
-      window.removeEventListener("mousedown", handleMouseDown)
+      globalThis.removeEventListener("keydown", handleKeyDown)
+      globalThis.removeEventListener("mousedown", handleMouseDown)
     }
   }, [])
 

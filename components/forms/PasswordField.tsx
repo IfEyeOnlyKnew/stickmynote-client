@@ -30,9 +30,9 @@ export function PasswordField({
   autoComplete = "current-password",
   showStrengthIndicator = false,
   minLength,
-}: PasswordFieldProps) {
+}: Readonly<PasswordFieldProps>) {
   const [showPassword, setShowPassword] = useState(false)
-  const id = `password-${label.toLowerCase().replace(/\s+/g, "-")}`
+  const id = `password-${label.toLowerCase().replaceAll(/\s+/g, "-")}`
 
   return (
     <div className="space-y-2">

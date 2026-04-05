@@ -31,8 +31,8 @@ export function FormField({
   maxLength,
   minLength,
   className = "",
-}: FormFieldProps) {
-  const id = `field-${label.toLowerCase().replace(/\s+/g, "-")}`
+}: Readonly<FormFieldProps>) {
+  const id = `field-${label.toLowerCase().replaceAll(/\s+/g, "-")}`
 
   return (
     <div className={`space-y-2 ${className}`}>

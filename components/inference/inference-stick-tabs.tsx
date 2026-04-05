@@ -32,6 +32,6 @@ const inferenceStickTabsConfig: NoteTabsConfig = {
   isTeamNote: false,
 }
 
-export function InferenceStickTabs(props: InferenceStickTabsProps) {
+export function InferenceStickTabs(props: Readonly<InferenceStickTabsProps>) {
   return <GenericNoteTabs {...props} config={inferenceStickTabsConfig} />
 }

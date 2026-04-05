@@ -57,7 +57,7 @@ export function NotedTemplateEditor({
   initialCategory = "general",
   initialContent = "",
   title = "Create Template",
-}: NotedTemplateEditorProps) {
+}: Readonly<NotedTemplateEditorProps>) {
   const [name, setName] = useState(initialName)
   const [description, setDescription] = useState(initialDescription)
   const [category, setCategory] = useState(initialCategory)
@@ -97,12 +97,12 @@ export function NotedTemplateEditor({
   // Reset form when dialog opens
   const handleOpenChange = useCallback(
     (isOpen: boolean) => {
-      if (!isOpen) {
-        onClose()
-      } else {
+      if (isOpen) {
         setName(initialName)
         setDescription(initialDescription)
         setCategory(initialCategory)
+      } else {
+        onClose()
       }
     },
     [onClose, initialName, initialDescription, initialCategory]

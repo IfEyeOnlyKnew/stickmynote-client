@@ -23,7 +23,7 @@ export async function GET(
        WHERE personal_stick_id = $1 AND reaction_type = 'like'`,
       [noteId]
     )
-    const likeCount = parseInt(countResult.rows[0]?.count || '0', 10)
+    const likeCount = Number.parseInt(countResult.rows[0]?.count || '0', 10)
 
     // Check if current user liked
     let isLiked = false

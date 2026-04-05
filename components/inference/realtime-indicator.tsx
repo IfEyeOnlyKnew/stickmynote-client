@@ -8,7 +8,7 @@ interface RealtimeIndicatorProps {
   isConnected: boolean
 }
 
-export function RealtimeIndicator({ isConnected }: RealtimeIndicatorProps) {
+export function RealtimeIndicator({ isConnected }: Readonly<RealtimeIndicatorProps>) {
   return (
     <TooltipProvider>
       <Tooltip>

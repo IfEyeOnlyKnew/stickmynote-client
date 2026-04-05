@@ -18,7 +18,7 @@ interface NotedOcrExtractorProps {
   onInsert: (text: string) => void
 }
 
-export function NotedOcrExtractor({ open, onClose, onInsert }: NotedOcrExtractorProps) {
+export function NotedOcrExtractor({ open, onClose, onInsert }: Readonly<NotedOcrExtractorProps>) {
   const [imagePreview, setImagePreview] = useState<string | null>(null)
   const [extractedText, setExtractedText] = useState("")
   const [processing, setProcessing] = useState(false)
@@ -108,9 +108,18 @@ export function NotedOcrExtractor({ open, onClose, onInsert }: NotedOcrExtractor
 
         <div className="space-y-3">
           {/* Upload area */}
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/*"
+            onChange={handleFileSelect}
+            className="hidden"
+            aria-label="Upload image for OCR"
+          />
           {!imagePreview && (
-            <div
-              className="border-2 border-dashed rounded-lg p-8 text-center cursor-pointer hover:border-primary/50 transition-colors"
+            <button
+              type="button"
+              className="border-2 border-dashed rounded-lg p-8 text-center cursor-pointer hover:border-primary/50 transition-colors w-full"
               onClick={() => fileInputRef.current?.click()}
             >
               <ImageIcon className="h-10 w-10 mx-auto text-muted-foreground/40 mb-3" />
@@ -120,14 +129,7 @@ export function NotedOcrExtractor({ open, onClose, onInsert }: NotedOcrExtractor
               <p className="text-xs text-muted-foreground/70">
                 Supports PNG, JPG, BMP, TIFF
               </p>
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept="image/*"
-                onChange={handleFileSelect}
-                className="hidden"
-              />
-            </div>
+            </button>
           )}
 
           {/* Image preview */}

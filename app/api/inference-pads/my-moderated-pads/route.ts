@@ -77,7 +77,7 @@ export async function GET(request: NextRequest) {
     // Add moderated pads (if not already added as owner)
     for (const mod of moderatedPads || []) {
       if (mod.social_pads && !allPads.has(mod.social_pad_id)) {
-        const pad = mod.social_pads as any
+        const pad = mod.social_pads
         allPads.set(mod.social_pad_id, {
           id: pad.id,
           name: pad.name,

@@ -16,7 +16,7 @@ interface MediaUploadModalProps {
   acceptedTypes?: "image" | "video" | "document" | "all"
 }
 
-export function MediaUploadModal({ open, onClose, onUploadComplete, acceptedTypes = "all" }: MediaUploadModalProps) {
+export function MediaUploadModal({ open, onClose, onUploadComplete, acceptedTypes = "all" }: Readonly<MediaUploadModalProps>) {
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
   const [uploading, setUploading] = useState(false)
   const [progress, setProgress] = useState(0)
@@ -51,7 +51,7 @@ export function MediaUploadModal({ open, onClose, onUploadComplete, acceptedType
     e.stopPropagation()
     setDragActive(false)
 
-    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+    if (e.dataTransfer.files?.[0]) {
       handleFileSelect(e.dataTransfer.files[0])
     }
   }
@@ -127,20 +127,18 @@ export function MediaUploadModal({ open, onClose, onUploadComplete, acceptedType
 
         <div className="space-y-4">
           {/* Drop Zone */}
-          <div
-            role="button"
-            tabIndex={0}
+          <button
+            type="button"
             onDragEnter={handleDrag}
             onDragLeave={handleDrag}
             onDragOver={handleDrag}
             onDrop={handleDrop}
             className={cn(
-              "border-2 border-dashed rounded-lg p-8 text-center transition-colors cursor-pointer",
+              "border-2 border-dashed rounded-lg p-8 text-center transition-colors cursor-pointer w-full",
               dragActive ? "border-purple-500 bg-purple-50" : "border-gray-300 hover:border-purple-400",
               selectedFile && "bg-gray-50",
             )}
             onClick={() => !selectedFile && document.getElementById("file-input")?.click()}
-            onKeyDown={(e) => e.key === "Enter" && !selectedFile && document.getElementById("file-input")?.click()}
           >
             {selectedFile ? (
               <div className="space-y-4">
@@ -174,7 +172,7 @@ export function MediaUploadModal({ open, onClose, onUploadComplete, acceptedType
                 </p>
               </>
             )}
-          </div>
+          </button>
 
           <input
             id="file-input"

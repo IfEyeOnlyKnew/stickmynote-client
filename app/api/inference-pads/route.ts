@@ -4,7 +4,7 @@ import { APICache, withCache } from "@/lib/api-cache"
 import { getOrgContext } from "@/lib/auth/get-org-context"
 import { db } from "@/lib/database/pg-client"
 
-const ADMIN_EMAILS = ["chrisdoran63@outlook.com"]
+const ADMIN_EMAILS = new Set(["chrisdoran63@outlook.com"])
 
 export async function GET(request: Request) {
   try {
@@ -76,7 +76,7 @@ export async function GET(request: Request) {
         return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
       }
 
-      const isUserAdmin = user.email && ADMIN_EMAILS.includes(user.email)
+      const isUserAdmin = user.email && ADMIN_EMAILS.has(user.email)
 
       if (!isUserAdmin) {
         return NextResponse.json({ error: "Forbidden" }, { status: 403 })

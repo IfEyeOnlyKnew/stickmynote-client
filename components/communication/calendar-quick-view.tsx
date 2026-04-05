@@ -54,7 +54,7 @@ export function CalendarQuickView({
   open,
   onOpenChange,
   onScheduleMeeting,
-}: CalendarQuickViewProps) {
+}: Readonly<CalendarQuickViewProps>) {
   const [currentDate, setCurrentDate] = useState(new Date())
   const [selectedDate, setSelectedDate] = useState(new Date())
   const [meetings, setMeetings] = useState<MeetingWithDetails[]>([])
@@ -189,9 +189,9 @@ export function CalendarQuickView({
                   </span>
                   {dayMeetings.length > 0 && (
                     <div className="flex gap-0.5 mt-1">
-                      {dayMeetings.slice(0, 3).map((_, i) => (
+                      {dayMeetings.slice(0, 3).map((meeting) => (
                         <div
-                          key={i}
+                          key={meeting.id}
                           className={cn(
                             "h-1.5 w-1.5 rounded-full",
                             isSelected ? "bg-primary-foreground" : "bg-primary"
@@ -214,16 +214,17 @@ export function CalendarQuickView({
               {isToday(selectedDate) ? "Today" : format(selectedDate, "EEEE, MMMM d")}
               {selectedDayMeetings.length > 0 && (
                 <Badge variant="secondary" className="ml-2">
-                  {selectedDayMeetings.length} meeting{selectedDayMeetings.length !== 1 ? "s" : ""}
+                  {selectedDayMeetings.length} meeting{selectedDayMeetings.length === 1 ? "" : "s"}
                 </Badge>
               )}
             </h3>
 
-            {isLoading ? (
+            {isLoading && (
               <div className="flex items-center justify-center py-8">
                 <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
               </div>
-            ) : selectedDayMeetings.length === 0 ? (
+            )}
+            {!isLoading && selectedDayMeetings.length === 0 && (
               <div className="text-center py-8 text-muted-foreground">
                 <CalendarDays className="h-10 w-10 mx-auto mb-2 opacity-50" />
                 <p>No meetings scheduled</p>
@@ -233,7 +234,8 @@ export function CalendarQuickView({
                   </Button>
                 )}
               </div>
-            ) : (
+            )}
+            {!isLoading && selectedDayMeetings.length > 0 && (
               <ScrollArea className="h-[200px]">
                 <div className="space-y-2 pr-4">
                   {selectedDayMeetings.map((meeting) => (
@@ -253,7 +255,7 @@ export function CalendarQuickView({
 // Meeting Card Component
 // ----------------------------------------------------------------------------
 
-function MeetingCard({ meeting }: { meeting: MeetingWithDetails }) {
+function MeetingCard({ meeting }: Readonly<{ meeting: MeetingWithDetails }>) {
   const startTime = new Date(meeting.start_time)
   const endTime = new Date(meeting.end_time)
 

@@ -2,7 +2,7 @@
 
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
-import { Lightbulb, ArrowRight, MessageSquarePlus } from "lucide-react"
+import { Lightbulb, MessageSquarePlus } from "lucide-react"
 import type { GuidedPrompt } from "@/types/discussion-templates"
 
 interface GuidedPromptsPanelProps {
@@ -36,7 +36,7 @@ export function GuidedPromptsPanel({
   prompts,
   onSelectPrompt,
   className,
-}: GuidedPromptsPanelProps) {
+}: Readonly<GuidedPromptsPanelProps>) {
   if (prompts.length === 0) {
     return null
   }
@@ -57,12 +57,12 @@ export function GuidedPromptsPanel({
       </div>
 
       <div className="space-y-2">
-        {displayedPrompts.map((prompt, idx) => {
+        {displayedPrompts.map((prompt) => {
           const styles = priorityStyles[prompt.priority]
 
           return (
             <div
-              key={idx}
+              key={prompt.prompt}
               className={cn(
                 "flex items-center justify-between gap-2 p-2.5 rounded-md border",
                 styles.bg,
@@ -75,18 +75,18 @@ export function GuidedPromptsPanel({
                   <span
                     className={cn(
                       "text-xs px-1.5 py-0.5 rounded",
-                      prompt.reason === "required"
-                        ? "bg-amber-100 text-amber-700"
-                        : prompt.reason === "suggested"
-                        ? "bg-blue-100 text-blue-700"
-                        : "bg-gray-100 text-gray-600"
+                      (() => {
+                        if (prompt.reason === "required") return "bg-amber-100 text-amber-700"
+                        if (prompt.reason === "suggested") return "bg-blue-100 text-blue-700"
+                        return "bg-gray-100 text-gray-600"
+                      })()
                     )}
                   >
-                    {prompt.reason === "required"
-                      ? "Required"
-                      : prompt.reason === "suggested"
-                      ? "Suggested"
-                      : "Next Step"}
+                    {(() => {
+                      if (prompt.reason === "required") return "Required"
+                      if (prompt.reason === "suggested") return "Suggested"
+                      return "Next Step"
+                    })()}
                   </span>
                   <span className="text-xs text-gray-500">
                     Category: <strong>{prompt.category}</strong>

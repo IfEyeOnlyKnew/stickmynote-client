@@ -10,7 +10,6 @@ import { ScrollArea } from "@/components/ui/scroll-area"
 import {
   Send,
   Loader2,
-  Users,
   Hash,
   Volume2,
   Lock,
@@ -37,7 +36,6 @@ import type {
   StickChatWithDetails,
   StickChatMessageWithUser,
   StickChatMemberWithUser,
-  ReactionSummary,
 } from "@/types/stick-chat"
 import { getChatDisplayName, isChatExpiringSoon, getDaysUntilExpiry, isChannel } from "@/types/stick-chat"
 
@@ -57,9 +55,9 @@ export function ChannelChatView({
   onExport,
   onInviteMembers,
   onSettings,
-}: ChannelChatViewProps) {
+}: Readonly<ChannelChatViewProps>) {
   const { csrfToken } = useCSRF()
-  const { connected, subscribe } = useWebSocket()
+  const { subscribe } = useWebSocket()
 
   const [messages, setMessages] = useState<StickChatMessageWithUser[]>([])
   const [newMessage, setNewMessage] = useState("")
@@ -83,7 +81,6 @@ export function ChannelChatView({
 
   // Typing
   const [typingUsers, setTypingUsers] = useState<Map<string, { name: string; timeout: NodeJS.Timeout }>>(new Map())
-  const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   const lastTypingSentRef = useRef<number>(0)
 
   const messagesEndRef = useRef<HTMLDivElement>(null)
@@ -129,6 +126,67 @@ export function ChannelChatView({
 
   // =========== WEBSOCKET SUBSCRIPTIONS ===========
 
+  // Extracted handlers to reduce function nesting depth
+  const handleWsThreadReply = useCallback((payload: any) => {
+    if (payload.chatId !== chat.id) return
+    setMessages((prev) =>
+      prev.map((m) =>
+        m.id === payload.message.parent_message_id
+          ? { ...m, thread_reply_count: (m.thread_reply_count || 0) + 1, thread_last_reply_at: payload.message.created_at }
+          : m
+      )
+    )
+    if (threadParentId === payload.message.parent_message_id) {
+      setThreadMessages((prev) => [...prev, payload.message])
+    }
+  }, [chat.id, threadParentId])
+
+  const handleWsMessageEdited = useCallback((payload: any) => {
+    if (payload.chatId !== chat.id) return
+    setMessages((prev) =>
+      prev.map((m) => (m.id === payload.message.id ? { ...payload.message, reactions: m.reactions } : m))
+    )
+  }, [chat.id])
+
+  const applyReactionToMessages = useCallback((messageId: string, emoji: string, added: boolean, userId?: string, userName?: string) => {
+    setMessages((prev) =>
+      prev.map((m) => {
+        if (m.id !== messageId) return m
+        const reactions = [...(m.reactions || [])]
+        const existing = reactions.find((r) => r.emoji === emoji)
+        if (added) {
+          if (existing) {
+            existing.count++
+            if (userId) existing.users.push({ id: userId, full_name: userName || "" })
+            else existing.hasReacted = true
+          } else {
+            reactions.push(
+              userId
+                ? { emoji, count: 1, users: [{ id: userId, full_name: userName || "" }], hasReacted: false }
+                : { emoji, count: 1, users: [], hasReacted: true }
+            )
+          }
+        } else {
+          if (existing) {
+            existing.count--
+            if (userId) existing.users = existing.users.filter((u) => u.id !== userId)
+            else existing.hasReacted = false
+            if (existing.count <= 0) reactions.splice(reactions.indexOf(existing), 1)
+          }
+        }
+        return { ...m, reactions }
+      })
+    )
+  }, [])
+
+  const clearTypingUser = useCallback((userId: string) => {
+    setTypingUsers((p) => {
+      const n = new Map(p)
+      n.delete(userId)
+      return n
+    })
+  }, [])
+
   useEffect(() => {
     const unsubs = [
       subscribe("chat.message", (payload: any) => {
@@ -136,61 +194,11 @@ export function ChannelChatView({
           setMessages((prev) => [...prev, payload.message])
         }
       }),
-      subscribe("chat.thread_reply", (payload: any) => {
-        if (payload.chatId === chat.id) {
-          // Update thread count on parent
-          setMessages((prev) =>
-            prev.map((m) =>
-              m.id === payload.message.parent_message_id
-                ? { ...m, thread_reply_count: (m.thread_reply_count || 0) + 1, thread_last_reply_at: payload.message.created_at }
-                : m
-            )
-          )
-          // If thread is open for this parent, add to thread messages
-          if (threadParentId === payload.message.parent_message_id) {
-            setThreadMessages((prev) => [...prev, payload.message])
-          }
-        }
-      }),
-      subscribe("chat.message_edited", (payload: any) => {
-        if (payload.chatId === chat.id) {
-          setMessages((prev) =>
-            prev.map((m) => (m.id === payload.message.id ? { ...payload.message, reactions: m.reactions } : m))
-          )
-        }
-      }),
+      subscribe("chat.thread_reply", handleWsThreadReply),
+      subscribe("chat.message_edited", handleWsMessageEdited),
       subscribe("chat.reaction", (payload: any) => {
         if (payload.chatId === chat.id) {
-          setMessages((prev) =>
-            prev.map((m) => {
-              if (m.id !== payload.messageId) return m
-              const reactions = [...(m.reactions || [])]
-              const existing = reactions.find((r) => r.emoji === payload.emoji)
-              if (payload.added) {
-                if (existing) {
-                  existing.count++
-                  existing.users.push({ id: payload.userId, full_name: payload.userName })
-                } else {
-                  reactions.push({
-                    emoji: payload.emoji,
-                    count: 1,
-                    users: [{ id: payload.userId, full_name: payload.userName }],
-                    hasReacted: false,
-                  })
-                }
-              } else {
-                if (existing) {
-                  existing.count--
-                  existing.users = existing.users.filter((u) => u.id !== payload.userId)
-                  if (existing.count <= 0) {
-                    const idx = reactions.indexOf(existing)
-                    reactions.splice(idx, 1)
-                  }
-                }
-              }
-              return { ...m, reactions }
-            })
-          )
+          applyReactionToMessages(payload.messageId, payload.emoji, payload.added, payload.userId, payload.userName)
         }
       }),
       subscribe("chat.typing", (payload: any) => {
@@ -199,13 +207,7 @@ export function ChannelChatView({
             const next = new Map(prev)
             const existing = next.get(payload.userId)
             if (existing) clearTimeout(existing.timeout)
-            const timeout = setTimeout(() => {
-              setTypingUsers((p) => {
-                const n = new Map(p)
-                n.delete(payload.userId)
-                return n
-              })
-            }, 4000)
+            const timeout = setTimeout(() => clearTypingUser(payload.userId), 4000)
             next.set(payload.userId, { name: payload.userName, timeout })
             return next
           })
@@ -215,7 +217,7 @@ export function ChannelChatView({
       subscribe("chat.unpinned", () => {}),
     ]
     return () => unsubs.forEach((u) => u())
-  }, [subscribe, chat.id, currentUserId, threadParentId])
+  }, [subscribe, chat.id, currentUserId, threadParentId, handleWsThreadReply, handleWsMessageEdited, applyReactionToMessages, clearTypingUser])
 
   // =========== AUTO SCROLL ===========
 
@@ -316,28 +318,7 @@ export function ChannelChatView({
       })
       if (res.ok) {
         const { added } = await res.json()
-        setMessages((prev) =>
-          prev.map((m) => {
-            if (m.id !== messageId) return m
-            const reactions = [...(m.reactions || [])]
-            const existing = reactions.find((r) => r.emoji === emoji)
-            if (added) {
-              if (existing) {
-                existing.count++
-                existing.hasReacted = true
-              } else {
-                reactions.push({ emoji, count: 1, users: [], hasReacted: true })
-              }
-            } else {
-              if (existing) {
-                existing.count--
-                existing.hasReacted = false
-                if (existing.count <= 0) reactions.splice(reactions.indexOf(existing), 1)
-              }
-            }
-            return { ...m, reactions }
-          })
-        )
+        applyReactionToMessages(messageId, emoji, added)
       }
     } catch (error) {
       console.error("Error toggling reaction:", error)
@@ -583,11 +564,13 @@ export function ChannelChatView({
         <div className="flex-shrink-0 border-b px-4 py-3">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              {chat.chat_type === "voice" ? (
+              {chat.chat_type === "voice" && (
                 <Volume2 className="w-5 h-5 text-green-600" />
-              ) : chat.visibility === "private" ? (
+              )}
+              {chat.chat_type !== "voice" && chat.visibility === "private" && (
                 <Lock className="w-5 h-5 text-gray-500" />
-              ) : (
+              )}
+              {chat.chat_type !== "voice" && chat.visibility !== "private" && (
                 <Hash className="w-5 h-5 text-gray-500" />
               )}
               <div>
@@ -660,11 +643,12 @@ export function ChannelChatView({
             </div>
           )}
 
-          {isLoading ? (
+          {isLoading && (
             <div className="flex items-center justify-center py-12">
               <Loader2 className="w-8 h-8 animate-spin text-gray-400" />
             </div>
-          ) : messages.length === 0 ? (
+          )}
+          {!isLoading && messages.length === 0 && (
             <div className="flex flex-col items-center justify-center py-12 text-gray-500">
               <Hash className="w-12 h-12 mb-3 text-gray-300" />
               <p className="text-lg font-medium">
@@ -676,7 +660,8 @@ export function ChannelChatView({
                   : "Start the conversation below"}
               </p>
             </div>
-          ) : (
+          )}
+          {!isLoading && messages.length > 0 && (
             <div className="py-2">
               {messages.filter((m) => !m.parent_message_id).map((msg) => renderMessage(msg))}
             </div>
@@ -716,7 +701,7 @@ export function ChannelChatView({
                 setNewMessage(e.target.value)
                 sendTypingIndicator()
               }}
-              placeholder={`Message ${isPersistentChannel ? `#${chat.name}` : displayName}...`}
+              placeholder={`Message ${isPersistentChannel ? "#" + chat.name : displayName}...`}
               className="resize-none min-h-[44px] max-h-[120px] text-sm"
               maxLength={4000}
               onKeyDown={(e) => {

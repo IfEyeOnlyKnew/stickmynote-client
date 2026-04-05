@@ -18,20 +18,20 @@ export function PWAInstallPrompt() {
   useEffect(() => {
     // Check if already installed
     const standalone =
-      window.matchMedia("(display-mode: standalone)").matches ||
-      (window.navigator as unknown as { standalone?: boolean }).standalone === true
+      globalThis.matchMedia("(display-mode: standalone)").matches ||
+      (globalThis.navigator as unknown as { standalone?: boolean }).standalone === true
     setIsStandalone(standalone)
 
     if (standalone) return
 
     // Check if iOS (no beforeinstallprompt support)
-    const ios = /iPad|iPhone|iPod/.test(navigator.userAgent) && !(window as unknown as { MSStream?: unknown }).MSStream
+    const ios = /iPad|iPhone|iPod/.test(navigator.userAgent) && !(globalThis as unknown as { MSStream?: unknown }).MSStream
     setIsIOS(ios)
 
     // Check if user dismissed before (respect for 7 days)
     const dismissedAt = localStorage.getItem("pwa-install-dismissed")
     if (dismissedAt) {
-      const daysSince = (Date.now() - parseInt(dismissedAt)) / (1000 * 60 * 60 * 24)
+      const daysSince = (Date.now() - Number.parseInt(dismissedAt)) / (1000 * 60 * 60 * 24)
       if (daysSince < 7) return
     }
 
@@ -42,18 +42,18 @@ export function PWAInstallPrompt() {
       setShowPrompt(true)
     }
 
-    window.addEventListener("beforeinstallprompt", handler)
+    globalThis.addEventListener("beforeinstallprompt", handler)
 
     // On iOS, show manual instructions after a delay
     if (ios) {
       const timer = setTimeout(() => setShowPrompt(true), 5000)
       return () => {
         clearTimeout(timer)
-        window.removeEventListener("beforeinstallprompt", handler)
+        globalThis.removeEventListener("beforeinstallprompt", handler)
       }
     }
 
-    return () => window.removeEventListener("beforeinstallprompt", handler)
+    return () => globalThis.removeEventListener("beforeinstallprompt", handler)
   }, [])
 
   const handleInstall = useCallback(async () => {

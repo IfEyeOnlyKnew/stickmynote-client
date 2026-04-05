@@ -81,7 +81,7 @@ export async function POST(request: NextRequest) {
       `SELECT COUNT(*) FROM personal_sticks WHERE ${whereClause}`,
       params
     )
-    const totalCount = parseInt(countResult.rows[0]?.count || '0', 10)
+    const totalCount = Number.parseInt(countResult.rows[0]?.count || '0', 10)
 
     // Sort order
     const ascending = sortBy === 'oldest'
@@ -135,8 +135,8 @@ export async function POST(request: NextRequest) {
     if (tags?.length) {
       const lowerTags = tags.map((t) => t.toLowerCase())
       notes = notes.filter((note: any) => {
-        const noteTags = (tagsMap[note.id] || []).map((t) => t.toLowerCase())
-        return lowerTags.some((tag) => noteTags.includes(tag))
+        const noteTags = new Set((tagsMap[note.id] || []).map((t) => t.toLowerCase()))
+        return lowerTags.some((tag) => noteTags.has(tag))
       })
     }
 
@@ -144,7 +144,7 @@ export async function POST(request: NextRequest) {
     const enrichedNotes = notes.map((note: any) => ({
       ...note,
       user: usersMap[note.user_id] || null,
-      reply_count: parseInt(note.reply_count || '0', 10),
+      reply_count: Number.parseInt(note.reply_count || '0', 10),
       view_count: 0,
       like_count: 0,
       tags: tagsMap[note.id] || [],

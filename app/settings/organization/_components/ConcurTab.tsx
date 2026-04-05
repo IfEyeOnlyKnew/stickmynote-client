@@ -238,17 +238,19 @@ try {
           </div>
 
           {/* Administrators list */}
-          {loading ? (
+          {loading && (
             <div className="flex items-center justify-center py-8">
               <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
             </div>
-          ) : administrators.length === 0 ? (
+          )}
+          {!loading && administrators.length === 0 && (
             <div className="text-center py-8 text-muted-foreground">
               <Users className="h-10 w-10 mx-auto mb-2 opacity-50" />
               <p className="text-sm">No Concur administrators yet</p>
               <p className="text-xs">Add users by email to allow them to create Concur groups</p>
             </div>
-          ) : (
+          )}
+          {!loading && administrators.length > 0 && (
             <div className="space-y-2">
               {administrators.map((admin) => (
                 <div

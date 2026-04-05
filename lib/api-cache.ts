@@ -24,8 +24,8 @@ export interface CacheOptions {
 }
 
 export class APICache {
-  private static DEFAULT_TTL = 60 // 1 minute
-  private static DEFAULT_SWR = 300 // 5 minutes
+  private static readonly DEFAULT_TTL = 60 // 1 minute
+  private static readonly DEFAULT_SWR = 300 // 5 minutes
 
   /**
    * Generate a cache key from request parameters

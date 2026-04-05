@@ -64,45 +64,42 @@ export function scanContent(text: string, customPatterns?: string[]): ScanResult
     return { hasSensitiveData: false, matches: [] }
   }
 
-  const matches: PatternMatch[] = []
+  const matches: PatternMatch[] = [
+    ...scanBuiltInPatterns(text),
+    ...scanCustomPatterns(text, customPatterns),
+  ]
 
-  // Check built-in patterns
+  return { hasSensitiveData: matches.length > 0, matches }
+}
+
+function scanBuiltInPatterns(text: string): PatternMatch[] {
+  const matches: PatternMatch[] = []
   for (const pattern of BUILT_IN_PATTERNS) {
-    // Reset lastIndex for global regexes
     pattern.regex.lastIndex = 0
     const found = text.match(pattern.regex)
-    if (found && found.length > 0) {
-      matches.push({
-        pattern: pattern.id,
-        label: pattern.label,
-        count: found.length,
-      })
+    if (found?.length) {
+      matches.push({ pattern: pattern.id, label: pattern.label, count: found.length })
     }
   }
+  return matches
+}
 
-  // Check custom patterns
-  if (customPatterns && customPatterns.length > 0) {
-    for (const patternStr of customPatterns) {
-      try {
-        const regex = new RegExp(patternStr, "gi")
-        const found = text.match(regex)
-        if (found && found.length > 0) {
-          matches.push({
-            pattern: "custom",
-            label: `Custom pattern: ${patternStr.slice(0, 30)}`,
-            count: found.length,
-          })
-        }
-      } catch {
-        // Skip invalid regex patterns silently
+function scanCustomPatterns(text: string, customPatterns?: string[]): PatternMatch[] {
+  if (!customPatterns?.length) return []
+
+  const matches: PatternMatch[] = []
+  for (const patternStr of customPatterns) {
+    try {
+      const regex = new RegExp(patternStr, "gi")
+      const found = text.match(regex)
+      if (found?.length) {
+        matches.push({ pattern: "custom", label: `Custom pattern: ${patternStr.slice(0, 30)}`, count: found.length })
       }
+    } catch {
+      // Skip invalid regex patterns silently
     }
   }
-
-  return {
-    hasSensitiveData: matches.length > 0,
-    matches,
-  }
+  return matches
 }
 
 /**

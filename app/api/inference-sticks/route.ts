@@ -61,7 +61,7 @@ interface MemberPadId {
 // ============================================================================
 
 const LOG_PREFIX = "[InferenceSticks]"
-const ADMIN_EMAILS = ["chrisdoran63@outlook.com"]
+const ADMIN_EMAILS = new Set(["chrisdoran63@outlook.com"])
 const DEFAULT_STICK_COLOR = "#fef3c7"
 
 const CACHE_TTL_SHORT = 30
@@ -121,8 +121,8 @@ function parseQueryParams(request: Request): {
   userId: string | null
 } {
   const { searchParams } = new URL(request.url)
-  const rawLimit = parseInt(searchParams.get("limit") || "20", 10)
-  const rawOffset = parseInt(searchParams.get("offset") || "0", 10)
+  const rawLimit = Number.parseInt(searchParams.get("limit") || "20", 10)
+  const rawOffset = Number.parseInt(searchParams.get("offset") || "0", 10)
   return {
     isPublic: searchParams.get("public") === "true",
     isAdmin: searchParams.get("admin") === "true",
@@ -480,7 +480,7 @@ async function handleAdminSticksRequest(
   serviceDb: DatabaseClient,
   user: { id: string; email?: string }
 ): Promise<Response> {
-  const isUserAdmin = user.email && ADMIN_EMAILS.includes(user.email)
+  const isUserAdmin = user.email && ADMIN_EMAILS.has(user.email)
   if (!isUserAdmin) {
     return Errors.forbidden()
   }

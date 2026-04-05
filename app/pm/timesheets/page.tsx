@@ -127,7 +127,10 @@ export default function TimesheetsPage() {
   useEffect(() => { fetchSuggestions() }, [fetchSuggestions])
 
   const navigate = (dir: 1 | -1) => {
-    setCurrentDate((d) => viewMode === "weekly" ? (dir === 1 ? addWeeks(d, 1) : subWeeks(d, 1)) : (dir === 1 ? addMonths(d, 1) : subMonths(d, 1)))
+    setCurrentDate((d) => {
+      if (viewMode === "weekly") return dir === 1 ? addWeeks(d, 1) : subWeeks(d, 1)
+      return dir === 1 ? addMonths(d, 1) : subMonths(d, 1)
+    })
   }
 
   const totalSeconds = entries.reduce((s, e) => s + (e.duration_seconds || 0), 0)
@@ -172,7 +175,8 @@ export default function TimesheetsPage() {
         body: JSON.stringify({ action, entryIds: [...selectedIds], note }),
       })
       const data = await res.json()
-      toast({ title: `${data.updated || 0} entries ${action === "submit" ? "submitted" : action === "approve" ? "approved" : "rejected"}` })
+      const actionLabel = (() => { if (action === "submit") return "submitted"; if (action === "approve") return "approved"; return "rejected" })()
+      toast({ title: `${data.updated || 0} entries ${actionLabel}` })
       setSelectedIds(new Set())
       fetchEntries()
     } catch {
@@ -271,7 +275,7 @@ export default function TimesheetsPage() {
           ))}
           {/* Empty cells for offset */}
           {Array.from({ length: getDay(start) }).map((_, i) => (
-            <div key={`empty-${i}`} />
+            <div key={`offset-${i}`} />
           ))}
           {entriesByDay.map(({ day, total }) => {
             const intensity = total > 0 ? Math.max(0.15, total / maxDayTotal) : 0

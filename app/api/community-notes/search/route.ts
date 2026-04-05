@@ -104,7 +104,7 @@ export async function GET(request: NextRequest) {
 
     query = query.order("created_at", { ascending: false }).range(offset, offset + limit - 1)
 
-    const [{ data: notes, error: notesError }, { count, error: countError }] = await Promise.all([query, countQuery])
+    const [{ data: notes, error: notesError }, { count }] = await Promise.all([query, countQuery])
 
     if (notesError) {
       console.error("Search notes error:", notesError)

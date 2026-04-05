@@ -49,7 +49,7 @@ export const useFullscreen = <T extends FullscreenItem>(
   const isExplicitDeletionRef = useRef(false)
 
   // Get the current fullscreen item
-  const fullscreenItem = fullscreenItemId ? allItems.find((item) => item.id === fullscreenItemId) || null : null
+  const fullscreenItem = fullscreenItemId ? allItems.find((item) => item.id === fullscreenItemId) ?? null : null
 
   const isFullscreen = fullscreenItemId !== null
 

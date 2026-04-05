@@ -22,7 +22,7 @@ interface SmartCaptureDialogProps {
   onTasksParsed: (tasks: ParsedTask[]) => Promise<void>
 }
 
-export function SmartCaptureDialog({ isOpen, onClose, onTasksParsed }: SmartCaptureDialogProps) {
+export function SmartCaptureDialog({ isOpen, onClose, onTasksParsed }: Readonly<SmartCaptureDialogProps>) {
   const [input, setInput] = useState("")
   const [loading, setLoading] = useState(false)
   const { toast } = useToast()

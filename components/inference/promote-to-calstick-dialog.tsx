@@ -35,7 +35,7 @@ export function PromoteToCalStickDialog({
   stickTopic,
   stickContent,
   onPromote,
-}: PromoteToCalStickDialogProps) {
+}: Readonly<PromoteToCalStickDialogProps>) {
   const [priority, setPriority] = useState("medium")
   const [dueDate, setDueDate] = useState("")
   const [isPromoting, setIsPromoting] = useState(false)

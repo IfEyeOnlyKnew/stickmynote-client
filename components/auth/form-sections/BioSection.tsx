@@ -8,7 +8,7 @@ interface BioSectionProps {
   isLoading: boolean
 }
 
-export function BioSection({ formData, updateField, isLoading }: BioSectionProps) {
+export function BioSection({ formData, updateField, isLoading }: Readonly<BioSectionProps>) {
   return (
     <TextAreaField
       label="Bio"

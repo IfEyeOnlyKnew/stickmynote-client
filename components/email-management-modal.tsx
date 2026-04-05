@@ -23,7 +23,7 @@ interface EmailManagementModalProps {
   onOpenChange: (open: boolean) => void
 }
 
-export function EmailManagementModal({ open, onOpenChange }: EmailManagementModalProps) {
+export function EmailManagementModal({ open, onOpenChange }: Readonly<EmailManagementModalProps>) {
   const [savedEmails, setSavedEmails] = useState<SavedEmail[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const [newEmail, setNewEmail] = useState("")
@@ -204,7 +204,7 @@ export function EmailManagementModal({ open, onOpenChange }: EmailManagementModa
       const emails = bulkEmails
         .split(/[,\n]/)
         .map((email) => email.trim().toLowerCase())
-        .filter((email) => email && email.includes("@"))
+        .filter((email) => email?.includes("@"))
 
       if (emails.length === 0) {
         throw new Error("No valid emails found")
@@ -289,7 +289,7 @@ export function EmailManagementModal({ open, onOpenChange }: EmailManagementModa
         throw new Error(errorData.error || "Failed to send invitations")
       }
 
-      const result = await response.json()
+      await response.json()
 
       toast({
         title: "Invitations sent",
@@ -348,7 +348,7 @@ export function EmailManagementModal({ open, onOpenChange }: EmailManagementModa
                   variant="default"
                 >
                   {isSendingInvites && "Sending..."}
-                  {!isSendingInvites && `Send ${selectedEmails.length} Invite${selectedEmails.length !== 1 ? "s" : ""}`}
+                  {!isSendingInvites && `Send ${selectedEmails.length} Invite${selectedEmails.length === 1 ? "" : "s"}`}
                 </Button>
                 <Button variant="outline" size="sm" onClick={exportEmails} disabled={savedEmails.length === 0}>
                   <Download className="h-4 w-4 mr-2" />

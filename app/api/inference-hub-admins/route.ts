@@ -2,7 +2,7 @@ import { createDatabaseClient } from "@/lib/database/database-adapter"
 import { NextResponse } from "next/server"
 import { getCachedAuthUser } from "@/lib/auth/cached-auth"
 
-const ADMIN_EMAILS = ["chrisdoran63@outlook.com"]
+const ADMIN_EMAILS = new Set(["chrisdoran63@outlook.com"])
 
 export async function GET() {
   try {
@@ -20,7 +20,7 @@ export async function GET() {
     }
     const user = authResult.user
 
-    const isAdmin = ADMIN_EMAILS.includes(user.email || "")
+    const isAdmin = ADMIN_EMAILS.has(user.email || "")
 
     if (!isAdmin) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 })
@@ -52,7 +52,7 @@ export async function POST(request: Request) {
     }
     const user = authResult.user
 
-    const isAdmin = ADMIN_EMAILS.includes(user.email || "")
+    const isAdmin = ADMIN_EMAILS.has(user.email || "")
 
     if (!isAdmin) {
       return NextResponse.json({ error: "Only global admins can assign roles" }, { status: 403 })
@@ -95,7 +95,7 @@ export async function DELETE(request: Request) {
     }
     const user = authResult.user
 
-    const isAdmin = ADMIN_EMAILS.includes(user.email || "")
+    const isAdmin = ADMIN_EMAILS.has(user.email || "")
 
     if (!isAdmin) {
       return NextResponse.json({ error: "Only global admins can remove roles" }, { status: 403 })

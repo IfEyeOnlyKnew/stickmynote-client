@@ -1,5 +1,5 @@
-import fs from "fs"
-import path from "path"
+import fs from "node:fs"
+import path from "node:path"
 
 type LogLevel = "info" | "warn" | "error" | "debug"
 
@@ -12,8 +12,8 @@ interface LogEntry {
 }
 
 class Logger {
-  private logDir: string
-  private enableFileLogging: boolean
+  private readonly logDir: string
+  private readonly enableFileLogging: boolean
 
   constructor() {
     this.logDir = process.env.LOG_DIR || path.join(process.cwd(), "logs")

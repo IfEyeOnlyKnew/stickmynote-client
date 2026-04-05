@@ -377,7 +377,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ sti
 
 export async function PUT(request: Request, { params }: { params: Promise<{ stickId: string }> }) {
   try {
-    const { stickId } = await params
+    await params
     const db = await createDatabaseClient()
 
     // Auth + org context check

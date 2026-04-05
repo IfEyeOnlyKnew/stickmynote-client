@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent } from "@/components/ui/card"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import { Award, Star, Trophy, Crown, Gem, Heart, Gift, Flame, Users, Lightbulb, GraduationCap, Sparkles } from "lucide-react"
 import { BADGE_TIERS } from "@/types/recognition"
@@ -29,7 +29,7 @@ interface BadgeDisplayProps {
   maxDisplay?: number
 }
 
-export function BadgeDisplay({ userId, compact = false, maxDisplay }: BadgeDisplayProps) {
+export function BadgeDisplay({ userId, compact = false, maxDisplay }: Readonly<BadgeDisplayProps>) {
   const [badges, setBadges] = useState<BadgeAward[]>([])
   const [loading, setLoading] = useState(true)
 

@@ -8,7 +8,7 @@ interface PrivacySettingsProps {
   onUpdate: (field: keyof UserSettings["privacy"], value: boolean | string) => void
 }
 
-export function PrivacySettings({ privacy, onUpdate }: PrivacySettingsProps) {
+export function PrivacySettings({ privacy, onUpdate }: Readonly<PrivacySettingsProps>) {
   return (
     <Card>
       <CardHeader>

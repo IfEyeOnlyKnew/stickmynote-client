@@ -23,8 +23,8 @@ export interface CachedSearchResult {
 }
 
 export class SearchCache {
-  private static CACHE_TTL = 300 // 5 minutes
-  private static MAX_CACHE_SIZE = 1000 // Maximum cached searches
+  private static readonly CACHE_TTL = 300 // 5 minutes
+  private static readonly MAX_CACHE_SIZE = 1000 // Maximum cached searches
 
   static getCacheKey(searchTerm: string, page = 1): string {
     return `search:${searchTerm.toLowerCase().trim()}:${page}`

@@ -79,16 +79,16 @@ export async function GET(
         endDate.setTime(startDate.getTime() + 3600000)
       }
 
-      const startStr = startDate.toISOString().replace(/[-:.]/g, '').slice(0, 15) + 'Z'
-      const endStr = endDate.toISOString().replace(/[-:.]/g, '').slice(0, 15) + 'Z'
+      const startStr = startDate.toISOString().replaceAll(/[-:.]/g, '').slice(0, 15) + 'Z'
+      const endStr = endDate.toISOString().replaceAll(/[-:.]/g, '').slice(0, 15) + 'Z'
       const dtStamp =
         new Date(task.updated_at || task.created_at)
           .toISOString()
-          .replace(/[-:.]/g, '')
+          .replaceAll(/[-:.]/g, '')
           .slice(0, 15) + 'Z'
 
-      const summary = (task.stick_topic || 'Untitled Task').replace(/,/g, '\\,')
-      const description = (task.content || '').replace(/\n/g, '\\n').replace(/,/g, '\\,')
+      const summary = (task.stick_topic || 'Untitled Task').replaceAll(',', String.raw`\,`)
+      const description = (task.content || '').replaceAll('\n', String.raw`\n`).replaceAll(',', String.raw`\,`)
       const priorityMap: Record<string, number> = {
         urgent: 1,
         high: 3,
@@ -131,17 +131,17 @@ export async function GET(
       const startDate = new Date(meeting.start_time)
       const endDate = new Date(meeting.end_time)
 
-      const startStr = startDate.toISOString().replace(/[-:.]/g, '').slice(0, 15) + 'Z'
-      const endStr = endDate.toISOString().replace(/[-:.]/g, '').slice(0, 15) + 'Z'
+      const startStr = startDate.toISOString().replaceAll(/[-:.]/g, '').slice(0, 15) + 'Z'
+      const endStr = endDate.toISOString().replaceAll(/[-:.]/g, '').slice(0, 15) + 'Z'
       const dtStamp =
         new Date(meeting.updated_at || meeting.created_at)
           .toISOString()
-          .replace(/[-:.]/g, '')
+          .replaceAll(/[-:.]/g, '')
           .slice(0, 15) + 'Z'
 
-      const summary = (meeting.title || 'Untitled Meeting').replace(/,/g, '\\,')
-      const desc = (meeting.description || '').replace(/\n/g, '\\n').replace(/,/g, '\\,')
-      const location = (meeting.location || '').replace(/,/g, '\\,')
+      const summary = (meeting.title || 'Untitled Meeting').replaceAll(',', String.raw`\,`)
+      const desc = (meeting.description || '').replaceAll('\n', String.raw`\n`).replaceAll(',', String.raw`\,`)
+      const location = (meeting.location || '').replaceAll(',', String.raw`\,`)
 
       const lines = [
         'BEGIN:VEVENT',

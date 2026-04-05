@@ -166,7 +166,7 @@ export default function Verify2FAPage() {
                   {error}
                   {attemptsRemaining > 0 && (
                     <span className="block mt-1 text-sm">
-                      {attemptsRemaining} attempt{attemptsRemaining !== 1 ? "s" : ""} remaining
+                      {attemptsRemaining} attempt{attemptsRemaining === 1 ? "" : "s"} remaining
                     </span>
                   )}
                 </AlertDescription>

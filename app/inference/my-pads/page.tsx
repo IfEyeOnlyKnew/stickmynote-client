@@ -108,10 +108,10 @@ export default function MyInferencePadsPage() {
       </header>
 
       <main className="container mx-auto px-4 py-8">
-        {loadingPads ? (
+        {loadingPads && (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {Array.from({ length: 6 }).map((_, i) => (
-              <Card key={i}>
+              <Card key={`skeleton-${i}`}>
                 <CardHeader>
                   <div className="flex items-start justify-between">
                     <div className="flex-1">
@@ -130,7 +130,8 @@ export default function MyInferencePadsPage() {
               </Card>
             ))}
           </div>
-        ) : pads.length === 0 ? (
+        )}
+        {!loadingPads && pads.length === 0 && (
           <Card>
             <CardContent className="py-12 text-center">
               <Users className="h-12 w-12 text-gray-400 mx-auto mb-4" />
@@ -139,7 +140,8 @@ export default function MyInferencePadsPage() {
               <Button onClick={() => router.push("/inference")}>Go to Inference Hub</Button>
             </CardContent>
           </Card>
-        ) : (
+        )}
+        {!loadingPads && pads.length > 0 && (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {pads.map((pad) => (
               <Card key={pad.id} className="hover:shadow-lg transition-shadow">

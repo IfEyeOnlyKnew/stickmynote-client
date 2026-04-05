@@ -33,7 +33,7 @@ export function CreatePadModal({
   open: controlledOpen,
   onOpenChange,
   onPadCreated,
-}: CreatePadModalProps) {
+}: Readonly<CreatePadModalProps>) {
   const [internalOpen, setInternalOpen] = useState(false)
   const [loading, setLoading] = useState(false)
   const [formData, setFormData] = useState({
@@ -42,7 +42,7 @@ export function CreatePadModal({
   })
   const router = useRouter()
 
-  const open = controlledOpen !== undefined ? controlledOpen : internalOpen
+  const open = controlledOpen ?? internalOpen
   const setOpen = onOpenChange || setInternalOpen
 
   const handleSubmit = async (e: React.FormEvent) => {

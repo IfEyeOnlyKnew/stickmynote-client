@@ -38,7 +38,7 @@ export function PersonalGroupsSidebar({
   onDeleteGroup,
   mobileOpen,
   onMobileClose,
-}: PersonalGroupsSidebarProps) {
+}: Readonly<PersonalGroupsSidebarProps>) {
   const isMobile = useIsMobile()
   const [isCreating, setIsCreating] = useState(false)
   const [newGroupName, setNewGroupName] = useState("")
@@ -86,7 +86,7 @@ export function PersonalGroupsSidebar({
     if (!mobileOpen) return null
     return (
       <div className="fixed inset-0 z-[9998]">
-        <div className="absolute inset-0 bg-black/40" onClick={onMobileClose} />
+        <button type="button" className="absolute inset-0 bg-black/40 border-none cursor-default" aria-label="Close sidebar" onClick={onMobileClose} />
         <div className="absolute top-0 left-0 h-full w-64 bg-white shadow-xl flex flex-col animate-in slide-in-from-left duration-200">
           <div className="flex items-center justify-between px-3 py-3 border-b border-gray-100">
             <h3 className="text-sm font-semibold text-gray-700">Groups</h3>

@@ -38,7 +38,7 @@ export function ConcurGroupSettingsDialog({
   currentHeaderImageUrl,
   onClose,
   onUpdated,
-}: ConcurGroupSettingsDialogProps) {
+}: Readonly<ConcurGroupSettingsDialogProps>) {
   const { toast } = useToast()
   const [logoUrl, setLogoUrl] = useState(currentLogoUrl || "")
   const [headerImageUrl, setHeaderImageUrl] = useState(currentHeaderImageUrl || "")

@@ -78,7 +78,7 @@ export function FullCalendarModal({
   open,
   onOpenChange,
   onScheduleMeeting,
-}: FullCalendarModalProps) {
+}: Readonly<FullCalendarModalProps>) {
   const [currentMonth, setCurrentMonth] = useState(new Date())
   const [selectedDate, setSelectedDate] = useState<Date | null>(null)
   const [meetings, setMeetings] = useState<MeetingWithDetails[]>([])
@@ -515,7 +515,7 @@ export function FullCalendarModal({
 // Meeting Card Component
 // ----------------------------------------------------------------------------
 
-function MeetingCard({ meeting }: { meeting: MeetingWithDetails }) {
+function MeetingCard({ meeting }: Readonly<{ meeting: MeetingWithDetails }>) {
   const startTime = new Date(meeting.start_time)
   const endTime = new Date(meeting.end_time)
   const { user } = useUser()
@@ -523,7 +523,7 @@ function MeetingCard({ meeting }: { meeting: MeetingWithDetails }) {
 
   // Find current user's attendee record
   const myAttendee = meeting.attendees?.find(
-    (a) => a.user_id === user?.id || (user?.email && a.email?.toLowerCase() === user.email.toLowerCase())
+    (a) => a.user_id === user?.id || a.email?.toLowerCase() === user?.email?.toLowerCase()
   )
 
   const handleRsvp = async (status: AttendeeStatus) => {
@@ -612,7 +612,7 @@ function MeetingCard({ meeting }: { meeting: MeetingWithDetails }) {
               className={cn("h-5 px-1.5 text-[10px]", myAttendee.status === s && ATTENDEE_STATUS_COLORS[s])}
               onClick={() => handleRsvp(s)}
             >
-              {s === "accepted" ? "Accept" : s === "tentative" ? "Maybe" : "Decline"}
+              {(() => { if (s === "accepted") return "Accept"; if (s === "tentative") return "Maybe"; return "Decline" })()}
             </Button>
           ))}
         </div>
@@ -625,12 +625,12 @@ function MeetingCard({ meeting }: { meeting: MeetingWithDetails }) {
 // Other User Busy Card Component
 // ----------------------------------------------------------------------------
 
-function OtherUserBusyCard({ email, busyTime }: { email: string; busyTime: BusyTime }) {
+function OtherUserBusyCard({ email, busyTime }: Readonly<{ email: string; busyTime: BusyTime }>) {
   const startTime = new Date(busyTime.start_time)
   const endTime = new Date(busyTime.end_time)
 
   // Extract display name from email (part before @)
-  const displayName = email.split("@")[0].replace(/[._]/g, " ")
+  const displayName = email.split("@")[0].replaceAll(/[._]/g, " ")
 
   return (
     <div className="p-2 bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-800 rounded-lg">

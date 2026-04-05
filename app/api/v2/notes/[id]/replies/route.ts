@@ -291,7 +291,7 @@ export async function DELETE(
         [reply.personal_stick_id]
       )
 
-      if (!noteResult.rows[0] || noteResult.rows[0].user_id !== user.id || noteResult.rows[0].org_id !== orgContext.orgId) {
+      if (noteResult.rows[0]?.user_id !== user.id || noteResult.rows[0]?.org_id !== orgContext.orgId) {
         return new Response(JSON.stringify({ error: "Cannot delete another user's reply" }), { status: 403 })
       }
     }

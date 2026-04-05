@@ -207,8 +207,6 @@ export async function POST(request: NextRequest) {
     if (!authResult.userId) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
-    const user = { id: authResult.userId }
-
     const orgContext = await getOrgContext()
     if (!orgContext) {
       return NextResponse.json({ error: "No organization context" }, { status: 403 })

@@ -22,8 +22,6 @@ export function useNoteSearchSimple(
   const [searchQuery, setSearchQuery] = useState("")
 
   const filteredNotes = useMemo(() => {
-    const startTime = performance.now()
-
     if (!Array.isArray(notes)) {
       return []
     }
@@ -44,7 +42,7 @@ export function useNoteSearchSimple(
     }
 
     // Apply search if query exists
-    if (!searchQuery || !searchQuery.trim()) {
+    if (!searchQuery?.trim()) {
       return notesToFilter
     }
 
@@ -108,7 +106,7 @@ export function useNoteSearch(notes: Note[] = [], searchTerm = "", filter: "all"
     }
 
     // Apply search if term exists
-    if (!searchTerm || !searchTerm.trim()) {
+    if (!searchTerm?.trim()) {
       const endTime = performance.now()
       return {
         filteredNotes: notesToFilter,

@@ -23,7 +23,7 @@ export function AuthForm({ mode = "signin" }: Readonly<AuthFormProps>) {
   const [isAlreadyAuthenticated, setIsAlreadyAuthenticated] = useState(false)
   const searchParams = useSearchParams()
   const redirectTo = searchParams.get("redirectTo") || searchParams.get("redirect") || "/dashboard"
-  const { user, reloadUser } = useUser()
+  const { reloadUser } = useUser()
 
   const {
     accessCode,
@@ -44,10 +44,11 @@ export function AuthForm({ mode = "signin" }: Readonly<AuthFormProps>) {
           const data = await response.json()
           if (data.user) {
             setIsAlreadyAuthenticated(true)
-            window.location.href = redirectTo
+            globalThis.location.href = redirectTo
           }
         }
-      } catch (error) {
+      } catch {
+        // Non-critical — auth check is best-effort; form shows regardless
       } finally {
         setIsCheckingAuth(false)
       }

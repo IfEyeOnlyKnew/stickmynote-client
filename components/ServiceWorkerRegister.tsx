@@ -2,6 +2,17 @@
 
 import { useEffect } from "react"
 
+function handleSwRegistration(registration: ServiceWorkerRegistration) {
+  console.log("ServiceWorker registration successful with scope:", registration.scope)
+
+  // Check for updates on page focus
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "visible") {
+      registration.update()
+    }
+  })
+}
+
 export function ServiceWorkerRegister() {
   useEffect(() => {
     // Only register service worker in production
@@ -20,16 +31,7 @@ export function ServiceWorkerRegister() {
     if ("serviceWorker" in navigator) {
       window.addEventListener("load", () => {
         navigator.serviceWorker.register("/sw.js").then(
-          (registration) => {
-            console.log("ServiceWorker registration successful with scope:", registration.scope)
-
-            // Check for updates on page focus
-            document.addEventListener("visibilitychange", () => {
-              if (document.visibilityState === "visible") {
-                registration.update()
-              }
-            })
-          },
+          handleSwRegistration,
           (err) => {
             console.log("ServiceWorker registration failed:", err)
           },

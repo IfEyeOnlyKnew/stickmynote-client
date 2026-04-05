@@ -38,7 +38,6 @@ import {
   Clock,
   CheckCircle2,
 } from "lucide-react"
-import { REPLY_CATEGORIES } from "@/components/inference/reply-modal"
 import { BreadcrumbNav } from "@/components/breadcrumb-nav"
 import { UserMenu } from "@/components/user-menu"
 import { formatDistanceToNow } from "date-fns"
@@ -494,7 +493,7 @@ const StickTableRow = React.memo(function StickTableRow({
               )}
 
               {/* Grouped View */}
-              {replies && replies.length > 0 && viewMode === 'grouped' ? (
+              {replies && replies.length > 0 && viewMode === 'grouped' && (
                 <div className="space-y-4">
                   {Array.from(groupedReplies.entries()).map(([category, categoryReplies]) => (
                     <div key={category}>
@@ -556,7 +555,8 @@ const StickTableRow = React.memo(function StickTableRow({
                     </div>
                   ))}
                 </div>
-              ) : replies && replies.length > 0 && viewMode === 'timeline' ? (
+              )}
+              {replies && replies.length > 0 && viewMode === 'timeline' && (
                 /* Timeline View */
                 <div className="relative">
                   <div className="absolute left-3 top-0 bottom-0 w-0.5 bg-gray-200" />
@@ -565,7 +565,7 @@ const StickTableRow = React.memo(function StickTableRow({
                       const milestone = getMilestone(reply, index)
                       const replyDate = new Date(reply.created_at)
                       const prevDate = index > 0 ? new Date(timelineSortedReplies[index - 1].created_at) : null
-                      const showDateHeader = !prevDate || replyDate.toDateString() !== prevDate.toDateString()
+                      const showDateHeader = replyDate.toDateString() !== prevDate?.toDateString()
 
                       return (
                         <div key={reply.id}>
@@ -633,7 +633,8 @@ const StickTableRow = React.memo(function StickTableRow({
                     })}
                   </div>
                 </div>
-              ) : (
+              )}
+              {(!replies || replies.length === 0) && (
                 <p className="text-sm text-gray-500 italic">No replies yet</p>
               )}
             </div>

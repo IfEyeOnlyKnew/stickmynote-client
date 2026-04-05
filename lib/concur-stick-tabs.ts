@@ -28,7 +28,9 @@ export async function getConcurStickTabs(groupId: string, stickId: string): Prom
 
 export async function saveConcurStickTab(groupId: string, stickId: string, tabType: string, data: any): Promise<any> {
   try {
-    const mappedTabType = tabType === "video" ? "videos" : tabType === "image" ? "images" : tabType
+    let mappedTabType = tabType
+    if (tabType === "video") mappedTabType = "videos"
+    else if (tabType === "image") mappedTabType = "images"
 
     const response = await fetch(`/api/concur/groups/${groupId}/sticks/${stickId}/tabs`, {
       method: "PUT",

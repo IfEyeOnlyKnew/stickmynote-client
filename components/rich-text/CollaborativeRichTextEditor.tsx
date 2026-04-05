@@ -56,7 +56,7 @@ export function CollaborativeRichTextEditor({
   onExpandClick,
   className,
   enableCollaboration = true,
-}: CollaborativeRichTextEditorProps) {
+}: Readonly<CollaborativeRichTextEditorProps>) {
   const isExternalUpdate = useRef(false)
   const lastContent = useRef(content)
   const [isLoading, setIsLoading] = useState(true)
@@ -326,7 +326,7 @@ export function CollaborativeRichTextEditor({
 
       for (let i = 0; i < items.length; i++) {
         const item = items[i]
-        if (item.type.indexOf("image") !== -1) {
+        if (item.type.includes("image")) {
           event.preventDefault()
           const file = item.getAsFile()
           if (file) {
@@ -357,7 +357,7 @@ export function CollaborativeRichTextEditor({
   const handleAddLink = useCallback(() => {
     if (!editor) return
 
-    const url = window.prompt("Enter URL:")
+    const url = globalThis.prompt("Enter URL:")
     if (url) {
       editor.chain().focus().setLink({ href: url }).run()
     }
@@ -391,7 +391,7 @@ export function CollaborativeRichTextEditor({
             onClick={() => {
               setError(null)
               setIsLoading(true)
-              window.location.reload()
+              globalThis.location.reload()
             }}
           >
             Reload Editor

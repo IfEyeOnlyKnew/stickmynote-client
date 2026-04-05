@@ -21,7 +21,7 @@ interface MediaGalleryProps {
   className?: string
 }
 
-export function MediaGallery({ items, onDelete, editable = false, className }: MediaGalleryProps) {
+export function MediaGallery({ items, onDelete, editable = false, className }: Readonly<MediaGalleryProps>) {
   const [selectedMedia, setSelectedMedia] = useState<MediaItem | null>(null)
   const [lightboxOpen, setLightboxOpen] = useState(false)
 
@@ -34,14 +34,14 @@ export function MediaGallery({ items, onDelete, editable = false, className }: M
     try {
       const response = await fetch(url)
       const blob = await response.blob()
-      const downloadUrl = window.URL.createObjectURL(blob)
+      const downloadUrl = globalThis.URL.createObjectURL(blob)
       const link = document.createElement("a")
       link.href = downloadUrl
       link.download = filename || "download"
       document.body.appendChild(link)
       link.click()
-      document.body.removeChild(link)
-      window.URL.revokeObjectURL(downloadUrl)
+      link.remove()
+      globalThis.URL.revokeObjectURL(downloadUrl)
     } catch (error) {
       console.error("[v0] Download error:", error)
     }
@@ -89,8 +89,8 @@ export function MediaGallery({ items, onDelete, editable = false, className }: M
   return (
     <>
       <div className={cn("grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4", className)}>
-        {items.map((item, index) => (
-          <div key={index} className="relative aspect-square">
+        {items.map((item) => (
+          <div key={item.url} className="relative aspect-square">
             {renderThumbnail(item)}
             {editable && onDelete && (
               <div className="absolute top-2 right-2 flex gap-1">

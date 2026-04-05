@@ -100,7 +100,7 @@ export async function POST(request: NextRequest) {
 
         // Create a temporary token for the setup flow (24 hour expiry)
         const token = await createToken(result.user.id)
-        const cookieStore = await cookies()
+        const cookieStore = cookies()
         cookieStore.set("session", token, {
           httpOnly: true,
           secure: process.env.NODE_ENV === "production",
@@ -159,7 +159,7 @@ export async function POST(request: NextRequest) {
     })
 
     // Set auth cookie
-    const cookieStore = await cookies()
+    const cookieStore = cookies()
     cookieStore.set("session", token, {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",

@@ -16,7 +16,7 @@ interface NotificationPreferencesModalProps {
   onOpenChange: (open: boolean) => void
 }
 
-export function NotificationPreferencesModal({ open, onOpenChange }: NotificationPreferencesModalProps) {
+export function NotificationPreferencesModal({ open, onOpenChange }: Readonly<NotificationPreferencesModalProps>) {
   const { preferences, loading, updatePreferences } = useNotificationPreferences()
   const [saving, setSaving] = useState(false)
 

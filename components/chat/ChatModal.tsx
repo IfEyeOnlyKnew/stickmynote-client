@@ -8,7 +8,7 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Send, FileText, Loader2, X, CornerDownRight, Clock, Calendar, MessageCircle } from "lucide-react"
 import { getTimestampDisplay } from "@/utils/noteUtils"
 import { useCSRF } from "@/hooks/useCSRF"
-import type { ChatRequest, ChatRequestStatus } from "@/types/chat-request"
+import type { ChatRequest } from "@/types/chat-request"
 
 interface ChatMessage {
   id: string
@@ -60,7 +60,7 @@ export function ChatModal({
   currentUserId,
   skipInvitation = false,
   existingRequest,
-}: ChatModalProps) {
+}: Readonly<ChatModalProps>) {
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [newMessage, setNewMessage] = useState("")
   const [isLoading, setIsLoading] = useState(false)
@@ -324,7 +324,7 @@ export function ChatModal({
       })
 
       if (response.ok) {
-        const { exportUrl, filename } = await response.json()
+        const { exportUrl } = await response.json()
         // Open download in new tab
         window.open(exportUrl, "_blank")
       } else {
@@ -521,16 +521,18 @@ export function ChatModal({
 
         {/* Messages area */}
         <div className="flex-1 overflow-y-auto p-4 space-y-3 min-h-0">
-          {isLoading ? (
+          {isLoading && (
             <div className="flex items-center justify-center py-8">
               <Loader2 className="h-6 w-6 animate-spin text-gray-400" />
             </div>
-          ) : messages.length === 0 ? (
+          )}
+          {!isLoading && messages.length === 0 && (
             <div className="flex flex-col items-center justify-center py-8 text-gray-500">
               <p className="text-sm">No messages yet</p>
               <p className="text-xs mt-1">Start the conversation below</p>
             </div>
-          ) : (
+          )}
+          {!isLoading && messages.length > 0 && (
             messages.map((msg) => (
               <div
                 key={msg.id}

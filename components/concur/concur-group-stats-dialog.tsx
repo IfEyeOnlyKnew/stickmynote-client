@@ -16,7 +16,6 @@ import {
   StickyNote,
   Users,
   TrendingUp,
-  Crown,
 } from "lucide-react"
 import { format } from "date-fns"
 
@@ -87,7 +86,7 @@ export function ConcurGroupStatsDialog({
   groupId,
   groupName,
   onClose,
-}: ConcurGroupStatsDialogProps) {
+}: Readonly<ConcurGroupStatsDialogProps>) {
   const [stats, setStats] = useState<GroupStats | null>(null)
   const [loading, setLoading] = useState(true)
 
@@ -122,11 +121,12 @@ export function ConcurGroupStatsDialog({
           </DialogDescription>
         </DialogHeader>
 
-        {loading ? (
+        {loading && (
           <div className="flex items-center justify-center py-12">
             <Loader2 className="h-8 w-8 animate-spin text-indigo-600" />
           </div>
-        ) : stats ? (
+        )}
+        {!loading && stats && (
           <div className="space-y-6">
             {/* Overview Cards */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
@@ -264,7 +264,8 @@ export function ConcurGroupStatsDialog({
               </div>
             )}
           </div>
-        ) : (
+        )}
+        {!loading && !stats && (
           <p className="text-center text-sm text-muted-foreground py-8">
             Failed to load stats
           </p>
@@ -283,12 +284,12 @@ function StatCard({
   label,
   value,
   color,
-}: {
+}: Readonly<{
   icon: React.ReactNode
   label: string
   value: number
   color: string
-}) {
+}>) {
   return (
     <div className={`rounded-lg p-3 ${color}`}>
       <div className="flex items-center gap-1.5 mb-1">
@@ -305,12 +306,12 @@ function EngagementBar({
   count,
   total,
   color,
-}: {
+}: Readonly<{
   label: string
   count: number
   total: number
   color: string
-}) {
+}>) {
   const pct = total > 0 ? Math.round((count / total) * 100) : 0
   return (
     <div className="text-center">
@@ -330,7 +331,7 @@ function EngagementBar({
   )
 }
 
-function ActivityChart({ data }: { data: ActivityDay[] }) {
+function ActivityChart({ data }: Readonly<{ data: ActivityDay[] }>) {
   const maxValue = Math.max(
     ...data.map((d) => d.sticks + d.replies + d.views),
     1
@@ -362,7 +363,7 @@ function ActivityChart({ data }: { data: ActivityDay[] }) {
           {data.length > 0 ? format(new Date(data[0].day), "MMM d") : ""}
         </span>
         <span className="text-[10px] text-muted-foreground">
-          {data.length > 0 ? format(new Date(data[data.length - 1].day), "MMM d") : ""}
+          {data.length > 0 ? format(new Date(data.at(-1)!.day), "MMM d") : ""}
         </span>
       </div>
       <div className="flex items-center justify-center gap-4 mt-2 text-[10px] text-muted-foreground">

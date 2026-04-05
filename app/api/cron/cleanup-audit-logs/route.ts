@@ -53,7 +53,7 @@ export async function GET(request: Request) {
         [cutoffDate.toISOString(), org.id],
       )
 
-      const deleted = parseInt(deleteResult.rowCount?.toString() || "0", 10)
+      const deleted = Number.parseInt(deleteResult.rowCount?.toString() || "0", 10)
       if (deleted > 0) {
         totalDeleted += deleted
         orgResults.push({ orgId: org.id, deleted, retentionDays: org.retention_days })
@@ -73,7 +73,7 @@ export async function GET(request: Request) {
       [defaultCutoff.toISOString()],
     )
 
-    const orphanDeleted = parseInt(orphanResult.rowCount?.toString() || "0", 10)
+    const orphanDeleted = Number.parseInt(orphanResult.rowCount?.toString() || "0", 10)
     totalDeleted += orphanDeleted
 
     const duration = Date.now() - startTime

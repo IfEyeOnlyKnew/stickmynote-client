@@ -37,7 +37,7 @@ export function QuickCallModal({
   open,
   onOpenChange,
   autoScreenShare = false,
-}: QuickCallModalProps) {
+}: Readonly<QuickCallModalProps>) {
   const { context } = useCommunicationPaletteContext()
   const { padName, stickTopic } = context
 
@@ -199,17 +199,19 @@ export function QuickCallModal({
             Cancel
           </Button>
           <Button onClick={handleCreateRoom} disabled={isCreating}>
-            {isCreating ? (
+            {isCreating && (
               <>
                 <Loader2 className="h-4 w-4 mr-2 animate-spin" />
                 Creating...
               </>
-            ) : autoScreenShare ? (
+            )}
+            {!isCreating && autoScreenShare && (
               <>
                 <Monitor className="h-4 w-4 mr-2" />
                 Start Sharing
               </>
-            ) : (
+            )}
+            {!isCreating && !autoScreenShare && (
               <>
                 <Phone className="h-4 w-4 mr-2" />
                 Start Call
@@ -229,10 +231,10 @@ export function QuickCallModal({
 export function ScreenShareModal({
   open,
   onOpenChange,
-}: {
+}: Readonly<{
   open: boolean
   onOpenChange: (open: boolean) => void
-}) {
+}>) {
   return (
     <QuickCallModal open={open} onOpenChange={onOpenChange} autoScreenShare />
   )

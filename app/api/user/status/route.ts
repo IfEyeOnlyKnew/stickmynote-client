@@ -140,42 +140,22 @@ export async function PUT(request: NextRequest) {
       )
       updatedStatus = insertResult.rows[0]
     } else {
-      // Build dynamic update query
+      // Build dynamic update query from provided fields
+      const updatableFields = [
+        "status", "custom_message", "custom_message_expires_at",
+        "focus_mode_enabled", "focus_mode_expires_at",
+        "auto_away_enabled", "auto_away_minutes", "calendar_sync_enabled",
+      ] as const
+
       const updates: string[] = []
       const values: any[] = []
       let paramIndex = 1
 
-      if (body.status !== undefined) {
-        updates.push(`status = $${paramIndex++}`)
-        values.push(body.status)
-      }
-      if (body.custom_message !== undefined) {
-        updates.push(`custom_message = $${paramIndex++}`)
-        values.push(body.custom_message)
-      }
-      if (body.custom_message_expires_at !== undefined) {
-        updates.push(`custom_message_expires_at = $${paramIndex++}`)
-        values.push(body.custom_message_expires_at)
-      }
-      if (body.focus_mode_enabled !== undefined) {
-        updates.push(`focus_mode_enabled = $${paramIndex++}`)
-        values.push(body.focus_mode_enabled)
-      }
-      if (body.focus_mode_expires_at !== undefined) {
-        updates.push(`focus_mode_expires_at = $${paramIndex++}`)
-        values.push(body.focus_mode_expires_at)
-      }
-      if (body.auto_away_enabled !== undefined) {
-        updates.push(`auto_away_enabled = $${paramIndex++}`)
-        values.push(body.auto_away_enabled)
-      }
-      if (body.auto_away_minutes !== undefined) {
-        updates.push(`auto_away_minutes = $${paramIndex++}`)
-        values.push(body.auto_away_minutes)
-      }
-      if (body.calendar_sync_enabled !== undefined) {
-        updates.push(`calendar_sync_enabled = $${paramIndex++}`)
-        values.push(body.calendar_sync_enabled)
+      for (const field of updatableFields) {
+        if (body[field] !== undefined) {
+          updates.push(`${field} = $${paramIndex++}`)
+          values.push(body[field])
+        }
       }
 
       if (updates.length === 0) {
@@ -286,60 +266,78 @@ async function getUserStatus(userId: string): Promise<UserStatus | null> {
 }
 
 async function getEffectiveStatus(userId: string, storedStatus: UserStatus | null): Promise<EffectiveUserStatus> {
-  // Get last seen time
   const userResult = await db.query(`SELECT last_seen_at FROM users WHERE id = $1`, [userId])
   const lastSeenAt = userResult.rows[0]?.last_seen_at || null
-
-  // Determine if online
-  const isOnline =
-    lastSeenAt && new Date(lastSeenAt) > new Date(Date.now() - ONLINE_THRESHOLD_MINUTES * 60 * 1000)
-
-  // Check if user is in a calendar meeting (for auto-busy)
+  const isOnline = isUserOnline(lastSeenAt)
   const inMeeting = await checkIfInMeeting(userId)
-
-  // Check working hours
   const withinWorkingHours = await checkWorkingHours(userId)
 
-  // Determine effective status
+  return resolveEffectiveStatus(userId, storedStatus, isOnline, inMeeting, withinWorkingHours, lastSeenAt)
+}
+
+function isUserOnline(lastSeenAt: string | null): boolean {
+  return !!lastSeenAt && new Date(lastSeenAt) > new Date(Date.now() - ONLINE_THRESHOLD_MINUTES * 60 * 1000)
+}
+
+function resolveEffectiveStatus(
+  userId: string,
+  storedStatus: UserStatus | any | null,
+  isOnline: boolean,
+  inMeeting: boolean,
+  withinWorkingHours: boolean,
+  lastSeenAt: string | null,
+): EffectiveUserStatus {
+  if (!isOnline) {
+    return buildEffectiveStatus(userId, "offline", null, false, withinWorkingHours, isOnline, lastSeenAt)
+  }
+
+  if (!storedStatus?.status) {
+    return buildEffectiveStatus(userId, "online", null, false, withinWorkingHours, isOnline, lastSeenAt)
+  }
+
+  const focusModeEnabled = storedStatus.focus_mode_enabled &&
+    (!storedStatus.focus_mode_expires_at || new Date(storedStatus.focus_mode_expires_at) > new Date())
+
+  const calendarSyncEnabled = storedStatus.calendar_sync_enabled !== false
+
   let effectiveStatus: UserStatusType
   let customMessage: string | null = null
-  let focusModeEnabled = false
 
-  if (!isOnline) {
-    effectiveStatus = "offline"
-  } else if (!storedStatus) {
-    effectiveStatus = "online"
+  if (focusModeEnabled) {
+    effectiveStatus = "dnd"
+  } else if (inMeeting && calendarSyncEnabled) {
+    effectiveStatus = "busy"
+    customMessage = "In a meeting"
+  } else if (!withinWorkingHours && storedStatus.auto_away_enabled) {
+    effectiveStatus = "away"
   } else {
-    // Check if focus mode is active (not expired)
-    focusModeEnabled =
-      storedStatus.focus_mode_enabled &&
-      (!storedStatus.focus_mode_expires_at || new Date(storedStatus.focus_mode_expires_at) > new Date())
+    effectiveStatus = storedStatus.status
+  }
 
-    if (focusModeEnabled) {
-      effectiveStatus = "dnd"
-    } else if (inMeeting && storedStatus.calendar_sync_enabled) {
-      effectiveStatus = "busy"
-      customMessage = "In a meeting"
-    } else if (!withinWorkingHours && storedStatus.auto_away_enabled) {
-      effectiveStatus = "away"
-    } else {
-      effectiveStatus = storedStatus.status
-    }
-
-    // Get custom message if not expired
-    if (storedStatus.custom_message) {
-      if (
-        !storedStatus.custom_message_expires_at ||
-        new Date(storedStatus.custom_message_expires_at) > new Date()
-      ) {
-        customMessage = storedStatus.custom_message
-      }
+  // Get custom message if not expired
+  if (storedStatus.custom_message) {
+    const notExpired = !storedStatus.custom_message_expires_at ||
+      new Date(storedStatus.custom_message_expires_at) > new Date()
+    if (notExpired) {
+      customMessage = storedStatus.custom_message
     }
   }
 
+  return buildEffectiveStatus(userId, effectiveStatus, customMessage, focusModeEnabled, withinWorkingHours, isOnline, lastSeenAt)
+}
+
+function buildEffectiveStatus(
+  userId: string,
+  status: UserStatusType,
+  customMessage: string | null,
+  focusModeEnabled: boolean,
+  withinWorkingHours: boolean,
+  isOnline: boolean,
+  lastSeenAt: string | null,
+): EffectiveUserStatus {
   return {
     user_id: userId,
-    status: effectiveStatus,
+    status,
     custom_message: customMessage,
     focus_mode_enabled: focusModeEnabled,
     is_within_working_hours: withinWorkingHours,
@@ -358,13 +356,11 @@ async function getMultipleUserStatuses(userIds: string[]): Promise<Record<string
     [userIds]
   )
 
-  // Build map of user_id -> row
   const rowMap: Record<string, any> = {}
   for (const row of statusResult.rows) {
     rowMap[row.id || row.user_id] = row
   }
 
-  // Get working hours for all users
   const workingHoursResult = await db.query(
     `SELECT * FROM user_working_hours WHERE user_id = ANY($1)`,
     [userIds]
@@ -374,62 +370,18 @@ async function getMultipleUserStatuses(userIds: string[]): Promise<Record<string
     workingHoursMap[row.user_id] = row
   }
 
-  // Check for current meetings
   const meetingUserIds = await checkMultipleUsersInMeetings(userIds)
 
-  // Build effective statuses
   const statuses: Record<string, EffectiveUserStatus> = {}
 
   for (const userId of userIds) {
     const row = rowMap[userId]
     const lastSeenAt = row?.last_seen_at || null
-    const isOnline =
-      lastSeenAt && new Date(lastSeenAt) > new Date(Date.now() - ONLINE_THRESHOLD_MINUTES * 60 * 1000)
-
     const inMeeting = meetingUserIds.has(userId)
     const workingHours = workingHoursMap[userId]
     const withinWorkingHours = workingHours ? checkWorkingHoursSync(workingHours) : true
 
-    let effectiveStatus: UserStatusType
-    let customMessage: string | null = null
-    let focusModeEnabled = false
-
-    if (!isOnline) {
-      effectiveStatus = "offline"
-    } else if (!row?.status) {
-      effectiveStatus = "online"
-    } else {
-      focusModeEnabled =
-        row.focus_mode_enabled &&
-        (!row.focus_mode_expires_at || new Date(row.focus_mode_expires_at) > new Date())
-
-      if (focusModeEnabled) {
-        effectiveStatus = "dnd"
-      } else if (inMeeting && row.calendar_sync_enabled !== false) {
-        effectiveStatus = "busy"
-        customMessage = "In a meeting"
-      } else if (!withinWorkingHours && row.auto_away_enabled) {
-        effectiveStatus = "away"
-      } else {
-        effectiveStatus = row.status
-      }
-
-      if (row.custom_message) {
-        if (!row.custom_message_expires_at || new Date(row.custom_message_expires_at) > new Date()) {
-          customMessage = row.custom_message
-        }
-      }
-    }
-
-    statuses[userId] = {
-      user_id: userId,
-      status: effectiveStatus,
-      custom_message: customMessage,
-      focus_mode_enabled: focusModeEnabled,
-      is_within_working_hours: withinWorkingHours,
-      is_online: isOnline,
-      last_seen_at: lastSeenAt,
-    }
+    statuses[userId] = resolveEffectiveStatus(userId, row, isUserOnline(lastSeenAt), inMeeting, withinWorkingHours, lastSeenAt)
   }
 
   return statuses

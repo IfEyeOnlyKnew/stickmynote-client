@@ -8,7 +8,7 @@ interface NotificationSettingsProps {
   onUpdate: (field: keyof UserSettings["notifications"], value: boolean) => void
 }
 
-export function NotificationSettings({ notifications, onUpdate }: NotificationSettingsProps) {
+export function NotificationSettings({ notifications, onUpdate }: Readonly<NotificationSettingsProps>) {
   return (
     <Card>
       <CardHeader>

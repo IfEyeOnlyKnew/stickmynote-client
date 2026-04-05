@@ -279,6 +279,32 @@ export function useChatRequests(options: UseChatRequestsOptions = {}): UseChatRe
     )
   }, [state.incomingRequests, state.outgoingRequests])
 
+  // Extracted WebSocket handlers to reduce function nesting depth
+  const handleWsNewRequest = useCallback((payload: ChatRequest) => {
+    setState((prev) => {
+      if (prev.incomingRequests.some((r) => r.id === payload.id)) return prev
+      return { ...prev, incomingRequests: [payload, ...prev.incomingRequests] }
+    })
+    onNewRequest?.(payload)
+  }, [onNewRequest])
+
+  const handleWsUpdatedRequest = useCallback((payload: ChatRequest) => {
+    setState((prev) => ({
+      ...prev,
+      outgoingRequests: prev.outgoingRequests.map((r) =>
+        r.id === payload.id ? payload : r
+      ),
+    }))
+    onRequestStatusChange?.(payload)
+  }, [onRequestStatusChange])
+
+  const handleWsCancelledRequest = useCallback((payload: { id: string }) => {
+    setState((prev) => ({
+      ...prev,
+      incomingRequests: prev.incomingRequests.filter((r) => r.id !== payload.id),
+    }))
+  }, [])
+
   // WebSocket subscription — real-time push events
   const { connected: wsConnected, subscribe } = useWebSocket()
 
@@ -286,35 +312,13 @@ export function useChatRequests(options: UseChatRequestsOptions = {}): UseChatRe
     if (!wsConnected) return
 
     const unsubs = [
-      subscribe("chat_request.new", (payload: ChatRequest) => {
-        // New incoming request
-        setState((prev) => {
-          if (prev.incomingRequests.some((r) => r.id === payload.id)) return prev
-          return { ...prev, incomingRequests: [payload, ...prev.incomingRequests] }
-        })
-        onNewRequest?.(payload)
-      }),
-      subscribe("chat_request.updated", (payload: ChatRequest) => {
-        // Outgoing request was responded to
-        setState((prev) => ({
-          ...prev,
-          outgoingRequests: prev.outgoingRequests.map((r) =>
-            r.id === payload.id ? payload : r
-          ),
-        }))
-        onRequestStatusChange?.(payload)
-      }),
-      subscribe("chat_request.cancelled", (payload: { id: string }) => {
-        // An incoming request was cancelled by requester
-        setState((prev) => ({
-          ...prev,
-          incomingRequests: prev.incomingRequests.filter((r) => r.id !== payload.id),
-        }))
-      }),
+      subscribe("chat_request.new", handleWsNewRequest),
+      subscribe("chat_request.updated", handleWsUpdatedRequest),
+      subscribe("chat_request.cancelled", handleWsCancelledRequest),
     ]
 
     return () => unsubs.forEach((unsub) => unsub())
-  }, [wsConnected, subscribe, onNewRequest, onRequestStatusChange])
+  }, [wsConnected, subscribe, handleWsNewRequest, handleWsUpdatedRequest, handleWsCancelledRequest])
 
   // Initial fetch always runs once
   useEffect(() => {

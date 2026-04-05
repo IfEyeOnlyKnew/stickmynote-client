@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -17,9 +17,8 @@ import QRCode from "qrcode"
 
 export default function Setup2FAPage() {
   const router = useRouter()
-  const searchParams = useSearchParams()
+  useSearchParams()
   const [step, setStep] = useState<"info" | "qr" | "verify" | "backup">("info")
-  const [qrCodeUri, setQrCodeUri] = useState<string>("")
   const [qrCodeDataUrl, setQrCodeDataUrl] = useState<string>("")
   const [secret, setSecret] = useState<string>("")
   const [backupCodes, setBackupCodes] = useState<string[]>([])
@@ -52,7 +51,6 @@ export default function Setup2FAPage() {
 
       const data = await response.json()
       setSecret(data.secret)
-      setQrCodeUri(data.qrCodeUri)
       setBackupCodes(data.backupCodes)
 
       // Generate QR code image
@@ -283,8 +281,8 @@ export default function Setup2FAPage() {
                   </Button>
                 </div>
                 <div className="grid grid-cols-2 gap-2 p-4 bg-muted rounded-lg font-mono text-sm">
-                  {backupCodes.map((code, i) => (
-                    <div key={i} className="py-1">
+                  {backupCodes.map((code) => (
+                    <div key={code} className="py-1">
                       {code}
                     </div>
                   ))}

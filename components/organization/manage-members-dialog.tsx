@@ -31,7 +31,7 @@ interface ManageMembersDialogProps {
   onOpenChange: (open: boolean) => void
 }
 
-export function ManageMembersDialog({ open, onOpenChange }: ManageMembersDialogProps) {
+export function ManageMembersDialog({ open, onOpenChange }: Readonly<ManageMembersDialogProps>) {
   const { currentOrg, currentOrgRole, canInvite, isPersonalOrg } = useOrganization()
   const { toast } = useToast()
 
@@ -207,13 +207,15 @@ export function ManageMembersDialog({ open, onOpenChange }: ManageMembersDialogP
         )}
 
         <ScrollArea className="h-[300px] pr-4">
-          {loading ? (
+          {loading && (
             <div className="flex items-center justify-center h-full">
               <Loader2 className="h-6 w-6 animate-spin" />
             </div>
-          ) : members.length === 0 ? (
+          )}
+          {!loading && members.length === 0 && (
             <div className="flex items-center justify-center h-full text-muted-foreground">No members found</div>
-          ) : (
+          )}
+          {!loading && members.length > 0 && (
             <div className="space-y-3">
               {members.map((member) => (
                 <div key={member.id} className="flex items-center justify-between p-3 rounded-lg border">

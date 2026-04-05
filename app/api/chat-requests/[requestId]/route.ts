@@ -51,14 +51,14 @@ const REQUEST_SELECT_FIELDS = `
 
 const USER_SELECT_FIELDS = "id, email, full_name, avatar_url, username"
 
-const VALID_STATUSES: ChatRequestStatus[] = [
+const VALID_STATUSES = new Set<ChatRequestStatus>([
   "pending",
   "accepted",
   "busy",
   "schedule_meeting",
   "give_me_5_minutes",
   "cancelled",
-]
+])
 
 // ============================================================================
 // Error Responses
@@ -167,7 +167,7 @@ async function enrichRequestWithUsers(
     parent_reply: parentReply ? {
       id: parentReply.id,
       content: parentReply.content,
-      user: parentReplyUser || undefined,
+      user: parentReplyUser ?? undefined,
     } : undefined,
   }
 }
@@ -235,7 +235,7 @@ export async function PATCH(
     const { status, response_message } = body
 
     // Validate status
-    if (!status || !VALID_STATUSES.includes(status)) {
+    if (!status || !VALID_STATUSES.has(status)) {
       return Errors.invalidStatus()
     }
 

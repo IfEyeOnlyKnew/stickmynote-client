@@ -89,13 +89,13 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       // Let's ensure end is at least start
       if (endDate < startDate) endDate.setTime(startDate.getTime() + 3600000)
 
-      const startStr = startDate.toISOString().replace(/[-:.]/g, "").slice(0, 15) + "Z"
-      const endStr = endDate.toISOString().replace(/[-:.]/g, "").slice(0, 15) + "Z"
+      const startStr = startDate.toISOString().replaceAll(/[-:.]/g, "").slice(0, 15) + "Z"
+      const endStr = endDate.toISOString().replaceAll(/[-:.]/g, "").slice(0, 15) + "Z"
       const dtStamp =
-        new Date(task.updated_at || task.created_at).toISOString().replace(/[-:.]/g, "").slice(0, 15) + "Z"
+        new Date(task.updated_at || task.created_at).toISOString().replaceAll(/[-:.]/g, "").slice(0, 15) + "Z"
 
-      const summary = (task.stick?.topic || "Untitled Task").replace(/,/g, "\\,")
-      const description = (task.content || "").replace(/\n/g, "\\n").replace(/,/g, "\\,")
+      const summary = (task.stick?.topic || "Untitled Task").replaceAll(",", String.raw`\,`)
+      const description = (task.content || "").replaceAll("\n", String.raw`\n`).replaceAll(",", String.raw`\,`)
       const priorityMap: Record<string, number> = { urgent: 1, high: 3, medium: 5, low: 7, none: 0 }
       const priority = priorityMap[task.calstick_priority] || 0
 

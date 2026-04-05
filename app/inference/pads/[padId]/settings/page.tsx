@@ -6,9 +6,9 @@ import { UserMenu } from "@/components/user-menu"
 
 export default async function PadSettingsPage({
   params,
-}: {
+}: Readonly<{
   params: Promise<{ padId: string }>
-}) {
+}>) {
   const { padId } = await params
   const db = await createDatabaseClient()
 

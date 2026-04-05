@@ -55,8 +55,8 @@ export function AuthFormModal({ mode = "signin", onSuccess }: Readonly<AuthFormM
         onSuccess()
       }
     }
-    window.addEventListener("keydown", handleEscape)
-    return () => window.removeEventListener("keydown", handleEscape)
+    globalThis.addEventListener("keydown", handleEscape)
+    return () => globalThis.removeEventListener("keydown", handleEscape)
   }, [onSuccess])
 
   if (!isAccessCodeVerified) {

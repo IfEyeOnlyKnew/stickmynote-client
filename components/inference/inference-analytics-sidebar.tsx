@@ -74,7 +74,14 @@ interface InferenceAnalyticsSidebarProps {
   onClose: () => void
 }
 
-export function InferenceAnalyticsSidebar({ isOpen, onClose }: InferenceAnalyticsSidebarProps) {
+function getRankColor(index: number): string {
+  if (index === 0) return "bg-yellow-100 text-yellow-700"
+  if (index === 1) return "bg-gray-100 text-gray-700"
+  if (index === 2) return "bg-orange-100 text-orange-700"
+  return "bg-blue-100 text-blue-700"
+}
+
+export function InferenceAnalyticsSidebar({ isOpen, onClose }: Readonly<InferenceAnalyticsSidebarProps>) {
   const [analytics, setAnalytics] = useState<AnalyticsData | null>(null)
   const [loading, setLoading] = useState(true)
 
@@ -125,11 +132,12 @@ export function InferenceAnalyticsSidebar({ isOpen, onClose }: InferenceAnalytic
         </div>
 
         <div className="overflow-y-auto h-[calc(100vh-80px)]">
-          {loading ? (
+          {loading && (
             <div className="flex items-center justify-center py-12">
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600"></div>
             </div>
-          ) : analytics ? (
+          )}
+          {!loading && analytics && (
             <Tabs defaultValue="overview" className="w-full">
               <TabsList className="w-full grid grid-cols-3 sticky top-0 bg-white z-10 border-b rounded-none">
                 <TabsTrigger value="overview">Overview</TabsTrigger>
@@ -342,8 +350,6 @@ export function InferenceAnalyticsSidebar({ isOpen, onClose }: InferenceAnalytic
                       {analytics.activityByDay.map((day) => {
                         const maxActivity = Math.max(...analytics.activityByDay.map((d) => d.stickCount + d.replyCount))
                         const totalActivity = day.stickCount + day.replyCount
-                        const percentage = maxActivity > 0 ? (totalActivity / maxActivity) * 100 : 0
-
                         return (
                           <div key={day.day} className="space-y-1">
                             <div className="flex items-center justify-between text-xs">
@@ -395,15 +401,7 @@ export function InferenceAnalyticsSidebar({ isOpen, onClose }: InferenceAnalytic
                           <div className="flex items-center justify-between">
                             <div className="flex items-center gap-2 flex-1 min-w-0">
                               <div
-                                className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${
-                                  index === 0
-                                    ? "bg-yellow-100 text-yellow-700"
-                                    : index === 1
-                                      ? "bg-gray-100 text-gray-700"
-                                      : index === 2
-                                        ? "bg-orange-100 text-orange-700"
-                                        : "bg-blue-100 text-blue-700"
-                                }`}
+                                className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${getRankColor(index)}`}
                               >
                                 {index + 1}
                               </div>
@@ -433,15 +431,7 @@ export function InferenceAnalyticsSidebar({ isOpen, onClose }: InferenceAnalytic
                           <div className="flex items-center justify-between">
                             <div className="flex items-center gap-2 flex-1 min-w-0">
                               <div
-                                className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold ${
-                                  index === 0
-                                    ? "bg-yellow-100 text-yellow-700"
-                                    : index === 1
-                                      ? "bg-gray-100 text-gray-700"
-                                      : index === 2
-                                        ? "bg-orange-100 text-orange-700"
-                                        : "bg-blue-100 text-blue-700"
-                                }`}
+                                className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold ${getRankColor(index)}`}
                               >
                                 {contributor.userName?.charAt(0).toUpperCase() ||
                                   contributor.userEmail.charAt(0).toUpperCase()}
@@ -497,7 +487,8 @@ export function InferenceAnalyticsSidebar({ isOpen, onClose }: InferenceAnalytic
                 )}
               </TabsContent>
             </Tabs>
-          ) : (
+          )}
+          {!loading && !analytics && (
             <div className="text-center py-12 text-gray-500">
               <BarChart3 className="h-12 w-12 mx-auto mb-3 text-gray-400" />
               <p>No analytics data available</p>
