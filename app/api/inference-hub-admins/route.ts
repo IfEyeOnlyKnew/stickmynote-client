@@ -1,13 +1,9 @@
-import { createDatabaseClient } from "@/lib/database/database-adapter"
 import { NextResponse } from "next/server"
 import { getCachedAuthUser } from "@/lib/auth/cached-auth"
-
-const ADMIN_EMAILS = new Set(["chrisdoran63@outlook.com"])
+import { isGlobalAdmin, getAdmins, createAdmin, deleteAdmin } from "@/lib/handlers/inference-hub-admins-handler"
 
 export async function GET() {
   try {
-    await createDatabaseClient()
-
     const authResult = await getCachedAuthUser()
     if (authResult.rateLimited) {
       return NextResponse.json(
@@ -18,18 +14,13 @@ export async function GET() {
     if (!authResult.user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
-    const user = authResult.user
 
-    const isAdmin = ADMIN_EMAILS.has(user.email || "")
-
-    if (!isAdmin) {
+    if (!isGlobalAdmin(authResult.user.email)) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 })
     }
 
-    return NextResponse.json({
-      admins: [],
-      currentUserRole: "global_admin",
-    })
+    const result = await getAdmins()
+    return NextResponse.json(result)
   } catch (error) {
     console.error("Error fetching admins:", error)
     return NextResponse.json({ error: "Internal server error" }, { status: 500 })
@@ -38,8 +29,6 @@ export async function GET() {
 
 export async function POST(request: Request) {
   try {
-    const db = await createDatabaseClient()
-
     const authResult = await getCachedAuthUser()
     if (authResult.rateLimited) {
       return NextResponse.json(
@@ -50,29 +39,14 @@ export async function POST(request: Request) {
     if (!authResult.user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
-    const user = authResult.user
 
-    const isAdmin = ADMIN_EMAILS.has(user.email || "")
-
-    if (!isAdmin) {
+    if (!isGlobalAdmin(authResult.user.email)) {
       return NextResponse.json({ error: "Only global admins can assign roles" }, { status: 403 })
     }
 
     const { userId, role } = await request.json()
-
-    const { data: newAdmin, error } = await db
-      .from("social_hub_admins")
-      .insert({
-        user_id: userId,
-        role,
-        granted_by: user.id,
-      })
-      .select()
-      .single()
-
-    if (error) throw error
-
-    return NextResponse.json({ admin: newAdmin })
+    const admin = await createAdmin(userId, role, authResult.user.id)
+    return NextResponse.json({ admin })
   } catch (error) {
     console.error("Error creating admin:", error)
     return NextResponse.json({ error: "Internal server error" }, { status: 500 })
@@ -81,8 +55,6 @@ export async function POST(request: Request) {
 
 export async function DELETE(request: Request) {
   try {
-    const db = await createDatabaseClient()
-
     const authResult = await getCachedAuthUser()
     if (authResult.rateLimited) {
       return NextResponse.json(
@@ -93,11 +65,8 @@ export async function DELETE(request: Request) {
     if (!authResult.user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
-    const user = authResult.user
 
-    const isAdmin = ADMIN_EMAILS.has(user.email || "")
-
-    if (!isAdmin) {
+    if (!isGlobalAdmin(authResult.user.email)) {
       return NextResponse.json({ error: "Only global admins can remove roles" }, { status: 403 })
     }
 
@@ -108,10 +77,7 @@ export async function DELETE(request: Request) {
       return NextResponse.json({ error: "Admin ID required" }, { status: 400 })
     }
 
-    const { error } = await db.from("social_hub_admins").delete().eq("id", adminId)
-
-    if (error) throw error
-
+    await deleteAdmin(adminId)
     return NextResponse.json({ success: true })
   } catch (error) {
     console.error("Error deleting admin:", error)

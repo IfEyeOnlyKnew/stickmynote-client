@@ -1,22 +1,16 @@
 // v2 Social Pads Knowledge Base API: production-quality, CRUD for KB articles
 import { type NextRequest } from 'next/server'
-import { db } from '@/lib/database/pg-client'
 import { getCachedAuthUser } from '@/lib/auth/cached-auth'
 import { handleApiError } from '@/lib/api/handle-api-error'
+import {
+  getKnowledgeBaseArticles,
+  createKnowledgeBaseArticle,
+  updateKnowledgeBaseArticle,
+  deleteKnowledgeBaseArticle,
+} from '@/lib/handlers/inference-pads-knowledge-base-handler'
+import { rateLimitResponse, unauthorizedResponse } from '@/lib/handlers/inference-response'
 
 export const dynamic = 'force-dynamic'
-
-// Helper to attach author to article
-async function attachAuthor(article: any) {
-  if (article.author_id) {
-    const result = await db.query(
-      `SELECT id, full_name, email, avatar_url FROM users WHERE id = $1`,
-      [article.author_id]
-    )
-    return { ...article, author: result.rows[0] || null }
-  }
-  return { ...article, author: null }
-}
 
 // GET /api/v2/inference-pads/[padId]/knowledge-base - Get all KB articles
 export async function GET(
@@ -27,28 +21,11 @@ export async function GET(
     const { padId } = await params
 
     const authResult = await getCachedAuthUser()
-    if (authResult.rateLimited) {
-      return new Response(
-        JSON.stringify({ error: 'Rate limit exceeded. Please try again in a moment.' }),
-        { status: 429, headers: { 'Retry-After': '30' } }
-      )
-    }
-    if (!authResult.user) {
-      return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401 })
-    }
+    if (authResult.rateLimited) return rateLimitResponse()
+    if (!authResult.user) return unauthorizedResponse()
 
-    const result = await db.query(
-      `SELECT * FROM social_pad_knowledge_base
-       WHERE social_pad_id = $1
-       ORDER BY is_pinned DESC NULLS LAST, pin_order ASC NULLS LAST, created_at DESC`,
-      [padId]
-    )
-
-    const articlesWithAuthors = await Promise.all(
-      result.rows.map((article: any) => attachAuthor(article))
-    )
-
-    return new Response(JSON.stringify({ articles: articlesWithAuthors }), { status: 200 })
+    const articles = await getKnowledgeBaseArticles(padId)
+    return new Response(JSON.stringify({ articles }), { status: 200 })
   } catch (error) {
     return handleApiError(error)
   }
@@ -63,16 +40,8 @@ export async function POST(
     const { padId } = await params
 
     const authResult = await getCachedAuthUser()
-    if (authResult.rateLimited) {
-      return new Response(
-        JSON.stringify({ error: 'Rate limit exceeded. Please try again in a moment.' }),
-        { status: 429, headers: { 'Retry-After': '30' } }
-      )
-    }
-    if (!authResult.user) {
-      return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401 })
-    }
-    const user = authResult.user
+    if (authResult.rateLimited) return rateLimitResponse()
+    if (!authResult.user) return unauthorizedResponse()
 
     const body = await request.json()
     const { title, content, category, tags } = body
@@ -84,21 +53,12 @@ export async function POST(
       )
     }
 
-    const result = await db.query(
-      `INSERT INTO social_pad_knowledge_base
-       (social_pad_id, title, content, category, tags, author_id)
-       VALUES ($1, $2, $3, $4, $5, $6)
-       RETURNING *`,
-      [padId, title, content, category || 'general', tags || [], user.id]
-    )
-
-    if (result.rows.length === 0) {
+    const article = await createKnowledgeBaseArticle(padId, authResult.user.id, { title, content, category, tags })
+    if (!article) {
       return new Response(JSON.stringify({ error: 'Failed to create article' }), { status: 500 })
     }
 
-    const articleWithAuthor = await attachAuthor(result.rows[0])
-
-    return new Response(JSON.stringify({ article: articleWithAuthor }), { status: 200 })
+    return new Response(JSON.stringify({ article }), { status: 200 })
   } catch (error) {
     return handleApiError(error)
   }
@@ -113,15 +73,8 @@ export async function PATCH(
     const { padId } = await params
 
     const authResult = await getCachedAuthUser()
-    if (authResult.rateLimited) {
-      return new Response(
-        JSON.stringify({ error: 'Rate limit exceeded. Please try again in a moment.' }),
-        { status: 429, headers: { 'Retry-After': '30' } }
-      )
-    }
-    if (!authResult.user) {
-      return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401 })
-    }
+    if (authResult.rateLimited) return rateLimitResponse()
+    if (!authResult.user) return unauthorizedResponse()
 
     const body = await request.json()
     const { articleId, title, content, category, tags, is_pinned, pin_order } = body
@@ -130,57 +83,16 @@ export async function PATCH(
       return new Response(JSON.stringify({ error: 'Article ID is required' }), { status: 400 })
     }
 
-    // Build update query dynamically
-    const updates: string[] = []
-    const values: any[] = []
-    let paramIndex = 1
+    const article = await updateKnowledgeBaseArticle(padId, articleId, { title, content, category, tags, is_pinned, pin_order })
 
-    if (title !== undefined) {
-      updates.push(`title = $${paramIndex++}`)
-      values.push(title)
-    }
-    if (content !== undefined) {
-      updates.push(`content = $${paramIndex++}`)
-      values.push(content)
-    }
-    if (category !== undefined) {
-      updates.push(`category = $${paramIndex++}`)
-      values.push(category)
-    }
-    if (tags !== undefined) {
-      updates.push(`tags = $${paramIndex++}`)
-      values.push(tags)
-    }
-    if (is_pinned !== undefined) {
-      updates.push(`is_pinned = $${paramIndex++}`)
-      values.push(is_pinned)
-    }
-    if (pin_order !== undefined) {
-      updates.push(`pin_order = $${paramIndex++}`)
-      values.push(pin_order)
-    }
-
-    if (updates.length === 0) {
+    if (article === undefined) {
       return new Response(JSON.stringify({ error: 'No fields to update' }), { status: 400 })
     }
-
-    values.push(articleId, padId)
-
-    const result = await db.query(
-      `UPDATE social_pad_knowledge_base
-       SET ${updates.join(', ')}, updated_at = NOW()
-       WHERE id = $${paramIndex++} AND social_pad_id = $${paramIndex}
-       RETURNING *`,
-      values
-    )
-
-    if (result.rows.length === 0) {
+    if (article === null) {
       return new Response(JSON.stringify({ error: 'Article not found' }), { status: 404 })
     }
 
-    const articleWithAuthor = await attachAuthor(result.rows[0])
-
-    return new Response(JSON.stringify({ article: articleWithAuthor }), { status: 200 })
+    return new Response(JSON.stringify({ article }), { status: 200 })
   } catch (error) {
     return handleApiError(error)
   }
@@ -195,15 +107,8 @@ export async function DELETE(
     const { padId } = await params
 
     const authResult = await getCachedAuthUser()
-    if (authResult.rateLimited) {
-      return new Response(
-        JSON.stringify({ error: 'Rate limit exceeded. Please try again in a moment.' }),
-        { status: 429, headers: { 'Retry-After': '30' } }
-      )
-    }
-    if (!authResult.user) {
-      return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401 })
-    }
+    if (authResult.rateLimited) return rateLimitResponse()
+    if (!authResult.user) return unauthorizedResponse()
 
     const { searchParams } = new URL(request.url)
     const articleId = searchParams.get('articleId')
@@ -212,11 +117,7 @@ export async function DELETE(
       return new Response(JSON.stringify({ error: 'Article ID is required' }), { status: 400 })
     }
 
-    await db.query(
-      `DELETE FROM social_pad_knowledge_base WHERE id = $1 AND social_pad_id = $2`,
-      [articleId, padId]
-    )
-
+    await deleteKnowledgeBaseArticle(padId, articleId)
     return new Response(JSON.stringify({ success: true }), { status: 200 })
   } catch (error) {
     return handleApiError(error)

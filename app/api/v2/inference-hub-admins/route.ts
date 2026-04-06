@@ -1,12 +1,10 @@
 // v2 Inference Hub Admins API: production-quality, manage hub admins
 import { type NextRequest } from 'next/server'
-import { db } from '@/lib/database/pg-client'
 import { getCachedAuthUser } from '@/lib/auth/cached-auth'
 import { handleApiError } from '@/lib/api/handle-api-error'
+import { isGlobalAdmin, getAdmins, createAdmin, deleteAdmin } from '@/lib/handlers/inference-hub-admins-handler'
 
 export const dynamic = 'force-dynamic'
-
-const ADMIN_EMAILS = new Set(['chrisdoran63@outlook.com'])
 
 // GET /api/v2/inference-hub-admins - Get hub admins (admin only)
 export async function GET(request: NextRequest) {
@@ -21,20 +19,13 @@ export async function GET(request: NextRequest) {
     if (!authResult.user) {
       return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401 })
     }
-    const user = authResult.user
 
-    const isAdmin = ADMIN_EMAILS.has(user.email || '')
-    if (!isAdmin) {
+    if (!isGlobalAdmin(authResult.user.email)) {
       return new Response(JSON.stringify({ error: 'Forbidden' }), { status: 403 })
     }
 
-    return new Response(
-      JSON.stringify({
-        admins: [],
-        currentUserRole: 'global_admin',
-      }),
-      { status: 200 }
-    )
+    const result = await getAdmins()
+    return new Response(JSON.stringify(result), { status: 200 })
   } catch (error) {
     return handleApiError(error)
   }
@@ -53,10 +44,8 @@ export async function POST(request: NextRequest) {
     if (!authResult.user) {
       return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401 })
     }
-    const user = authResult.user
 
-    const isAdmin = ADMIN_EMAILS.has(user.email || '')
-    if (!isAdmin) {
+    if (!isGlobalAdmin(authResult.user.email)) {
       return new Response(
         JSON.stringify({ error: 'Only global admins can assign roles' }),
         { status: 403 }
@@ -64,15 +53,8 @@ export async function POST(request: NextRequest) {
     }
 
     const { userId, role } = await request.json()
-
-    const result = await db.query(
-      `INSERT INTO social_hub_admins (user_id, role, granted_by)
-       VALUES ($1, $2, $3)
-       RETURNING *`,
-      [userId, role, user.id]
-    )
-
-    return new Response(JSON.stringify({ admin: result.rows[0] }), { status: 200 })
+    const admin = await createAdmin(userId, role, authResult.user.id)
+    return new Response(JSON.stringify({ admin }), { status: 200 })
   } catch (error) {
     return handleApiError(error)
   }
@@ -91,10 +73,8 @@ export async function DELETE(request: NextRequest) {
     if (!authResult.user) {
       return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401 })
     }
-    const user = authResult.user
 
-    const isAdmin = ADMIN_EMAILS.has(user.email || '')
-    if (!isAdmin) {
+    if (!isGlobalAdmin(authResult.user.email)) {
       return new Response(
         JSON.stringify({ error: 'Only global admins can remove roles' }),
         { status: 403 }
@@ -108,8 +88,7 @@ export async function DELETE(request: NextRequest) {
       return new Response(JSON.stringify({ error: 'Admin ID required' }), { status: 400 })
     }
 
-    await db.query(`DELETE FROM social_hub_admins WHERE id = $1`, [adminId])
-
+    await deleteAdmin(adminId)
     return new Response(JSON.stringify({ success: true }), { status: 200 })
   } catch (error) {
     return handleApiError(error)

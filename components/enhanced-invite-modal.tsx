@@ -2,7 +2,7 @@
 
 import type React from "react"
 
-import { useState, useEffect, useRef } from "react"
+import { useState } from "react"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -13,20 +13,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { X, Users, Mail, FileText, Check } from "lucide-react"
 import { CsvEmailUpload } from "@/components/csv-email-upload"
-
-interface User {
-  id: string
-  username: string | null
-  email: string | null
-  full_name: string | null
-}
-
-interface SavedEmail {
-  id: string
-  email: string
-  name?: string
-  source: string
-}
+import { useInviteEmails } from "@/hooks/useInviteEmails"
 
 interface EnhancedInviteModalProps {
   open: boolean
@@ -41,62 +28,28 @@ interface EnhancedInviteModalProps {
 }
 
 export function EnhancedInviteModal({ open, onOpenChange, teamId, onInviteSubmit, trigger }: Readonly<EnhancedInviteModalProps>) {
-  const [searchQuery, setSearchQuery] = useState("")
-  const [searchResults, setSearchResults] = useState<User[]>([])
-  const [savedEmails, setSavedEmails] = useState<SavedEmail[]>([])
-  const [selectedEmails, setSelectedEmails] = useState<string[]>([])
-  const [selectedUsers, setSelectedUsers] = useState<User[]>([])
+  const {
+    searchQuery,
+    setSearchQuery,
+    searchResults,
+    savedEmails,
+    selectedEmails,
+    selectedUsers,
+    isLoading,
+    manualEmails,
+    setManualEmails,
+    filteredSavedEmails,
+    totalSelected,
+    toggleEmailSelection,
+    toggleUserSelection,
+    addManualEmail,
+    resetForm,
+    setIsLoading,
+    loadSavedEmails,
+  } = useInviteEmails({ entityId: teamId, entityParam: "teamId", open })
+
   const [inviteRole, setInviteRole] = useState<"admin" | "editor" | "viewer">("viewer")
-  const [isLoading, setIsLoading] = useState(false)
   const [activeTab, setActiveTab] = useState("invite")
-  const [manualEmails, setManualEmails] = useState("")
-  const inputRef = useRef<HTMLInputElement>(null)
-
-  // Load saved emails on mount
-  /* eslint-disable react-hooks/exhaustive-deps */
-  useEffect(() => {
-    if (open) {
-      loadSavedEmails()
-    }
-  }, [open, teamId])
-  /* eslint-enable react-hooks/exhaustive-deps */
-
-  // Search users and saved emails
-  useEffect(() => {
-    if (!searchQuery.trim()) {
-      setSearchResults([])
-      return
-    }
-
-    const searchUsers = async () => {
-      try {
-        // Search existing users
-        const userResponse = await fetch(`/api/user-search?query=${encodeURIComponent(searchQuery)}&teamId=${teamId}`)
-        if (userResponse.ok) {
-          const users = await userResponse.json()
-          setSearchResults(users)
-        }
-      } catch (err) {
-        console.error("Search error:", err)
-      }
-    }
-
-    const debounce = setTimeout(searchUsers, 300)
-    return () => clearTimeout(debounce)
-  }, [searchQuery, teamId])
-
-  const loadSavedEmails = async () => {
-    try {
-      const response = await fetch(`/api/saved-emails?teamId=${teamId}`)
-
-      if (response.ok) {
-        const data = await response.json()
-        setSavedEmails(data.savedEmails || [])
-      }
-    } catch (err) {
-      // Silent fail - saved emails are optional
-    }
-  }
 
   const handleCsvUpload = async (emails: Array<{ email: string; name?: string }>) => {
     try {
@@ -105,52 +58,6 @@ export function EnhancedInviteModal({ open, onOpenChange, teamId, onInviteSubmit
       setActiveTab("invite")
     } catch (err) {
       // Silent fail
-    } finally {
-      setIsLoading(false)
-    }
-  }
-
-  const addManualEmail = async () => {
-    if (!manualEmails.trim()) {
-      return
-    }
-
-    const emails = manualEmails
-      .split(/[,;\n]/)
-      .map((e) => e.trim())
-      .filter((e) => e.length > 0 && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e))
-      .map((email) => ({ email }))
-
-    if (emails.length === 0) {
-      alert("No valid emails found. Please check the format.")
-      return
-    }
-
-    try {
-      setIsLoading(true)
-
-      const requestBody = {
-        emails,
-        teamId,
-        source: "manual",
-      }
-
-      const response = await fetch("/api/saved-emails", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(requestBody),
-      })
-
-      const responseText = await response.text()
-
-      if (response.ok) {
-        await loadSavedEmails()
-        setManualEmails("")
-      } else {
-        alert(`Failed to save emails: ${responseText}`)
-      }
-    } catch (err) {
-      alert(`Error adding emails: ${err}`)
     } finally {
       setIsLoading(false)
     }
@@ -197,16 +104,6 @@ export function EnhancedInviteModal({ open, onOpenChange, teamId, onInviteSubmit
     }
   }
 
-  const toggleEmailSelection = (email: string) => {
-    setSelectedEmails((prev) => (prev.includes(email) ? prev.filter((e) => e !== email) : [...prev, email]))
-  }
-
-  const toggleUserSelection = (user: User) => {
-    setSelectedUsers((prev) =>
-      prev.find((u) => u.id === user.id) ? prev.filter((u) => u.id !== user.id) : [...prev, user],
-    )
-  }
-
   const handleSubmit = async () => {
     const userIds = selectedUsers.map((u) => u.id)
     const emails = [...selectedEmails]
@@ -229,11 +126,7 @@ export function EnhancedInviteModal({ open, onOpenChange, teamId, onInviteSubmit
         role: inviteRole,
       })
 
-      // Reset form
-      setSearchQuery("")
-      setSelectedEmails([])
-      setSelectedUsers([])
-      setSearchResults([])
+      resetForm()
       onOpenChange(false)
     } catch (err) {
       console.error("Error submitting invites:", err)
@@ -241,23 +134,6 @@ export function EnhancedInviteModal({ open, onOpenChange, teamId, onInviteSubmit
       setIsLoading(false)
     }
   }
-
-  const filteredSavedEmails = savedEmails.filter((email) =>
-    searchQuery
-      ? email.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        email.name?.toLowerCase().includes(searchQuery.toLowerCase())
-      : true,
-  )
-
-  const totalSelected =
-    selectedUsers.length +
-    selectedEmails.length +
-    (searchQuery &&
-    /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(searchQuery) &&
-    !selectedEmails.includes(searchQuery) &&
-    !selectedUsers.some((u) => u.email === searchQuery)
-      ? 1
-      : 0)
 
   return (
     <>
@@ -292,7 +168,6 @@ export function EnhancedInviteModal({ open, onOpenChange, teamId, onInviteSubmit
                 <div>
                   <Label htmlFor="search">Search or type email</Label>
                   <Input
-                    ref={inputRef}
                     id="search"
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}

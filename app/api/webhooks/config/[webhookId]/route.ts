@@ -1,71 +1,42 @@
-import { createDatabaseClient } from "@/lib/database/database-adapter"
 import { NextResponse } from "next/server"
 import { getCachedAuthUser } from "@/lib/auth/cached-auth"
+import { getWebhookConfig, updateWebhookConfig, deleteWebhookConfig } from "@/lib/handlers/webhooks-config-handler"
 
 export async function GET(_request: Request, { params }: { params: Promise<{ webhookId: string }> }) {
-  const { webhookId } = await params
-  const db = await createDatabaseClient()
+  try {
+    const { webhookId } = await params
 
-  const { user, rateLimited } = await getCachedAuthUser()
+    const { user, rateLimited } = await getCachedAuthUser()
+    if (rateLimited) {
+      return NextResponse.json({ error: "Too many requests" }, { status: 429 })
+    }
+    if (!user) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    }
 
-  if (rateLimited) {
-    return NextResponse.json({ error: "Too many requests" }, { status: 429 })
+    const result = await getWebhookConfig(webhookId, user.id)
+    return NextResponse.json(result.body, { status: result.status })
+  } catch (error) {
+    console.error("Error fetching webhook:", error)
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 })
   }
-
-  if (!user) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
-  }
-
-  const { data: webhook, error } = await db
-    .from("webhook_configurations")
-    .select("*")
-    .eq("id", webhookId)
-    .eq("user_id", user.id)
-    .maybeSingle()
-
-  if (error || !webhook) {
-    return NextResponse.json({ error: error?.message || "Webhook not found" }, { status: 404 })
-  }
-
-  return NextResponse.json({ webhook })
 }
 
 export async function PATCH(request: Request, { params }: { params: Promise<{ webhookId: string }> }) {
-  const { webhookId } = await params
-  const db = await createDatabaseClient()
-
-  const { user, rateLimited } = await getCachedAuthUser()
-
-  if (rateLimited) {
-    return NextResponse.json({ error: "Too many requests" }, { status: 429 })
-  }
-
-  if (!user) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
-  }
-
   try {
-    const body = await request.json()
+    const { webhookId } = await params
 
-    // Don't allow updating signing_secret through this endpoint
-    const { signing_secret: _, ...updateData } = body
-
-    const { data: webhook, error } = await db
-      .from("webhook_configurations")
-      .update({
-        ...updateData,
-        updated_at: new Date().toISOString(),
-      })
-      .eq("id", webhookId)
-      .eq("user_id", user.id)
-      .select()
-      .maybeSingle()
-
-    if (error) {
-      return NextResponse.json({ error: error.message }, { status: 500 })
+    const { user, rateLimited } = await getCachedAuthUser()
+    if (rateLimited) {
+      return NextResponse.json({ error: "Too many requests" }, { status: 429 })
+    }
+    if (!user) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
-    return NextResponse.json({ webhook })
+    const body = await request.json()
+    const result = await updateWebhookConfig(webhookId, user.id, body)
+    return NextResponse.json(result.body, { status: result.status })
   } catch (err) {
     console.error("Error updating webhook:", err)
     return NextResponse.json({ error: "Invalid request body" }, { status: 400 })
@@ -73,24 +44,21 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ we
 }
 
 export async function DELETE(_request: Request, { params }: { params: Promise<{ webhookId: string }> }) {
-  const { webhookId } = await params
-  const db = await createDatabaseClient()
+  try {
+    const { webhookId } = await params
 
-  const { user, rateLimited } = await getCachedAuthUser()
+    const { user, rateLimited } = await getCachedAuthUser()
+    if (rateLimited) {
+      return NextResponse.json({ error: "Too many requests" }, { status: 429 })
+    }
+    if (!user) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    }
 
-  if (rateLimited) {
-    return NextResponse.json({ error: "Too many requests" }, { status: 429 })
+    await deleteWebhookConfig(webhookId, user.id)
+    return NextResponse.json({ success: true })
+  } catch (error) {
+    console.error("Error deleting webhook:", error)
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 })
   }
-
-  if (!user) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
-  }
-
-  const { error } = await db.from("webhook_configurations").delete().eq("id", webhookId).eq("user_id", user.id)
-
-  if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 })
-  }
-
-  return NextResponse.json({ success: true })
 }

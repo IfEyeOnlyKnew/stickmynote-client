@@ -1,6 +1,4 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { getCachedAuthUser, createRateLimitResponse, createUnauthorizedResponse } from "@/lib/auth/cached-auth"
-import { getOrgContext } from "@/lib/auth/get-org-context"
 import { validateCSRFMiddleware } from "@/lib/csrf"
 import { db } from "@/lib/database/pg-client"
 import {
@@ -9,6 +7,7 @@ import {
   addChatMember,
   removeChatMember,
 } from "@/lib/database/stick-chat-queries"
+import { authenticateWithOrg, handleRateLimitError } from "@/lib/handlers/stick-chats-handler"
 import type { AddMemberRequest } from "@/types/stick-chat"
 
 /**
@@ -23,49 +22,11 @@ import type { AddMemberRequest } from "@/types/stick-chat"
 
 const Errors = {
   csrf: () => NextResponse.json({ error: "Invalid or missing CSRF token" }, { status: 403 }),
-  noOrgContext: () => NextResponse.json({ error: "No organization context" }, { status: 403 }),
   notFound: () => NextResponse.json({ error: "Chat not found" }, { status: 404 }),
   forbidden: () => NextResponse.json({ error: "Only the chat owner can manage members" }, { status: 403 }),
   userIdRequired: () => NextResponse.json({ error: "user_id or email is required" }, { status: 400 }),
-  addFailed: () => NextResponse.json({ error: "Failed to add member" }, { status: 500 }),
-  removeFailed: () => NextResponse.json({ error: "Failed to remove member" }, { status: 500 }),
   internal: () => NextResponse.json({ error: "Internal server error" }, { status: 500 }),
 } as const
-
-// ============================================================================
-// Auth Helpers
-// ============================================================================
-
-interface OrgContext {
-  orgId: string
-  organizationId?: string
-}
-
-interface RateLimitedResult {
-  rateLimited: true
-}
-
-function isRateLimited(result: OrgContext | RateLimitedResult | null): result is RateLimitedResult {
-  return result !== null && "rateLimited" in result
-}
-
-async function safeGetOrgContext(userId: string): Promise<OrgContext | RateLimitedResult | null> {
-  try {
-    return await getOrgContext(userId)
-  } catch (error) {
-    if (error instanceof Error && error.message === "RATE_LIMITED") {
-      return { rateLimited: true }
-    }
-    throw error
-  }
-}
-
-function handleRateLimitError(error: unknown): NextResponse | null {
-  if (error instanceof Error && error.message === "RATE_LIMITED") {
-    return createRateLimitResponse()
-  }
-  return null
-}
 
 // ============================================================================
 // Handlers
@@ -81,23 +42,11 @@ export async function GET(
 ) {
   try {
     const { chatId } = await params
-    const { user, error: authError } = await getCachedAuthUser()
-
-    if (authError === "rate_limited") {
-      return createRateLimitResponse()
-    }
-
-    if (!user) {
-      return createUnauthorizedResponse()
-    }
-
-    const orgContextResult = await safeGetOrgContext(user.id)
-    if (isRateLimited(orgContextResult)) {
-      return createRateLimitResponse()
-    }
+    const auth = await authenticateWithOrg()
+    if (!auth.ok) return auth.response
 
     // Verify chat exists and user has access
-    const chat = await getChatById(chatId, user.id)
+    const chat = await getChatById(chatId, auth.user.id)
     if (!chat) {
       return Errors.notFound()
     }
@@ -132,28 +81,16 @@ export async function POST(
 
   try {
     const { chatId } = await params
-    const { user, error: authError } = await getCachedAuthUser()
-
-    if (authError === "rate_limited") {
-      return createRateLimitResponse()
-    }
-
-    if (!user) {
-      return createUnauthorizedResponse()
-    }
-
-    const orgContextResult = await safeGetOrgContext(user.id)
-    if (isRateLimited(orgContextResult)) {
-      return createRateLimitResponse()
-    }
+    const auth = await authenticateWithOrg()
+    if (!auth.ok) return auth.response
 
     // Verify chat exists and user is owner
-    const chat = await getChatById(chatId, user.id)
+    const chat = await getChatById(chatId, auth.user.id)
     if (!chat) {
       return Errors.notFound()
     }
 
-    if (chat.owner_id !== user.id) {
+    if (chat.owner_id !== auth.user.id) {
       return Errors.forbidden()
     }
 
@@ -223,20 +160,8 @@ export async function DELETE(
 
   try {
     const { chatId } = await params
-    const { user, error: authError } = await getCachedAuthUser()
-
-    if (authError === "rate_limited") {
-      return createRateLimitResponse()
-    }
-
-    if (!user) {
-      return createUnauthorizedResponse()
-    }
-
-    const orgContextResult = await safeGetOrgContext(user.id)
-    if (isRateLimited(orgContextResult)) {
-      return createRateLimitResponse()
-    }
+    const auth = await authenticateWithOrg()
+    if (!auth.ok) return auth.response
 
     const body = await request.json()
     const { user_id } = body
@@ -245,9 +170,9 @@ export async function DELETE(
       return Errors.userIdRequired()
     }
 
-    const removed = await removeChatMember(chatId, user_id, user.id)
+    const removed = await removeChatMember(chatId, user_id, auth.user.id)
     if (removed === 0) {
-      return Errors.removeFailed()
+      return NextResponse.json({ error: "Failed to remove member" }, { status: 500 })
     }
 
     const members = await getChatMembers(chatId)

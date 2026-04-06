@@ -1,48 +1,13 @@
 // v2 Discussion Templates API: Get, update, delete single template
 import { type NextRequest } from "next/server"
-import { db } from "@/lib/database/pg-client"
 import { getCachedAuthUser } from "@/lib/auth/cached-auth"
 import { getOrgContext } from "@/lib/auth/get-org-context"
 import { handleApiError } from "@/lib/api/handle-api-error"
+import { getTemplate, updateTemplate, deleteTemplate } from "@/lib/handlers/discussion-templates-detail-handler"
+import { toResponse, rateLimitResponse, unauthorizedResponse } from "@/lib/handlers/inference-response"
 import type { UpdateTemplateRequest } from "@/types/discussion-templates"
 
 export const dynamic = "force-dynamic"
-
-function buildTemplateUpdates(body: UpdateTemplateRequest): { updates: string[]; values: any[]; paramCount: number } {
-  const stringFields = ["name", "description", "category", "goal_text", "expected_outcome"]
-  const jsonFields = ["required_categories", "optional_categories", "category_flow", "scoring_rubric", "milestones"]
-  const directFields = ["completion_mode", "require_approval", "min_approvers", "icon_name", "color_scheme", "is_public"]
-
-  const updates: string[] = []
-  const values: any[] = []
-  let paramCount = 0
-
-  for (const field of stringFields) {
-    if ((body as any)[field] !== undefined) {
-      paramCount++
-      updates.push(`${field} = $${paramCount}`)
-      values.push((body as any)[field]?.trim() || null)
-    }
-  }
-
-  for (const field of jsonFields) {
-    if ((body as any)[field] !== undefined) {
-      paramCount++
-      updates.push(`${field} = $${paramCount}`)
-      values.push(JSON.stringify((body as any)[field]))
-    }
-  }
-
-  for (const field of directFields) {
-    if ((body as any)[field] !== undefined) {
-      paramCount++
-      updates.push(`${field} = $${paramCount}`)
-      values.push((body as any)[field])
-    }
-  }
-
-  return { updates, values, paramCount }
-}
 
 // GET /api/v2/discussion-templates/[templateId] - Get single template
 export async function GET(
@@ -53,80 +18,12 @@ export async function GET(
     const { templateId } = await params
 
     const authResult = await getCachedAuthUser()
-    if (authResult.rateLimited) {
-      return new Response(
-        JSON.stringify({ error: "Rate limit exceeded. Please try again in a moment." }),
-        { status: 429, headers: { "Retry-After": "30" } }
-      )
-    }
-    if (!authResult.user) {
-      return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401 })
-    }
+    if (authResult.rateLimited) return rateLimitResponse()
+    if (!authResult.user) return unauthorizedResponse()
 
     const orgContext = await getOrgContext()
-
-    // Get the template - must be system, public, owned by user, or in user's org
-    const result = await db.query(
-      `SELECT
-        id, name, description, category,
-        is_system, is_public,
-        goal_text, expected_outcome,
-        required_categories, optional_categories, category_flow, milestones,
-        completion_mode, auto_complete_threshold,
-        require_approval, min_approvers, approval_roles,
-        icon_name, color_scheme,
-        use_count, created_by, org_id,
-        created_at, updated_at
-      FROM discussion_templates
-      WHERE id = $1
-        AND (
-          is_system = true
-          OR is_public = true
-          ${orgContext?.orgId ? "OR org_id = $2" : ""}
-          OR created_by = $${orgContext?.orgId ? "3" : "2"}
-        )`,
-      orgContext?.orgId
-        ? [templateId, orgContext.orgId, authResult.user.id]
-        : [templateId, authResult.user.id]
-    )
-
-    if (result.rows.length === 0) {
-      return new Response(JSON.stringify({ error: "Template not found" }), { status: 404 })
-    }
-
-    const row = result.rows[0]
-
-    return new Response(
-      JSON.stringify({
-        template: {
-          id: row.id,
-          name: row.name,
-          description: row.description,
-          category: row.category,
-          is_system: row.is_system,
-          is_public: row.is_public,
-          goal_text: row.goal_text,
-          expected_outcome: row.expected_outcome,
-          required_categories: row.required_categories || [],
-          optional_categories: row.optional_categories || [],
-          category_flow: row.category_flow || [],
-          milestones: row.milestones || [],
-          completion_mode: row.completion_mode,
-          auto_complete_threshold: row.auto_complete_threshold,
-          require_approval: row.require_approval,
-          min_approvers: row.min_approvers,
-          approval_roles: row.approval_roles || [],
-          icon_name: row.icon_name,
-          color_scheme: row.color_scheme,
-          use_count: row.use_count,
-          created_by: row.created_by,
-          org_id: row.org_id,
-          created_at: row.created_at,
-          updated_at: row.updated_at,
-        },
-      }),
-      { status: 200 }
-    )
+    const result = await getTemplate(templateId, authResult.user.id, orgContext)
+    return toResponse(result)
   } catch (error) {
     return handleApiError(error)
   }
@@ -141,102 +38,13 @@ export async function PATCH(
     const { templateId } = await params
 
     const authResult = await getCachedAuthUser()
-    if (authResult.rateLimited) {
-      return new Response(
-        JSON.stringify({ error: "Rate limit exceeded. Please try again in a moment." }),
-        { status: 429, headers: { "Retry-After": "30" } }
-      )
-    }
-    if (!authResult.user) {
-      return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401 })
-    }
+    if (authResult.rateLimited) return rateLimitResponse()
+    if (!authResult.user) return unauthorizedResponse()
 
     const orgContext = await getOrgContext()
-
-    // Check if template exists and user can modify it (not system, owned by user or org admin)
-    const existingResult = await db.query(
-      `SELECT id, is_system, created_by, org_id
-       FROM discussion_templates
-       WHERE id = $1`,
-      [templateId]
-    )
-
-    if (existingResult.rows.length === 0) {
-      return new Response(JSON.stringify({ error: "Template not found" }), { status: 404 })
-    }
-
-    const existing = existingResult.rows[0]
-
-    if (existing.is_system) {
-      return new Response(
-        JSON.stringify({ error: "Cannot modify system templates" }),
-        { status: 403 }
-      )
-    }
-
-    const isOwner = existing.created_by === authResult.user.id
-    const isOrgAdmin = (orgContext?.role === "admin" || orgContext?.role === "owner") && existing.org_id === orgContext?.orgId
-
-    if (!isOwner && !isOrgAdmin) {
-      return new Response(
-        JSON.stringify({ error: "Not authorized to modify this template" }),
-        { status: 403 }
-      )
-    }
-
     const body: UpdateTemplateRequest = await request.json()
-
-    // Build update query dynamically
-    const { updates, values, paramCount } = buildTemplateUpdates(body)
-
-    if (updates.length === 0) {
-      return new Response(JSON.stringify({ error: "No updates provided" }), { status: 400 })
-    }
-
-    const idParam = paramCount + 1
-    values.push(templateId)
-
-    const result = await db.query(
-      `UPDATE discussion_templates
-       SET ${updates.join(", ")}, updated_at = NOW()
-       WHERE id = $${idParam}
-       RETURNING *`,
-      values
-    )
-
-    const row = result.rows[0]
-
-    return new Response(
-      JSON.stringify({
-        template: {
-          id: row.id,
-          name: row.name,
-          description: row.description,
-          category: row.category,
-          is_system: row.is_system,
-          is_public: row.is_public,
-          goal_text: row.goal_text,
-          expected_outcome: row.expected_outcome,
-          required_categories: row.required_categories || [],
-          optional_categories: row.optional_categories || [],
-          category_flow: row.category_flow || [],
-          milestones: row.milestones || [],
-          completion_mode: row.completion_mode,
-          auto_complete_threshold: row.auto_complete_threshold,
-          require_approval: row.require_approval,
-          min_approvers: row.min_approvers,
-          approval_roles: row.approval_roles || [],
-          icon_name: row.icon_name,
-          color_scheme: row.color_scheme,
-          use_count: row.use_count,
-          created_by: row.created_by,
-          org_id: row.org_id,
-          created_at: row.created_at,
-          updated_at: row.updated_at,
-        },
-      }),
-      { status: 200 }
-    )
+    const result = await updateTemplate(templateId, authResult.user.id, orgContext, body)
+    return toResponse(result)
   } catch (error) {
     return handleApiError(error)
   }
@@ -251,52 +59,12 @@ export async function DELETE(
     const { templateId } = await params
 
     const authResult = await getCachedAuthUser()
-    if (authResult.rateLimited) {
-      return new Response(
-        JSON.stringify({ error: "Rate limit exceeded. Please try again in a moment." }),
-        { status: 429, headers: { "Retry-After": "30" } }
-      )
-    }
-    if (!authResult.user) {
-      return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401 })
-    }
+    if (authResult.rateLimited) return rateLimitResponse()
+    if (!authResult.user) return unauthorizedResponse()
 
     const orgContext = await getOrgContext()
-
-    // Check if template exists and user can delete it
-    const existingResult = await db.query(
-      `SELECT id, is_system, created_by, org_id
-       FROM discussion_templates
-       WHERE id = $1`,
-      [templateId]
-    )
-
-    if (existingResult.rows.length === 0) {
-      return new Response(JSON.stringify({ error: "Template not found" }), { status: 404 })
-    }
-
-    const existing = existingResult.rows[0]
-
-    if (existing.is_system) {
-      return new Response(
-        JSON.stringify({ error: "Cannot delete system templates" }),
-        { status: 403 }
-      )
-    }
-
-    const isOwner = existing.created_by === authResult.user.id
-    const isOrgAdmin = (orgContext?.role === "admin" || orgContext?.role === "owner") && existing.org_id === orgContext?.orgId
-
-    if (!isOwner && !isOrgAdmin) {
-      return new Response(
-        JSON.stringify({ error: "Not authorized to delete this template" }),
-        { status: 403 }
-      )
-    }
-
-    await db.query(`DELETE FROM discussion_templates WHERE id = $1`, [templateId])
-
-    return new Response(JSON.stringify({ success: true }), { status: 200 })
+    const result = await deleteTemplate(templateId, authResult.user.id, orgContext)
+    return toResponse(result)
   } catch (error) {
     return handleApiError(error)
   }

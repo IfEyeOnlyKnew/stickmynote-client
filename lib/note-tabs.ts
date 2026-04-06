@@ -1,246 +1,30 @@
 import { queryOne, queryMany, execute } from "@/lib/database/pg-client"
 import { createDatabaseClient } from "@/lib/database/database-adapter"
-import type { Note as BaseNote, Reply, VideoItem, ImageItem, NoteTab } from "@/types/note"
+import type { Reply, NoteTab } from "@/types/note"
+import {
+  type Note,
+  type CreateNoteData,
+  type UpdateNoteData,
+  type CreateReplyData,
+  type NotesResponse,
+  type DatabaseNoteRow,
+  type DatabaseReplyRow,
+  type ExtractedTabData,
+  extractTabData,
+  transformReplyFromRaw,
+  transformPartialNote,
+  buildNoteUpdatePayload,
+  buildNoteInsertPayload,
+} from "@/lib/notes-shared"
 
-// Extend Note type to include 'tags', 'images', 'videos', and 'replies' if not present
-export interface Note extends BaseNote {
-  tags: string[]
-  images: ImageItem[]
-  videos: VideoItem[]
-  replies: Reply[]
-}
+// Re-export shared types for backward compatibility
+export type { Note, CreateNoteData, UpdateNoteData, CreateReplyData, NotesResponse }
 
-// ============================================================================
-// TYPES
-// ============================================================================
-
-export interface CreateNoteData {
-  topic?: string
-  content: string
-  color?: string
-  position_x?: number
-  position_y?: number
-  is_shared?: boolean
-  tags?: string[]
-  images?: string[]
-  videos?: string[]
-}
-
-export interface UpdateNoteData extends Partial<CreateNoteData> {
-  id: string
-}
-
-export interface CreateReplyData {
-  note_id: string
-  content: string
-  color?: string
-}
-
-export interface NotesResponse {
-  notes: Note[]
-  hasMore: boolean
-  total: number
-}
-
-interface DatabaseNoteRow {
-  id: string
-  user_id: string
-  title: string | null
-  topic: string | null
-  content: string
-  color: string
-  position_x: number
-  position_y: number
-  is_shared: boolean
-  z_index: number | null
-  is_pinned: boolean | null
-  created_at: string
-  updated_at: string
-}
-
-interface DatabaseReplyRow {
-  id: string
-  personal_stick_id: string // Renamed from note_id
-  user_id: string
-  content: string
-  color: string
-  created_at: string
-  updated_at: string
-  parent_reply_id?: string | null
-}
-
-interface ReplyInsertPayload {
-  personal_stick_id: string // Renamed from note_id
-  content: string
-  color: string
-  created_at: string
-  updated_at: string
-  user_id: string
-}
-
-interface PartialNoteData {
-  id?: unknown
-  topic?: unknown
-  title?: unknown
-  content?: unknown
-  color?: unknown
-  position_x?: unknown
-  position_y?: unknown
-  is_shared?: unknown
-  z_index?: unknown
-  is_pinned?: unknown
-  created_at?: unknown
-  updated_at?: unknown
-  user_id?: unknown
-}
-
-interface NoteUpdatePayload {
-  title?: string
-  topic?: string
-  content?: string
-  color?: string
-  position_x?: number
-  position_y?: number
-  is_shared?: boolean
-  z_index?: number
-  is_pinned?: boolean
-  updated_at: string
-}
-
-// ============================================================================
-// HELPER FUNCTIONS
-// ============================================================================
-
-/**
- * Resolves the updated_at timestamp with fallback to created_at or current time
- */
-function resolveUpdatedAt(updatedAt: unknown, createdAt: unknown): string {
-  if (typeof updatedAt === "string" && updatedAt) {
-    return updatedAt
-  }
-  if (typeof createdAt === "string" && createdAt) {
-    return createdAt
-  }
-  return new Date().toISOString()
-}
-
-/**
- * Resolves a string field with a fallback value
- */
-function resolveStringField(value: unknown, fallback: string): string {
-  return typeof value === "string" && value ? value : fallback
-}
-
-/**
- * Resolves a timestamp field or returns current time
- */
-function resolveTimestamp(value: unknown): string {
-  return typeof value === "string" && value ? value : new Date().toISOString()
-}
-
-interface ExtractedTabData {
-  tags: string[]
-  images: ImageItem[]
-  videos: VideoItem[]
-}
-
-/**
- * Extracts tags, images, and videos from note tabs
- */
-function extractTabData(noteTabs: unknown[] | null): ExtractedTabData {
-  const result: ExtractedTabData = { tags: [], images: [], videos: [] }
-  if (!noteTabs) {
-    return result
-  }
-  for (const tab of noteTabs as any[]) {
-    if (!tab.tab_data) {
-      continue
-    }
-    const tabData = typeof tab.tab_data === "string" ? JSON.parse(tab.tab_data) : tab.tab_data
-    if (tabData.tags && Array.isArray(tabData.tags)) {
-      result.tags = [...result.tags, ...tabData.tags]
-    }
-    if (tabData.images && Array.isArray(tabData.images)) {
-      result.images = [...result.images, ...tabData.images]
-    }
-    if (tabData.videos && Array.isArray(tabData.videos)) {
-      result.videos = [...result.videos, ...tabData.videos]
-    }
-  }
-  return result
-}
-
-/**
- * Transforms a raw reply into a Reply object
- */
-function transformReply(reply: unknown): Reply {
-  const r = reply as any
-  return {
-    id: resolveStringField(r.id, "unknown-reply-id"),
-    content: r.content || "",
-    color: r.color || "#ffffff",
-    created_at: resolveTimestamp(r.created_at),
-    updated_at: resolveUpdatedAt(r.updated_at, r.created_at),
-    user_id: resolveStringField(r.user_id, "unknown-user"),
-    note_id: resolveStringField(r.personal_stick_id, "unknown-note-id"),
-  }
-}
-
-/**
- * Builds the update payload from update data
- */
-function buildUpdatePayload(updateData: Partial<CreateNoteData>): NoteUpdatePayload {
-  const payload: NoteUpdatePayload = {
-    updated_at: new Date().toISOString(),
-  }
-
-  if (updateData.topic !== undefined) {
-    payload.topic = updateData.topic
-    payload.title = updateData.topic || "Untitled Note"
-  }
-  if (updateData.content !== undefined) {
-    payload.content = updateData.content
-  }
-  if (updateData.color !== undefined) {
-    payload.color = updateData.color
-  }
-  if (updateData.position_x !== undefined) {
-    payload.position_x = updateData.position_x
-  }
-  if (updateData.position_y !== undefined) {
-    payload.position_y = updateData.position_y
-  }
-  if (updateData.is_shared !== undefined) {
-    payload.is_shared = Boolean(updateData.is_shared)
-  }
-
-  return payload
-}
-
-/**
- * Transforms partial note data into a complete Note object
- */
-function buildTransformedNote(noteData: PartialNoteData, tabData: ExtractedTabData, replies: unknown[]): Note {
-  return {
-    id: resolveStringField(noteData.id, "unknown-id"),
-    topic: (noteData.topic as string) || "",
-    title: (noteData.title as string) || (noteData.topic as string) || "Untitled Note",
-    content: (noteData.content as string) || "",
-    color: (noteData.color as string) || "#fef3c7",
-    position_x: (noteData.position_x as number) || 0,
-    position_y: (noteData.position_y as number) || 0,
-    is_shared: Boolean(noteData.is_shared),
-    z_index: (noteData.z_index as number) || undefined,
-    is_pinned: (noteData.is_pinned as boolean) || undefined,
-    tags: tabData.tags,
-    images: tabData.images,
-    videos: tabData.videos,
-    created_at: resolveTimestamp(noteData.created_at),
-    updated_at: resolveTimestamp(noteData.updated_at),
-    user_id: resolveStringField(noteData.user_id, "unknown-user"),
-    replies: replies.map(transformReply),
-  }
-}
+// Local aliases for internal use
+const transformReply = transformReplyFromRaw
+const buildTransformedNote = (noteData: any, tabData: ExtractedTabData, replies: unknown[]) =>
+  transformPartialNote(noteData, tabData, (replies as any[]).map(transformReplyFromRaw))
+const buildUpdatePayload = buildNoteUpdatePayload
 
 // ============================================================================
 // NOTES FUNCTIONS

@@ -1,17 +1,15 @@
 import "server-only"
 import { Pool, type PoolClient, type QueryResult, type QueryResultRow } from "pg"
-
-interface DatabaseConfig {
-  host: string
-  port: number
-  database: string
-  user: string
-  password: string
-  ssl?: boolean | { rejectUnauthorized: boolean }
-  max?: number
-  idleTimeoutMillis?: number
-  connectionTimeoutMillis?: number
-}
+import {
+  type DatabaseConfig,
+  buildDatabaseConfig,
+  createPool,
+  executeTransaction,
+  performHealthCheck,
+  queryOneHelper,
+  queryManyHelper,
+  executeHelper,
+} from "./pg-shared"
 
 interface QueryStat {
   sql: string
@@ -30,39 +28,12 @@ class PostgresDatabase {
   private readonly queryStats: QueryStat[] = []
 
   constructor() {
-    // Configure SSL
-    let sslConfig: boolean | { rejectUnauthorized: boolean } = false
-    if (process.env.POSTGRES_SSL === "true") {
-      // For self-signed certificates, set rejectUnauthorized to false
-      sslConfig = { rejectUnauthorized: process.env.POSTGRES_SSL_REJECT_UNAUTHORIZED !== "false" }
-    }
-
-    const maxPool = Number(process.env.POSTGRES_MAX_POOL) || 20
-
-    this.config = {
-      host: process.env.POSTGRES_HOST || "localhost",
-      port: Number.parseInt(process.env.POSTGRES_PORT || "5432"),
-      database: process.env.POSTGRES_DATABASE || "stickmynote",
-      user: process.env.POSTGRES_USER || "stickmynote_user",
-      password: process.env.POSTGRES_PASSWORD || "",
-      ssl: sslConfig,
-      max: maxPool,
-      idleTimeoutMillis: 30000,
-      connectionTimeoutMillis: 10000,
-    }
+    this.config = buildDatabaseConfig()
   }
 
   private getPool(): Pool {
     if (!this.pool) {
-      this.pool = new Pool(this.config)
-
-      this.pool.on("error", (err) => {
-        console.error("[PostgreSQL] Unexpected pool error:", err)
-      })
-
-      this.pool.on("connect", () => {
-        console.log("[PostgreSQL] New client connected to pool")
-      })
+      this.pool = createPool(this.config)
     }
     return this.pool
   }
@@ -106,33 +77,11 @@ class PostgresDatabase {
   }
 
   async transaction<T>(callback: (client: PoolClient) => Promise<T>): Promise<T> {
-    const client = await this.getClient()
-    try {
-      await client.query("BEGIN")
-      const result = await callback(client)
-      await client.query("COMMIT")
-      return result
-    } catch (error) {
-      await client.query("ROLLBACK")
-      throw error
-    } finally {
-      client.release()
-    }
+    return executeTransaction(() => this.getClient(), callback)
   }
 
   async healthCheck(): Promise<{ healthy: boolean; message: string }> {
-    try {
-      await this.query("SELECT NOW()")
-      return {
-        healthy: true,
-        message: `Connected to PostgreSQL at ${this.config.host}:${this.config.port}`,
-      }
-    } catch (error) {
-      return {
-        healthy: false,
-        message: error instanceof Error ? error.message : "Unknown database error",
-      }
-    }
+    return performHealthCheck((text) => this.query(text), this.config)
   }
 
   /**
@@ -194,16 +143,13 @@ export const db = new PostgresDatabase()
 
 // Helper functions for common operations
 export async function queryOne<T extends QueryResultRow = any>(text: string, params?: any[]): Promise<T | null> {
-  const result = await db.query<T>(text, params)
-  return result.rows[0] || null
+  return queryOneHelper((t, p) => db.query<T>(t, p), text, params)
 }
 
 export async function queryMany<T extends QueryResultRow = any>(text: string, params?: any[]): Promise<T[]> {
-  const result = await db.query<T>(text, params)
-  return result.rows
+  return queryManyHelper((t, p) => db.query<T>(t, p), text, params)
 }
 
 export async function execute(text: string, params?: any[]): Promise<number> {
-  const result = await db.query(text, params)
-  return result.rowCount || 0
+  return executeHelper((t, p) => db.query(t, p), text, params)
 }

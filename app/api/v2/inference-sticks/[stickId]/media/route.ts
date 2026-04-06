@@ -1,9 +1,10 @@
 // v2 Social Sticks Media API: production-quality, manage stick media
 import { type NextRequest } from 'next/server'
-import { db } from '@/lib/database/pg-client'
 import { getCachedAuthUser } from '@/lib/auth/cached-auth'
 import { getOrgContext } from '@/lib/auth/get-org-context'
 import { handleApiError } from '@/lib/api/handle-api-error'
+import { addMedia, removeMedia } from '@/lib/handlers/inference-sticks-media-handler'
+import { toResponse, rateLimitResponse, unauthorizedResponse, noOrgResponse } from '@/lib/handlers/inference-response'
 
 export const dynamic = 'force-dynamic'
 
@@ -16,47 +17,15 @@ export async function POST(
     const { stickId } = await params
 
     const authResult = await getCachedAuthUser()
-    if (authResult.rateLimited) {
-      return new Response(
-        JSON.stringify({ error: 'Rate limit exceeded. Please try again in a moment.' }),
-        { status: 429, headers: { 'Retry-After': '30' } }
-      )
-    }
-    if (!authResult.user) {
-      return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401 })
-    }
-    const user = authResult.user
+    if (authResult.rateLimited) return rateLimitResponse()
+    if (!authResult.user) return unauthorizedResponse()
 
     const orgContext = await getOrgContext()
-    if (!orgContext) {
-      return new Response(JSON.stringify({ error: 'Organization context required' }), { status: 403 })
-    }
+    if (!orgContext) return noOrgResponse()
 
     const body = await request.json()
-    const { url, type, filename } = body
-
-    // Check stick ownership
-    const stickResult = await db.query(
-      `SELECT user_id FROM social_sticks WHERE id = $1 AND org_id = $2`,
-      [stickId, orgContext.orgId]
-    )
-
-    if (stickResult.rows.length === 0 || stickResult.rows[0].user_id !== user.id) {
-      return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 403 })
-    }
-
-    // Insert media
-    const mediaResult = await db.query(
-      `INSERT INTO social_stick_media (social_stick_id, url, type, filename, user_id, org_id)
-       VALUES ($1, $2, $3, $4, $5, $6)
-       RETURNING *`,
-      [stickId, url, type, filename, user.id, orgContext.orgId]
-    )
-
-    return new Response(
-      JSON.stringify({ success: true, data: mediaResult.rows[0] }),
-      { status: 200 }
-    )
+    const result = await addMedia(stickId, authResult.user.id, orgContext.orgId, body)
+    return toResponse(result)
   } catch (error) {
     return handleApiError(error)
   }
@@ -71,32 +40,15 @@ export async function DELETE(
     const { stickId } = await params
 
     const authResult = await getCachedAuthUser()
-    if (authResult.rateLimited) {
-      return new Response(
-        JSON.stringify({ error: 'Rate limit exceeded. Please try again in a moment.' }),
-        { status: 429, headers: { 'Retry-After': '30' } }
-      )
-    }
-    if (!authResult.user) {
-      return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401 })
-    }
-    const user = authResult.user
+    if (authResult.rateLimited) return rateLimitResponse()
+    if (!authResult.user) return unauthorizedResponse()
 
     const orgContext = await getOrgContext()
-    if (!orgContext) {
-      return new Response(JSON.stringify({ error: 'Organization context required' }), { status: 403 })
-    }
+    if (!orgContext) return noOrgResponse()
 
     const body = await request.json()
-    const { url } = body
-
-    await db.query(
-      `DELETE FROM social_stick_media
-       WHERE social_stick_id = $1 AND url = $2 AND user_id = $3 AND org_id = $4`,
-      [stickId, url, user.id, orgContext.orgId]
-    )
-
-    return new Response(JSON.stringify({ success: true }), { status: 200 })
+    const result = await removeMedia(stickId, authResult.user.id, orgContext.orgId, body.url)
+    return toResponse(result)
   } catch (error) {
     return handleApiError(error)
   }

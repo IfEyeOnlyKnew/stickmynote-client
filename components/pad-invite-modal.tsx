@@ -12,20 +12,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { X, Users, Mail, FileText, Check, Shield } from "lucide-react"
 import { CsvEmailUpload } from "@/components/csv-email-upload"
-
-interface User {
-  id: string
-  username: string | null
-  email: string | null
-  full_name: string | null
-}
-
-interface SavedEmail {
-  id: string
-  email: string
-  name?: string
-  source: string
-}
+import { useInviteEmails } from "@/hooks/useInviteEmails"
 
 type PadRole = "admin" | "editor" | "viewer"
 
@@ -41,16 +28,32 @@ interface PadInviteModalProps {
 }
 
 export function PadInviteModal({ open, onOpenChange, padId, onInviteSubmit }: Readonly<PadInviteModalProps>) {
-  const [searchQuery, setSearchQuery] = useState("")
-  const [searchResults, setSearchResults] = useState<User[]>([])
-  const [savedEmails, setSavedEmails] = useState<SavedEmail[]>([])
-  const [selectedEmails, setSelectedEmails] = useState<string[]>([])
-  const [selectedUsers, setSelectedUsers] = useState<User[]>([])
+  const {
+    searchQuery,
+    setSearchQuery,
+    searchResults,
+    savedEmails,
+    selectedEmails,
+    selectedUsers,
+    isLoading,
+    manualEmails,
+    setManualEmails,
+    filteredSavedEmails,
+    totalSelected,
+    toggleEmailSelection,
+    toggleUserSelection,
+    addManualEmail,
+    addTypedEmail,
+    handleKeyDown,
+    resetForm,
+    setSelectedEmails,
+    setIsLoading,
+    loadSavedEmails,
+  } = useInviteEmails({ entityId: padId, entityParam: "padId", open })
+
   const [inviteRole, setInviteRole] = useState<PadRole>("viewer")
   const [defaultManageRole, setDefaultManageRole] = useState<PadRole>("viewer")
-  const [isLoading, setIsLoading] = useState(false)
   const [activeTab, setActiveTab] = useState("invite")
-  const [manualEmails, setManualEmails] = useState("")
   const [padName, setPadName] = useState("Pad")
   const inputRef = useRef<HTMLInputElement>(null)
   const dialogRef = useRef<HTMLDivElement>(null)
@@ -58,7 +61,6 @@ export function PadInviteModal({ open, onOpenChange, padId, onInviteSubmit }: Re
   useEffect(() => {
     if (open) {
       loadPadData()
-      loadSavedEmails()
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, padId])
@@ -75,42 +77,8 @@ export function PadInviteModal({ open, onOpenChange, padId, onInviteSubmit }: Re
     }
   }
 
-  useEffect(() => {
-    if (!searchQuery.trim()) {
-      setSearchResults([])
-      return
-    }
-
-    const searchUsers = async () => {
-      try {
-        const userResponse = await fetch(`/api/user-search?query=${encodeURIComponent(searchQuery)}&padId=${padId}`)
-        if (userResponse.ok) {
-          const users = await userResponse.json()
-          setSearchResults(users)
-        }
-      } catch (err) {
-        console.error("Search error:", err)
-      }
-    }
-
-    const debounce = setTimeout(searchUsers, 300)
-    return () => clearTimeout(debounce)
-  }, [searchQuery, padId])
-
   const handleRoleChange = (value: PadRole) => {
     setInviteRole(value)
-  }
-
-  const loadSavedEmails = async () => {
-    try {
-      const response = await fetch(`/api/saved-emails?padId=${padId}`)
-      if (response.ok) {
-        const data = await response.json()
-        setSavedEmails(data.savedEmails || [])
-      }
-    } catch (err) {
-      console.error("Error loading saved emails:", err)
-    }
   }
 
   const handleCsvUpload = async (emails: Array<{ email: string; name?: string }>) => {
@@ -123,56 +91,6 @@ export function PadInviteModal({ open, onOpenChange, padId, onInviteSubmit }: Re
     } finally {
       setIsLoading(false)
     }
-  }
-
-  const addManualEmail = async () => {
-    if (!manualEmails.trim()) return
-
-    const emails = manualEmails
-      .split(/[,;\n]/)
-      .map((e) => e.trim())
-      .filter((e) => e.length > 0 && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e))
-      .map((email) => ({ email }))
-
-    if (emails.length === 0) {
-      alert("No valid emails found. Please check the format.")
-      return
-    }
-
-    try {
-      setIsLoading(true)
-      const response = await fetch("/api/saved-emails", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          emails,
-          padId,
-          source: "manual",
-        }),
-      })
-
-      if (response.ok) {
-        await loadSavedEmails()
-        setManualEmails("")
-      } else {
-        const errorText = await response.text()
-        alert(`Failed to save emails: ${errorText}`)
-      }
-    } catch (err) {
-      alert(`Error adding emails: ${err}`)
-    } finally {
-      setIsLoading(false)
-    }
-  }
-
-  const toggleEmailSelection = (email: string) => {
-    setSelectedEmails((prev) => (prev.includes(email) ? prev.filter((e) => e !== email) : [...prev, email]))
-  }
-
-  const toggleUserSelection = (user: User) => {
-    setSelectedUsers((prev) =>
-      prev.some((u) => u.id === user.id) ? prev.filter((u) => u.id !== user.id) : [...prev, user],
-    )
   }
 
   const handleSubmit = async () => {
@@ -200,11 +118,7 @@ export function PadInviteModal({ open, onOpenChange, padId, onInviteSubmit }: Re
     try {
       setIsLoading(true)
       await onInviteSubmit(submitData)
-
-      setSearchQuery("")
-      setSelectedEmails([])
-      setSelectedUsers([])
-      setSearchResults([])
+      resetForm()
       await loadPadData()
     } catch (err) {
       console.error("Error submitting invites:", err)
@@ -212,40 +126,6 @@ export function PadInviteModal({ open, onOpenChange, padId, onInviteSubmit }: Re
       setIsLoading(false)
     }
   }
-
-  const addTypedEmail = () => {
-    if (searchQuery && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(searchQuery)) {
-      const isAlreadySelected =
-        selectedEmails.includes(searchQuery) || selectedUsers.some((u) => u.email === searchQuery)
-      if (!isAlreadySelected) {
-        setSelectedEmails((prev) => [...prev, searchQuery])
-        setSearchQuery("")
-      }
-    }
-  }
-
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === "Enter") {
-      addTypedEmail()
-    }
-  }
-
-  const filteredSavedEmails = savedEmails.filter((email) =>
-    searchQuery
-      ? email.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        email.name?.toLowerCase().includes(searchQuery.toLowerCase())
-      : true,
-  )
-
-  const totalSelected =
-    selectedUsers.length +
-    selectedEmails.length +
-    (searchQuery &&
-    /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(searchQuery) &&
-    !selectedEmails.includes(searchQuery) &&
-    !selectedUsers.some((u) => u.email === searchQuery)
-      ? 1
-      : 0)
 
   useEffect(() => {
     const handleEscape = (e: KeyboardEvent) => {

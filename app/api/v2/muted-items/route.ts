@@ -1,8 +1,9 @@
 // v2 Muted Items API: production-quality, manage muted notification items
 import { type NextRequest } from 'next/server'
-import { db } from '@/lib/database/pg-client'
 import { getCachedAuthUser } from '@/lib/auth/cached-auth'
 import { handleApiError } from '@/lib/api/handle-api-error'
+import { getMutedItems, muteItem, unmuteItem } from '@/lib/handlers/muted-items-handler'
+import { rateLimitResponse, unauthorizedResponse } from '@/lib/handlers/inference-response'
 
 export const dynamic = 'force-dynamic'
 
@@ -10,25 +11,11 @@ export const dynamic = 'force-dynamic'
 export async function GET(request: NextRequest) {
   try {
     const authResult = await getCachedAuthUser()
-    if (authResult.rateLimited) {
-      return new Response(
-        JSON.stringify({ error: 'Rate limit exceeded. Please try again in a moment.' }),
-        { status: 429, headers: { 'Retry-After': '30' } }
-      )
-    }
-    if (!authResult.user) {
-      return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401 })
-    }
-    const user = authResult.user
+    if (authResult.rateLimited) return rateLimitResponse()
+    if (!authResult.user) return unauthorizedResponse()
 
-    const result = await db.query(
-      `SELECT * FROM notification_muted_items
-       WHERE user_id = $1
-       ORDER BY created_at DESC`,
-      [user.id]
-    )
-
-    return new Response(JSON.stringify({ mutedItems: result.rows }), { status: 200 })
+    const mutedItems = await getMutedItems(authResult.user.id)
+    return new Response(JSON.stringify({ mutedItems }), { status: 200 })
   } catch (error) {
     return handleApiError(error)
   }
@@ -38,30 +25,12 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const authResult = await getCachedAuthUser()
-    if (authResult.rateLimited) {
-      return new Response(
-        JSON.stringify({ error: 'Rate limit exceeded. Please try again in a moment.' }),
-        { status: 429, headers: { 'Retry-After': '30' } }
-      )
-    }
-    if (!authResult.user) {
-      return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401 })
-    }
-    const user = authResult.user
+    if (authResult.rateLimited) return rateLimitResponse()
+    if (!authResult.user) return unauthorizedResponse()
 
     const body = await request.json()
-    const { entity_type, entity_id, muted_until, reason } = body
-
-    const result = await db.query(
-      `INSERT INTO notification_muted_items (user_id, entity_type, entity_id, muted_until, reason)
-       VALUES ($1, $2, $3, $4, $5)
-       ON CONFLICT (user_id, entity_type, entity_id)
-       DO UPDATE SET muted_until = EXCLUDED.muted_until, reason = EXCLUDED.reason, updated_at = NOW()
-       RETURNING *`,
-      [user.id, entity_type, entity_id, muted_until || null, reason]
-    )
-
-    return new Response(JSON.stringify({ mutedItem: result.rows[0] }), { status: 200 })
+    const mutedItem = await muteItem(authResult.user.id, body)
+    return new Response(JSON.stringify({ mutedItem }), { status: 200 })
   } catch (error) {
     return handleApiError(error)
   }
@@ -71,16 +40,8 @@ export async function POST(request: NextRequest) {
 export async function DELETE(request: NextRequest) {
   try {
     const authResult = await getCachedAuthUser()
-    if (authResult.rateLimited) {
-      return new Response(
-        JSON.stringify({ error: 'Rate limit exceeded. Please try again in a moment.' }),
-        { status: 429, headers: { 'Retry-After': '30' } }
-      )
-    }
-    if (!authResult.user) {
-      return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401 })
-    }
-    const user = authResult.user
+    if (authResult.rateLimited) return rateLimitResponse()
+    if (!authResult.user) return unauthorizedResponse()
 
     const { searchParams } = new URL(request.url)
     const entityType = searchParams.get('entity_type')
@@ -93,12 +54,7 @@ export async function DELETE(request: NextRequest) {
       )
     }
 
-    await db.query(
-      `DELETE FROM notification_muted_items
-       WHERE user_id = $1 AND entity_type = $2 AND entity_id = $3`,
-      [user.id, entityType, entityId]
-    )
-
+    await unmuteItem(authResult.user.id, entityType, entityId)
     return new Response(JSON.stringify({ success: true }), { status: 200 })
   } catch (error) {
     return handleApiError(error)

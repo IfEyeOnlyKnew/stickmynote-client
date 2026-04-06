@@ -8,19 +8,10 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import { Pencil, Trash2, MessageSquare, CheckSquare, AlertCircle, RefreshCw, ChevronDown, ChevronRight, CornerDownRight, Send, X, Check } from "lucide-react"
 import { formatDistanceToNow } from "date-fns"
+import { DEPTH_COLORS } from "@/components/replies/reply-shared"
 
 // Maximum nesting depth before showing message
 export const MAX_REPLY_DEPTH = 5
-
-// Depth-based colors for visual distinction of thread levels
-const DEPTH_COLORS = [
-  { line: "border-blue-400", bg: "bg-blue-50", text: "text-blue-600" },
-  { line: "border-green-400", bg: "bg-green-50", text: "text-green-600" },
-  { line: "border-purple-400", bg: "bg-purple-50", text: "text-purple-600" },
-  { line: "border-orange-400", bg: "bg-orange-50", text: "text-orange-600" },
-  { line: "border-pink-400", bg: "bg-pink-50", text: "text-pink-600" },
-  { line: "border-cyan-400", bg: "bg-cyan-50", text: "text-cyan-600" },
-]
 
 interface Reply {
   id: string
