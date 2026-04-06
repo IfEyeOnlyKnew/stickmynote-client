@@ -162,8 +162,8 @@ async function enrichRequestWithUsers(
 
   return {
     ...request,
-    requester: requester || undefined,
-    recipient: recipient || undefined,
+    requester: requester ?? undefined,
+    recipient: recipient ?? undefined,
     parent_reply: parentReply ? {
       id: parentReply.id,
       content: parentReply.content,

@@ -115,6 +115,131 @@ async function saveExportLinkToDetailsTab(
   }
 }
 
+// Fetch stick data with pad info
+async function fetchStickData(stickId: string) {
+  const stickResult = await db.query(
+    `SELECT s.*, p.name as pad_name, p.owner_id as pad_owner_id
+     FROM paks_pad_sticks s
+     LEFT JOIN paks_pads p ON s.pad_id = p.id
+     WHERE s.id = $1`,
+    [stickId]
+  )
+  return stickResult.rows[0] || null
+}
+
+// Fetch replies with user info
+async function fetchReplies(stickId: string) {
+  const result = await db.query(
+    `SELECT r.*, u.username, u.email
+     FROM paks_pad_stick_replies r
+     LEFT JOIN users u ON r.user_id = u.id
+     WHERE r.stick_id = $1
+     ORDER BY r.created_at ASC`,
+    [stickId]
+  )
+  return result.rows
+}
+
+// Build AI prompt for summary generation
+function buildExportPrompt(tone: string, stickData: any, replies: any[], videoLinks: any[], imageLinks: any[]): string {
+  const repliesFormatted = replies.length > 0
+    ? replies.map((r: any) => `- ${r.username || r.email || 'User'}: ${r.content}`).join('\n')
+    : '- No replies yet'
+
+  return `${getTonePrompt(tone)}
+
+Please create a comprehensive summary of this Stick:
+
+**Stick Information:**
+- Topic: ${stickData.topic || 'Untitled'}
+- Content: ${stickData.content || 'No content'}
+- Pad: ${stickData.pad_name || 'Unknown Pad'}
+- Created: ${new Date(stickData.created_at).toLocaleDateString()}
+
+**Media Content:**
+- Videos: ${videoLinks.length > 0 ? videoLinks.map((v: any) => v.title || v.url).join(', ') : 'None'}
+- Images: ${imageLinks.length > 0 ? imageLinks.map((i: any) => i.caption || i.url).join(', ') : 'None'}
+
+**Replies (${replies.length}):**
+${repliesFormatted}
+
+Provide a well-structured summary.`
+}
+
+// Build DOCX reply paragraphs
+function buildReplyParagraphs(docx: any, replies: any[]) {
+  const { Paragraph: DocxParagraph, TextRun: DocxTextRun } = docx
+
+  if (replies.length === 0) {
+    return [new DocxParagraph({
+      children: [new DocxTextRun({ text: 'No replies.', italics: true, size: 24 })],
+      spacing: { after: 300 },
+    })]
+  }
+
+  return replies.flatMap((r: any) => [
+    new DocxParagraph({
+      children: [
+        new DocxTextRun({ text: r.username || r.email || 'User', bold: true, size: 26 }),
+        new DocxTextRun({ text: ` (${new Date(r.created_at).toLocaleDateString()})`, italics: true, size: 22 }),
+      ],
+      spacing: { after: 100 },
+    }),
+    new DocxParagraph({
+      children: [new DocxTextRun({ text: r.content, size: 24 })],
+      spacing: { after: 400 },
+    }),
+  ])
+}
+
+// Build complete DOCX document
+function buildDocxDocument(docx: any, stickData: any, summary: string, replies: any[]) {
+  const { Document: DocxDocument, Paragraph: DocxParagraph, TextRun: DocxTextRun, HeadingLevel } = docx
+  const summaryParagraphs = splitSummaryIntoParagraphs(summary)
+
+  return new DocxDocument({
+    sections: [{
+      children: [
+        new DocxParagraph({ text: 'STICK EXPORT', heading: HeadingLevel?.TITLE, spacing: { after: 400 } }),
+        new DocxParagraph({
+          children: [new DocxTextRun({ text: `Generated on ${new Date().toLocaleDateString()}`, italics: true, size: 20 })],
+          spacing: { after: 600 },
+        }),
+        new DocxParagraph({ text: 'SUMMARY', heading: HeadingLevel?.HEADING_1, spacing: { before: 400, after: 200 } }),
+        ...summaryParagraphs.map((p: string) =>
+          new DocxParagraph({ children: [new DocxTextRun({ text: p, size: 24 })], spacing: { after: 300 } })
+        ),
+        new DocxParagraph({ text: 'STICK INFORMATION', heading: HeadingLevel?.HEADING_1, spacing: { before: 400, after: 200 } }),
+        new DocxParagraph({
+          children: [
+            new DocxTextRun({ text: 'Topic: ', bold: true, size: 24 }),
+            new DocxTextRun({ text: stickData.topic || 'Untitled', size: 24 }),
+          ],
+          spacing: { after: 200 },
+        }),
+        new DocxParagraph({
+          children: [
+            new DocxTextRun({ text: 'Pad: ', bold: true, size: 24 }),
+            new DocxTextRun({ text: stickData.pad_name || 'Unknown', size: 24 }),
+          ],
+          spacing: { after: 200 },
+        }),
+        new DocxParagraph({ text: 'MAIN CONTENT', heading: HeadingLevel?.HEADING_1, spacing: { before: 400, after: 200 } }),
+        new DocxParagraph({
+          children: [new DocxTextRun({ text: stickData.content || 'No content', size: 24 })],
+          spacing: { after: 400 },
+        }),
+        new DocxParagraph({
+          text: `REPLIES (${replies.length})`,
+          heading: HeadingLevel?.HEADING_1,
+          spacing: { before: 400, after: 200 },
+        }),
+        ...buildReplyParagraphs(docx, replies),
+      ],
+    }],
+  })
+}
+
 // POST /api/v2/sticks/[id]/export - Export stick to DOCX
 export async function POST(
   request: NextRequest,
@@ -134,139 +259,32 @@ export async function POST(
     if ('error' in authGuard) return authGuard.error
     const user = authGuard.user
 
-    // Get stick with pad info
-    const stickResult = await db.query(
-      `SELECT s.*, p.name as pad_name, p.owner_id as pad_owner_id
-       FROM paks_pad_sticks s
-       LEFT JOIN paks_pads p ON s.pad_id = p.id
-       WHERE s.id = $1`,
-      [stickId]
-    )
-
-    if (stickResult.rows.length === 0) {
+    const stickData = await fetchStickData(stickId)
+    if (!stickData) {
       return new Response(JSON.stringify({ error: 'Stick not found' }), { status: 404 })
     }
-
-    const stickData = stickResult.rows[0]
 
     const accessDenied = await checkExportAccess(stickData, user.id)
     if (accessDenied) return accessDenied
 
-    // Get replies
-    const repliesResult = await db.query(
-      `SELECT r.*, u.username, u.email
-       FROM paks_pad_stick_replies r
-       LEFT JOIN users u ON r.user_id = u.id
-       WHERE r.stick_id = $1
-       ORDER BY r.created_at ASC`,
-      [stickId]
-    )
+    const replies = await fetchReplies(stickId)
 
-    // Get tabs for media content
     const tabsResult = await db.query(
       `SELECT * FROM paks_pad_stick_tabs WHERE stick_id = $1 ORDER BY tab_order ASC`,
       [stickId]
     )
-
     const { videoLinks, imageLinks } = extractMediaFromTabs(tabsResult.rows)
 
-    // Build AI prompt
-    const repliesFormatted = repliesResult.rows.length > 0
-      ? repliesResult.rows.map((r: any) => `- ${r.username || r.email || 'User'}: ${r.content}`).join('\n')
-      : '- No replies yet'
-
-    const prompt = `${getTonePrompt(tone)}
-
-Please create a comprehensive summary of this Stick:
-
-**Stick Information:**
-- Topic: ${stickData.topic || 'Untitled'}
-- Content: ${stickData.content || 'No content'}
-- Pad: ${stickData.pad_name || 'Unknown Pad'}
-- Created: ${new Date(stickData.created_at).toLocaleDateString()}
-
-**Media Content:**
-- Videos: ${videoLinks.length > 0 ? videoLinks.map((v: any) => v.title || v.url).join(', ') : 'None'}
-- Images: ${imageLinks.length > 0 ? imageLinks.map((i: any) => i.caption || i.url).join(', ') : 'None'}
-
-**Replies (${repliesResult.rows.length}):**
-${repliesFormatted}
-
-Provide a well-structured summary.`
-
+    const prompt = buildExportPrompt(tone, stickData, replies, videoLinks, imageLinks)
     const summary = await generateSummary(prompt)
 
     if (!docx) {
       return new Response(JSON.stringify({ error: 'DOCX generation not available' }), { status: 500 })
     }
 
-    const { Document: DocxDocument, Paragraph: DocxParagraph, TextRun: DocxTextRun, Packer: DocxPacker, HeadingLevel } = docx
+    const doc = buildDocxDocument(docx, stickData, summary, replies)
 
-    // Create DOCX
-    const summaryParagraphs = splitSummaryIntoParagraphs(summary)
-
-    const doc = new DocxDocument({
-      sections: [{
-        children: [
-          new DocxParagraph({ text: 'STICK EXPORT', heading: HeadingLevel?.TITLE, spacing: { after: 400 } }),
-          new DocxParagraph({
-            children: [
-              new DocxTextRun({ text: `Generated on ${new Date().toLocaleDateString()}`, italics: true, size: 20 }),
-            ],
-            spacing: { after: 600 },
-          }),
-          new DocxParagraph({ text: 'SUMMARY', heading: HeadingLevel?.HEADING_1, spacing: { before: 400, after: 200 } }),
-          ...summaryParagraphs.map((p: string) =>
-            new DocxParagraph({ children: [new DocxTextRun({ text: p, size: 24 })], spacing: { after: 300 } })
-          ),
-          new DocxParagraph({ text: 'STICK INFORMATION', heading: HeadingLevel?.HEADING_1, spacing: { before: 400, after: 200 } }),
-          new DocxParagraph({
-            children: [
-              new DocxTextRun({ text: 'Topic: ', bold: true, size: 24 }),
-              new DocxTextRun({ text: stickData.topic || 'Untitled', size: 24 }),
-            ],
-            spacing: { after: 200 },
-          }),
-          new DocxParagraph({
-            children: [
-              new DocxTextRun({ text: 'Pad: ', bold: true, size: 24 }),
-              new DocxTextRun({ text: stickData.pad_name || 'Unknown', size: 24 }),
-            ],
-            spacing: { after: 200 },
-          }),
-          new DocxParagraph({ text: 'MAIN CONTENT', heading: HeadingLevel?.HEADING_1, spacing: { before: 400, after: 200 } }),
-          new DocxParagraph({
-            children: [new DocxTextRun({ text: stickData.content || 'No content', size: 24 })],
-            spacing: { after: 400 },
-          }),
-          new DocxParagraph({
-            text: `REPLIES (${repliesResult.rows.length})`,
-            heading: HeadingLevel?.HEADING_1,
-            spacing: { before: 400, after: 200 },
-          }),
-          ...(repliesResult.rows.length > 0
-            ? repliesResult.rows.flatMap((r: any) => [
-                new DocxParagraph({
-                  children: [
-                    new DocxTextRun({ text: r.username || r.email || 'User', bold: true, size: 26 }),
-                    new DocxTextRun({ text: ` (${new Date(r.created_at).toLocaleDateString()})`, italics: true, size: 22 }),
-                  ],
-                  spacing: { after: 100 },
-                }),
-                new DocxParagraph({
-                  children: [new DocxTextRun({ text: r.content, size: 24 })],
-                  spacing: { after: 400 },
-                }),
-              ])
-            : [new DocxParagraph({
-                children: [new DocxTextRun({ text: 'No replies.', italics: true, size: 24 })],
-                spacing: { after: 300 },
-              })]),
-        ],
-      }],
-    })
-
-    const buffer = await DocxPacker.toBuffer(doc)
+    const buffer = await docx.Packer.toBuffer(doc)
     const docxBlob = new Blob([new Uint8Array(buffer)], {
       type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
     })
@@ -274,7 +292,6 @@ Provide a well-structured summary.`
     const filename = generateExportFilename(stickData.topic)
     const blob = await put(filename, Buffer.from(await docxBlob.arrayBuffer()), { folder: 'documents' })
 
-    // Save export link to details tab using stick's org_id
     const exportLink = buildExportLink(blob.url, filename)
     await saveExportLinkToDetailsTab(stickId, user.id, stickData.org_id, exportLink)
 

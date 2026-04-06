@@ -161,7 +161,7 @@ export function MobileStickCard({
       <Card className="w-full max-w-full min-w-0 overflow-hidden">
         <CardContent className="p-4 space-y-3">
           {/* Header: Checkbox, Color bar, Topic, Expand */}
-          <div className="flex items-start gap-2" tabIndex={0} onClick={handleCardClick} onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") handleCardClick?.(e as unknown as React.MouseEvent) }}>
+          <div className="flex items-start gap-2" role="button" tabIndex={0} onClick={handleCardClick} onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") handleCardClick?.(e as unknown as React.MouseEvent) }}>
             {onSelect && (
               <div role="presentation" onClick={(e) => e.stopPropagation()} onKeyDown={(e) => e.stopPropagation()}>
                 <Checkbox

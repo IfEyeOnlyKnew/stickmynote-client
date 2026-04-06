@@ -155,8 +155,8 @@ export default function MyInferenceSticksPage() {
       <main className="container mx-auto px-4 py-8">
         {loadingSticks && (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {Array.from({ length: 9 }).map((_, i) => (
-              <StickCardSkeleton key={`skeleton-${i}`} />
+            {[0, 1, 2, 3, 4, 5, 6, 7, 8].map((n) => (
+              <StickCardSkeleton key={`skeleton-${n}`} />
             ))}
           </div>
         )}

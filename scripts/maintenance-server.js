@@ -8,17 +8,17 @@
  *   node maintenance-server.js 8443     # Start on custom port
  */
 
-const https = require('https');
-const fs = require('fs');
-const path = require('path');
+const https = require('node:https');
+const fs = require('node:fs');
+const path = require('node:path');
 
 const PORT = process.argv[2] || 443;
 const CERT_DIR = path.join(__dirname, '..', 'certs');
 const MAINTENANCE_PAGE = path.join(__dirname, '..', 'public', 'maintenance.html');
 
 // Check if running from production folder
-const prodCertDir = 'C:\\stick-my-note-prod\\stickmynote-client\\certs';
-const prodMaintenancePage = 'C:\\stick-my-note-prod\\stickmynote-client\\public\\maintenance.html';
+const prodCertDir = String.raw`C:\stick-my-note-prod\stickmynote-client\certs`;
+const prodMaintenancePage = String.raw`C:\stick-my-note-prod\stickmynote-client\public\maintenance.html`;
 
 let certDir = fs.existsSync(prodCertDir) ? prodCertDir : CERT_DIR;
 let maintenancePage = fs.existsSync(prodMaintenancePage) ? prodMaintenancePage : MAINTENANCE_PAGE;
@@ -62,7 +62,10 @@ try {
 
 // Create HTTPS server
 const server = https.createServer(sslOptions, (req, res) => {
-  console.log(`${new Date().toISOString()} - ${req.method} ${req.url} from ${req.socket.remoteAddress}`);
+  // Sanitize user-controlled data before logging to prevent log injection (SonarCloud S5145)
+  const safeMethod = (req.method || "").replaceAll(/[^\w]/g, "")
+  const safeUrl = (req.url || "").slice(0, 200).replaceAll(/[\r\n]/g, "")
+  console.log(`${new Date().toISOString()} - ${safeMethod} ${safeUrl} from ${req.socket.remoteAddress}`);
 
   res.writeHead(503, {
     'Content-Type': 'text/html; charset=utf-8',

@@ -30,37 +30,41 @@ function parseSearchQueries(response: string, fallbackTags: string[]): string[] 
   return fallbackTags.map((tag) => `${tag} tutorial guide`)
 }
 
+async function executeBraveSearchRequest(query: string): Promise<Hyperlink[] | null> {
+  const response = await fetch(
+    `https://api.search.brave.com/res/v1/web/search?q=${encodeURIComponent(query)}&count=3`,
+    {
+      headers: {
+        'X-Subscription-Token': process.env.BRAVE_API_KEY!,
+        Accept: 'application/json',
+      },
+    }
+  )
+
+  if (response.status === 429) return null // signal retry
+  if (!response.ok) return []
+
+  const data = await response.json()
+  return (data.web?.results || []).map((result: any) => ({
+    url: result.url,
+    title: result.title || result.url,
+  }))
+}
+
 async function fetchBraveSearch(query: string, maxRetries = 2): Promise<Hyperlink[]> {
   if (!process.env.BRAVE_API_KEY) return []
 
   for (let retries = 0; retries <= maxRetries; retries++) {
     try {
-      const response = await fetch(
-        `https://api.search.brave.com/res/v1/web/search?q=${encodeURIComponent(query)}&count=3`,
-        {
-          headers: {
-            'X-Subscription-Token': process.env.BRAVE_API_KEY,
-            Accept: 'application/json',
-          },
-        }
-      )
-
-      if (response.status === 429 && retries < maxRetries) {
+      const results = await executeBraveSearchRequest(query)
+      if (results !== null) return results
+      // Rate limited - retry with backoff
+      if (retries < maxRetries) {
         await new Promise((resolve) => setTimeout(resolve, Math.pow(2, retries) * 1000))
-        continue
       }
-
-      if (!response.ok) return []
-
-      const data = await response.json()
-      return (data.web?.results || []).map((result: any) => ({
-        url: result.url,
-        title: result.title || result.url,
-      }))
     } catch {
       if (retries < maxRetries) {
         await new Promise((resolve) => setTimeout(resolve, 1000))
-        continue
       }
     }
   }

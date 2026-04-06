@@ -223,6 +223,48 @@ async function fetchReactionsForMessages(
 }
 
 // ============================================================================
+// Private Mode Filtering
+// ============================================================================
+
+function isVisibleInPrivateMode(
+  msg: PadMessage,
+  allMessages: PadMessage[],
+  userId: string,
+  ownMessageIds: Set<string>,
+  moderatorIds: Set<string>,
+): boolean {
+  if (msg.user_id === userId) return true
+  if (msg.is_pinned) return true
+
+  // AI messages that follow user's messages (context-aware)
+  if (msg.is_ai_message) {
+    if (msg.reply_to_id && ownMessageIds.has(msg.reply_to_id)) return true
+    const msgIndex = allMessages.findIndex((m) => m.id === msg.id)
+    if (msgIndex > 0 && allMessages[msgIndex - 1].user_id === userId) return true
+  }
+
+  // Moderator replies to user's messages
+  if (msg.reply_to_id && ownMessageIds.has(msg.reply_to_id)) {
+    return moderatorIds.has(msg.user_id)
+  }
+
+  return false
+}
+
+function applyPrivateModeFilter(
+  messages: PadMessage[],
+  userId: string,
+  moderatorIds: Set<string>,
+): PadMessage[] {
+  const ownMessageIds = new Set(
+    messages.filter((m) => m.user_id === userId).map((m) => m.id)
+  )
+  return messages.filter((msg) =>
+    isVisibleInPrivateMode(msg, messages, userId, ownMessageIds, moderatorIds)
+  )
+}
+
+// ============================================================================
 // GET - Fetch pad messages (Optimized with pagination)
 // ============================================================================
 //
@@ -344,37 +386,8 @@ export async function GET(
     let filteredMessages: PadMessage[] = beforeCursor ? (messages || []).reverse() : (messages || [])
 
     // Step 4: Additional filtering for private mode (reply_to logic)
-    // This handles moderator replies to user's messages
     if (isPrivateMode && filteredMessages.length > 0) {
-      const ownMessageIds = new Set(
-        filteredMessages
-          .filter((m: PadMessage) => m.user_id === userId)
-          .map((m: PadMessage) => m.id)
-      )
-
-      filteredMessages = filteredMessages.filter((msg: PadMessage) => {
-        // Already filtered at DB level: own messages, pinned, AI
-        if (msg.user_id === userId) return true
-        if (msg.is_pinned) return true
-
-        // AI messages that follow user's messages (context-aware)
-        if (msg.is_ai_message) {
-          const msgIndex = filteredMessages.findIndex((m: PadMessage) => m.id === msg.id)
-          if (msgIndex > 0) {
-            const prevMsg = filteredMessages[msgIndex - 1]
-            if (prevMsg.user_id === userId) return true
-          }
-          // Also allow if it's a reply to user's message
-          if (msg.reply_to_id && ownMessageIds.has(msg.reply_to_id)) return true
-        }
-
-        // Moderator replies to user's messages
-        if (msg.reply_to_id && ownMessageIds.has(msg.reply_to_id)) {
-          return moderatorIds.has(msg.user_id)
-        }
-
-        return false
-      })
+      filteredMessages = applyPrivateModeFilter(filteredMessages, userId, moderatorIds)
     }
 
     // Step 5: Parallel fetch user data and reactions

@@ -2,8 +2,7 @@
 
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import React from "react"
-import { useEffect, useCallback, useMemo } from "react"
+import React, { useEffect, useCallback, useMemo, useState } from "react"
 import { useNoteContext } from "./NoteContext"
 import { useNote } from "@/hooks/useNote"
 import { NoteFullscreenHeader } from "./note-fullscreen/NoteFullscreenHeader"
@@ -11,7 +10,6 @@ import { NoteFullscreenContent } from "./note-fullscreen/NoteFullscreenContent"
 import { NoteFullscreenReplies } from "./note-fullscreen/NoteFullscreenReplies"
 import { SummarizeLinksButton } from "./ui/summarize-links-button"
 import { Trash2, Share2, Lock, MessagesSquare, Video, Sparkles } from "lucide-react"
-import { useState } from "react"
 import { CreateChatModal } from "@/components/stick-chats/CreateChatModal"
 import { AskAIModal } from "@/components/ai/AskAIModal"
 

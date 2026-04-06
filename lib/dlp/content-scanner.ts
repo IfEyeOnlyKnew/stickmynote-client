@@ -32,7 +32,7 @@ const BUILT_IN_PATTERNS: BuiltInPattern[] = [
     id: "credit_card",
     label: "Credit Card Number",
     // Visa, Mastercard, Amex, Discover — 13-19 digits with optional separators
-    regex: /\b(?:4\d{3}|5[1-5]\d{2}|3[47]\d{2}|6(?:011|5\d{2}))[\s-]?\d{4}[\s-]?\d{4}[\s-]?\d{1,7}\b/g,
+    regex: /\b(?:4\d{3}|5[1-5]\d{2}|3[47]\d{2}|6\d{3})[\s-]?\d{4}[\s-]?\d{4}[\s-]?\d{1,7}\b/g,
   },
   {
     id: "phone_us",
@@ -43,12 +43,12 @@ const BUILT_IN_PATTERNS: BuiltInPattern[] = [
     id: "api_key",
     label: "API Key / Secret",
     // Matches long hex strings (32+ chars) or base64-like tokens prefixed with common key identifiers
-    regex: /\b(?:sk|pk|api|key|token|secret|password)[_-]?[a-zA-Z0-9]{20,}\b/gi,
+    regex: /\b(?:sk|pk|api|key|token|secret|password)[_-]?\w{20,}\b/gi,
   },
   {
     id: "ip_address",
     label: "IP Address",
-    regex: /\b(?:(?:25[0-5]|2[0-4]\d|[01]?\d\d?)\.){3}(?:25[0-5]|2[0-4]\d|[01]?\d\d?)\b/g,
+    regex: /\b(?:(?:25[0-5]|2[0-4]\d|1?\d\d?)\.){3}(?:25[0-5]|2[0-4]\d|1?\d\d?)\b/g,
   },
 ]
 

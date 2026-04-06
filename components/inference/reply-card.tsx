@@ -54,6 +54,13 @@ interface ReplyCardProps {
   renderNestedReply: (reply: Reply, depth: number, parentAuthor?: string) => React.ReactNode
 }
 
+// Extracted to reduce cognitive complexity
+function CalStickSyncIcon({ isCheckingSync, hasChanges }: Readonly<{ isCheckingSync: boolean; hasChanges: boolean }>) {
+  if (isCheckingSync) return <RefreshCw className="h-2.5 w-2.5 animate-spin" />
+  if (hasChanges) return <AlertCircle className="h-2.5 w-2.5" />
+  return <CheckSquare className="h-2.5 w-2.5" />
+}
+
 export const ReplyCard = memo(function ReplyCard({
   reply,
   depth = 0,
@@ -117,17 +124,11 @@ export const ReplyCard = memo(function ReplyCard({
       setIsCheckingSync(true)
       try {
         const response = await fetch(`/api/calsticks/${reply.calstick_id}`)
-        if (response.ok) {
-          const data = await response.json()
-          const calstick = data.calstick
-          setCalstickInfo({
-            id: calstick.id,
-            content: calstick.content,
-            updated_at: calstick.updated_at,
-          })
-          // Check if content differs
-          setHasCalstickChanges(calstick.content !== reply.content)
-        }
+        if (!response.ok) return
+
+        const { calstick } = await response.json()
+        setCalstickInfo({ id: calstick.id, content: calstick.content, updated_at: calstick.updated_at })
+        setHasCalstickChanges(calstick.content !== reply.content)
       } catch (error) {
         console.error("Error checking CalStick sync:", error)
       } finally {
@@ -289,15 +290,7 @@ export const ReplyCard = memo(function ReplyCard({
                                 : "border-purple-400 bg-purple-50 text-purple-700"
                             }`}
                           >
-                            {isCheckingSync && (
-                              <RefreshCw className="h-2.5 w-2.5 animate-spin" />
-                            )}
-                            {!isCheckingSync && hasCalstickChanges && (
-                              <AlertCircle className="h-2.5 w-2.5" />
-                            )}
-                            {!isCheckingSync && !hasCalstickChanges && (
-                              <CheckSquare className="h-2.5 w-2.5" />
-                            )}
+                            <CalStickSyncIcon isCheckingSync={isCheckingSync} hasChanges={hasCalstickChanges} />
                             CalStick
                           </Badge>
                         </TooltipTrigger>

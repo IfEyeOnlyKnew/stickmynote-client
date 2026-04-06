@@ -14,7 +14,7 @@ import {
   useSpeakingParticipants,
 } from "@livekit/components-react"
 import "@livekit/components-styles"
-import { Track, type LocalVideoTrack, type DataPublishOptions } from "livekit-client"
+import { Track } from "livekit-client"
 import { BackgroundProcessor, type BackgroundProcessorWrapper } from "@livekit/track-processors"
 import { VideoTile } from "./video-tile"
 import { Button } from "@/components/ui/button"
@@ -111,6 +111,77 @@ export function CustomVideoCall({ roomName, onLeave, userName = "Guest", isMinim
   )
 }
 
+// Extracted sub-components to reduce cognitive complexity in VideoCallContent
+function VideoChatSidebar({ chatMessages, localIdentity, chatInput, onChatInputChange, onSendMessage, onClose }: Readonly<{
+  chatMessages: Array<{ id: string | number; from?: { identity?: string; name?: string }; message?: string }>
+  localIdentity: string
+  chatInput: string
+  onChatInputChange: (value: string) => void
+  onSendMessage: () => void
+  onClose: () => void
+}>) {
+  return (
+    <div className="absolute right-4 top-4 bottom-24 w-80 bg-slate-900 border border-slate-800 rounded-lg shadow-xl flex flex-col z-20">
+      <div className="p-4 border-b border-slate-800 flex justify-between items-center">
+        <h3 className="font-semibold">Chat</h3>
+        <Button variant="ghost" size="icon" onClick={onClose} className="h-8 w-8">
+          <X className="h-4 w-4" />
+        </Button>
+      </div>
+      <ScrollArea className="flex-1 p-4">
+        <div className="space-y-4">
+          {chatMessages.map((msg) => {
+            const isMe = msg.from?.identity === localIdentity
+            return (
+              <div key={msg.id} className={`flex flex-col ${isMe ? "items-end" : "items-start"}`}>
+                <span className="text-xs text-slate-400 mb-1">
+                  {isMe ? "You" : msg.from?.name || msg.from?.identity || "Guest"}
+                </span>
+                <div
+                  className={`px-3 py-2 rounded-lg max-w-[80%] ${
+                    isMe ? "bg-indigo-600 text-white" : "bg-slate-800 text-slate-200"
+                  }`}
+                >
+                  {msg.message}
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      </ScrollArea>
+      <div className="p-4 border-t border-slate-800 flex gap-2">
+        <Input
+          value={chatInput}
+          onChange={(e) => onChatInputChange(e.target.value)}
+          onKeyDown={(e) => e.key === "Enter" && onSendMessage()}
+          placeholder="Type a message..."
+          className="bg-slate-950 border-slate-700 text-white"
+        />
+        <Button size="icon" onClick={onSendMessage} className="bg-indigo-600 hover:bg-indigo-700">
+          <Send className="h-4 w-4" />
+        </Button>
+      </div>
+    </div>
+  )
+}
+
+function createVideoProcessor(effect: "none" | "blur" | "image", imageUrl: string): BackgroundProcessorWrapper | null {
+  if (effect === "blur") {
+    return BackgroundProcessor({ mode: "background-blur", blurRadius: 10 })
+  }
+  if (effect === "image") {
+    return BackgroundProcessor({ mode: "virtual-background", imagePath: imageUrl })
+  }
+  return null
+}
+
+function getGridColsClass(count: number): string {
+  if (count <= 1) return "grid-cols-1"
+  if (count <= 4) return "grid-cols-2"
+  if (count <= 9) return "grid-cols-3"
+  return "grid-cols-4"
+}
+
 function VideoCallContent({ roomName, onLeave, userName, isMinimized }: Readonly<CustomVideoCallProps>) {
   const room = useRoomContext()
   const participants = useParticipants()
@@ -131,17 +202,17 @@ function VideoCallContent({ roomName, onLeave, userName, isMinimized }: Readonly
   )
   const [, setBgProcessor] = useState<BackgroundProcessorWrapper | null>(null)
 
-  // Reaction data channel
-  const { send: sendReactionData } = useDataChannel("reaction", (msg) => {
+  // Reaction data channel handler extracted to reduce nesting depth
+  const handleReactionData = useCallback((msg: { payload: BufferSource }) => {
     try {
       const data = JSON.parse(new TextDecoder().decode(msg.payload))
-      if (data.emoji) {
-        addReaction(data.emoji)
-      }
+      if (data.emoji) addReaction(data.emoji)
     } catch {
       // Parse error ignored — malformed reaction payloads are silently dropped
     }
-  })
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
+  const { send: sendReactionData } = useDataChannel("reaction", handleReactionData)
 
   const activeSpeakerId = speakingParticipants.length > 0
     ? speakingParticipants[0].identity
@@ -179,7 +250,7 @@ function VideoCallContent({ roomName, onLeave, userName, isMinimized }: Readonly
 
   const sendReaction = (emoji: string) => {
     const payload = new TextEncoder().encode(JSON.stringify({ emoji, name: userName }))
-    sendReactionData(payload, { topic: "reaction" } as DataPublishOptions)
+    sendReactionData(payload, { topic: "reaction" })
     addReaction(emoji)
   }
 
@@ -213,23 +284,17 @@ function VideoCallContent({ roomName, onLeave, userName, isMinimized }: Readonly
   const applyVideoEffect = useCallback(
     async (effect: "none" | "blur" | "image", imageUrl?: string) => {
       const camPub = localParticipant.getTrackPublication(Track.Source.Camera)
-      const camTrack = camPub?.track as LocalVideoTrack | undefined
-
+      const camTrack = camPub?.track
       if (!camTrack) return
 
       try {
-        if (effect === "none") {
+        const processor = createVideoProcessor(effect, imageUrl || backgroundImage)
+        if (processor) {
+          await camTrack.setProcessor(processor)
+          setBgProcessor(processor)
+        } else {
           await camTrack.stopProcessor()
           setBgProcessor(null)
-        } else if (effect === "blur") {
-          const processor = BackgroundProcessor({ mode: "background-blur", blurRadius: 10 })
-          await camTrack.setProcessor(processor)
-          setBgProcessor(processor)
-        } else if (effect === "image") {
-          const url = imageUrl || backgroundImage
-          const processor = BackgroundProcessor({ mode: "virtual-background", imagePath: url })
-          await camTrack.setProcessor(processor)
-          setBgProcessor(processor)
         }
 
         setVideoEffect(effect)
@@ -240,13 +305,6 @@ function VideoCallContent({ roomName, onLeave, userName, isMinimized }: Readonly
     },
     [localParticipant, backgroundImage],
   )
-
-  const getGridCols = () => {
-    if (participants.length <= 1) return "grid-cols-1"
-    if (participants.length <= 4) return "grid-cols-2"
-    if (participants.length <= 9) return "grid-cols-3"
-    return "grid-cols-4"
-  }
 
   const renderSpeakerLayout = () => {
     const speaker = speakingParticipants[0] || participants[0]
@@ -283,7 +341,7 @@ function VideoCallContent({ roomName, onLeave, userName, isMinimized }: Readonly
     }
 
     return (
-      <div className={`grid gap-4 h-full ${getGridCols()}`}>
+      <div className={`grid gap-4 h-full ${getGridColsClass(participants.length)}`}>
         {participants.map((p) => (
           <VideoTile
             key={p.identity}
@@ -297,47 +355,14 @@ function VideoCallContent({ roomName, onLeave, userName, isMinimized }: Readonly
   }
 
   const renderChatSidebar = () => (
-    <div className="absolute right-4 top-4 bottom-24 w-80 bg-slate-900 border border-slate-800 rounded-lg shadow-xl flex flex-col z-20">
-      <div className="p-4 border-b border-slate-800 flex justify-between items-center">
-        <h3 className="font-semibold">Chat</h3>
-        <Button variant="ghost" size="icon" onClick={() => setShowChat(false)} className="h-8 w-8">
-          <X className="h-4 w-4" />
-        </Button>
-      </div>
-      <ScrollArea className="flex-1 p-4">
-        <div className="space-y-4">
-          {chatMessages.map((msg) => {
-            const isMe = msg.from?.identity === localParticipant.identity
-            return (
-              <div key={msg.id} className={`flex flex-col ${isMe ? "items-end" : "items-start"}`}>
-                <span className="text-xs text-slate-400 mb-1">
-                  {isMe ? "You" : msg.from?.name || msg.from?.identity || "Guest"}
-                </span>
-                <div
-                  className={`px-3 py-2 rounded-lg max-w-[80%] ${
-                    isMe ? "bg-indigo-600 text-white" : "bg-slate-800 text-slate-200"
-                  }`}
-                >
-                  {msg.message}
-                </div>
-              </div>
-            )
-          })}
-        </div>
-      </ScrollArea>
-      <div className="p-4 border-t border-slate-800 flex gap-2">
-        <Input
-          value={chatInput}
-          onChange={(e) => setChatInput(e.target.value)}
-          onKeyDown={(e) => e.key === "Enter" && handleSendMessage()}
-          placeholder="Type a message..."
-          className="bg-slate-950 border-slate-700 text-white"
-        />
-        <Button size="icon" onClick={handleSendMessage} className="bg-indigo-600 hover:bg-indigo-700">
-          <Send className="h-4 w-4" />
-        </Button>
-      </div>
-    </div>
+    <VideoChatSidebar
+      chatMessages={chatMessages}
+      localIdentity={localParticipant.identity}
+      chatInput={chatInput}
+      onChatInputChange={setChatInput}
+      onSendMessage={handleSendMessage}
+      onClose={() => setShowChat(false)}
+    />
   )
 
   const renderMinimizedControls = () => (

@@ -82,6 +82,26 @@ const PROVIDER_PRESETS: Record<PresetKey, { label: string; discoveryTemplate: st
   },
 }
 
+// Extracted helpers to reduce cognitive complexity
+function getPresetFromUrl(url: string): PresetKey {
+  if (url.includes("login.microsoftonline.com")) return "azure"
+  if (url.includes(".okta.com")) return "okta"
+  if (url.includes("accounts.google.com")) return "google"
+  return "custom"
+}
+
+function getIdpStatusBadgeVariant(status: string): "default" | "secondary" | "outline" {
+  if (status === "active") return "default"
+  if (status === "draft") return "secondary"
+  return "outline"
+}
+
+function getIdpStatusLabel(status: string): string {
+  if (status === "active") return "Active"
+  if (status === "draft") return "Draft"
+  return "Disabled"
+}
+
 export function SSOTab({ currentOrgId }: Readonly<SSOTabProps>) {
   const { toast } = useToast()
   const [loading, setLoading] = useState(true)
@@ -118,22 +138,17 @@ export function SSOTab({ currentOrgId }: Readonly<SSOTabProps>) {
         setDomains(data.domains)
 
         if (data.identityProvider) {
+          const idp = data.identityProvider
           setHasIdp(true)
-          setIdpStatus(data.identityProvider.status)
-          setDisplayName(data.identityProvider.display_name)
-          setDiscoveryUrl(data.identityProvider.oidc_discovery_url || "")
-          setClientId(data.identityProvider.oidc_client_id || "")
-          setScopes(data.identityProvider.oidc_scopes || "openid profile email")
-          setJitEnabled(data.identityProvider.jit_provisioning_enabled)
-          setDefaultRole(data.identityProvider.default_role)
-          setAutoUpdateProfile(data.identityProvider.auto_update_profile)
-
-          // Detect preset from discovery URL
-          const url = data.identityProvider.oidc_discovery_url || ""
-          if (url.includes("login.microsoftonline.com")) setPreset("azure")
-          else if (url.includes(".okta.com")) setPreset("okta")
-          else if (url.includes("accounts.google.com")) setPreset("google")
-          else setPreset("custom")
+          setIdpStatus(idp.status)
+          setDisplayName(idp.display_name)
+          setDiscoveryUrl(idp.oidc_discovery_url || "")
+          setClientId(idp.oidc_client_id || "")
+          setScopes(idp.oidc_scopes || "openid profile email")
+          setJitEnabled(idp.jit_provisioning_enabled)
+          setDefaultRole(idp.default_role)
+          setAutoUpdateProfile(idp.auto_update_profile)
+          setPreset(getPresetFromUrl(idp.oidc_discovery_url || ""))
         }
       }
     } catch (err) {
@@ -162,29 +177,22 @@ export function SSOTab({ currentOrgId }: Readonly<SSOTabProps>) {
         method: "POST",
         headers: { "Content-Type": "application/json", "X-CSRF-Token": csrfToken },
         body: JSON.stringify({
-          displayName,
-          protocol: "oidc",
-          discoveryUrl,
-          clientId,
-          clientSecret,
-          scopes,
-          jitProvisioningEnabled: jitEnabled,
-          defaultRole,
-          autoUpdateProfile,
-          ssoEnabled,
-          ssoEnforceOnly,
+          displayName, protocol: "oidc", discoveryUrl, clientId, clientSecret,
+          scopes, jitProvisioningEnabled: jitEnabled, defaultRole, autoUpdateProfile,
+          ssoEnabled, ssoEnforceOnly,
         }),
       })
 
-      if (res.ok) {
-        toast({ title: "SSO configuration saved" })
-        setHasIdp(true)
-        setClientSecret("") // Clear after save
-        await loadConfig()
-      } else {
+      if (!res.ok) {
         const data = await res.json()
         toast({ title: "Error", description: data.error, variant: "destructive" })
+        return
       }
+
+      toast({ title: "SSO configuration saved" })
+      setHasIdp(true)
+      setClientSecret("")
+      await loadConfig()
     } catch (err) {
       toast({ title: "Error", description: "Failed to save SSO configuration", variant: "destructive" })
     } finally {
@@ -475,7 +483,7 @@ export function SSOTab({ currentOrgId }: Readonly<SSOTabProps>) {
               <p className="text-xs text-muted-foreground">
                 Update user display name from IdP on each login
               </p>
-            </div>
+            </div>{" "}
             <Switch checked={autoUpdateProfile} onCheckedChange={setAutoUpdateProfile} />
           </div>
 
@@ -540,9 +548,9 @@ export function SSOTab({ currentOrgId }: Readonly<SSOTabProps>) {
             <div className="flex items-center gap-2">
               <span className="text-sm font-medium">Status:</span>
               <Badge
-                variant={(() => { if (idpStatus === "active") return "default" as const; if (idpStatus === "draft") return "secondary" as const; return "outline" as const })()}
+                variant={getIdpStatusBadgeVariant(idpStatus)}
               >
-                {(() => { if (idpStatus === "active") return "Active"; if (idpStatus === "draft") return "Draft"; return "Disabled" })()}
+                {getIdpStatusLabel(idpStatus)}
               </Badge>
             </div>
 

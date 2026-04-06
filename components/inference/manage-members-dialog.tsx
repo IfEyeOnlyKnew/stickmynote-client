@@ -68,13 +68,15 @@ interface ManageMembersDialogProps {
   padName: string
 }
 
+type InviteRole = "admin" | "editor" | "viewer"
+
 export function ManageMembersDialog({ open, onOpenChange, padId, padName }: Readonly<ManageMembersDialogProps>) {
   const [members, setMembers] = useState<Member[]>([])
   const [pendingInvites, setPendingInvites] = useState<PendingInvite[]>([])
   const [isOwner, setIsOwner] = useState(false)
   const [loading, setLoading] = useState(false)
   const [inviteEmail, setInviteEmail] = useState("")
-  const [inviteRole, setInviteRole] = useState<"admin" | "editor" | "viewer">("viewer")
+  const [inviteRole, setInviteRole] = useState<InviteRole>("viewer")
   const [inviting, setInviting] = useState(false)
   const [activeTab, setActiveTab] = useState("invite")
   const [bulkEmails, setBulkEmails] = useState("")
@@ -586,7 +588,7 @@ export function ManageMembersDialog({ open, onOpenChange, padId, padName }: Read
                   </div>
                   <Select
                     value={inviteRole}
-                    onValueChange={(value) => setInviteRole(value as "admin" | "editor" | "viewer")}
+                    onValueChange={(value) => setInviteRole(value as InviteRole)}
                   >
                     <SelectTrigger className="w-32">
                       <SelectValue />
@@ -742,7 +744,7 @@ export function ManageMembersDialog({ open, onOpenChange, padId, padName }: Read
                     <Label>Select Role for Group Members</Label>
                     <Select
                       value={inviteRole}
-                      onValueChange={(value) => setInviteRole(value as "admin" | "editor" | "viewer")}
+                      onValueChange={(value) => setInviteRole(value as InviteRole)}
                     >
                       <SelectTrigger>
                         <SelectValue />
@@ -824,7 +826,7 @@ export function ManageMembersDialog({ open, onOpenChange, padId, padName }: Read
                   <Label>Select Role for Bulk Invites</Label>
                   <Select
                     value={inviteRole}
-                    onValueChange={(value) => setInviteRole(value as "admin" | "editor" | "viewer")}
+                    onValueChange={(value) => setInviteRole(value as InviteRole)}
                   >
                     <SelectTrigger>
                       <SelectValue />

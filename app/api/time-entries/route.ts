@@ -27,6 +27,32 @@ async function enrichEntriesWithTasks(db: any, entries: any[]): Promise<any[]> {
   })
 }
 
+function applyTimeEntryFilters(
+  query: any,
+  filters: { userId: string | null; currentUserId: string; start: string | null; end: string | null; taskId: string | null; approvalStatus: string | null },
+) {
+  let q = query.eq("user_id", filters.userId || filters.currentUserId)
+
+  if (filters.start) q = q.gte("started_at", filters.start)
+  if (filters.end) q = q.lte("started_at", filters.end)
+  if (filters.taskId) q = q.eq("task_id", filters.taskId)
+  if (filters.approvalStatus) q = q.eq("approval_status", filters.approvalStatus)
+
+  return q
+}
+
+function isTableNotFoundError(error: { code?: string; message?: string }): boolean {
+  return error.code === "PGRST204" || !!error.message?.includes("Could not find the table")
+}
+
+function tableNotFoundResponse() {
+  return NextResponse.json({
+    entries: [],
+    tableNotFound: true,
+    message: "Time tracking tables not created. Please run scripts/add-calstick-phase2-fields.sql",
+  })
+}
+
 export async function GET(request: NextRequest) {
   try {
     const db = await createDatabaseClient()
@@ -43,47 +69,20 @@ export async function GET(request: NextRequest) {
     const user = authResult.user
 
     const { searchParams } = new URL(request.url)
-    const start = searchParams.get("start")
-    const end = searchParams.get("end")
-    const taskId = searchParams.get("taskId")
-    const approvalStatus = searchParams.get("approvalStatus")
-    const userId = searchParams.get("userId")
-
-    let query = db
-      .from("time_entries")
-      .select("*")
-      .order("started_at", { ascending: false })
-
-    // Filter by user - default to current user, but allow viewing team entries
-    if (userId) {
-      query = query.eq("user_id", userId)
-    } else {
-      query = query.eq("user_id", user.id)
-    }
-
-    if (start) {
-      query = query.gte("started_at", start)
-    }
-    if (end) {
-      query = query.lte("started_at", end)
-    }
-    if (taskId) {
-      query = query.eq("task_id", taskId)
-    }
-    if (approvalStatus) {
-      query = query.eq("approval_status", approvalStatus)
-    }
+    const baseQuery = db.from("time_entries").select("*").order("started_at", { ascending: false })
+    const query = applyTimeEntryFilters(baseQuery, {
+      userId: searchParams.get("userId"),
+      currentUserId: user.id,
+      start: searchParams.get("start"),
+      end: searchParams.get("end"),
+      taskId: searchParams.get("taskId"),
+      approvalStatus: searchParams.get("approvalStatus"),
+    })
 
     const { data: entries, error } = await query
 
     if (error) {
-      if (error.code === "PGRST204" || error.message?.includes("Could not find the table")) {
-        return NextResponse.json({
-          entries: [],
-          tableNotFound: true,
-          message: "Time tracking tables not created. Please run scripts/add-calstick-phase2-fields.sql",
-        })
-      }
+      if (isTableNotFoundError(error)) return tableNotFoundResponse()
       throw error
     }
 
@@ -93,6 +92,21 @@ export async function GET(request: NextRequest) {
     console.error("Error fetching time entries:", error)
     return NextResponse.json({ error: "Failed to fetch time entries" }, { status: 500 })
   }
+}
+
+function buildInsertData(userId: string, body: Record<string, unknown>): Record<string, unknown> {
+  const data: Record<string, unknown> = {
+    task_id: body.taskId,
+    user_id: userId,
+    started_at: body.startedAt,
+    ended_at: body.endedAt,
+    duration_seconds: body.durationSeconds,
+    note: body.note,
+  }
+  if (body.isBillable !== undefined) {
+    data.is_billable = body.isBillable
+  }
+  return data
 }
 
 export async function POST(request: NextRequest) {
@@ -110,50 +124,31 @@ export async function POST(request: NextRequest) {
     }
     const user = authResult.user
 
-    const { taskId, startedAt, endedAt, durationSeconds, note, isBillable } = await request.json()
+    const body = await request.json()
 
-    if (!taskId || !startedAt) {
+    if (!body.taskId || !body.startedAt) {
       return NextResponse.json({ error: "Task ID and start time are required" }, { status: 400 })
     }
 
-    // Verify task exists
     const { data: task, error: taskError } = await db
       .from("paks_pad_stick_replies")
       .select("id, stick_id")
-      .eq("id", taskId)
+      .eq("id", body.taskId)
       .maybeSingle()
 
     if (taskError || !task) {
       return NextResponse.json({ error: "Task not found" }, { status: 404 })
     }
 
-    const insertData: Record<string, unknown> = {
-      task_id: taskId,
-      user_id: user.id,
-      started_at: startedAt,
-      ended_at: endedAt,
-      duration_seconds: durationSeconds,
-      note,
-    }
-    if (isBillable !== undefined) {
-      insertData.is_billable = isBillable
-    }
-
     const { data: entry, error } = await db
       .from("time_entries")
-      .insert(insertData)
+      .insert(buildInsertData(user.id, body))
       .select()
       .maybeSingle()
 
     if (error) {
       if (error.code === "42P01") {
-        return NextResponse.json(
-          {
-            error: "Time tracking tables not created",
-            tableNotFound: true,
-          },
-          { status: 500 },
-        )
+        return NextResponse.json({ error: "Time tracking tables not created", tableNotFound: true }, { status: 500 })
       }
       throw error
     }

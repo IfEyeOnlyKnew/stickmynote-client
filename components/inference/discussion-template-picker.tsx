@@ -165,6 +165,7 @@ export function DiscussionTemplatePicker({
                     return (
                       <div
                         key={template.id}
+                        role="button"
                         tabIndex={0}
                         className={cn(
                           "p-4 rounded-lg border-2 cursor-pointer transition-all",

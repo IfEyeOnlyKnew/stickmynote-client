@@ -314,6 +314,46 @@ interface ExportLink {
   type: string
 }
 
+function parseTabDataSafe(tabData: unknown): { exports?: ExportLink[]; [key: string]: any } {
+  try {
+    if (typeof tabData === "string") return JSON.parse(tabData)
+    if (tabData && typeof tabData === "object") return tabData as { exports?: ExportLink[] }
+  } catch {
+    // fall through
+  }
+  return {}
+}
+
+async function upsertDetailsTabExport(
+  db: any,
+  noteId: string,
+  noteOwnerId: string,
+  existingTab: { id: string; tab_data: unknown } | null,
+  exportLink: ExportLink,
+): Promise<void> {
+  if (existingTab) {
+    const currentData = parseTabDataSafe(existingTab.tab_data)
+    const newTabData = { ...currentData, exports: [...(currentData.exports || []), exportLink] }
+    const { error } = await db
+      .from("personal_sticks_tabs")
+      .update({ tab_data: newTabData, updated_at: new Date().toISOString() })
+      .eq("id", existingTab.id)
+    if (error) console.error("[summarize-replies] Error updating tab:", error)
+    return
+  }
+
+  const { error } = await db.from("personal_sticks_tabs").insert({
+    personal_stick_id: noteId,
+    user_id: noteOwnerId,
+    tab_type: "details",
+    tab_name: "Details",
+    tab_content: "Note details and exports",
+    tab_data: { exports: [exportLink] },
+    tab_order: 3,
+  })
+  if (error) console.error("[summarize-replies] Error inserting tab:", error)
+}
+
 async function saveExportLinkToDetailsTab(
   db: any,
   noteId: string,
@@ -321,90 +361,28 @@ async function saveExportLinkToDetailsTab(
   exportLink: ExportLink
 ): Promise<void> {
   try {
-    console.log("[summarize-replies] Saving export link for noteId:", noteId)
-
-    // First, get the note owner's user_id - exports should be saved to the owner's tabs
-    // so they appear when anyone views the note (tabs API fetches by note owner)
     const { data: note, error: noteError } = await db
       .from("personal_sticks")
       .select("user_id")
       .eq("id", noteId)
       .single()
 
-    if (noteError) {
-      console.error("[summarize-replies] Error fetching note:", noteError)
+    if (noteError || !note) {
+      console.error("[summarize-replies] Error fetching note:", noteError || "not found")
       return
     }
 
-    if (!note) {
-      console.error("[summarize-replies] Note not found:", noteId)
-      return
-    }
-
-    const noteOwnerId = note.user_id
-    console.log("[summarize-replies] Note owner ID:", noteOwnerId)
-
-    // Check if details tab exists for the note owner
     const { data: existingTab } = await db
       .from("personal_sticks_tabs")
       .select("id, tab_data")
       .eq("personal_stick_id", noteId)
-      .eq("user_id", noteOwnerId)
+      .eq("user_id", note.user_id)
       .eq("tab_type", "details")
       .maybeSingle()
 
-    if (existingTab) {
-      // Update existing tab
-      console.log("[summarize-replies] Found existing details tab, updating...")
-      let currentData: { exports?: ExportLink[]; [key: string]: any } = {}
-      try {
-        if (typeof existingTab.tab_data === "string") {
-          currentData = JSON.parse(existingTab.tab_data)
-        } else if (existingTab.tab_data && typeof existingTab.tab_data === "object") {
-          currentData = existingTab.tab_data
-        }
-      } catch {
-        currentData = {}
-      }
-
-      const updatedExports = [...(currentData.exports || []), exportLink]
-      const newTabData = { ...currentData, exports: updatedExports }
-
-      const { error: updateError } = await db
-        .from("personal_sticks_tabs")
-        .update({
-          tab_data: newTabData,
-          updated_at: new Date().toISOString(),
-        })
-        .eq("id", existingTab.id)
-
-      if (updateError) {
-        console.error("[summarize-replies] Error updating tab:", updateError)
-      } else {
-        console.log("[summarize-replies] Successfully updated details tab with export")
-      }
-    } else {
-      // Create new details tab for the note owner
-      console.log("[summarize-replies] No existing details tab, creating new one...")
-      const { error: insertError } = await db.from("personal_sticks_tabs").insert({
-        personal_stick_id: noteId,
-        user_id: noteOwnerId,
-        tab_type: "details",
-        tab_name: "Details",
-        tab_content: "Note details and exports",
-        tab_data: { exports: [exportLink] },
-        tab_order: 3,
-      })
-
-      if (insertError) {
-        console.error("[summarize-replies] Error inserting tab:", insertError)
-      } else {
-        console.log("[summarize-replies] Successfully created details tab with export")
-      }
-    }
+    await upsertDetailsTabExport(db, noteId, note.user_id, existingTab, exportLink)
   } catch (error) {
     console.error("[summarize-replies] Failed to save export link:", error)
-    // Don't throw - export was still successful
   }
 }
 
@@ -514,42 +492,31 @@ export async function POST(request: NextRequest) {
     }
     console.log("[summarize-replies] AI summary generated successfully")
 
-    // Generate DOCX if requested
-    if (generateDocx) {
-      console.log("[summarize-replies] Generating DOCX document...")
-      const { url: docxUrl, filename } = await generateDocxDocument(summary, replies, tone, noteId)
-      console.log("[summarize-replies] DOCX generated:", filename, "URL:", docxUrl)
+    if (!generateDocx) {
+      return NextResponse.json({ summary, replyCount: replies.length, tone })
+    }
 
-      const cleanedUrl = await tryCleanupDocx(docxUrl, filename)
-      const finalUrl = cleanedUrl || docxUrl
+    // Generate DOCX
+    console.log("[summarize-replies] Generating DOCX document...")
+    const { url: docxUrl, filename } = await generateDocxDocument(summary, replies, tone, noteId)
+    console.log("[summarize-replies] DOCX generated:", filename, "URL:", docxUrl)
 
-      // Save export link to the note's Details tab
-      // Use serviceDb to bypass RLS - we need to query/update the note owner's tabs
-      if (authResult.user?.id) {
-        console.log("[summarize-replies] Saving export link to details tab...")
-        const exportLink: ExportLink = {
-          url: finalUrl,
-          filename,
-          created_at: new Date().toISOString(),
-          type: `reply-summary-${tone}`,
-        }
-        await saveExportLinkToDetailsTab(serviceDb, noteId, authResult.user.id, exportLink)
-      }
+    const cleanedUrl = await tryCleanupDocx(docxUrl, filename)
+    const finalUrl = cleanedUrl || docxUrl
 
-      console.log("[summarize-replies] Returning success response")
-      return NextResponse.json({
-        summary,
-        replyCount: replies.length,
-        tone,
-        docxUrl: finalUrl,
+    // Save export link to the note's Details tab
+    if (authResult.user?.id) {
+      const exportLink: ExportLink = {
+        url: finalUrl,
         filename,
-      })
+        created_at: new Date().toISOString(),
+        type: `reply-summary-${tone}`,
+      }
+      await saveExportLinkToDetailsTab(serviceDb, noteId, authResult.user.id, exportLink)
     }
 
     return NextResponse.json({
-      summary,
-      replyCount: replies.length,
-      tone,
+      summary, replyCount: replies.length, tone, docxUrl: finalUrl, filename,
     })
   } catch (error) {
     console.error(`${LOG_PREFIX} POST error:`, error)

@@ -25,6 +25,37 @@ async function checkInviteDLP(inviteEmails: string[], userId: string): Promise<N
   return null
 }
 
+async function sendInviteEmails(
+  emails: string[], roomName: string, roomUrl: string,
+  userProfile: { email?: string; username?: string } | null,
+): Promise<void> {
+  const inviter = userProfile?.username || userProfile?.email || "a user"
+  try {
+    await fetch(`${process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000"}/api/send-email`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        to: emails,
+        subject: `You're invited to join "${roomName}" video room`,
+        html: `
+          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+            <h2 style="color: #2563eb;">Video Room Invitation</h2>
+            <p>You've been invited by <strong>${inviter}</strong> to join a video conference.</p>
+            <div style="background-color: #f3f4f6; padding: 20px; border-radius: 8px; margin: 20px 0;">
+              <h3 style="margin-top: 0;">Room: ${roomName}</h3>
+              <p style="margin-bottom: 0;">Click the button below to join:</p>
+            </div>
+            <a href="${roomUrl}" style="display: inline-block; background-color: #2563eb; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold;">Join Video Room</a>
+            <p style="margin-top: 20px; color: #6b7280; font-size: 14px;">Or copy this link: <a href="${roomUrl}">${roomUrl}</a></p>
+          </div>
+        `,
+      }),
+    })
+  } catch (emailError) {
+    console.error("Error sending invitation emails:", emailError)
+  }
+}
+
 // GET - Fetch all rooms for the current user
 export async function GET() {
   try {
@@ -83,32 +114,8 @@ export async function POST(request: NextRequest) {
     // Create room via LiveKit
     const room = await createVideoRoom(name, user.id)
 
-    // Send invitation emails if provided
     if (inviteEmails.length > 0) {
-      try {
-        await fetch(`${process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000"}/api/send-email`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            to: inviteEmails,
-            subject: `You're invited to join "${name}" video room`,
-            html: `
-              <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-                <h2 style="color: #2563eb;">Video Room Invitation</h2>
-                <p>You've been invited by <strong>${userProfile?.username || userProfile?.email || "a user"}</strong> to join a video conference.</p>
-                <div style="background-color: #f3f4f6; padding: 20px; border-radius: 8px; margin: 20px 0;">
-                  <h3 style="margin-top: 0;">Room: ${name}</h3>
-                  <p style="margin-bottom: 0;">Click the button below to join:</p>
-                </div>
-                <a href="${room.room_url}" style="display: inline-block; background-color: #2563eb; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold;">Join Video Room</a>
-                <p style="margin-top: 20px; color: #6b7280; font-size: 14px;">Or copy this link: <a href="${room.room_url}">${room.room_url}</a></p>
-              </div>
-            `,
-          }),
-        })
-      } catch (emailError) {
-        console.error("Error sending invitation emails:", emailError)
-      }
+      await sendInviteEmails(inviteEmails, name, room.room_url, userProfile)
     }
 
     return NextResponse.json({ room: { id: room.id, room_url: room.room_url, name, livekit_room_name: room.livekit_room_name } })

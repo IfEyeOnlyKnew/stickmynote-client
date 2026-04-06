@@ -25,8 +25,8 @@ export interface OIDCUserInfo {
   rawAttributes: Record<string, unknown>
 }
 
-// Cache discovered configurations for 1 hour
-const discoveryCache = new Map<string, { config: unknown; expiresAt: number }>()
+// Cache discovered configurations for 1 hour (openid-client config type is not directly importable)
+const discoveryCache = new Map<string, { config: any; expiresAt: number }>()
 const CACHE_TTL_MS = 60 * 60 * 1000
 
 /**
@@ -108,7 +108,7 @@ export async function buildAuthorizationUrl(
     state,
   }
 
-  const redirectTo = oidc.buildAuthorizationUrl(config as any, parameters)
+  const redirectTo = oidc.buildAuthorizationUrl(config, parameters)
 
   return {
     redirectUrl: redirectTo.href,
@@ -133,7 +133,7 @@ export async function exchangeCodeForUser(
   const config = await discoverProvider(idp.oidc_discovery_url, idp.oidc_client_id, clientSecret)
 
   const currentUrl = new URL(callbackUrl)
-  const tokens = await oidc.authorizationCodeGrant(config as any, currentUrl, {
+  const tokens = await oidc.authorizationCodeGrant(config, currentUrl, {
     pkceCodeVerifier: codeVerifier,
     expectedState,
   })

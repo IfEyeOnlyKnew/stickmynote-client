@@ -233,8 +233,8 @@ export default function FormsPage() {
                     <div className="flex items-center gap-2 mb-1">
                       <FileText className="h-4 w-4 text-primary/70 shrink-0" />
                       <h3 className="font-semibold truncate">{form.title}</h3>
-                      <Badge variant={form.is_active === false ? "secondary" : "default"} className="text-xs">
-                        {form.is_active === false ? "Inactive" : "Active"}
+                      <Badge variant={form.is_active ? "default" : "secondary"} className="text-xs">
+                        {form.is_active ? "Active" : "Inactive"}
                       </Badge>
                     </div>
                     {form.description && (

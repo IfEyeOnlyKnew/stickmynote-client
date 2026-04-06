@@ -24,29 +24,50 @@ interface ImageTabContentProps {
   onPasteImage?: (file: File) => void
 }
 
+function isTextInputFocused(): boolean {
+  const active = document.activeElement
+  if (!active) return false
+  if (active.tagName !== "INPUT" && active.tagName !== "TEXTAREA") return false
+  const inputType = (active as HTMLInputElement).type
+  if (inputType === "file") return false
+  console.log("[ImageTab] Skipping paste - focus is on input:", active.tagName, inputType)
+  return true
+}
+
+function findImageInFiles(files: FileList): File | null {
+  for (const file of files) {
+    if (file.type.startsWith("image/")) {
+      console.log("[ImageTab] Found image in clipboardData.files:", file.type, file.size)
+      return file
+    }
+  }
+  return null
+}
+
+function findImageInItems(items: DataTransferItemList): File | null {
+  for (const item of items) {
+    console.log("[ImageTab] Clipboard item:", item.kind, item.type)
+    if (item.kind !== "file" || !item.type.startsWith("image/")) continue
+    const file = item.getAsFile()
+    if (file) {
+      console.log("[ImageTab] Found image in clipboardData.items:", file.type, file.size)
+      return file
+    }
+  }
+  return null
+}
+
 function extractImageFromClipboard(clipboardData: DataTransfer): File | null {
   // Try clipboardData.files first (more reliable for pasted images)
-  if (clipboardData.files && clipboardData.files.length > 0) {
-    for (let i = 0; i < clipboardData.files.length; i++) {
-      if (clipboardData.files[i].type.startsWith("image/")) {
-        console.log("[ImageTab] Found image in clipboardData.files:", clipboardData.files[i].type, clipboardData.files[i].size)
-        return clipboardData.files[i]
-      }
-    }
+  if (clipboardData.files?.length > 0) {
+    const fromFiles = findImageInFiles(clipboardData.files)
+    if (fromFiles) return fromFiles
   }
 
   // Fallback to clipboardData.items
   if (clipboardData.items) {
-    for (let i = 0; i < clipboardData.items.length; i++) {
-      console.log("[ImageTab] Clipboard item:", clipboardData.items[i].kind, clipboardData.items[i].type)
-      if (clipboardData.items[i].kind === "file" && clipboardData.items[i].type.startsWith("image/")) {
-        const file = clipboardData.items[i].getAsFile()
-        if (file) {
-          console.log("[ImageTab] Found image in clipboardData.items:", file.type, file.size)
-          return file
-        }
-      }
-    }
+    const fromItems = findImageInItems(clipboardData.items)
+    if (fromItems) return fromItems
   }
 
   console.log("[ImageTab] No image found in clipboard")
@@ -54,9 +75,9 @@ function extractImageFromClipboard(clipboardData: DataTransfer): File | null {
 }
 
 function extractImageFromDrop(files: FileList): File | null {
-  for (let i = 0; i < files.length; i++) {
-    if (files[i].type.startsWith("image/")) {
-      return files[i]
+  for (const file of files) {
+    if (file.type.startsWith("image/")) {
+      return file
     }
   }
   return null
@@ -90,21 +111,14 @@ export function ImageTabContent({
       if (!e.clipboardData) return
 
       // Don't intercept if user is typing in a text input/textarea
-      const active = document.activeElement
-      if (active && (active.tagName === "INPUT" || active.tagName === "TEXTAREA")) {
-        const inputType = (active as HTMLInputElement).type
-        if (inputType !== "file") {
-          console.log("[ImageTab] Skipping paste - focus is on input:", active.tagName, inputType)
-          return
-        }
-      }
+      if (isTextInputFocused()) return
 
       const file = extractImageFromClipboard(e.clipboardData)
-      if (file) {
-        e.preventDefault()
-        console.log("[ImageTab] Calling onPasteImage with file:", file.name, file.type, file.size)
-        onPasteImage(file)
-      }
+      if (!file) return
+
+      e.preventDefault()
+      console.log("[ImageTab] Calling onPasteImage with file:", file.name, file.type, file.size)
+      onPasteImage(file)
     }
 
     document.addEventListener("paste", handler)

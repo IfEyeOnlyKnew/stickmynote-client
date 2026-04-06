@@ -29,6 +29,33 @@ const Errors = {
 } as const
 
 // ============================================================================
+// LDAP User Resolution
+// ============================================================================
+
+async function resolveOrProvisionUser(
+  email: string, dn?: string, full_name?: string, username?: string,
+): Promise<string> {
+  const existingUserResult = await db.query(
+    `SELECT id FROM users WHERE email = $1 ${dn ? 'OR distinguished_name = $2' : ''} LIMIT 1`,
+    dn ? [email, dn] : [email]
+  )
+
+  if (existingUserResult.rows.length > 0) {
+    return existingUserResult.rows[0].id
+  }
+
+  const newUserResult = await db.query(
+    `INSERT INTO users (email, full_name, username, distinguished_name, email_verified, hub_mode, created_at, updated_at)
+     VALUES ($1, $2, $3, $4, true, 'full_access', NOW(), NOW())
+     RETURNING id`,
+    [email, full_name || username || email.split('@')[0], username, dn || null]
+  )
+  const userId = newUserResult.rows[0].id
+  console.log(`[StickChatMembers] Auto-provisioned LDAP user: ${email} (${userId})`)
+  return userId
+}
+
+// ============================================================================
 // Handlers
 // ============================================================================
 
@@ -95,31 +122,8 @@ export async function POST(
     }
 
     const body: AddMemberRequest = await request.json()
-    let { user_id } = body
     const { email, dn, full_name, username } = body
-
-    // If no user_id but we have email, try to find or create the user
-    if (!user_id && email) {
-      // First, check if user already exists by email or DN
-      const existingUserResult = await db.query(
-        `SELECT id FROM users WHERE email = $1 ${dn ? 'OR distinguished_name = $2' : ''} LIMIT 1`,
-        dn ? [email, dn] : [email]
-      )
-
-      if (existingUserResult.rows.length > 0) {
-        user_id = existingUserResult.rows[0].id
-      } else {
-        // Auto-provision the LDAP user
-        const newUserResult = await db.query(
-          `INSERT INTO users (email, full_name, username, distinguished_name, email_verified, hub_mode, created_at, updated_at)
-           VALUES ($1, $2, $3, $4, true, 'full_access', NOW(), NOW())
-           RETURNING id`,
-          [email, full_name || username || email.split('@')[0], username, dn || null]
-        )
-        user_id = newUserResult.rows[0].id
-        console.log(`[StickChatMembers] Auto-provisioned LDAP user: ${email} (${user_id})`)
-      }
-    }
+    const user_id = body.user_id || (email ? await resolveOrProvisionUser(email, dn, full_name, username) : undefined)
 
     if (!user_id) {
       return Errors.userIdRequired()

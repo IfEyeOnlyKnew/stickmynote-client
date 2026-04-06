@@ -1,12 +1,12 @@
 import { Client } from 'pg';
-import * as path from 'path';
+import * as path from 'node:path';
 import * as dotenv from 'dotenv';
 
 dotenv.config({ path: path.join(__dirname, '..', '.env') });
 
 const client = new Client({
   host: process.env.POSTGRES_HOST,
-  port: parseInt(process.env.POSTGRES_PORT || '5432'),
+  port: Number.parseInt(process.env.POSTGRES_PORT || '5432'),
   database: process.env.POSTGRES_DATABASE || process.env.POSTGRES_DB,
   user: process.env.POSTGRES_USER,
   password: process.env.POSTGRES_PASSWORD,
@@ -82,7 +82,7 @@ async function main() {
 
     for (const table of tables) {
       const name = table.tablename;
-      const rows = parseInt(table.row_count) || 0;
+      const rows = Number.parseInt(table.row_count) || 0;
 
       if (CORE_TABLES.has(name)) {
         coreTables.push({ name, rows });
@@ -117,7 +117,7 @@ async function main() {
     console.log('=' .repeat(70));
     console.log('🗑️  EMPTY NON-CORE TABLES (candidates for deletion)');
     console.log('=' .repeat(70));
-    emptyTables.sort();
+    emptyTables.sort((a, b) => a.localeCompare(b));
     for (const name of emptyTables) {
       console.log(`  ${name}`);
     }

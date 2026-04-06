@@ -9,6 +9,63 @@ export const dynamic = "force-dynamic"
 // POST - Toggle a reaction on a message
 // ============================================================================
 
+async function verifyPadAccess(db: any, padId: string, userId: string): Promise<NextResponse | null> {
+  const { data: pad } = await db
+    .from("social_pads")
+    .select("id, is_public, owner_id")
+    .eq("id", padId)
+    .maybeSingle()
+
+  if (!pad) {
+    return NextResponse.json({ error: "Pad not found" }, { status: 404 })
+  }
+
+  if (pad.owner_id === userId || pad.is_public) return null
+
+  const { data: membership } = await db
+    .from("social_pad_members")
+    .select("id")
+    .eq("social_pad_id", padId)
+    .eq("user_id", userId)
+    .maybeSingle()
+
+  if (!membership) {
+    return NextResponse.json({ error: "Access denied" }, { status: 403 })
+  }
+
+  return null
+}
+
+async function removeReaction(db: any, reactionId: string, emoji: string): Promise<NextResponse> {
+  const { error: deleteError } = await db
+    .from("social_pad_message_reactions")
+    .delete()
+    .eq("id", reactionId)
+
+  if (deleteError) {
+    console.error("[Reactions] Delete error:", deleteError)
+    return NextResponse.json({ error: "Failed to remove reaction" }, { status: 500 })
+  }
+
+  return NextResponse.json({ action: "removed", emoji })
+}
+
+async function addReaction(db: any, messageId: string, userId: string, emoji: string): Promise<NextResponse> {
+  const { error: insertError } = await db
+    .from("social_pad_message_reactions")
+    .insert({ message_id: messageId, user_id: userId, emoji })
+
+  if (insertError) {
+    if (insertError.code === "42P01") {
+      return NextResponse.json({ action: "skipped", message: "Reactions table not available - migration required" })
+    }
+    console.error("[Reactions] Insert error:", insertError)
+    return NextResponse.json({ error: "Failed to add reaction" }, { status: 500 })
+  }
+
+  return NextResponse.json({ action: "added", emoji })
+}
+
 export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ padId: string; messageId: string }> }
@@ -17,13 +74,8 @@ export async function POST(
     const { padId, messageId } = await params
     const authResult = await getCachedAuthUser()
 
-    if (authResult.rateLimited) {
-      return createRateLimitResponse()
-    }
-
-    if (!authResult.user) {
-      return createUnauthorizedResponse()
-    }
+    if (authResult.rateLimited) return createRateLimitResponse()
+    if (!authResult.user) return createUnauthorizedResponse()
 
     const db = await createServiceDatabaseClient()
     const userId = authResult.user.id
@@ -31,12 +83,11 @@ export async function POST(
     const body = await request.json()
     const { emoji } = body
 
-    // Validate emoji
     if (!emoji || !AVAILABLE_REACTIONS.includes(emoji)) {
       return NextResponse.json({ error: "Invalid reaction emoji" }, { status: 400 })
     }
 
-    // Verify the message exists and user has access to the pad
+    // Verify message exists in this pad
     const { data: message } = await db
       .from("social_pad_messages")
       .select("id, social_pad_id")
@@ -49,25 +100,10 @@ export async function POST(
     }
 
     // Verify pad access
-    const { data: pad } = await db
-      .from("social_pads")
-      .select("id, is_public, owner_id")
-      .eq("id", padId)
-      .maybeSingle()
+    const accessError = await verifyPadAccess(db, padId, userId)
+    if (accessError) return accessError
 
-    if (!pad) {
-      return NextResponse.json({ error: "Pad not found" }, { status: 404 })
-    }
-
-    // Check access (owner, public, or member)
-    const hasAccess = pad.owner_id === userId || pad.is_public ||
-      !!(await db.from("social_pad_members").select("id").eq("social_pad_id", padId).eq("user_id", userId).maybeSingle()).data
-
-    if (!hasAccess) {
-      return NextResponse.json({ error: "Access denied" }, { status: 403 })
-    }
-
-    // Check if reaction already exists
+    // Toggle reaction
     const { data: existingReaction } = await db
       .from("social_pad_message_reactions")
       .select("id")
@@ -77,42 +113,9 @@ export async function POST(
       .maybeSingle()
 
     if (existingReaction) {
-      // Remove the reaction (toggle off)
-      const { error: deleteError } = await db
-        .from("social_pad_message_reactions")
-        .delete()
-        .eq("id", existingReaction.id)
-
-      if (deleteError) {
-        console.error("[Reactions] Delete error:", deleteError)
-        return NextResponse.json({ error: "Failed to remove reaction" }, { status: 500 })
-      }
-
-      return NextResponse.json({ action: "removed", emoji })
-    } else {
-      // Add the reaction (toggle on)
-      const { error: insertError } = await db
-        .from("social_pad_message_reactions")
-        .insert({
-          message_id: messageId,
-          user_id: userId,
-          emoji,
-        })
-
-      if (insertError) {
-        // Table might not exist
-        if (insertError.code === "42P01") {
-          return NextResponse.json({
-            action: "skipped",
-            message: "Reactions table not available - migration required"
-          })
-        }
-        console.error("[Reactions] Insert error:", insertError)
-        return NextResponse.json({ error: "Failed to add reaction" }, { status: 500 })
-      }
-
-      return NextResponse.json({ action: "added", emoji })
+      return removeReaction(db, existingReaction.id, emoji)
     }
+    return addReaction(db, messageId, userId, emoji)
   } catch (error) {
     console.error("[Reactions] POST error:", error)
     return NextResponse.json({ error: "Internal server error" }, { status: 500 })

@@ -68,7 +68,9 @@ function computeProjectBreakdown(tasks: any[], now: Date) {
   return Array.from(padMap.values())
     .map((p) => {
       const pctComplete = p.total > 0 ? Math.round((p.completed / p.total) * 100) : 0
-      const rag = p.overdue > 3 ? "red" : p.overdue > 0 ? "amber" : "green"
+      let rag = "green"
+      if (p.overdue > 3) rag = "red"
+      else if (p.overdue > 0) rag = "amber"
       return { ...p, completionRate: pctComplete, ragStatus: rag }
     })
     .sort((a, b) => b.total - a.total)
@@ -100,7 +102,9 @@ function computePortfolioMetrics(tasks: any[]) {
 
   const utilBalance = Math.max(0, 100 - Math.abs(teamUtilization - 75))
   const healthScore = Math.round(completionRate * 0.3 + onTimeRate * 0.25 + budgetAdherence * 0.2 + utilBalance * 0.25)
-  const ragStatus = healthScore >= 75 ? "green" : healthScore >= 50 ? "amber" : "red"
+  let ragStatus = "red"
+  if (healthScore >= 75) ragStatus = "green"
+  else if (healthScore >= 50) ragStatus = "amber"
 
   const priorityDistribution = ["urgent", "high", "medium", "low"]
     .map((p) => ({ name: p.charAt(0).toUpperCase() + p.slice(1), value: countByFilter(tasks, (t) => t.calstick_priority === p) }))

@@ -153,6 +153,28 @@ export function PadChatSettingsDialog({
     }
   }, [padId])
 
+  // Extracted to reduce nesting depth (S2004)
+  const searchMembers = useCallback(async (query: string) => {
+    setSearching(true)
+    try {
+      const response = await fetch(
+        `/api/inference-pads/${padId}/members?search=${encodeURIComponent(query)}&limit=10`
+      )
+      if (!response.ok) return
+
+      const data = await response.json()
+      const moderatorIdSet = new Set(moderators.map((mod) => mod.user_id))
+      const available = (data.members || []).filter(
+        (member: { user_id: string }) => !moderatorIdSet.has(member.user_id)
+      )
+      setSearchResults(available)
+    } catch (error) {
+      console.error("[ChatSettings] Error searching members:", error)
+    } finally {
+      setSearching(false)
+    }
+  }, [padId, moderators])
+
   // Debounced search for members
   useEffect(() => {
     if (!searchQuery || searchQuery.length < 2) {
@@ -160,30 +182,9 @@ export function PadChatSettingsDialog({
       return
     }
 
-    const timeoutId = setTimeout(async () => {
-      setSearching(true)
-      try {
-        const response = await fetch(
-          `/api/inference-pads/${padId}/members?search=${encodeURIComponent(searchQuery)}&limit=10`
-        )
-        if (response.ok) {
-          const data = await response.json()
-          // Filter out users who are already moderators
-          const moderatorIds = new Set(moderators.map((mod) => mod.user_id))
-          const available = (data.members || []).filter(
-            (member: { user_id: string }) => !moderatorIds.has(member.user_id)
-          )
-          setSearchResults(available)
-        }
-      } catch (error) {
-        console.error("[ChatSettings] Error searching members:", error)
-      } finally {
-        setSearching(false)
-      }
-    }, 300) // 300ms debounce
-
+    const timeoutId = setTimeout(() => searchMembers(searchQuery), 300)
     return () => clearTimeout(timeoutId)
-  }, [searchQuery, padId, moderators])
+  }, [searchQuery, searchMembers])
 
   useEffect(() => {
     if (open) {
@@ -603,7 +604,7 @@ export function PadChatSettingsDialog({
                             <AlertDialogAction
                               className="bg-red-600 hover:bg-red-700"
                               onClick={(e) => {
-                                const keepPinned = (document.getElementById("keep-pinned") as HTMLButtonElement)?.getAttribute("data-state") === "checked"
+                                const keepPinned = (document.getElementById("keep-pinned") as HTMLButtonElement)?.dataset.state === "checked"
                                 handleClearAllMessages(keepPinned)
                               }}
                             >

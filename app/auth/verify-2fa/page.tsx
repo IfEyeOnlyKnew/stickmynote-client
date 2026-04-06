@@ -64,7 +64,7 @@ export default function Verify2FAPage() {
       const data = await response.json()
 
       if (!response.ok) {
-        setAttemptsRemaining(data.attemptsRemaining || 0)
+        setAttemptsRemaining(data.attemptsRemaining ?? 0)
         throw new Error(data.error || "Verification failed")
       }
 

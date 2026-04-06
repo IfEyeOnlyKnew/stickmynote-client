@@ -42,9 +42,11 @@ app.prepare().then(() => {
     if (req.headers.upgrade) return
 
     // Proxy HTTP requests to LiveKit (for the /validate endpoint the SDK uses on error)
-    if (req.url && req.url.startsWith("/livekit-ws/")) {
+    if (req.url?.startsWith("/livekit-ws/")) {
       const http = require("node:http")
-      const targetPath = req.url.replace(/^\/livekit-ws/, "") || "/"
+      const rawPath = req.url.replace(/^\/livekit-ws/, "") || "/"
+      // Sanitize proxy path: only allow URL-safe characters to prevent SSRF/injection
+      const targetPath = rawPath.replace(/[^\w/?.&=%+-]/g, "")
       const livekitHost = process.env.LIVEKIT_PROXY_HOST || "192.168.50.80"
       const livekitPort = Number(process.env.LIVEKIT_PROXY_PORT) || 7880
       const proxyReq = http.request(
@@ -58,7 +60,7 @@ app.prepare().then(() => {
 
     // Serve dynamically uploaded files from UPLOAD_DIR (defaults to <cwd>/uploads).
     // Stored outside public/ so git deploys never wipe user files.
-    if (req.url && req.url.startsWith("/uploads/")) {
+    if (req.url?.startsWith("/uploads/")) {
       const urlPath = req.url.split("?")[0]
       const uploadsRoot = pathModule.resolve(process.env.UPLOAD_DIR || pathModule.join(process.cwd(), "uploads"))
       // Prevent directory traversal: resolve and verify path stays within uploads

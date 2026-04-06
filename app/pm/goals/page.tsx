@@ -326,11 +326,12 @@ export default function GoalsPage() {
               : null
 
             const parentObj = obj.parent_id ? objectives.find((o) => o.id === obj.parent_id) : null
-            const depth = (obj as any).depth || 0
+            const depth = obj.depth || 0
 
             return (
               <Card key={obj.id} className="overflow-hidden" style={depth > 0 ? { marginLeft: depth * 24 } : undefined}>
                 <div
+                  role="button"
                   tabIndex={0}
                   className="p-4 cursor-pointer hover:bg-muted/30 transition-colors"
                   onClick={() => toggleExpanded(obj.id!)}

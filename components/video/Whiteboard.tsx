@@ -37,6 +37,60 @@ interface WhiteboardProps {
 const COLORS = ["#000000", "#EF4444", "#3B82F6", "#10B981", "#F59E0B", "#8B5CF6", "#EC4899", "#FFFFFF"]
 const LINE_WIDTHS = [2, 4, 8, 16]
 
+// Tool-specific draw functions extracted to reduce cognitive complexity
+const DRAW_TOOL_MAP: Record<string, (ctx: CanvasRenderingContext2D, action: DrawAction) => void> = {
+  pen: (ctx, action) => {
+    if (action.points.length < 2) return
+    ctx.beginPath()
+    ctx.moveTo(action.points[0].x, action.points[0].y)
+    for (let i = 1; i < action.points.length; i++) {
+      ctx.lineTo(action.points[i].x, action.points[i].y)
+    }
+    ctx.stroke()
+  },
+  eraser: (ctx, action) => {
+    if (action.points.length < 2) return
+    ctx.beginPath()
+    ctx.moveTo(action.points[0].x, action.points[0].y)
+    for (let i = 1; i < action.points.length; i++) {
+      ctx.lineTo(action.points[i].x, action.points[i].y)
+    }
+    ctx.stroke()
+  },
+  line: (ctx, action) => {
+    if (action.points.length < 2) return
+    const start = action.points[0]
+    const end = action.points.at(-1)!
+    ctx.beginPath()
+    ctx.moveTo(start.x, start.y)
+    ctx.lineTo(end.x, end.y)
+    ctx.stroke()
+  },
+  rect: (ctx, action) => {
+    if (action.points.length < 2) return
+    const start = action.points[0]
+    const end = action.points.at(-1)!
+    ctx.strokeRect(start.x, start.y, end.x - start.x, end.y - start.y)
+  },
+  circle: (ctx, action) => {
+    if (action.points.length < 2) return
+    const start = action.points[0]
+    const end = action.points.at(-1)!
+    const rx = Math.abs(end.x - start.x) / 2
+    const ry = Math.abs(end.y - start.y) / 2
+    const cx = (start.x + end.x) / 2
+    const cy = (start.y + end.y) / 2
+    ctx.beginPath()
+    ctx.ellipse(cx, cy, rx, ry, 0, 0, Math.PI * 2)
+    ctx.stroke()
+  },
+  text: (ctx, action) => {
+    if (!action.text) return
+    ctx.font = `${action.lineWidth * 4}px sans-serif`
+    ctx.fillText(action.text, action.points[0].x, action.points[0].y)
+  },
+}
+
 export function Whiteboard({ onDrawAction, incomingActions, className }: Readonly<WhiteboardProps>) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const [isDrawing, setIsDrawing] = useState(false)
@@ -96,41 +150,9 @@ export function Whiteboard({ onDrawAction, incomingActions, className }: Readonl
     ctx.lineCap = "round"
     ctx.lineJoin = "round"
 
-    if (action.tool === "pen" || action.tool === "eraser") {
-      if (action.points.length < 2) return
-      ctx.beginPath()
-      ctx.moveTo(action.points[0].x, action.points[0].y)
-      for (let i = 1; i < action.points.length; i++) {
-        ctx.lineTo(action.points[i].x, action.points[i].y)
-      }
-      ctx.stroke()
-    } else if (action.tool === "line") {
-      if (action.points.length < 2) return
-      const start = action.points[0]
-      const end = action.points.at(-1)!
-      ctx.beginPath()
-      ctx.moveTo(start.x, start.y)
-      ctx.lineTo(end.x, end.y)
-      ctx.stroke()
-    } else if (action.tool === "rect") {
-      if (action.points.length < 2) return
-      const start = action.points[0]
-      const end = action.points.at(-1)!
-      ctx.strokeRect(start.x, start.y, end.x - start.x, end.y - start.y)
-    } else if (action.tool === "circle") {
-      if (action.points.length < 2) return
-      const start = action.points[0]
-      const end = action.points.at(-1)!
-      const rx = Math.abs(end.x - start.x) / 2
-      const ry = Math.abs(end.y - start.y) / 2
-      const cx = (start.x + end.x) / 2
-      const cy = (start.y + end.y) / 2
-      ctx.beginPath()
-      ctx.ellipse(cx, cy, rx, ry, 0, 0, Math.PI * 2)
-      ctx.stroke()
-    } else if (action.tool === "text" && action.text) {
-      ctx.font = `${action.lineWidth * 4}px sans-serif`
-      ctx.fillText(action.text, action.points[0].x, action.points[0].y)
+    const drawFn = DRAW_TOOL_MAP[action.tool]
+    if (drawFn) {
+      drawFn(ctx, action)
     }
   }, [])
 
@@ -169,23 +191,23 @@ export function Whiteboard({ onDrawAction, incomingActions, className }: Readonl
     const point = getCanvasPoint(e)
     setCurrentPoints((prev) => [...prev, point])
 
-    // Live drawing for pen/eraser
-    if (tool === "pen" || tool === "eraser") {
-      const canvas = canvasRef.current
-      if (!canvas) return
-      const ctx = canvas.getContext("2d")
-      if (!ctx) return
-      const points = [...currentPoints, point]
-      if (points.length < 2) return
-      ctx.strokeStyle = tool === "eraser" ? "#FFFFFF" : color
-      ctx.lineWidth = tool === "eraser" ? lineWidth * 4 : lineWidth
-      ctx.lineCap = "round"
-      ctx.lineJoin = "round"
-      ctx.beginPath()
-      ctx.moveTo(points.at(-2)!.x, points.at(-2)!.y)
-      ctx.lineTo(point.x, point.y)
-      ctx.stroke()
-    }
+    // Live drawing for pen/eraser only
+    if (tool !== "pen" && tool !== "eraser") return
+
+    const canvas = canvasRef.current
+    if (!canvas) return
+    const ctx = canvas.getContext("2d")
+    if (!ctx) return
+    const points = [...currentPoints, point]
+    if (points.length < 2) return
+    ctx.strokeStyle = tool === "eraser" ? "#FFFFFF" : color
+    ctx.lineWidth = tool === "eraser" ? lineWidth * 4 : lineWidth
+    ctx.lineCap = "round"
+    ctx.lineJoin = "round"
+    ctx.beginPath()
+    ctx.moveTo(points.at(-2)!.x, points.at(-2)!.y)
+    ctx.lineTo(point.x, point.y)
+    ctx.stroke()
   }
 
   const handleMouseUp = () => {

@@ -166,13 +166,11 @@ export function ChannelChatView({
                 : { emoji, count: 1, users: [], hasReacted: true }
             )
           }
-        } else {
-          if (existing) {
+        } else if (existing) {
             existing.count--
             if (userId) existing.users = existing.users.filter((u) => u.id !== userId)
             else existing.hasReacted = false
             if (existing.count <= 0) reactions.splice(reactions.indexOf(existing), 1)
-          }
         }
         return { ...m, reactions }
       })
@@ -187,37 +185,41 @@ export function ChannelChatView({
     })
   }, [])
 
+  const handleWsNewMessage = useCallback((payload: any) => {
+    if (payload.chatId === chat.id) {
+      setMessages((prev) => [...prev, payload.message])
+    }
+  }, [chat.id])
+
+  const handleWsReaction = useCallback((payload: any) => {
+    if (payload.chatId !== chat.id) return
+    applyReactionToMessages(payload.messageId, payload.emoji, payload.added, payload.userId, payload.userName)
+  }, [chat.id, applyReactionToMessages])
+
+  const handleWsTyping = useCallback((payload: any) => {
+    if (payload.chatId !== chat.id || payload.userId === currentUserId) return
+    setTypingUsers((prev) => {
+      const next = new Map(prev)
+      const existing = next.get(payload.userId)
+      if (existing) clearTimeout(existing.timeout)
+      const timeout = setTimeout(() => clearTypingUser(payload.userId), 4000)
+      next.set(payload.userId, { name: payload.userName, timeout })
+      return next
+    })
+  }, [chat.id, currentUserId, clearTypingUser])
+
   useEffect(() => {
     const unsubs = [
-      subscribe("chat.message", (payload: any) => {
-        if (payload.chatId === chat.id) {
-          setMessages((prev) => [...prev, payload.message])
-        }
-      }),
+      subscribe("chat.message", handleWsNewMessage),
       subscribe("chat.thread_reply", handleWsThreadReply),
       subscribe("chat.message_edited", handleWsMessageEdited),
-      subscribe("chat.reaction", (payload: any) => {
-        if (payload.chatId === chat.id) {
-          applyReactionToMessages(payload.messageId, payload.emoji, payload.added, payload.userId, payload.userName)
-        }
-      }),
-      subscribe("chat.typing", (payload: any) => {
-        if (payload.chatId === chat.id && payload.userId !== currentUserId) {
-          setTypingUsers((prev) => {
-            const next = new Map(prev)
-            const existing = next.get(payload.userId)
-            if (existing) clearTimeout(existing.timeout)
-            const timeout = setTimeout(() => clearTypingUser(payload.userId), 4000)
-            next.set(payload.userId, { name: payload.userName, timeout })
-            return next
-          })
-        }
-      }),
+      subscribe("chat.reaction", handleWsReaction),
+      subscribe("chat.typing", handleWsTyping),
       subscribe("chat.pinned", () => {}),
       subscribe("chat.unpinned", () => {}),
     ]
     return () => unsubs.forEach((u) => u())
-  }, [subscribe, chat.id, currentUserId, threadParentId, handleWsThreadReply, handleWsMessageEdited, applyReactionToMessages, clearTypingUser])
+  }, [subscribe, handleWsNewMessage, handleWsThreadReply, handleWsMessageEdited, handleWsReaction, handleWsTyping])
 
   // =========== AUTO SCROLL ===========
 

@@ -2,8 +2,8 @@
 // Usage: node scripts/run-2fa-migration.js
 
 const { Client } = require('pg');
-const fs = require('fs');
-const path = require('path');
+const fs = require('node:fs');
+const path = require('node:path');
 
 async function runMigration() {
   // Load environment variables

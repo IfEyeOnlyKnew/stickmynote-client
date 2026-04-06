@@ -133,6 +133,81 @@ async function sendADGroupEmail(
   })
 }
 
+// ============================================================================
+// POST helpers
+// ============================================================================
+
+async function checkPadAdminAccess(
+  db: any, padId: string, userId: string,
+): Promise<{ pad: any; error?: NextResponse }> {
+  const { data: pad, error: padError } = await db
+    .from("social_pads")
+    .select("id, user_id, name")
+    .eq("id", padId)
+    .maybeSingle()
+
+  if (padError || !pad) {
+    return { pad: null, error: NextResponse.json({ error: "Pad not found" }, { status: 404 }) }
+  }
+
+  if (pad.user_id === userId) return { pad }
+
+  const { data: membership } = await db
+    .from("social_pad_members")
+    .select("role")
+    .eq("social_pad_id", padId)
+    .eq("user_id", userId)
+    .maybeSingle()
+
+  if (membership?.role !== "admin") {
+    return { pad: null, error: NextResponse.json({ error: "Only pad owners and admins can invite groups" }, { status: 403 }) }
+  }
+
+  return { pad }
+}
+
+const VALID_ROLES = new Set(["admin", "editor", "viewer"])
+
+async function processSingleMember(
+  db: any,
+  member: { email: string; dn?: string },
+  padId: string,
+  pad: { user_id: string; name: string },
+  memberRole: string,
+  inviterId: string,
+): Promise<{ outcome: "added" | "invited" | "skipped"; error?: string }> {
+  if (!member.email) return { outcome: "skipped" }
+
+  try {
+    const outcome = await processADGroupMember(db, member, padId, pad, memberRole, inviterId)
+    return { outcome }
+  } catch (memberErr) {
+    const errMsg = memberErr instanceof Error ? memberErr.message : String(memberErr)
+    console.error(`[ADGroup] Error processing member ${member.email}:`, memberErr)
+    return { outcome: "skipped", error: `Error processing ${member.email}: ${errMsg}` }
+  }
+}
+
+async function processMembers(
+  db: any,
+  members: { email: string; dn?: string }[],
+  padId: string,
+  pad: { user_id: string; name: string },
+  memberRole: string,
+  inviterId: string,
+): Promise<{ added: number; invited: number; skipped: number; errors: string[] }> {
+  const counts: Record<string, number> = { added: 0, invited: 0, skipped: 0 }
+  const errors: string[] = []
+
+  for (const member of members) {
+    const { outcome, error } = await processSingleMember(db, member, padId, pad, memberRole, inviterId)
+    counts[outcome]++
+    if (error) errors.push(error)
+  }
+
+  return { added: counts.added, invited: counts.invited, skipped: counts.skipped, errors }
+}
+
 // POST: Invite all members of an AD group
 export async function POST(request: NextRequest, { params }: { params: Promise<{ padId: string }> }) {
   try {
@@ -151,35 +226,8 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     }
     const user = authResult.user
 
-    // Check if user is owner or admin of the pad
-    const { data: pad, error: padError } = await db
-      .from("social_pads")
-      .select("id, user_id, name")
-      .eq("id", padId)
-      .maybeSingle()
-
-    if (padError || !pad) {
-      return NextResponse.json({ error: "Pad not found" }, { status: 404 })
-    }
-
-    const isOwner = pad.user_id === user.id
-
-    // Check if admin
-    let isAdmin = false
-    if (!isOwner) {
-      const { data: membership } = await db
-        .from("social_pad_members")
-        .select("role")
-        .eq("social_pad_id", padId)
-        .eq("user_id", user.id)
-        .maybeSingle()
-
-      isAdmin = membership?.role === "admin"
-    }
-
-    if (!isOwner && !isAdmin) {
-      return NextResponse.json({ error: "Only pad owners and admins can invite groups" }, { status: 403 })
-    }
+    const { pad, error: accessError } = await checkPadAdminAccess(db, padId, user.id)
+    if (accessError) return accessError
 
     const body = await request.json()
     const { groupDn, role } = body
@@ -188,13 +236,9 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       return NextResponse.json({ error: "Group DN is required" }, { status: 400 })
     }
 
-    // Validate role
-    const validRoles = ["admin", "editor", "viewer"]
-    const memberRole = validRoles.includes(role) ? role : "viewer"
+    const memberRole = VALID_ROLES.has(role) ? role : "viewer"
 
-    // Get all members of the AD group
     const groupResult = await getADGroupMembers(groupDn)
-
     if (!groupResult.success) {
       return NextResponse.json(
         { error: groupResult.error || "Failed to get group members from Active Directory" },
@@ -203,47 +247,17 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     }
 
     const members = groupResult.members || []
-
     if (members.length === 0) {
-      return NextResponse.json({
-        message: "No members found in this group",
-        added: 0,
-        invited: 0,
-        skipped: 0,
-      })
+      return NextResponse.json({ message: "No members found in this group", added: 0, invited: 0, skipped: 0 })
     }
 
-    let added = 0
-    let invited = 0
-    let skipped = 0
-    const errors: string[] = []
-
-    // Process each member
-    for (const member of members) {
-      if (!member.email) {
-        skipped++
-        continue
-      }
-
-      try {
-        const result = await processADGroupMember(db, member, padId, pad, memberRole, user.id)
-        if (result === "added") added++
-        else if (result === "invited") invited++
-        else skipped++
-      } catch (memberErr) {
-        const errMsg = memberErr instanceof Error ? memberErr.message : String(memberErr)
-        errors.push(`Error processing ${member.email}: ${errMsg}`)
-        console.error(`[ADGroup] Error processing member ${member.email}:`, memberErr)
-      }
-    }
+    const result = await processMembers(db, members, padId, pad, memberRole, user.id)
 
     return NextResponse.json({
-      message: `Processed ${members.length} group members: ${added} added, ${invited} invited, ${skipped} skipped`,
-      added,
-      invited,
-      skipped,
+      message: `Processed ${members.length} group members: ${result.added} added, ${result.invited} invited, ${result.skipped} skipped`,
+      ...result,
       totalMembers: members.length,
-      errors: errors.length > 0 ? errors : undefined,
+      errors: result.errors.length > 0 ? result.errors : undefined,
     })
   } catch (error) {
     console.error("[ADGroup] POST error:", error)

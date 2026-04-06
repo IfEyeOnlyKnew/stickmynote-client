@@ -110,8 +110,8 @@ export default function MyInferencePadsPage() {
       <main className="container mx-auto px-4 py-8">
         {loadingPads && (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {Array.from({ length: 6 }).map((_, i) => (
-              <Card key={`skeleton-${i}`}>
+            {[0, 1, 2, 3, 4, 5].map((n) => (
+              <Card key={`skeleton-${n}`}>
                 <CardHeader>
                   <div className="flex items-start justify-between">
                     <div className="flex-1">

@@ -130,66 +130,66 @@ Format the summary in clear paragraphs with good structure. Focus on the most im
 // Handler
 // ============================================================================
 
+interface ExportContext {
+  chatId: string
+  user: { id: string }
+  chat: any
+  messages: any[]
+  DocClass: typeof import("docx").Document
+  ParagraphClass: typeof import("docx").Paragraph
+  TextRunClass: typeof import("docx").TextRun
+  PackerClass: typeof import("docx").Packer
+}
+
+async function validateExportRequest(
+  request: NextRequest,
+  chatId: string,
+): Promise<{ ctx: ExportContext } | { error: NextResponse }> {
+  const { user, error: authError } = await getCachedAuthUser()
+  if (authError === "rate_limited") return { error: createRateLimitResponse() }
+  if (!user) return { error: createUnauthorizedResponse() }
+
+  const orgContextResult = await safeGetOrgContext(user.id)
+  if (isRateLimited(orgContextResult)) return { error: createRateLimitResponse() }
+
+  const isMember = await isChatMember(chatId, user.id)
+  if (!isMember) return { error: Errors.notMember() }
+
+  const chat = await getChatById(chatId, user.id)
+  if (!chat) return { error: Errors.notFound() }
+
+  const messages = await getAllChatMessages(chatId)
+  if (messages.length === 0) return { error: Errors.noMessages() }
+
+  if (!isAIAvailable()) return { error: Errors.aiNotAvailable() }
+  if (!Document || !Paragraph || !TextRun || !HeadingLevel || !Packer) return { error: Errors.docxNotAvailable() }
+
+  return {
+    ctx: {
+      chatId, user, chat, messages,
+      DocClass: Document, ParagraphClass: Paragraph,
+      TextRunClass: TextRun, PackerClass: Packer,
+    },
+  }
+}
+
 export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ chatId: string }> }
 ) {
   const isCSRFValid = await validateCSRFMiddleware(request)
-  if (!isCSRFValid) {
-    return Errors.csrf()
-  }
+  if (!isCSRFValid) return Errors.csrf()
 
   await initializeModules()
 
   try {
     const { chatId } = await params
-    const { user, error: authError } = await getCachedAuthUser()
+    const result = await validateExportRequest(request, chatId)
+    if ("error" in result) return result.error
 
-    if (authError === "rate_limited") {
-      return createRateLimitResponse()
-    }
-
-    if (!user) {
-      return createUnauthorizedResponse()
-    }
-
-    const orgContextResult = await safeGetOrgContext(user.id)
-    if (isRateLimited(orgContextResult)) {
-      return createRateLimitResponse()
-    }
-
-    // Verify membership
-    const isMember = await isChatMember(chatId, user.id)
-    if (!isMember) {
-      return Errors.notMember()
-    }
-
-    // Get chat details
-    const chat = await getChatById(chatId, user.id)
-    if (!chat) {
-      return Errors.notFound()
-    }
-
-    // Get all messages
-    const messages = await getAllChatMessages(chatId)
-    if (messages.length === 0) {
-      return Errors.noMessages()
-    }
-
-    // Check AI availability
-    if (!isAIAvailable()) {
-      return Errors.aiNotAvailable()
-    }
-
-    // Check docx module availability
-    if (!Document || !Paragraph || !TextRun || !HeadingLevel || !Packer) {
-      return Errors.docxNotAvailable()
-    }
-
-    const DocClass = Document
-    const ParagraphClass = Paragraph
-    const TextRunClass = TextRun
-    const PackerClass = Packer
+    const { ctx } = result
+    const { user, chat, messages, DocClass, ParagraphClass, TextRunClass, PackerClass } = ctx
+    const HeadingLevelEnum = HeadingLevel!
 
     // Get chat display name
     const chatName = getChatDisplayName(chat, user.id)
@@ -214,7 +214,7 @@ export async function POST(
     docChildren.push(
       new ParagraphClass({
         text: `Chat Export: ${chatName}`,
-        heading: HeadingLevel.HEADING_1,
+        heading: HeadingLevelEnum.HEADING_1,
       })
     )
 
@@ -243,7 +243,7 @@ export async function POST(
       // AI Summary Section
       new ParagraphClass({
         text: "Executive Summary",
-        heading: HeadingLevel.HEADING_2,
+        heading: HeadingLevelEnum.HEADING_2,
       })
     )
 
@@ -261,7 +261,7 @@ export async function POST(
       // Full Conversation Section
       new ParagraphClass({
         text: "Full Conversation",
-        heading: HeadingLevel.HEADING_2,
+        heading: HeadingLevelEnum.HEADING_2,
       })
     )
 

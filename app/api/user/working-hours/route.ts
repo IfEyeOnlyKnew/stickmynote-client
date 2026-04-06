@@ -73,7 +73,7 @@ const TIME_FIELDS = [
   "sunday_start", "sunday_end",
 ] as const
 
-const TIME_REGEX = /^([01]?[0-9]|2[0-3]):[0-5][0-9]$/
+const TIME_REGEX = /^([01]?\d|2[0-3]):[0-5]\d$/
 
 function validateTimeFields(body: any): string | null {
   for (const field of TIME_FIELDS) {
@@ -85,120 +85,89 @@ function validateTimeFields(body: any): string | null {
   return null
 }
 
+async function insertWorkingHours(userId: string, body: UpdateWorkingHoursRequest): Promise<WorkingHours> {
+  const insertResult = await db.query(
+    `INSERT INTO user_working_hours (
+      user_id, enabled, timezone,
+      monday_start, monday_end, tuesday_start, tuesday_end,
+      wednesday_start, wednesday_end, thursday_start, thursday_end,
+      friday_start, friday_end, saturday_start, saturday_end,
+      sunday_start, sunday_end, away_message
+    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)
+    RETURNING *`,
+    [
+      userId, body.enabled ?? false, body.timezone ?? "America/New_York",
+      body.monday_start ?? "09:00", body.monday_end ?? "17:00",
+      body.tuesday_start ?? "09:00", body.tuesday_end ?? "17:00",
+      body.wednesday_start ?? "09:00", body.wednesday_end ?? "17:00",
+      body.thursday_start ?? "09:00", body.thursday_end ?? "17:00",
+      body.friday_start ?? "09:00", body.friday_end ?? "17:00",
+      body.saturday_start ?? null, body.saturday_end ?? null,
+      body.sunday_start ?? null, body.sunday_end ?? null,
+      body.away_message ?? "I'm currently outside my working hours. I'll respond when I'm back.",
+    ]
+  )
+  return insertResult.rows[0]
+}
+
+const UPDATABLE_FIELDS: (keyof UpdateWorkingHoursRequest)[] = [
+  "enabled", "timezone",
+  "monday_start", "monday_end", "tuesday_start", "tuesday_end",
+  "wednesday_start", "wednesday_end", "thursday_start", "thursday_end",
+  "friday_start", "friday_end", "saturday_start", "saturday_end",
+  "sunday_start", "sunday_end", "away_message",
+]
+
+function buildUpdateQuery(body: UpdateWorkingHoursRequest): { updates: string[]; values: any[] } {
+  const updates: string[] = []
+  const values: any[] = []
+  let paramIndex = 1
+
+  for (const field of UPDATABLE_FIELDS) {
+    if (body[field] !== undefined) {
+      updates.push(`${field} = $${paramIndex++}`)
+      values.push(body[field])
+    }
+  }
+  return { updates, values }
+}
+
 export async function PUT(request: NextRequest) {
   try {
     const { user, error: authError } = await getCachedAuthUser()
 
-    if (authError === "rate_limited") {
-      return createRateLimitResponse()
-    }
-
-    if (!user) {
-      return createUnauthorizedResponse()
-    }
+    if (authError === "rate_limited") return createRateLimitResponse()
+    if (!user) return createUnauthorizedResponse()
 
     const body: UpdateWorkingHoursRequest = await request.json()
 
-    // Validate time formats if provided
     const invalidField = validateTimeFields(body)
     if (invalidField) {
       return NextResponse.json({ error: `Invalid time format for ${invalidField}` }, { status: 400 })
     }
 
-    // Check if record exists
     const existingResult = await db.query(`SELECT id FROM user_working_hours WHERE user_id = $1`, [user.id])
 
-    let updatedHours: WorkingHours
-
     if (existingResult.rows.length === 0) {
-      // Insert new record
-      const insertResult = await db.query(
-        `INSERT INTO user_working_hours (
-          user_id,
-          enabled,
-          timezone,
-          monday_start, monday_end,
-          tuesday_start, tuesday_end,
-          wednesday_start, wednesday_end,
-          thursday_start, thursday_end,
-          friday_start, friday_end,
-          saturday_start, saturday_end,
-          sunday_start, sunday_end,
-          away_message
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)
-        RETURNING *`,
-        [
-          user.id,
-          body.enabled ?? false,
-          body.timezone ?? "America/New_York",
-          body.monday_start ?? "09:00",
-          body.monday_end ?? "17:00",
-          body.tuesday_start ?? "09:00",
-          body.tuesday_end ?? "17:00",
-          body.wednesday_start ?? "09:00",
-          body.wednesday_end ?? "17:00",
-          body.thursday_start ?? "09:00",
-          body.thursday_end ?? "17:00",
-          body.friday_start ?? "09:00",
-          body.friday_end ?? "17:00",
-          body.saturday_start ?? null,
-          body.saturday_end ?? null,
-          body.sunday_start ?? null,
-          body.sunday_end ?? null,
-          body.away_message ?? "I'm currently outside my working hours. I'll respond when I'm back.",
-        ]
-      )
-      updatedHours = insertResult.rows[0]
-    } else {
-      // Build dynamic update query
-      const updates: string[] = []
-      const values: any[] = []
-      let paramIndex = 1
-
-      const fields: (keyof UpdateWorkingHoursRequest)[] = [
-        "enabled",
-        "timezone",
-        "monday_start",
-        "monday_end",
-        "tuesday_start",
-        "tuesday_end",
-        "wednesday_start",
-        "wednesday_end",
-        "thursday_start",
-        "thursday_end",
-        "friday_start",
-        "friday_end",
-        "saturday_start",
-        "saturday_end",
-        "sunday_start",
-        "sunday_end",
-        "away_message",
-      ]
-
-      for (const field of fields) {
-        if (body[field] !== undefined) {
-          updates.push(`${field} = $${paramIndex++}`)
-          values.push(body[field])
-        }
-      }
-
-      if (updates.length === 0) {
-        return NextResponse.json({ error: "No fields to update" }, { status: 400 })
-      }
-
-      values.push(user.id)
-
-      const updateResult = await db.query(
-        `UPDATE user_working_hours
-         SET ${updates.join(", ")}, updated_at = NOW()
-         WHERE user_id = $${paramIndex}
-         RETURNING *`,
-        values
-      )
-      updatedHours = updateResult.rows[0]
+      const updatedHours = await insertWorkingHours(user.id, body)
+      return NextResponse.json({ workingHours: updatedHours })
     }
 
-    return NextResponse.json({ workingHours: updatedHours })
+    const { updates, values } = buildUpdateQuery(body)
+    if (updates.length === 0) {
+      return NextResponse.json({ error: "No fields to update" }, { status: 400 })
+    }
+
+    values.push(user.id)
+    const updateResult = await db.query(
+      `UPDATE user_working_hours
+       SET ${updates.join(", ")}, updated_at = NOW()
+       WHERE user_id = $${values.length}
+       RETURNING *`,
+      values
+    )
+
+    return NextResponse.json({ workingHours: updateResult.rows[0] })
   } catch (error) {
     console.error("[WorkingHours] PUT error:", error)
     return NextResponse.json({ error: "Internal server error" }, { status: 500 })

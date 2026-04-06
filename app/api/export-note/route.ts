@@ -202,6 +202,72 @@ ${repliesSection}
 Please provide a well-structured, comprehensive summary that captures all aspects of this note. Use clear paragraph breaks to separate different topics and themes. Format it as a professional document that could serve as a complete record of this note's content and discussion.`
 }
 
+async function tryCleanupDocx(blobUrl: string, filename: string): Promise<string> {
+  try {
+    const cleanupResponse = await fetch(
+      `${process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000"}/api/cleanup-docx`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ blobUrl, filename }),
+      },
+    )
+    if (cleanupResponse.ok) {
+      const cleanupResult = await cleanupResponse.json()
+      return cleanupResult.cleanedUrl
+    }
+  } catch (cleanupError) {
+    console.warn("DOCX cleanup error, using original document:", cleanupError)
+  }
+  return blobUrl
+}
+
+async function fetchRepliesWithUsers(db: DatabaseClient, noteId: string) {
+  const { data: repliesData } = await db
+    .from("personal_sticks_replies")
+    .select("*")
+    .eq("personal_stick_id", noteId)
+    .order("created_at", { ascending: true })
+
+  const replyUserIds = [...new Set((repliesData || []).map((r: any) => r.user_id).filter(Boolean))]
+  const userMap = new Map<string, { username: string; email: string }>()
+
+  if (replyUserIds.length > 0) {
+    const { data: users } = await db.from("users").select("id, username, email").in("id", replyUserIds)
+    for (const u of users || []) {
+      userMap.set(u.id, { username: u.username, email: u.email })
+    }
+  }
+
+  return (repliesData || []).map((r: any) => ({
+    ...r,
+    user: r.user_id ? userMap.get(r.user_id) || null : null,
+  }))
+}
+
+function extractMediaFromTabs(tabsData: any[]) {
+  const noteTabs = tabsData || []
+
+  const videoLinks = noteTabs
+    .filter((tab: any) => tab.tab_type === "video")
+    .flatMap((tab: any) => {
+      const data = parseTabData(tab.tab_data)
+      return (data.videos || []).map((video: any) => ({
+        ...video,
+        embed_url: video.embed_url || video.url,
+      }))
+    })
+
+  const imageLinks = noteTabs
+    .filter((tab: any) => tab.tab_type === "images")
+    .flatMap((tab: any) => {
+      const data = parseTabData(tab.tab_data)
+      return data.images || []
+    })
+
+  return { videoLinks, imageLinks }
+}
+
 export async function POST(request: NextRequest) {
   const isCSRFValid = await validateCSRFMiddleware(request)
   if (!isCSRFValid) {
@@ -252,30 +318,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Note not found or access denied" }, { status: 404 })
     }
 
-    // Fetch replies
-    const { data: repliesData } = await db
-      .from("personal_sticks_replies")
-      .select("*")
-      .eq("personal_stick_id", noteId)
-      .order("created_at", { ascending: true })
-
-    // Fetch user data for replies separately
-    const replyUserIds = [...new Set((repliesData || []).map((r: any) => r.user_id).filter(Boolean))]
-    let userMap = new Map<string, { username: string; email: string }>()
-    if (replyUserIds.length > 0) {
-      const { data: users } = await db
-        .from("users")
-        .select("id, username, email")
-        .in("id", replyUserIds)
-      for (const u of users || []) {
-        userMap.set(u.id, { username: u.username, email: u.email })
-      }
-    }
-
-    const replies = (repliesData || []).map((r: any) => ({
-      ...r,
-      user: r.user_id ? userMap.get(r.user_id) || null : null,
-    }))
+    const replies = await fetchRepliesWithUsers(db, noteId)
 
     // Fetch tabs
     const { data: tabsData } = await db
@@ -284,24 +327,7 @@ export async function POST(request: NextRequest) {
       .eq("personal_stick_id", noteId)
       .order("tab_order", { ascending: true })
 
-    const noteTabs = tabsData || []
-
-    const videoLinks = noteTabs
-      .filter((tab) => tab.tab_type === "video")
-      .flatMap((tab) => {
-        const data = parseTabData(tab.tab_data)
-        return (data.videos || []).map((video) => ({
-          ...video,
-          embed_url: video.embed_url || video.url,
-        }))
-      })
-
-    const imageLinks = noteTabs
-      .filter((tab) => tab.tab_type === "images")
-      .flatMap((tab) => {
-        const data = parseTabData(tab.tab_data)
-        return data.images || []
-      })
+    const { videoLinks, imageLinks } = extractMediaFromTabs(tabsData || [])
 
     // Fetch tags
     const { data: tagsData } = await db
@@ -433,29 +459,10 @@ export async function POST(request: NextRequest) {
     const filename = `note-export-${noteId}-${Date.now()}.docx`
     const blob = await put(filename, Buffer.from(await docxBlob.arrayBuffer()), { folder: "documents" })
 
-    let finalUrl = blob.url
-    let message = "Complete note export generated successfully"
-
-    try {
-      const cleanupResponse = await fetch(
-        `${process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000"}/api/cleanup-docx`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ blobUrl: blob.url, filename }),
-        },
-      )
-
-      if (cleanupResponse.ok) {
-        const cleanupResult = await cleanupResponse.json()
-        finalUrl = cleanupResult.cleanedUrl
-        message = "Complete note export generated and cleaned successfully"
-      } else {
-        console.warn("DOCX cleanup failed, using original document")
-      }
-    } catch (cleanupError) {
-      console.warn("DOCX cleanup error, using original document:", cleanupError)
-    }
+    const finalUrl = await tryCleanupDocx(blob.url, filename)
+    const message = finalUrl !== blob.url
+      ? "Complete note export generated and cleaned successfully"
+      : "Complete note export generated successfully"
 
     await saveExportLink(db, noteId, user.id, {
       url: finalUrl,

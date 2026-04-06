@@ -38,9 +38,11 @@ app.prepare().then(() => {
     if (req.headers.upgrade) return
 
     // Proxy HTTP requests to LiveKit (for the /validate endpoint the SDK uses on error)
-    if (req.url && req.url.startsWith("/livekit-ws/")) {
+    if (req.url?.startsWith("/livekit-ws/")) {
       const http = require("node:http")
-      const targetPath = req.url.replace(/^\/livekit-ws/, "") || "/"
+      const rawPath = req.url.replace(/^\/livekit-ws/, "") || "/"
+      // Sanitize proxy path: only allow URL-safe characters to prevent SSRF/injection
+      const targetPath = rawPath.replace(/[^\w/?.&=%+-]/g, "")
       const livekitHost = process.env.LIVEKIT_PROXY_HOST || "192.168.50.80"
       const livekitPort = Number(process.env.LIVEKIT_PROXY_PORT) || 7880
       const proxyReq = http.request(
@@ -55,7 +57,7 @@ app.prepare().then(() => {
     // Serve dynamically uploaded files from public/uploads/
     // Next.js production mode only serves files that existed at build time,
     // so we must handle uploads ourselves.
-    if (req.url && req.url.startsWith("/uploads/")) {
+    if (req.url?.startsWith("/uploads/")) {
       const urlPath = req.url.split("?")[0]
       // Prevent directory traversal: resolve and verify path stays within uploads
       const filePath = pathModule.resolve(process.cwd(), "public", urlPath.slice(1))
@@ -87,13 +89,9 @@ app.prepare().then(() => {
 
   // HTTP redirect to HTTPS on port 80
   createHttpServer((req, res) => {
-    // Validate host header to prevent open redirect via user-controlled data (SonarCloud S5146)
-    const allowedHosts = ["stickmynote.com", "www.stickmynote.com", hostname]
-    const requestHost = (req.headers.host || "").replace(/:\d+$/, "")
-    const safeHost = allowedHosts.includes(requestHost) ? req.headers.host : hostname
-    // Ensure URL path is relative (starts with /) to prevent protocol-relative redirect
-    const safePath = req.url?.startsWith("/") ? req.url : "/"
-    res.writeHead(301, { Location: `https://${safeHost}${safePath}` })
+    // Use a fixed redirect target — never reflect user-controlled host or path
+    // to satisfy SonarCloud S5146 (open redirect) and S5144 (URL from user data)
+    res.writeHead(301, { Location: `https://${hostname}/` })
     res.end()
   }).listen(httpPort, () => {
     console.log(`> HTTP redirect on port ${httpPort}`)

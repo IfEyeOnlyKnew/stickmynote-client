@@ -99,7 +99,7 @@ export const ChatRoomView: React.FC<ChatRoomViewProps> = ({
     [chat.id, cursor]
   )
 
-  // Extracted handler to reduce function nesting depth
+  // Extracted handlers to reduce function nesting depth
   const handleWsMessageEdited = useCallback((payload: any) => {
     if (payload.chatId !== chat.id) return
     setMessages((prev) =>
@@ -107,23 +107,23 @@ export const ChatRoomView: React.FC<ChatRoomViewProps> = ({
     )
   }, [chat.id])
 
+  const handleWsNewMessage = useCallback((payload: any) => {
+    if (payload.chatId !== chat.id) return
+    setMessages((prev) => [...prev, payload.message])
+  }, [chat.id])
+
   // Initial fetch + WebSocket for real-time updates
   useEffect(() => {
     fetchMessages()
 
-    // Subscribe to real-time messages via WebSocket
-    const unsubMessage = subscribe("chat.message", (payload: any) => {
-      if (payload.chatId === chat.id) {
-        setMessages((prev) => [...prev, payload.message])
-      }
-    })
+    const unsubMessage = subscribe("chat.message", handleWsNewMessage)
     const unsubEdit = subscribe("chat.message_edited", handleWsMessageEdited)
 
     return () => {
       unsubMessage()
       unsubEdit()
     }
-  }, [chat.id, handleWsMessageEdited]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [chat.id, handleWsNewMessage, handleWsMessageEdited]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Auto-scroll to bottom on new messages
   useEffect(() => {
@@ -379,9 +379,7 @@ export const ChatRoomView: React.FC<ChatRoomViewProps> = ({
                   >
                     {!isOwnMessage && (
                       <p
-                        className={`text-xs font-medium mb-1 ${
-                          isOwnMessage ? "text-blue-100" : "text-gray-600"
-                        }`}
+                        className="text-xs font-medium mb-1 text-gray-600"
                       >
                         {displayName}
                       </p>

@@ -214,6 +214,50 @@ Format the summary in clear paragraphs with good structure. Focus on the most im
 }
 
 // ============================================================================
+// Data Helpers
+// ============================================================================
+
+async function enrichMessagesWithUsers(
+  db: DatabaseClient,
+  messagesData: Array<{ id: string; content: string; created_at: string; user_id: string }>,
+): Promise<ChatMessage[]> {
+  const userIds = [...new Set(messagesData.map((m) => m.user_id).filter(Boolean))]
+  const userMap = new Map<string, { username?: string; email?: string; full_name?: string }>()
+
+  if (userIds.length > 0) {
+    const { data: users } = await db
+      .from("users")
+      .select("id, email, full_name, username")
+      .in("id", userIds)
+    for (const u of users || []) {
+      userMap.set(u.id, { username: u.username, email: u.email, full_name: u.full_name })
+    }
+  }
+
+  return messagesData.map((m) => ({ ...m, user: userMap.get(m.user_id) ?? undefined }))
+}
+
+async function tryCleanupDocx(blobUrl: string, filename: string): Promise<string> {
+  try {
+    const cleanupResponse = await fetch(
+      `${process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000"}/api/cleanup-docx`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ blobUrl, filename }),
+      }
+    )
+    if (cleanupResponse.ok) {
+      const cleanupResult = await cleanupResponse.json()
+      return cleanupResult.cleanedUrl
+    }
+  } catch (cleanupError) {
+    console.warn("[ChatExport] DOCX cleanup error, using original:", cleanupError)
+  }
+  return blobUrl
+}
+
+// ============================================================================
 // Handler
 // ============================================================================
 
@@ -285,25 +329,7 @@ export async function POST(
       return NextResponse.json({ error: "No messages to export" }, { status: 400 })
     }
 
-    // Fetch user data for messages
-    const userIds = [...new Set(messagesData.map((m) => m.user_id).filter(Boolean))]
-    const userMap = new Map<string, { username?: string; email?: string; full_name?: string }>()
-
-    if (userIds.length > 0) {
-      const { data: users } = await db
-        .from("users")
-        .select("id, email, full_name, username")
-        .in("id", userIds)
-
-      for (const u of users || []) {
-        userMap.set(u.id, { username: u.username, email: u.email, full_name: u.full_name })
-      }
-    }
-
-    const messages: ChatMessage[] = messagesData.map((m) => ({
-      ...m,
-      user: userMap.get(m.user_id) || undefined,
-    }))
+    const messages = await enrichMessagesWithUsers(db, messagesData)
 
     // Fetch thread context (parent replies leading to this chat)
     const threadContext = await fetchThreadContext(db, parentReplyId)
@@ -453,26 +479,7 @@ export async function POST(
     const filename = `chat-export-${parentReplyId.slice(0, 8)}-${Date.now()}.docx`
     const blob = await put(filename, Buffer.from(await docxBlob.arrayBuffer()), { folder: "documents" })
 
-    let finalUrl = blob.url
-
-    // Try to clean up the DOCX (optional)
-    try {
-      const cleanupResponse = await fetch(
-        `${process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000"}/api/cleanup-docx`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ blobUrl: blob.url, filename }),
-        }
-      )
-
-      if (cleanupResponse.ok) {
-        const cleanupResult = await cleanupResponse.json()
-        finalUrl = cleanupResult.cleanedUrl
-      }
-    } catch (cleanupError) {
-      console.warn("[ChatExport] DOCX cleanup error, using original:", cleanupError)
-    }
+    const finalUrl = await tryCleanupDocx(blob.url, filename)
 
     // Save export link to Details tab
     await saveExportLink(db, noteId, user.id, {

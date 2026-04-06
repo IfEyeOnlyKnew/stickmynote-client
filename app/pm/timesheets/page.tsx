@@ -274,8 +274,8 @@ export default function TimesheetsPage() {
             <div key={d} className="text-center text-xs font-medium text-muted-foreground py-1">{d}</div>
           ))}
           {/* Empty cells for offset */}
-          {Array.from({ length: getDay(start) }).map((_, i) => (
-            <div key={`offset-${i}`} />
+          {Array.from({ length: getDay(start) }, (_, n) => n).map((n) => (
+            <div key={`offset-${n}`} />
           ))}
           {entriesByDay.map(({ day, total }) => {
             const intensity = total > 0 ? Math.max(0.15, total / maxDayTotal) : 0

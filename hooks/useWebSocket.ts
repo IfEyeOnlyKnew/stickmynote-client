@@ -30,14 +30,15 @@ function notifyListeners() {
   }
 }
 
-function dispatchToWildcardHandlers(type: string, payload: unknown) {
-  for (const [pattern, handlers] of globalHandlers) {
-    if (!pattern.endsWith(".*")) continue
-    const prefix = pattern.slice(0, -2)
-    if (!type.startsWith(prefix + ".") || pattern === type) continue
-    for (const handler of handlers) {
-      handler(payload)
-    }
+function isWildcardMatch(pattern: string, type: string): boolean {
+  if (!pattern.endsWith(".*")) return false
+  const prefix = pattern.slice(0, -2)
+  return type.startsWith(prefix + ".") && pattern !== type
+}
+
+function dispatchHandlers(handlers: Set<EventHandler>, payload: unknown) {
+  for (const handler of handlers) {
+    handler(payload)
   }
 }
 
@@ -49,21 +50,27 @@ function handleMessage(event: MessageEvent) {
     // Dispatch to exact match handlers
     const exactHandlers = globalHandlers.get(data.type)
     if (exactHandlers) {
-      for (const handler of exactHandlers) {
-        handler(data.payload)
-      }
+      dispatchHandlers(exactHandlers, data.payload)
     }
 
     // Dispatch to wildcard handlers (e.g., "chat_request.*" matches "chat_request.new")
-    dispatchToWildcardHandlers(data.type, data.payload)
+    for (const [pattern, handlers] of globalHandlers) {
+      if (isWildcardMatch(pattern, data.type)) {
+        dispatchHandlers(handlers, data.payload)
+      }
+    }
   } catch {
     // Ignore malformed messages
   }
 }
 
+function isAlreadyConnected(): boolean {
+  return !!globalWs && (globalWs.readyState === WebSocket.OPEN || globalWs.readyState === WebSocket.CONNECTING)
+}
+
 function connect() {
   if (typeof globalThis.window === "undefined") return
-  if (globalWs && (globalWs.readyState === WebSocket.OPEN || globalWs.readyState === WebSocket.CONNECTING)) return
+  if (isAlreadyConnected()) return
 
   const url = getWsUrl()
   if (!url) return

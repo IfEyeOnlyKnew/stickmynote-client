@@ -210,20 +210,24 @@ export function useNotifications() {
   // WebSocket subscription for real-time push
   const { connected: wsConnected, subscribe } = useWebSocket()
 
+  const handleWsNotificationNew = useCallback(() => {
+    fetchNotifications()
+  }, [fetchNotifications])
+
+  const handleWsNotificationRead = useCallback((payload: { id: string }) => {
+    markNotificationReadLocally(payload.id)
+  }, [markNotificationReadLocally])
+
   useEffect(() => {
     if (!wsConnected) return
 
     const unsubs = [
-      subscribe("notification.new", () => {
-        fetchNotifications()
-      }),
-      subscribe("notification.read", (payload: { id: string }) => {
-        markNotificationReadLocally(payload.id)
-      }),
+      subscribe("notification.new", handleWsNotificationNew),
+      subscribe("notification.read", handleWsNotificationRead),
     ]
 
     return () => unsubs.forEach((unsub) => unsub())
-  }, [wsConnected, subscribe, fetchNotifications, markNotificationReadLocally])
+  }, [wsConnected, subscribe, handleWsNotificationNew, handleWsNotificationRead])
 
   // Initial fetch
   useEffect(() => {

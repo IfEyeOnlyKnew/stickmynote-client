@@ -47,106 +47,104 @@ export function parseSearchParams(searchParams: URLSearchParams): SearchParams {
 // GET: Search sticks
 // ============================================================================
 
-export async function searchSticks(
-  params: SearchParams,
-  user: { id: string },
-  orgContext: OrgContext
-): Promise<{ status: number; body: any }> {
-  // Get user's accessible pad IDs
-  const memberPadsResult = await db.query(
-    `SELECT social_pad_id FROM social_pad_members WHERE user_id = $1 AND org_id = $2`,
-    [user.id, orgContext.orgId]
-  )
-  const padIds = memberPadsResult.rows.map((p: any) => p.social_pad_id)
+// ============================================================================
+// Query building helpers
+// ============================================================================
 
-  // Build sticks query with filters
-  let sticksQuery = `
-    SELECT
-      ss.id, ss.topic, ss.content, ss.color, ss.created_at, ss.updated_at,
-      ss.social_pad_id, ss.user_id, ss.is_public,
-      sp.id as pad_id, sp.name as pad_name, sp.is_public as pad_is_public, sp.owner_id as pad_owner_id,
-      u.id as author_id, u.full_name, u.email, u.username, u.avatar_url
-    FROM social_sticks ss
-    INNER JOIN social_pads sp ON sp.id = ss.social_pad_id
-    LEFT JOIN users u ON u.id = ss.user_id
-    WHERE ss.org_id = $1
-      AND (sp.is_public = true OR sp.owner_id = $2`
+interface QueryBuilder {
+  query: string
+  params: any[]
+  paramIndex: number
+}
 
-  const queryParams: any[] = [orgContext.orgId, user.id]
-  let paramIndex = 3
+function addOptionalFilter(
+  builder: QueryBuilder,
+  value: string | null,
+  clause: string,
+): void {
+  if (!value) return
+  builder.query += ` AND ${clause.replace('?', `$${builder.paramIndex}`)}`
+  builder.params.push(value)
+  builder.paramIndex++
+}
 
-  if (padIds.length > 0) {
-    sticksQuery += ` OR ss.social_pad_id = ANY($${paramIndex})`
-    queryParams.push(padIds)
-    paramIndex++
-  }
-  sticksQuery += ')'
-
-  // Apply filters
+function applySearchFilters(builder: QueryBuilder, params: SearchParams): void {
   if (params.visibility === 'public') {
-    sticksQuery += ` AND sp.is_public = true`
+    builder.query += ` AND sp.is_public = true`
   } else if (params.visibility === 'private') {
-    sticksQuery += ` AND sp.is_public = false`
+    builder.query += ` AND sp.is_public = false`
   }
 
-  if (params.authorId) {
-    sticksQuery += ` AND ss.user_id = $${paramIndex}`
-    queryParams.push(params.authorId)
-    paramIndex++
-  }
+  addOptionalFilter(builder, params.authorId, 'ss.user_id = ?')
+  addOptionalFilter(builder, params.padId, 'ss.social_pad_id = ?')
+  addOptionalFilter(builder, params.dateFrom, 'ss.created_at >= ?')
+  addOptionalFilter(builder, params.dateTo, 'ss.created_at <= ?')
 
-  if (params.padId) {
-    sticksQuery += ` AND ss.social_pad_id = $${paramIndex}`
-    queryParams.push(params.padId)
-    paramIndex++
-  }
-
-  if (params.dateFrom) {
-    sticksQuery += ` AND ss.created_at >= $${paramIndex}`
-    queryParams.push(params.dateFrom)
-    paramIndex++
-  }
-
-  if (params.dateTo) {
-    sticksQuery += ` AND ss.created_at <= $${paramIndex}`
-    queryParams.push(params.dateTo)
-    paramIndex++
-  }
-
-  // Apply text search
   if (params.query) {
     const searchPattern = `%${params.query}%`
-    sticksQuery += ` AND (ss.topic ILIKE $${paramIndex} OR ss.content ILIKE $${paramIndex} OR u.full_name ILIKE $${paramIndex} OR u.email ILIKE $${paramIndex})`
-    queryParams.push(searchPattern)
-    paramIndex++
+    builder.query += ` AND (ss.topic ILIKE $${builder.paramIndex} OR ss.content ILIKE $${builder.paramIndex} OR u.full_name ILIKE $${builder.paramIndex} OR u.email ILIKE $${builder.paramIndex})`
+    builder.params.push(searchPattern)
+    builder.paramIndex++
   }
+}
 
-  // Apply sorting
+function applySorting(builder: QueryBuilder, params: SearchParams): void {
   const sortColumn = params.sortBy === 'updated_at' ? 'ss.updated_at' : 'ss.created_at'
   const sortDirection = params.sortOrder === 'asc' ? 'ASC' : 'DESC'
-  sticksQuery += ` ORDER BY ${sortColumn} ${sortDirection}`
+  builder.query += ` ORDER BY ${sortColumn} ${sortDirection}`
+}
 
-  const sticksResult = await db.query(sticksQuery, queryParams)
-
-  // Get reply counts for sticks
-  const stickIds = sticksResult.rows.map((s: any) => s.id)
-  let replyCountMap: Record<string, number> = {}
-
-  if (stickIds.length > 0) {
-    const replyCountsResult = await db.query(
-      `SELECT social_stick_id, COUNT(*) as count
-       FROM social_stick_replies
-       WHERE social_stick_id = ANY($1) AND org_id = $2
-       GROUP BY social_stick_id`,
-      [stickIds, orgContext.orgId]
-    )
-    replyCountMap = Object.fromEntries(
-      replyCountsResult.rows.map((r: any) => [r.social_stick_id, Number.parseInt(r.count)])
-    )
+function buildSticksQuery(params: SearchParams, orgId: string, userId: string, padIds: string[]): QueryBuilder {
+  const builder: QueryBuilder = {
+    query: `
+      SELECT
+        ss.id, ss.topic, ss.content, ss.color, ss.created_at, ss.updated_at,
+        ss.social_pad_id, ss.user_id, ss.is_public,
+        sp.id as pad_id, sp.name as pad_name, sp.is_public as pad_is_public, sp.owner_id as pad_owner_id,
+        u.id as author_id, u.full_name, u.email, u.username, u.avatar_url
+      FROM social_sticks ss
+      INNER JOIN social_pads sp ON sp.id = ss.social_pad_id
+      LEFT JOIN users u ON u.id = ss.user_id
+      WHERE ss.org_id = $1
+        AND (sp.is_public = true OR sp.owner_id = $2`,
+    params: [orgId, userId],
+    paramIndex: 3,
   }
 
-  // Process sticks
-  let sticks = sticksResult.rows.map((row: any) => ({
+  if (padIds.length > 0) {
+    builder.query += ` OR ss.social_pad_id = ANY($${builder.paramIndex})`
+    builder.params.push(padIds)
+    builder.paramIndex++
+  }
+  builder.query += ')'
+
+  applySearchFilters(builder, params)
+  applySorting(builder, params)
+
+  return builder
+}
+
+// ============================================================================
+// Result processing helpers
+// ============================================================================
+
+async function fetchReplyCountMap(stickIds: string[], orgId: string): Promise<Record<string, number>> {
+  if (stickIds.length === 0) return {}
+
+  const replyCountsResult = await db.query(
+    `SELECT social_stick_id, COUNT(*) as count
+     FROM social_stick_replies
+     WHERE social_stick_id = ANY($1) AND org_id = $2
+     GROUP BY social_stick_id`,
+    [stickIds, orgId]
+  )
+  return Object.fromEntries(
+    replyCountsResult.rows.map((r: any) => [r.social_stick_id, Number.parseInt(r.count)])
+  )
+}
+
+function mapRowToStick(row: any, replyCount: number) {
+  return {
     id: row.id,
     topic: row.topic,
     content: row.content,
@@ -163,49 +161,38 @@ export async function searchSticks(
       owner_id: row.pad_owner_id,
     },
     users: row.author_id
-      ? {
-          id: row.author_id,
-          full_name: row.full_name,
-          email: row.email,
-          username: row.username,
-          avatar_url: row.avatar_url,
-        }
+      ? { id: row.author_id, full_name: row.full_name, email: row.email, username: row.username, avatar_url: row.avatar_url }
       : null,
-    reply_count: replyCountMap[row.id] || 0,
-  }))
-
-  // Sort by reply count if requested
-  if (params.sortBy === 'replies') {
-    const multiplier = params.sortOrder === 'desc' ? 1 : -1
-    sticks.sort((a: any, b: any) => multiplier * ((b.reply_count || 0) - (a.reply_count || 0)))
+    reply_count: replyCount,
   }
+}
 
-  // Search replies if requested
-  let replyResults: any[] = []
-  if (params.includeReplies && params.query) {
-    const repliesResult = await db.query(
-      `SELECT
-        ssr.id, ssr.content, ssr.category, ssr.created_at, ssr.social_stick_id, ssr.user_id,
-        u.id as author_id, u.full_name, u.email, u.username, u.avatar_url,
-        ss.id as stick_id, ss.topic as stick_topic, ss.social_pad_id,
-        sp.id as pad_id, sp.name as pad_name, sp.is_public as pad_is_public
-       FROM social_stick_replies ssr
-       INNER JOIN social_sticks ss ON ss.id = ssr.social_stick_id
-       INNER JOIN social_pads sp ON sp.id = ss.social_pad_id
-       LEFT JOIN users u ON u.id = ssr.user_id
-       WHERE ssr.org_id = $1
-         AND ssr.content ILIKE $2
-         AND (sp.is_public = true OR sp.id = ANY($3))`,
-      [orgContext.orgId, `%${params.query}%`, padIds]
-    )
-    replyResults = repliesResult.rows
-  }
+async function searchReplies(params: SearchParams, orgId: string, padIds: string[]): Promise<any[]> {
+  if (!params.includeReplies || !params.query) return []
 
-  // Extract authors and pads for metadata
+  const repliesResult = await db.query(
+    `SELECT
+      ssr.id, ssr.content, ssr.category, ssr.created_at, ssr.social_stick_id, ssr.user_id,
+      u.id as author_id, u.full_name, u.email, u.username, u.avatar_url,
+      ss.id as stick_id, ss.topic as stick_topic, ss.social_pad_id,
+      sp.id as pad_id, sp.name as pad_name, sp.is_public as pad_is_public
+     FROM social_stick_replies ssr
+     INNER JOIN social_sticks ss ON ss.id = ssr.social_stick_id
+     INNER JOIN social_pads sp ON sp.id = ss.social_pad_id
+     LEFT JOIN users u ON u.id = ssr.user_id
+     WHERE ssr.org_id = $1
+       AND ssr.content ILIKE $2
+       AND (sp.is_public = true OR sp.id = ANY($3))`,
+    [orgId, `%${params.query}%`, padIds]
+  )
+  return repliesResult.rows
+}
+
+function extractMetadata(sticks: any[]) {
   const authorsMap = new Map<string, any>()
   const padsMap = new Map<string, any>()
 
-  sticks.forEach((stick: any) => {
+  for (const stick of sticks) {
     if (stick.user_id && !authorsMap.has(stick.user_id)) {
       authorsMap.set(stick.user_id, {
         id: stick.user_id,
@@ -219,7 +206,44 @@ export async function searchSticks(
         name: stick.social_pads?.name || 'Unknown',
       })
     }
-  })
+  }
+
+  return {
+    authors: Array.from(authorsMap.values()),
+    pads: Array.from(padsMap.values()),
+  }
+}
+
+// ============================================================================
+// Main search function
+// ============================================================================
+
+export async function searchSticks(
+  params: SearchParams,
+  user: { id: string },
+  orgContext: OrgContext
+): Promise<{ status: number; body: any }> {
+  const memberPadsResult = await db.query(
+    `SELECT social_pad_id FROM social_pad_members WHERE user_id = $1 AND org_id = $2`,
+    [user.id, orgContext.orgId]
+  )
+  const padIds = memberPadsResult.rows.map((p: any) => p.social_pad_id)
+
+  const builder = buildSticksQuery(params, orgContext.orgId, user.id, padIds)
+  const sticksResult = await db.query(builder.query, builder.params)
+
+  const stickIds = sticksResult.rows.map((s: any) => s.id)
+  const replyCountMap = await fetchReplyCountMap(stickIds, orgContext.orgId)
+
+  let sticks = sticksResult.rows.map((row: any) => mapRowToStick(row, replyCountMap[row.id] || 0))
+
+  if (params.sortBy === 'replies') {
+    const multiplier = params.sortOrder === 'desc' ? 1 : -1
+    sticks.sort((a: any, b: any) => multiplier * ((b.reply_count || 0) - (a.reply_count || 0)))
+  }
+
+  const replyResults = await searchReplies(params, orgContext.orgId, padIds)
+  const { authors, pads } = extractMetadata(sticks)
 
   return {
     status: 200,
@@ -231,8 +255,8 @@ export async function searchSticks(
         totalReplies: replyResults.length,
         total: sticks.length,
         hasMore: false,
-        authors: Array.from(authorsMap.values()),
-        pads: Array.from(padsMap.values()),
+        authors,
+        pads,
       },
     },
   }

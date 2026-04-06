@@ -89,6 +89,209 @@ interface PadChatPanelProps {
   onClose?: () => void
 }
 
+// Extracted to reduce cognitive complexity (S3776)
+function getMessageBgClass(msg: PadMessage, isOwnMessage: boolean): string {
+  if (msg.is_ai_message) return "bg-gradient-to-r from-purple-100 to-blue-100 text-gray-900 border border-purple-200"
+  if (isOwnMessage) return "bg-purple-600 text-white"
+  return "bg-white text-gray-900 border"
+}
+
+function PadChatChronologicalMessage({
+  msg,
+  currentUserId,
+  isUserModerator,
+  canModerate,
+  getDisplayName,
+  getInitials,
+  formatMessageTime,
+  showReactions,
+  setShowReactions,
+  handlePinMessage,
+  handleDeleteMessage,
+  handleToggleReaction,
+  availableReactions,
+}: Readonly<{
+  msg: PadMessage
+  currentUserId: string
+  isUserModerator: (userId: string) => boolean
+  canModerate: boolean
+  getDisplayName: (msg: PadMessage) => string
+  getInitials: (name: string) => string
+  formatMessageTime: (dateStr: string) => string
+  showReactions: string | null
+  setShowReactions: (id: string | null) => void
+  handlePinMessage: (messageId: string) => void
+  handleDeleteMessage: (messageId: string) => void
+  handleToggleReaction: (messageId: string, emoji: ReactionEmoji) => void
+  availableReactions: readonly ReactionEmoji[]
+}>) {
+  const isOwnMessage = msg.user_id === currentUserId
+  const displayName = getDisplayName(msg)
+  const userIsModerator = isUserModerator(msg.user_id)
+  const canManageMessage = isOwnMessage || canModerate
+
+  return (
+    <div
+      className={`flex gap-2 group ${isOwnMessage ? "flex-row-reverse" : ""}`}
+    >
+      <TooltipProvider>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <div className="relative">
+              <Avatar className="w-8 h-8 flex-shrink-0">
+                {msg.user?.avatar_url && (
+                  <AvatarImage src={msg.user.avatar_url} />
+                )}
+                <AvatarFallback
+                  className={`text-xs ${
+                    userIsModerator
+                      ? "bg-amber-100 text-amber-700"
+                      : "bg-purple-100 text-purple-700"
+                  }`}
+                >
+                  {getInitials(displayName)}
+                </AvatarFallback>
+              </Avatar>
+              {userIsModerator && (
+                <div className="absolute -bottom-0.5 -right-0.5 bg-amber-500 rounded-full p-0.5">
+                  <Shield className="h-2 w-2 text-white" />
+                </div>
+              )}
+            </div>
+          </TooltipTrigger>
+          <TooltipContent>
+            <p>{displayName}</p>
+            {userIsModerator && <p className="text-xs text-amber-600">Moderator</p>}
+          </TooltipContent>
+        </Tooltip>
+      </TooltipProvider>
+
+      <div className={`max-w-[75%] ${isOwnMessage ? "text-right" : ""}`}>
+        <div
+          className={`relative inline-block rounded-lg px-3 py-2 ${getMessageBgClass(msg, isOwnMessage)}`}
+        >
+          {/* AI badge */}
+          {msg.is_ai_message && (
+            <div className="flex items-center gap-1 text-xs text-purple-600 mb-1">
+              <Bot className="h-3 w-3" />
+              <span>AI Assistant</span>
+            </div>
+          )}
+
+          {/* User name and moderator badge */}
+          {!isOwnMessage && !msg.is_ai_message && (
+            <div className="flex items-center gap-1 mb-1">
+              <p className="text-xs font-medium text-purple-600">
+                {displayName}
+              </p>
+              {userIsModerator && (
+                <Badge className="text-[9px] px-1 py-0 bg-amber-100 text-amber-700 border-0">
+                  MOD
+                </Badge>
+              )}
+            </div>
+          )}
+
+          <p className="text-sm whitespace-pre-wrap break-words">
+            {msg.content}
+          </p>
+
+          {/* Edited indicator */}
+          {msg.is_edited && (
+            <span className={`text-[10px] ${isOwnMessage ? "text-white/70" : "text-gray-400"}`}>
+              (edited)
+            </span>
+          )}
+
+          {/* Message actions */}
+          {canManageMessage && (
+            <div className={`absolute top-1 ${isOwnMessage ? "left-1" : "right-1"} opacity-0 group-hover:opacity-100 transition-opacity`}>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className={`h-5 w-5 p-0 ${isOwnMessage ? "text-white/70 hover:text-white hover:bg-white/20" : "text-gray-400 hover:text-gray-600"}`}
+                  >
+                    <MoreHorizontal className="h-3 w-3" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align={isOwnMessage ? "start" : "end"}>
+                  {canModerate && !msg.is_pinned && (
+                    <DropdownMenuItem onClick={() => handlePinMessage(msg.id)}>
+                      <Pin className="h-3 w-3 mr-2" />
+                      Pin message
+                    </DropdownMenuItem>
+                  )}
+                  <DropdownMenuItem
+                    onClick={() => handleDeleteMessage(msg.id)}
+                    className="text-red-600"
+                  >
+                    <Trash2 className="h-3 w-3 mr-2" />
+                    Delete
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
+          )}
+        </div>
+
+        {/* Reactions */}
+        {msg.reactions && msg.reactions.length > 0 && (
+          <div className={`flex gap-1 mt-1 ${isOwnMessage ? "justify-end" : "justify-start"}`}>
+            {msg.reactions.map((reaction) => (
+              <button
+                key={reaction.emoji}
+                type="button"
+                onClick={() => handleToggleReaction(msg.id, reaction.emoji as ReactionEmoji)}
+                className={`text-xs px-1.5 py-0.5 rounded-full border ${
+                  reaction.user_reacted
+                    ? "bg-purple-100 border-purple-300"
+                    : "bg-gray-100 border-gray-200"
+                }`}
+              >
+                {reaction.emoji} {reaction.count}
+              </button>
+            ))}
+          </div>
+        )}
+
+        {/* Timestamp and reaction button */}
+        <div className={`flex items-center gap-2 mt-0.5 ${isOwnMessage ? "justify-end" : "justify-start"}`}>
+          <p className="text-xs text-gray-400">
+            {formatMessageTime(msg.created_at)}
+          </p>
+          <button
+            type="button"
+            onClick={() => setShowReactions(showReactions === msg.id ? null : msg.id)}
+            className="text-gray-400 hover:text-gray-600 opacity-0 group-hover:opacity-100 transition-opacity"
+            aria-label="Add reaction"
+          >
+            <Smile className="h-3 w-3" />
+          </button>
+        </div>
+
+        {/* Reaction picker */}
+        {showReactions === msg.id && (
+          <div className={`flex gap-1 mt-1 p-1 bg-white rounded-lg shadow-lg border ${isOwnMessage ? "justify-end" : "justify-start"}`}>
+            {availableReactions.map((emoji) => (
+              <button
+                key={emoji}
+                type="button"
+                onClick={() => handleToggleReaction(msg.id, emoji)}
+                className="text-sm hover:scale-125 transition-transform p-1"
+                aria-label={`React with ${emoji}`}
+              >
+                {emoji}
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
 export function PadChatPanel({
   padId,
   padName,
@@ -141,6 +344,18 @@ export function PadChatPanel({
     return isWithinOfficeHours(settings)
   }, [settings])
 
+  // Track unread per user for grouped view
+  const trackGroupedUnread = useCallback((otherUserMessages: PadMessage[]) => {
+    for (const msg of otherUserMessages) {
+      if (expandedUsers.has(msg.user_id)) continue
+      setUnreadPerUser(prev => {
+        const newMap = new Map(prev)
+        newMap.set(msg.user_id, (newMap.get(msg.user_id) || 0) + 1)
+        return newMap
+      })
+    }
+  }, [expandedUsers])
+
   // Handle notifications for new messages from other users
   const handleNewMessageNotifications = useCallback((fetchedMessages: PadMessage[]) => {
     const otherUserMessages = fetchedMessages.filter(msg => msg.user_id !== currentUserId)
@@ -150,19 +365,10 @@ export function PadChatPanel({
       setUnreadCount(prev => prev + otherUserMessages.length)
     }
 
-    // Track unread per user for grouped view
     if (viewMode === "grouped") {
-      for (const msg of otherUserMessages) {
-        if (expandedUsers.has(msg.user_id)) continue
-        setUnreadPerUser(prev => {
-          const newMap = new Map(prev)
-          newMap.set(msg.user_id, (newMap.get(msg.user_id) || 0) + 1)
-          return newMap
-        })
-      }
+      trackGroupedUnread(otherUserMessages)
     }
 
-    // Play sound if enabled (once for batch)
     if (settings?.enable_sounds) {
       playNotificationSound()
     }
@@ -173,7 +379,7 @@ export function PadChatPanel({
       const senderName = lastOtherMsg.user.full_name || lastOtherMsg.user.email?.split("@")[0] || "Someone"
       notifyNewMessage(senderName, lastOtherMsg.content)
     }
-  }, [currentUserId, isCollapsed, viewMode, expandedUsers, settings?.enable_sounds, notifyNewMessage])
+  }, [currentUserId, isCollapsed, viewMode, trackGroupedUnread, settings?.enable_sounds, notifyNewMessage])
 
   // Fetch messages - optimized with cursor-based polling
   // Initial fetch gets all messages, subsequent polls only get new ones
@@ -805,180 +1011,24 @@ export function PadChatPanel({
           )}
           {!isLoading && settings?.chat_enabled && messages.length > 0 && !(viewMode === "grouped" && isModerator) && (
             /* Chronological view (default) */
-            messages.filter(m => !m.is_deleted).map((msg) => {
-              const isOwnMessage = msg.user_id === currentUserId
-              const displayName = getDisplayName(msg)
-              const userIsModerator = isUserModerator(msg.user_id)
-              const canManageMessage = isOwnMessage || canModerate
-
-              return (
-                <div
-                  key={msg.id}
-                  className={`flex gap-2 group ${isOwnMessage ? "flex-row-reverse" : ""}`}
-                >
-                  <TooltipProvider>
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <div className="relative">
-                          <Avatar className="w-8 h-8 flex-shrink-0">
-                            {msg.user?.avatar_url && (
-                              <AvatarImage src={msg.user.avatar_url} />
-                            )}
-                            <AvatarFallback
-                              className={`text-xs ${
-                                userIsModerator
-                                  ? "bg-amber-100 text-amber-700"
-                                  : "bg-purple-100 text-purple-700"
-                              }`}
-                            >
-                              {getInitials(displayName)}
-                            </AvatarFallback>
-                          </Avatar>
-                          {userIsModerator && (
-                            <div className="absolute -bottom-0.5 -right-0.5 bg-amber-500 rounded-full p-0.5">
-                              <Shield className="h-2 w-2 text-white" />
-                            </div>
-                          )}
-                        </div>
-                      </TooltipTrigger>
-                      <TooltipContent>
-                        <p>{displayName}</p>
-                        {userIsModerator && <p className="text-xs text-amber-600">Moderator</p>}
-                      </TooltipContent>
-                    </Tooltip>
-                  </TooltipProvider>
-
-                  <div className={`max-w-[75%] ${isOwnMessage ? "text-right" : ""}`}>
-                    <div
-                      className={`relative inline-block rounded-lg px-3 py-2 ${
-                        (() => {
-                          if (msg.is_ai_message) return "bg-gradient-to-r from-purple-100 to-blue-100 text-gray-900 border border-purple-200"
-                          if (isOwnMessage) return "bg-purple-600 text-white"
-                          return "bg-white text-gray-900 border"
-                        })()
-                      }`}
-                    >
-                      {/* AI badge */}
-                      {msg.is_ai_message && (
-                        <div className="flex items-center gap-1 text-xs text-purple-600 mb-1">
-                          <Bot className="h-3 w-3" />
-                          <span>AI Assistant</span>
-                        </div>
-                      )}
-
-                      {/* User name and moderator badge */}
-                      {!isOwnMessage && !msg.is_ai_message && (
-                        <div className="flex items-center gap-1 mb-1">
-                          <p className="text-xs font-medium text-purple-600">
-                            {displayName}
-                          </p>
-                          {userIsModerator && (
-                            <Badge className="text-[9px] px-1 py-0 bg-amber-100 text-amber-700 border-0">
-                              MOD
-                            </Badge>
-                          )}
-                        </div>
-                      )}
-
-                      <p className="text-sm whitespace-pre-wrap break-words">
-                        {msg.content}
-                      </p>
-
-                      {/* Edited indicator */}
-                      {msg.is_edited && (
-                        <span className={`text-[10px] ${isOwnMessage ? "text-white/70" : "text-gray-400"}`}>
-                          (edited)
-                        </span>
-                      )}
-
-                      {/* Message actions */}
-                      {canManageMessage && (
-                        <div className={`absolute top-1 ${isOwnMessage ? "left-1" : "right-1"} opacity-0 group-hover:opacity-100 transition-opacity`}>
-                          <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                className={`h-5 w-5 p-0 ${isOwnMessage ? "text-white/70 hover:text-white hover:bg-white/20" : "text-gray-400 hover:text-gray-600"}`}
-                              >
-                                <MoreHorizontal className="h-3 w-3" />
-                              </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align={isOwnMessage ? "start" : "end"}>
-                              {canModerate && !msg.is_pinned && (
-                                <DropdownMenuItem onClick={() => handlePinMessage(msg.id)}>
-                                  <Pin className="h-3 w-3 mr-2" />
-                                  Pin message
-                                </DropdownMenuItem>
-                              )}
-                              <DropdownMenuItem
-                                onClick={() => handleDeleteMessage(msg.id)}
-                                className="text-red-600"
-                              >
-                                <Trash2 className="h-3 w-3 mr-2" />
-                                Delete
-                              </DropdownMenuItem>
-                            </DropdownMenuContent>
-                          </DropdownMenu>
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Reactions */}
-                    {msg.reactions && msg.reactions.length > 0 && (
-                      <div className={`flex gap-1 mt-1 ${isOwnMessage ? "justify-end" : "justify-start"}`}>
-                        {msg.reactions.map((reaction) => (
-                          <button
-                            key={reaction.emoji}
-                            type="button"
-                            onClick={() => handleToggleReaction(msg.id, reaction.emoji as ReactionEmoji)}
-                            className={`text-xs px-1.5 py-0.5 rounded-full border ${
-                              reaction.user_reacted
-                                ? "bg-purple-100 border-purple-300"
-                                : "bg-gray-100 border-gray-200"
-                            }`}
-                          >
-                            {reaction.emoji} {reaction.count}
-                          </button>
-                        ))}
-                      </div>
-                    )}
-
-                    {/* Timestamp and reaction button */}
-                    <div className={`flex items-center gap-2 mt-0.5 ${isOwnMessage ? "justify-end" : "justify-start"}`}>
-                      <p className="text-xs text-gray-400">
-                        {formatMessageTime(msg.created_at)}
-                      </p>
-                      <button
-                        type="button"
-                        onClick={() => setShowReactions(showReactions === msg.id ? null : msg.id)}
-                        className="text-gray-400 hover:text-gray-600 opacity-0 group-hover:opacity-100 transition-opacity"
-                        aria-label="Add reaction"
-                      >
-                        <Smile className="h-3 w-3" />
-                      </button>
-                    </div>
-
-                    {/* Reaction picker */}
-                    {showReactions === msg.id && (
-                      <div className={`flex gap-1 mt-1 p-1 bg-white rounded-lg shadow-lg border ${isOwnMessage ? "justify-end" : "justify-start"}`}>
-                        {AVAILABLE_REACTIONS.map((emoji) => (
-                          <button
-                            key={emoji}
-                            type="button"
-                            onClick={() => handleToggleReaction(msg.id, emoji)}
-                            className="text-sm hover:scale-125 transition-transform p-1"
-                            aria-label={`React with ${emoji}`}
-                          >
-                            {emoji}
-                          </button>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                </div>
-              )
-            })
+            messages.filter(m => !m.is_deleted).map((msg) => (
+              <PadChatChronologicalMessage
+                key={msg.id}
+                msg={msg}
+                currentUserId={currentUserId}
+                isUserModerator={isUserModerator}
+                canModerate={canModerate}
+                getDisplayName={getDisplayName}
+                getInitials={getInitials}
+                formatMessageTime={formatMessageTime}
+                showReactions={showReactions}
+                setShowReactions={setShowReactions}
+                handlePinMessage={handlePinMessage}
+                handleDeleteMessage={handleDeleteMessage}
+                handleToggleReaction={handleToggleReaction}
+                availableReactions={AVAILABLE_REACTIONS}
+              />
+            ))
           )}
           {!isLoading && !settings?.chat_enabled && (
             <div className="flex flex-col items-center justify-center h-full text-gray-500 text-center">

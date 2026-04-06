@@ -191,9 +191,9 @@ export const DetailsTabContent = memo(function DetailsTabContent({
         <div className="space-y-2">
           <span className="text-sm font-medium text-gray-700 block">Export Links</span>
           <div className="space-y-2">
-            {exportLinks.map((exportLink: any, index: number) => (
+            {exportLinks.map((exportLink: any) => (
               <div
-                key={`${exportLink.url}-${index}`}
+                key={`${exportLink.type}-${exportLink.created_at}`}
                 className="flex items-center justify-between p-3 bg-gray-50 border border-gray-200 rounded-md"
               >
                 <div className="flex-1">

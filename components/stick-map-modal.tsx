@@ -153,23 +153,49 @@ function CenterNode({ topic, color }: Readonly<{ topic: string; color: string }>
   )
 }
 
+function getOrbitNodeClasses(hasData: boolean, node: MapNode) {
+  const base = "absolute flex flex-col items-center justify-center rounded-full border-2 transition-all duration-300 hover:scale-110 hover:shadow-lg z-10"
+  const cursor = hasData ? "cursor-pointer" : "cursor-default"
+  const bg = hasData ? node.bgColor : "bg-gray-50"
+  const border = hasData ? node.borderColor : "border-gray-200 border-dashed"
+  const opacity = hasData ? "" : "opacity-50"
+  return `${base} ${cursor} ${bg} ${border} ${opacity}`
+}
+
+function OrbitNodeTooltip({ node, hasData }: Readonly<{ node: MapNode; hasData: boolean }>) {
+  if (!hasData) {
+    return <p className="text-muted-foreground">No {node.label.toLowerCase()} yet</p>
+  }
+  return (
+    <>
+      <p className="text-muted-foreground">
+        {node.count} {node.count === 1 ? "item" : "items"}
+      </p>
+      {node.subtitle && (
+        <p className="text-muted-foreground text-xs">{node.subtitle}</p>
+      )}
+    </>
+  )
+}
+
 function OrbitNode({ node, position, index, onClick }: Readonly<{ node: MapNode; position: { x: number; y: number }; index: number; onClick?: (nodeId: string, data?: { chatId?: string; meetingId?: string }) => void }>) {
   const hasData = node.count > 0
+  const isClickable = hasData && !!onClick
+  const colorClass = hasData ? node.color : "text-gray-400"
+
+  const handleClick = isClickable ? () => onClick(node.id, node.data) : undefined
+  const handleKeyDown = isClickable ? (e: React.KeyboardEvent) => { if (e.key === "Enter" || e.key === " ") onClick(node.id, node.data) } : undefined
 
   return (
     <TooltipProvider delayDuration={200}>
       <Tooltip>
         <TooltipTrigger asChild>
-          <div
-            tabIndex={(hasData && onClick) ? 0 : undefined}
-            onClick={(hasData && onClick) ? () => onClick(node.id, node.data) : undefined}
-            onKeyDown={(hasData && onClick) ? (e) => { if (e.key === "Enter" || e.key === " ") onClick(node.id, node.data) } : undefined}
-            className={`absolute flex flex-col items-center justify-center rounded-full border-2
-              transition-all duration-300 hover:scale-110 hover:shadow-lg z-10
-              ${hasData ? "cursor-pointer" : "cursor-default"}
-              ${hasData ? node.bgColor : "bg-gray-50"}
-              ${hasData ? node.borderColor : "border-gray-200 border-dashed"}
-              ${hasData ? "" : "opacity-50"}`}
+          <button
+            type="button"
+            disabled={!isClickable}
+            onClick={handleClick}
+            onKeyDown={handleKeyDown}
+            className={getOrbitNodeClasses(hasData, node)}
             style={{
               width: NODE_RADIUS * 2,
               height: NODE_RADIUS * 2,
@@ -179,10 +205,8 @@ function OrbitNode({ node, position, index, onClick }: Readonly<{ node: MapNode;
               animationDelay: `${index * 80}ms`,
             }}
           >
-            <div className={hasData ? node.color : "text-gray-400"}>
-              {node.icon}
-            </div>
-            <span className={`text-[10px] font-semibold mt-0.5 ${hasData ? node.color : "text-gray-400"}`}>
+            <div className={colorClass}>{node.icon}</div>
+            <span className={`text-[10px] font-semibold mt-0.5 ${colorClass}`}>
               {node.label}
             </span>
             {hasData && (
@@ -190,23 +214,12 @@ function OrbitNode({ node, position, index, onClick }: Readonly<{ node: MapNode;
                 {node.count}
               </span>
             )}
-          </div>
+          </button>
         </TooltipTrigger>
         <TooltipContent className="z-[10002]" sideOffset={8}>
           <div className="text-sm">
             <p className="font-semibold">{node.label}</p>
-            {hasData ? (
-              <>
-                <p className="text-muted-foreground">
-                  {node.count} {node.count === 1 ? "item" : "items"}
-                </p>
-                {node.subtitle && (
-                  <p className="text-muted-foreground text-xs">{node.subtitle}</p>
-                )}
-              </>
-            ) : (
-              <p className="text-muted-foreground">No {node.label.toLowerCase()} yet</p>
-            )}
+            <OrbitNodeTooltip node={node} hasData={hasData} />
           </div>
         </TooltipContent>
       </Tooltip>

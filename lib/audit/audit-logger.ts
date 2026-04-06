@@ -84,7 +84,7 @@ export async function logAuditEvent(params: AuditEventParams): Promise<void> {
       }
     }
 
-    const metadata = { ...extraMetadata, ...(params.metadata || {}) }
+    const metadata = { ...extraMetadata, ...params.metadata }
 
     // ip_address is INET — pass null if empty/invalid to avoid cast errors
     const ipAddress = params.ipAddress && params.ipAddress !== "unknown" ? params.ipAddress : null

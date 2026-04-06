@@ -215,14 +215,73 @@ export async function GET(request: NextRequest) {
   }
 }
 
+// Shared helpers for POST/DELETE/PUT
+
+async function verifyNoteOwnership(noteId: string, userId: string): Promise<NextResponse | null> {
+  const noteResult = await db.query(
+    `SELECT id, user_id FROM personal_sticks WHERE id = $1`,
+    [noteId]
+  )
+  if (noteResult.rows.length === 0) return NextResponse.json({ error: "Not found" }, { status: 404 })
+  if (noteResult.rows[0].user_id !== userId) return NextResponse.json({ error: "Forbidden" }, { status: 403 })
+  return null
+}
+
+async function findMediaTab(noteId: string, tabType: string): Promise<NoteTabRow | undefined> {
+  const dbType: DbTabType = tabType === "videos" ? "video" : "images"
+  const findResult = tabType === "videos"
+    ? await db.query(
+        `SELECT id, tab_type, tab_data FROM personal_sticks_tabs
+         WHERE personal_stick_id = $1 AND tab_type IN ('video', 'videos')
+         LIMIT 1`,
+        [noteId]
+      )
+    : await db.query(
+        `SELECT id, tab_type, tab_data FROM personal_sticks_tabs
+         WHERE personal_stick_id = $1 AND tab_type = $2
+         LIMIT 1`,
+        [noteId, dbType]
+      )
+  return findResult.rows[0] as NoteTabRow | undefined
+}
+
+async function createMediaTab(noteId: string, userId: string, tabType: string): Promise<NoteTabRow | undefined> {
+  const storeType = tabType === "videos" ? "videos" : "images"
+  const insertResult = await db.query(
+    `INSERT INTO personal_sticks_tabs
+     (personal_stick_id, user_id, tab_type, tab_name, tab_content, tab_data, tab_order, created_at, updated_at)
+     VALUES ($1, $2, $3, $4, '', $5, $6, NOW(), NOW())
+     RETURNING *`,
+    [
+      noteId, userId, storeType,
+      storeType === "videos" ? "Videos" : "Images",
+      JSON.stringify(storeType === "videos" ? { videos: [] } : { images: [] }),
+      storeType === "videos" ? 1 : 2,
+    ]
+  )
+  return insertResult.rows[0]
+}
+
+function normalizeIncomingItems(tabType: string, items: any[]): (VideoInfo | ImageInfo)[] {
+  if (tabType === "videos") {
+    return items.map((it) => {
+      const asUrl = (it?.url as string) || (it?.embed_url as string) || ""
+      if (asUrl) return { ...extractVideoInfo(asUrl), ...it } as VideoInfo
+      return it as VideoInfo
+    })
+  }
+  return items.map((img: ImageInfo, idx: number) => {
+    const { id, ...imgWithoutId } = img
+    return { id: id || `image_${Date.now()}_${idx}`, ...imgWithoutId }
+  })
+}
+
 // POST /api/note-tabs  (merge media items)
 // Body: { noteId: string, tabType: 'videos'|'images', items: VideoInfo[] | ImageInfo[] }
 export async function POST(request: NextRequest) {
   try {
     const session = await getSession()
-    if (!session) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
-    }
+    if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     const userId = session.user.id
 
     const body = await request.json().catch(() => ({}))
@@ -234,101 +293,26 @@ export async function POST(request: NextRequest) {
     if (!["videos", "images"].includes(tabType)) return NextResponse.json({ error: "Invalid tabType" }, { status: 400 })
     if (!items.length) return NextResponse.json({ error: "No items to merge" }, { status: 400 })
 
-    // Verify ownership
-    const noteResult = await db.query(
-      `SELECT id, user_id FROM personal_sticks WHERE id = $1`,
-      [noteId]
-    )
+    const ownershipError = await verifyNoteOwnership(noteId, userId)
+    if (ownershipError) return ownershipError
 
-    if (noteResult.rows.length === 0) {
-      return NextResponse.json({ error: "Not found" }, { status: 404 })
-    }
+    let tab = await findMediaTab(noteId, tabType)
+    if (!tab) tab = await createMediaTab(noteId, userId, tabType)
+    if (!tab) return NextResponse.json({ error: "Failed to create or find tab" }, { status: 500 })
 
-    if (noteResult.rows[0].user_id !== userId) {
-      return NextResponse.json({ error: "Forbidden" }, { status: 403 })
-    }
-
-    const dbType: DbTabType = tabType === "videos" ? "video" : "images"
-
-    // Find existing tab (check both singular and plural forms for video tabs)
-    const findResult = tabType === "videos"
-      ? await db.query(
-          `SELECT id, tab_type, tab_data FROM personal_sticks_tabs
-           WHERE personal_stick_id = $1 AND tab_type IN ('video', 'videos')
-           LIMIT 1`,
-          [noteId]
-        )
-      : await db.query(
-          `SELECT id, tab_type, tab_data FROM personal_sticks_tabs
-           WHERE personal_stick_id = $1 AND tab_type = $2
-           LIMIT 1`,
-          [noteId, dbType]
-        )
-
-    let tab = findResult.rows[0] as NoteTabRow | undefined
-
-    if (!tab) {
-      // Create new tab — always store "videos" (plural) for consistency with notes/route.ts
-      const storeType = tabType === "videos" ? "videos" : "images"
-      const insertResult = await db.query(
-        `INSERT INTO personal_sticks_tabs
-         (personal_stick_id, user_id, tab_type, tab_name, tab_content, tab_data, tab_order, created_at, updated_at)
-         VALUES ($1, $2, $3, $4, '', $5, $6, NOW(), NOW())
-         RETURNING *`,
-        [
-          noteId,
-          userId,
-          storeType,
-          storeType === "videos" ? "Videos" : "Images",
-          JSON.stringify(storeType === "videos" ? { videos: [] } : { images: [] }),
-          storeType === "videos" ? 1 : 2,
-        ]
-      )
-      tab = insertResult.rows[0]
-    }
-
-    if (!tab) {
-      return NextResponse.json({ error: "Failed to create or find tab" }, { status: 500 })
-    }
-
-    const baseData = normalizeTabData(tab?.tab_data)
+    const baseData = normalizeTabData(tab.tab_data)
     const currentArr = (baseData?.[tabType] || []) as (VideoInfo | ImageInfo)[]
-
-    const normalizedIncoming: (VideoInfo | ImageInfo)[] =
-      tabType === "videos"
-        ? (items as any[]).map((it) => {
-            const asUrl = (it?.url as string) || (it?.embed_url as string) || ""
-            if (asUrl) {
-              return { ...extractVideoInfo(asUrl), ...it } as VideoInfo
-            }
-            return it as VideoInfo
-          })
-        : (items as ImageInfo[]).map((img, idx) => {
-            const { id, ...imgWithoutId } = img
-            return {
-              id: id || `image_${Date.now()}_${idx}`,
-              ...imgWithoutId,
-            }
-          })
-
-    const merged = dedupeByIdOrUrl([...(currentArr || []), ...normalizedIncoming])
-    const newTabData = { ...baseData, [tabType]: merged }
+    const normalizedIncoming = normalizeIncomingItems(tabType, items)
+    const merged = dedupeByIdOrUrl([...currentArr, ...normalizedIncoming])
 
     await db.query(
       `UPDATE personal_sticks_tabs
        SET tab_data = $1, updated_at = NOW()
        WHERE id = $2`,
-      [
-        JSON.stringify(newTabData),
-        tab.id,
-      ]
+      [JSON.stringify({ ...baseData, [tabType]: merged }), tab.id]
     )
 
-    return NextResponse.json({
-      success: true,
-      count: merged.length,
-      tabType,
-    })
+    return NextResponse.json({ success: true, count: merged.length, tabType })
   } catch (err) {
     console.error("POST /api/note-tabs error:", err)
     return NextResponse.json({ error: "Internal server error" }, { status: 500 })
@@ -340,9 +324,7 @@ export async function POST(request: NextRequest) {
 export async function DELETE(request: NextRequest) {
   try {
     const session = await getSession()
-    if (!session) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
-    }
+    if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     const userId = session.user.id
 
     const body = await request.json().catch(() => ({}))
@@ -354,53 +336,21 @@ export async function DELETE(request: NextRequest) {
     if (!["videos", "images"].includes(tabType)) return NextResponse.json({ error: "Invalid tabType" }, { status: 400 })
     if (!itemId) return NextResponse.json({ error: "Missing itemId" }, { status: 400 })
 
-    // Verify ownership
-    const noteResult = await db.query(
-      `SELECT id, user_id FROM personal_sticks WHERE id = $1`,
-      [noteId]
-    )
+    const ownershipError = await verifyNoteOwnership(noteId, userId)
+    if (ownershipError) return ownershipError
 
-    if (noteResult.rows.length === 0) {
-      return NextResponse.json({ error: "Not found" }, { status: 404 })
-    }
-
-    if (noteResult.rows[0].user_id !== userId) {
-      return NextResponse.json({ error: "Forbidden" }, { status: 403 })
-    }
-
-    const dbType: DbTabType = tabType === "videos" ? "video" : "images"
-
-    // Find existing tab (check both singular and plural forms for video tabs)
-    const findResult = tabType === "videos"
-      ? await db.query(
-          `SELECT id, tab_type, tab_data FROM personal_sticks_tabs
-           WHERE personal_stick_id = $1 AND tab_type IN ('video', 'videos')
-           LIMIT 1`,
-          [noteId]
-        )
-      : await db.query(
-          `SELECT id, tab_type, tab_data FROM personal_sticks_tabs
-           WHERE personal_stick_id = $1 AND tab_type = $2
-           LIMIT 1`,
-          [noteId, dbType]
-        )
-
-    const tab = findResult.rows[0]
+    const tab = await findMediaTab(noteId, tabType)
     if (!tab) return NextResponse.json({ success: true, count: 0 })
 
     const baseData = normalizeTabData(tab.tab_data)
     const currentArr = (baseData?.[tabType] || []) as (VideoInfo | ImageInfo)[]
-    const filtered = (currentArr || []).filter((i) => (i?.id || i?.url || "") !== itemId)
-    const newTabData = { ...baseData, [tabType]: filtered }
+    const filtered = currentArr.filter((i) => (i?.id || i?.url || "") !== itemId)
 
     await db.query(
       `UPDATE personal_sticks_tabs
        SET tab_data = $1, updated_at = NOW()
        WHERE id = $2`,
-      [
-        JSON.stringify(newTabData),
-        tab.id,
-      ]
+      [JSON.stringify({ ...baseData, [tabType]: filtered }), tab.id]
     )
 
     return NextResponse.json({ success: true, count: filtered.length })
@@ -426,19 +376,8 @@ export async function PUT(request: NextRequest) {
 
     if (!validateUUID(noteId)) return NextResponse.json({ error: "Invalid noteId" }, { status: 400 })
 
-    // Verify ownership
-    const noteResult = await db.query(
-      `SELECT id, user_id FROM personal_sticks WHERE id = $1`,
-      [noteId]
-    )
-
-    if (noteResult.rows.length === 0) {
-      return NextResponse.json({ error: "Not found" }, { status: 404 })
-    }
-
-    if (noteResult.rows[0].user_id !== userId) {
-      return NextResponse.json({ error: "Forbidden" }, { status: 403 })
-    }
+    const ownershipError = await verifyNoteOwnership(noteId, userId)
+    if (ownershipError) return ownershipError
 
     const dbType: DbTabType = "details"
 

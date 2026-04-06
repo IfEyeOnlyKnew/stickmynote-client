@@ -159,7 +159,7 @@ export function DiscussionTemplateProgress({
       </div>
 
       {/* Milestones (if any reached) */}
-      {progress.milestones.length > 0 && progress.milestones.some((m) => m.state.reached) && (
+      {progress.milestones.some((m) => m.state.reached) && (
         <div className="mt-3 pt-3 border-t border-gray-200">
           <div className="flex items-center gap-1 text-xs text-gray-600 mb-1.5">
             <Flag className="h-3 w-3" />

@@ -31,6 +31,49 @@ interface AuthMethodInfo {
   enforceOnly: boolean
 }
 
+// Extracted to reduce cognitive complexity of SignInForm
+function OrgMembershipAlert({ orgInfo }: Readonly<{ orgInfo: OrganizationInfo }>) {
+  if (orgInfo.isMember) {
+    return (
+      <span className="text-green-700">
+        You are a member of <strong>{orgInfo.organization?.name}</strong>
+      </span>
+    )
+  }
+
+  if (orgInfo.hasPendingRequest) {
+    return (
+      <span className="text-yellow-700">
+        Your access request to <strong>{orgInfo.organization?.name}</strong> is pending approval.
+      </span>
+    )
+  }
+
+  return (
+    <div className="text-yellow-700">
+      <p>
+        Organization <strong>{orgInfo.organization?.name}</strong> found for your domain.
+      </p>
+      {orgInfo.requiresApproval && <p className="text-sm mt-1">Membership approval is required to access.</p>}
+      {(orgInfo.supportContacts?.contact1?.email || orgInfo.supportContacts?.contact2?.email) && (
+        <div className="mt-2 text-sm">
+          <p className="font-medium">Contact support for access:</p>
+          {orgInfo.supportContacts.contact1?.email && (
+            <p>
+              {orgInfo.supportContacts.contact1.name || "Primary"}: {orgInfo.supportContacts.contact1.email}
+            </p>
+          )}
+          {orgInfo.supportContacts.contact2?.email && (
+            <p>
+              {orgInfo.supportContacts.contact2.name || "Secondary"}: {orgInfo.supportContacts.contact2.email}
+            </p>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
 interface SignInFormProps {
   onSubmit: (data: SignInData) => Promise<boolean>
   isLoading: boolean
@@ -46,39 +89,26 @@ export function SignInForm({ onSubmit, isLoading }: Readonly<SignInFormProps>) {
   const [ssoLoading, setSsoLoading] = useState(false)
 
   useEffect(() => {
+    const clearOrgState = () => {
+      setOrgInfo(null)
+      setAuthMethod(null)
+    }
+
     const checkOrganization = async () => {
-      if (!email?.includes("@")) {
-        setOrgInfo(null)
-        setAuthMethod(null)
-        return
-      }
+      if (!email?.includes("@")) return clearOrgState()
 
       const domain = email.split("@")[1]?.toLowerCase()
-      if (!domain || isPublicEmailDomain(email)) {
-        setOrgInfo(null)
-        setAuthMethod(null)
-        return
-      }
+      if (!domain || isPublicEmailDomain(email)) return clearOrgState()
 
       setCheckingOrg(true)
       try {
-        // Check org membership and auth method in parallel
         const [orgRes, authRes] = await Promise.all([
           fetch(`/api/organizations/check-membership?domain=${domain}`),
           fetch(`/api/auth/resolve-method?email=${encodeURIComponent(email)}`),
         ])
 
-        if (orgRes.ok) {
-          const data = await orgRes.json()
-          setOrgInfo(data)
-        }
-
-        if (authRes.ok) {
-          const data = await authRes.json()
-          setAuthMethod(data)
-        } else {
-          setAuthMethod(null)
-        }
+        setOrgInfo(orgRes.ok ? await orgRes.json() : null)
+        setAuthMethod(authRes.ok ? await authRes.json() : null)
       } catch (err) {
         console.error("Error checking organization:", err)
       } finally {
@@ -86,7 +116,7 @@ export function SignInForm({ onSubmit, isLoading }: Readonly<SignInFormProps>) {
       }
     }
 
-    const timeoutId = setTimeout(checkOrganization, 500) // Debounce
+    const timeoutId = setTimeout(checkOrganization, 500)
     return () => clearTimeout(timeoutId)
   }, [email])
 
@@ -145,39 +175,7 @@ export function SignInForm({ onSubmit, isLoading }: Readonly<SignInFormProps>) {
         <Alert className={orgInfo.isMember ? "border-green-200 bg-green-50" : "border-yellow-200 bg-yellow-50"}>
           <Building2 className={`h-4 w-4 ${orgInfo.isMember ? "text-green-600" : "text-yellow-600"}`} />
           <AlertDescription>
-            {orgInfo.isMember && (
-              <span className="text-green-700">
-                You are a member of <strong>{orgInfo.organization?.name}</strong>
-              </span>
-            )}
-            {!orgInfo.isMember && orgInfo.hasPendingRequest && (
-              <span className="text-yellow-700">
-                Your access request to <strong>{orgInfo.organization?.name}</strong> is pending approval.
-              </span>
-            )}
-            {!orgInfo.isMember && !orgInfo.hasPendingRequest && (
-              <div className="text-yellow-700">
-                <p>
-                  Organization <strong>{orgInfo.organization?.name}</strong> found for your domain.
-                </p>
-                {orgInfo.requiresApproval && <p className="text-sm mt-1">Membership approval is required to access.</p>}
-                {(orgInfo.supportContacts?.contact1?.email || orgInfo.supportContacts?.contact2?.email) && (
-                  <div className="mt-2 text-sm">
-                    <p className="font-medium">Contact support for access:</p>
-                    {orgInfo.supportContacts.contact1?.email && (
-                      <p>
-                        {orgInfo.supportContacts.contact1.name || "Primary"}: {orgInfo.supportContacts.contact1.email}
-                      </p>
-                    )}
-                    {orgInfo.supportContacts.contact2?.email && (
-                      <p>
-                        {orgInfo.supportContacts.contact2.name || "Secondary"}: {orgInfo.supportContacts.contact2.email}
-                      </p>
-                    )}
-                  </div>
-                )}
-              </div>
-            )}
+            <OrgMembershipAlert orgInfo={orgInfo} />
           </AlertDescription>
         </Alert>
       )}

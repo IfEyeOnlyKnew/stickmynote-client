@@ -48,6 +48,10 @@ export function ActivityFeedModal({ open, onOpenChange }: ActivityFeedModalProps
     }
   }
 
+  const handleStickDetailClose = (open: boolean) => {
+    if (!open) setSelectedStickId(null)
+  }
+
   const renderActivityCard = (activity: InferenceActivity) => (
     <Card
       key={activity.id}
@@ -151,9 +155,7 @@ export function ActivityFeedModal({ open, onOpenChange }: ActivityFeedModalProps
         <StickDetailModal
           stickId={selectedStickId}
           open={!!selectedStickId}
-          onOpenChange={(open) => {
-            if (!open) setSelectedStickId(null)
-          }}
+          onOpenChange={handleStickDetailClose}
         />
       )}
     </>

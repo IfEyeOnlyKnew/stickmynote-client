@@ -206,19 +206,15 @@ export async function generateText(options: GenerateTextOptions): Promise<{ text
   const config = getAIProviderConfig()
   const provider = getActiveProvider()
 
-  if (provider === "ollama" && config.ollama) {
-    return generateWithOllama(options, config.ollama)
+  const providerMap: Record<string, () => Promise<{ text: string; provider: AIProvider }>> = {
+    ollama: () => config.ollama ? generateWithOllama(options, config.ollama) : Promise.reject(new Error("Ollama not configured")),
+    azure: () => config.azure ? generateWithAzure(options, config.azure) : Promise.reject(new Error("Azure not configured")),
+    anthropic: () => config.anthropic ? generateWithAnthropic(options, config.anthropic) : Promise.reject(new Error("Anthropic not configured")),
   }
 
-  if (provider === "azure" && config.azure) {
-    return generateWithAzure(options, config.azure)
-  }
-
-  if (provider === "anthropic" && config.anthropic) {
-    return generateWithAnthropic(options, config.anthropic)
-  }
-
-  throw new Error("No AI provider available")
+  const handler = providerMap[provider]
+  if (!handler) throw new Error("No AI provider available")
+  return handler()
 }
 
 async function generateWithOllama(

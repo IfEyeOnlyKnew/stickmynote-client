@@ -179,6 +179,52 @@ function generateGuidedPrompts(
 }
 
 /**
+ * Check if a single milestone has been reached
+ */
+function isMilestoneReached(
+  milestone: Milestone,
+  checklist: Record<string, CategoryChecklistItem>,
+  replyCount: number,
+): boolean {
+  const triggersMet = milestone.triggerCategories.every(
+    (cat) => checklist[cat]?.count > 0
+  )
+  const minRepliesMet = !milestone.minReplies || replyCount >= milestone.minReplies
+  const requiredMet =
+    !milestone.requiredCategories ||
+    milestone.requiredCategories.every((cat) => checklist[cat]?.fulfilled)
+
+  return triggersMet && minRepliesMet && requiredMet
+}
+
+/**
+ * Build the state for a reached milestone
+ */
+function buildReachedState(
+  milestone: Milestone,
+  checklist: Record<string, CategoryChecklistItem>,
+): MilestoneState {
+  const state: MilestoneState = { reached: true }
+
+  const triggerTimestamps = milestone.triggerCategories
+    .map((cat) => checklist[cat]?.firstAt)
+    .filter((t): t is string => Boolean(t))
+    .sort((a, b) => a.localeCompare(b))
+
+  if (triggerTimestamps.length > 0) {
+    state.reachedAt = triggerTimestamps.at(-1)!
+  }
+
+  const lastTriggerCategory = milestone.triggerCategories.at(-1)!
+  const triggerReplyId = checklist[lastTriggerCategory]?.replyIds?.[0]
+  if (triggerReplyId) {
+    state.triggeredBy = triggerReplyId
+  }
+
+  return state
+}
+
+/**
  * Check milestone status based on current replies
  */
 function checkMilestones(
@@ -187,49 +233,12 @@ function checkMilestones(
   replies: Reply[]
 ): Array<Milestone & { state: MilestoneState }> {
   return milestones.map((milestone) => {
-    const state: MilestoneState = {
-      reached: false,
-    }
+    const reached = isMilestoneReached(milestone, checklist, replies.length)
+    const state = reached
+      ? buildReachedState(milestone, checklist)
+      : { reached: false }
 
-    // Check if all trigger categories have replies
-    const triggersMet = milestone.triggerCategories.every(
-      (cat) => checklist[cat]?.count > 0
-    )
-
-    // Check if minimum replies requirement is met
-    const minRepliesMet = !milestone.minReplies || replies.length >= milestone.minReplies
-
-    // Check if required categories are fulfilled (if specified)
-    const requiredMet =
-      !milestone.requiredCategories ||
-      milestone.requiredCategories.every((cat) => checklist[cat]?.fulfilled)
-
-    if (triggersMet && minRepliesMet && requiredMet) {
-      state.reached = true
-
-      // Find the earliest timestamp when the milestone was reached
-      const triggerTimestamps = milestone.triggerCategories
-        .map((cat) => checklist[cat]?.firstAt)
-        .filter((t): t is string => Boolean(t))
-        .sort((a, b) => a.localeCompare(b))
-
-      if (triggerTimestamps.length > 0) {
-        state.reachedAt = triggerTimestamps.at(-1)!
-      }
-
-      // Find the reply that triggered the milestone
-      const lastTriggerCategory =
-        milestone.triggerCategories.at(-1)!
-      const triggerReplyId = checklist[lastTriggerCategory]?.replyIds?.[0]
-      if (triggerReplyId) {
-        state.triggeredBy = triggerReplyId
-      }
-    }
-
-    return {
-      ...milestone,
-      state,
-    }
+    return { ...milestone, state }
   })
 }
 
