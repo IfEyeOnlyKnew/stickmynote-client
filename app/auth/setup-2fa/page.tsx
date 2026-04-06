@@ -5,98 +5,31 @@ import { useRouter, useSearchParams } from "next/navigation"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Alert, AlertDescription } from "@/components/ui/alert"
+import { AlertTriangle, ShieldAlert } from "lucide-react"
+import { useTwoFactorSetup } from "@/hooks/use-two-factor-setup"
 import {
-  InputOTP,
-  InputOTPGroup,
-  InputOTPSlot,
-  InputOTPSeparator,
-} from "@/components/ui/input-otp"
-import { AlertTriangle, Copy, Check, ShieldAlert } from "lucide-react"
-import { getCsrfToken } from "@/lib/client-csrf"
-import QRCode from "qrcode"
+  QRCodeDisplay,
+  OTPVerificationInput,
+  BackupCodesDisplay,
+  TwoFactorError,
+} from "@/components/auth/TwoFactorShared"
 
 export default function Setup2FAPage() {
   const router = useRouter()
   useSearchParams()
   const [step, setStep] = useState<"info" | "qr" | "verify" | "backup">("info")
-  const [qrCodeDataUrl, setQrCodeDataUrl] = useState<string>("")
-  const [secret, setSecret] = useState<string>("")
-  const [backupCodes, setBackupCodes] = useState<string[]>([])
-  const [code, setCode] = useState("")
-  const [error, setError] = useState("")
-  const [loading, setLoading] = useState(false)
-  const [copiedSecret, setCopiedSecret] = useState(false)
-  const [copiedCodes, setCopiedCodes] = useState(false)
+  const tfa = useTwoFactorSetup()
 
   // No grace period - setup is required immediately
 
   async function handleSetupStart() {
-    setLoading(true)
-    setError("")
-
-    try {
-      const csrfToken = await getCsrfToken()
-      const response = await fetch("/api/auth/2fa/setup", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "x-csrf-token": csrfToken,
-        },
-      })
-
-      if (!response.ok) {
-        const data = await response.json()
-        throw new Error(data.error || "Setup failed")
-      }
-
-      const data = await response.json()
-      setSecret(data.secret)
-      setBackupCodes(data.backupCodes)
-
-      // Generate QR code image
-      const qrDataUrl = await QRCode.toDataURL(data.qrCodeUri)
-      setQrCodeDataUrl(qrDataUrl)
-
-      setStep("qr")
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Setup failed")
-    } finally {
-      setLoading(false)
-    }
+    const success = await tfa.startSetup()
+    if (success) setStep("qr")
   }
 
   async function handleVerify() {
-    if (code.length !== 6) {
-      setError("Please enter a 6-digit code")
-      return
-    }
-
-    setLoading(true)
-    setError("")
-
-    try {
-      const csrfToken = await getCsrfToken()
-      const response = await fetch("/api/auth/2fa/verify-setup", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "x-csrf-token": csrfToken,
-        },
-        body: JSON.stringify({ code }),
-      })
-
-      if (!response.ok) {
-        const data = await response.json()
-        throw new Error(data.error || "Verification failed")
-      }
-
-      setStep("backup")
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Verification failed")
-      setCode("")
-    } finally {
-      setLoading(false)
-    }
+    const success = await tfa.verifyCode()
+    if (success) setStep("backup")
   }
 
   function handleComplete() {
@@ -104,18 +37,6 @@ export default function Setup2FAPage() {
   }
 
   // Skip is not allowed - 2FA setup is mandatory
-
-  function copySecret() {
-    navigator.clipboard.writeText(secret)
-    setCopiedSecret(true)
-    setTimeout(() => setCopiedSecret(false), 2000)
-  }
-
-  function copyBackupCodes() {
-    navigator.clipboard.writeText(backupCodes.join("\n"))
-    setCopiedCodes(true)
-    setTimeout(() => setCopiedCodes(false), 2000)
-  }
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-background px-4">
@@ -148,15 +69,11 @@ export default function Setup2FAPage() {
                 </ul>
               </div>
 
-              {error && (
-                <Alert variant="destructive">
-                  <AlertDescription>{error}</AlertDescription>
-                </Alert>
-              )}
+              <TwoFactorError error={tfa.error} />
             </CardContent>
             <CardFooter>
-              <Button onClick={handleSetupStart} disabled={loading} className="w-full">
-                {loading ? "Starting..." : "Get Started"}
+              <Button onClick={handleSetupStart} disabled={tfa.loading} className="w-full">
+                {tfa.loading ? "Starting..." : "Get Started"}
               </Button>
             </CardFooter>
           </>
@@ -171,27 +88,12 @@ export default function Setup2FAPage() {
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              {qrCodeDataUrl && (
-                <div className="flex justify-center">
-                  <img src={qrCodeDataUrl} alt="QR Code" className="w-64 h-64" />
-                </div>
-              )}
-
-              <div className="space-y-2">
-                <p className="text-sm font-medium">Or enter this code manually:</p>
-                <div className="flex items-center gap-2">
-                  <code className="flex-1 px-3 py-2 bg-muted rounded text-sm font-mono break-all">
-                    {secret}
-                  </code>
-                  <Button size="icon" variant="outline" onClick={copySecret}>
-                    {copiedSecret ? (
-                      <Check className="h-4 w-4" />
-                    ) : (
-                      <Copy className="h-4 w-4" />
-                    )}
-                  </Button>
-                </div>
-              </div>
+              <QRCodeDisplay
+                qrCodeDataUrl={tfa.qrCodeDataUrl}
+                secret={tfa.secret}
+                copiedSecret={tfa.copiedSecret}
+                onCopySecret={tfa.copySecret}
+              />
 
               <Button onClick={() => setStep("verify")} className="w-full">
                 Continue to Verification
@@ -209,27 +111,9 @@ export default function Setup2FAPage() {
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="flex justify-center">
-                <InputOTP maxLength={6} value={code} onChange={setCode}>
-                  <InputOTPGroup>
-                    <InputOTPSlot index={0} />
-                    <InputOTPSlot index={1} />
-                    <InputOTPSlot index={2} />
-                  </InputOTPGroup>
-                  <InputOTPSeparator />
-                  <InputOTPGroup>
-                    <InputOTPSlot index={3} />
-                    <InputOTPSlot index={4} />
-                    <InputOTPSlot index={5} />
-                  </InputOTPGroup>
-                </InputOTP>
-              </div>
+              <OTPVerificationInput code={tfa.code} onCodeChange={tfa.setCode} />
 
-              {error && (
-                <Alert variant="destructive">
-                  <AlertDescription>{error}</AlertDescription>
-                </Alert>
-              )}
+              <TwoFactorError error={tfa.error} />
 
               <div className="flex gap-2">
                 <Button variant="outline" onClick={() => setStep("qr")} className="flex-1">
@@ -237,10 +121,10 @@ export default function Setup2FAPage() {
                 </Button>
                 <Button
                   onClick={handleVerify}
-                  disabled={loading || code.length !== 6}
+                  disabled={tfa.loading || tfa.code.length !== 6}
                   className="flex-1"
                 >
-                  {loading ? "Verifying..." : "Verify and Enable"}
+                  {tfa.loading ? "Verifying..." : "Verify and Enable"}
                 </Button>
               </div>
             </CardContent>
@@ -256,38 +140,11 @@ export default function Setup2FAPage() {
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              <Alert>
-                <AlertTriangle className="h-4 w-4" />
-                <AlertDescription>
-                  These codes will only be shown once. Make sure to save them in a secure location.
-                </AlertDescription>
-              </Alert>
-
-              <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <p className="text-sm font-medium">Backup Codes:</p>
-                  <Button size="sm" variant="outline" onClick={copyBackupCodes}>
-                    {copiedCodes ? (
-                      <>
-                        <Check className="h-4 w-4 mr-2" />
-                        Copied
-                      </>
-                    ) : (
-                      <>
-                        <Copy className="h-4 w-4 mr-2" />
-                        Copy All
-                      </>
-                    )}
-                  </Button>
-                </div>
-                <div className="grid grid-cols-2 gap-2 p-4 bg-muted rounded-lg font-mono text-sm">
-                  {backupCodes.map((code) => (
-                    <div key={code} className="py-1">
-                      {code}
-                    </div>
-                  ))}
-                </div>
-              </div>
+              <BackupCodesDisplay
+                backupCodes={tfa.backupCodes}
+                copiedCodes={tfa.copiedCodes}
+                onCopyBackupCodes={tfa.copyBackupCodes}
+              />
 
               <Button onClick={handleComplete} className="w-full">
                 I've Saved My Backup Codes - Continue to App

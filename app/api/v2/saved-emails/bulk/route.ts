@@ -1,8 +1,13 @@
 // v2 Saved Emails Bulk API: production-quality, bulk operations
 import { type NextRequest } from 'next/server'
-import { db } from '@/lib/database/pg-client'
 import { getCachedAuthUser } from '@/lib/auth/cached-auth'
 import { handleApiError } from '@/lib/api/handle-api-error'
+import {
+  bulkDeleteSavedEmails,
+  bulkAddSavedEmails,
+  parseCSVEmails,
+  validateAndParseEmails,
+} from '@/lib/handlers/saved-emails-handler'
 
 export const dynamic = 'force-dynamic'
 
@@ -19,32 +24,16 @@ export async function DELETE(request: NextRequest) {
     if (!authResult.user) {
       return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401 })
     }
-    const user = authResult.user
 
     const body = await request.json()
     const { emailIds, teamId } = body
 
-    if (!emailIds || !Array.isArray(emailIds) || emailIds.length === 0) {
-      return new Response(JSON.stringify({ error: 'Invalid email IDs array' }), { status: 400 })
+    const result = await bulkDeleteSavedEmails(authResult.user, emailIds, teamId)
+    return new Response(JSON.stringify(result), { status: 200 })
+  } catch (error: any) {
+    if (error?.message === 'Invalid email IDs array') {
+      return new Response(JSON.stringify({ error: error.message }), { status: 400 })
     }
-
-    if (teamId) {
-      await db.query(
-        `DELETE FROM saved_emails WHERE user_id = $1 AND id = ANY($2) AND team_id = $3`,
-        [user.id, emailIds, teamId]
-      )
-    } else {
-      await db.query(
-        `DELETE FROM saved_emails WHERE user_id = $1 AND id = ANY($2)`,
-        [user.id, emailIds]
-      )
-    }
-
-    return new Response(
-      JSON.stringify({ success: true, deletedCount: emailIds.length }),
-      { status: 200 }
-    )
-  } catch (error) {
     return handleApiError(error)
   }
 }
@@ -68,11 +57,7 @@ export async function POST(request: NextRequest) {
     const uploadType = request.headers.get('x-upload-type')
     const isFormDataRequest = contentType?.includes('multipart/form-data') || uploadType === 'csv-file'
 
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
-    let emailsToInsert: { email: string; name: string | null }[] = []
-
     if (isFormDataRequest) {
-      // Handle CSV file upload
       const formData = await request.formData()
       const file = formData.get('file') as File
 
@@ -80,99 +65,30 @@ export async function POST(request: NextRequest) {
         return new Response(JSON.stringify({ error: 'No CSV file provided' }), { status: 400 })
       }
 
-      const fileText = await file.text()
-      if (!fileText.trim()) {
-        return new Response(JSON.stringify({ error: 'CSV file is empty' }), { status: 400 })
-      }
-
-      const lines = fileText.split(/\r?\n/).filter((line) => line.trim())
-      emailsToInsert = lines
-        .map((line) => {
-          const trimmedLine = line.trim().replaceAll(/^["']|["']$/g, '')
-          if (trimmedLine.includes(',')) {
-            const [email, name] = trimmedLine.split(',').map((s) => s.trim().replaceAll(/^["']|["']$/g, ''))
-            return { email: email?.toLowerCase(), name: name || null }
-          } else {
-            return { email: trimmedLine.toLowerCase(), name: null }
-          }
-        })
-        .filter((item) => item.email && emailRegex.test(item.email))
-    } else {
-      // Handle JSON bulk add
-      const body = await request.json()
-      const { emails } = body
-
-      if (!emails || !Array.isArray(emails) || emails.length === 0) {
-        return new Response(JSON.stringify({ error: 'Invalid emails array' }), { status: 400 })
-      }
-
-      emailsToInsert = emails
-        .filter((emailItem: any) => {
-          const email = typeof emailItem === 'string' ? emailItem : emailItem.email
-          return email && emailRegex.test(email)
-        })
-        .map((emailItem: any) => {
-          const email = typeof emailItem === 'string' ? emailItem : emailItem.email
-          const name = typeof emailItem === 'object' && emailItem.name ? emailItem.name : null
-          return { email: email.toLowerCase().trim(), name }
-        })
+      const parsedEmails = await parseCSVEmails(file)
+      const result = await bulkAddSavedEmails(user, parsedEmails, 'csv')
+      return new Response(JSON.stringify({ success: true, ...result }), { status: 200 })
     }
 
-    if (emailsToInsert.length === 0) {
-      return new Response(
-        JSON.stringify({ error: 'No valid email addresses found' }),
-        { status: 400 }
-      )
+    // Handle JSON bulk add
+    const body = await request.json()
+    const { emails } = body
+
+    if (!emails || !Array.isArray(emails) || emails.length === 0) {
+      return new Response(JSON.stringify({ error: 'Invalid emails array' }), { status: 400 })
     }
 
-    // Check for existing emails
-    const existingResult = await db.query(
-      `SELECT email FROM saved_emails WHERE user_id = $1 AND email = ANY($2) AND team_id IS NULL`,
-      [user.id, emailsToInsert.map((e) => e.email)]
-    )
-    const existingEmailSet = new Set(existingResult.rows.map((e: any) => e.email))
-
-    const newEmails = emailsToInsert.filter((e) => !existingEmailSet.has(e.email))
-    const duplicateCount = emailsToInsert.length - newEmails.length
-
-    if (newEmails.length === 0) {
-      return new Response(
-        JSON.stringify({
-          success: true,
-          added: 0,
-          skipped: duplicateCount,
-          message: 'All emails already exist in your saved list',
-        }),
-        { status: 200 }
-      )
+    const validEmails = validateAndParseEmails(emails)
+    if (validEmails.length === 0) {
+      return new Response(JSON.stringify({ error: 'No valid email addresses found' }), { status: 400 })
     }
 
-    // Insert new emails
-    const source = isFormDataRequest ? 'csv' : 'bulk'
-    const insertValues = newEmails
-      .map((_, i) => `($1, $${i * 3 + 2}, $${i * 3 + 3}, $${i * 3 + 4})`)
-      .join(', ')
-    const insertParams: any[] = [user.id]
-    newEmails.forEach((e) => {
-      insertParams.push(e.email, e.name, source)
-    })
-
-    const insertResult = await db.query(
-      `INSERT INTO saved_emails (user_id, email, name, source)
-       VALUES ${insertValues}
-       RETURNING *`,
-      insertParams
-    )
-
-    return new Response(
-      JSON.stringify({
-        success: true,
-        added: insertResult.rows.length,
-        skipped: duplicateCount,
-      }),
-      { status: 200 }
-    )
-  } catch (error) {
+    const result = await bulkAddSavedEmails(user, validEmails, 'bulk')
+    return new Response(JSON.stringify({ success: true, ...result }), { status: 200 })
+  } catch (error: any) {
+    if (error?.message?.includes('CSV') || error?.message?.includes('email')) {
+      return new Response(JSON.stringify({ error: error.message }), { status: 400 })
+    }
     return handleApiError(error)
   }
 }

@@ -1,38 +1,25 @@
-import { createDatabaseClient } from "@/lib/database/database-adapter"
 import { NextResponse } from "next/server"
 import { getOrgContext } from "@/lib/auth/get-org-context"
 import { getCachedAuthUser } from "@/lib/auth/cached-auth"
+import { getObjectives, createObjective } from "@/lib/handlers/calsticks-objectives-handler"
 
 export async function GET() {
   try {
-    const db = await createDatabaseClient()
     const authResult = await getCachedAuthUser()
     if (authResult.rateLimited) {
       return NextResponse.json({ error: "Rate limited" }, { status: 429, headers: { "Retry-After": "30" } })
     }
-    if (!authResult.userId) {
+    if (!authResult.user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
-    const user = { id: authResult.userId }
 
     const orgContext = await getOrgContext()
     if (!orgContext) {
       return NextResponse.json({ error: "No organization context" }, { status: 403 })
     }
 
-    const { data: objectives, error } = await db
-      .from("objectives")
-      .select(`
-        *,
-        key_results (*)
-      `)
-      .eq("user_id", user.id)
-      .eq("org_id", orgContext.orgId)
-      .order("created_at", { ascending: false })
-
-    if (error) throw error
-
-    return NextResponse.json(objectives || [])
+    const objectives = await getObjectives(authResult.user, orgContext)
+    return NextResponse.json(objectives)
   } catch (error) {
     console.error("Error fetching objectives:", error)
     return NextResponse.json({ error: "Failed to fetch objectives" }, { status: 500 })
@@ -41,15 +28,13 @@ export async function GET() {
 
 export async function POST(request: Request) {
   try {
-    const db = await createDatabaseClient()
     const authResult = await getCachedAuthUser()
     if (authResult.rateLimited) {
       return NextResponse.json({ error: "Rate limited" }, { status: 429, headers: { "Retry-After": "30" } })
     }
-    if (!authResult.userId) {
+    if (!authResult.user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
-    const user = { id: authResult.userId }
 
     const orgContext = await getOrgContext()
     if (!orgContext) {
@@ -57,34 +42,7 @@ export async function POST(request: Request) {
     }
 
     const body = await request.json()
-    const { key_results, ...objectiveData } = body
-
-    const { data: objective, error: objError } = await db
-      .from("objectives")
-      .insert({
-        ...objectiveData,
-        user_id: user.id,
-        org_id: orgContext.orgId,
-      })
-      .select()
-      .maybeSingle()
-
-    if (objError) throw objError
-
-    // Create key results with org_id
-    if (key_results && key_results.length > 0) {
-      const keyResultsData = key_results.map((kr: any) => ({
-        ...kr,
-        objective_id: objective?.id,
-        org_id: orgContext.orgId,
-        progress: Math.round(((kr.current_value - kr.start_value) / (kr.target_value - kr.start_value)) * 100),
-      }))
-
-      const { error: krError } = await db.from("key_results").insert(keyResultsData)
-
-      if (krError) throw krError
-    }
-
+    const objective = await createObjective(authResult.user, orgContext, body)
     return NextResponse.json(objective)
   } catch (error) {
     console.error("Error creating objective:", error)

@@ -1,6 +1,7 @@
 import { getCachedAuthUser, createRateLimitResponse, createUnauthorizedResponse } from "@/lib/auth/cached-auth"
 import { createDatabaseClient } from "@/lib/database/database-adapter"
 import { type NextRequest, NextResponse } from "next/server"
+import { buildInviteLink, sendInvitationEmail } from "@/lib/handlers/stick-members-handler"
 
 export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -72,27 +73,16 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
 
     // Send invitation email
     const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000"
-    const inviteLink = `${siteUrl}/pads/${stick.pad_id}?stick=${stickId}`
+    const inviteLink = buildInviteLink(siteUrl, stick.pad_id, stickId)
 
-    try {
-      await fetch(`${siteUrl}/api/send-email`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          to: email,
-          subject: `You've been invited to collaborate on "${stick.title}"`,
-          html: `
-            <h2>Stick Invitation</h2>
-            <p>You've been invited to collaborate on the stick "${stick.title}" in the pad "${pad?.title || "Untitled Pad"}".</p>
-            <p>Role: ${role}</p>
-            <p><a href="${inviteLink}">Click here to view the stick</a></p>
-          `,
-        }),
-      })
-    } catch (emailError) {
-      console.error("[v0] Error sending invitation email:", emailError)
-      // Don't fail the request if email fails
-    }
+    await sendInvitationEmail(
+      siteUrl,
+      email,
+      stick.title,
+      pad?.title || "Untitled Pad",
+      role,
+      inviteLink,
+    )
 
     return NextResponse.json({
       success: true,

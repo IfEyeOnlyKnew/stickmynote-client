@@ -2,8 +2,12 @@ import { NextResponse } from "next/server"
 import { createDatabaseClient } from "@/lib/database/database-adapter"
 import { getCachedAuthUser, createRateLimitResponse, createUnauthorizedResponse } from "@/lib/auth/cached-auth"
 import { getOrgContext } from "@/lib/auth/get-org-context"
-
-type Hyperlink = { url: string; title: string }
+import {
+  type Hyperlink,
+  formatHyperlinks,
+  deduplicateByUrl,
+  validateGenerateTagsInput,
+} from "@/lib/handlers/stick-generate-tags-handler"
 
 async function fetchSearXNGResults(query: string): Promise<Hyperlink[]> {
   const searxngUrl = process.env.SEARXNG_URL || "https://searx.be"
@@ -54,28 +58,11 @@ async function fetchHyperlinks(searchQueries: string[]): Promise<Hyperlink[]> {
     const searchPromises = searchQueries.slice(0, 3).map((query) => fetchSearXNGResults(query))
     const searchResults = await Promise.all(searchPromises)
 
-    // Deduplicate by URL
-    const seen = new Set<string>()
-    const uniqueResults: Hyperlink[] = []
-    for (const result of searchResults.flat()) {
-      if (!seen.has(result.url)) {
-        seen.add(result.url)
-        uniqueResults.push(result)
-      }
-    }
-
-    return uniqueResults.slice(0, 8)
+    return deduplicateByUrl(searchResults.flat()).slice(0, 8)
   } catch (error) {
     console.error("[Generate Links] Error fetching hyperlinks:", error)
     return []
   }
-}
-
-function formatHyperlinks(hyperlinks: Hyperlink[]): Hyperlink[] {
-  return hyperlinks.map((link) => ({
-    url: link.url.startsWith("http") ? link.url : `https://${link.url}`,
-    title: link.title,
-  }))
 }
 
 function generateSearchQueries(topic: string, content: string): string[] {
@@ -144,21 +131,6 @@ async function checkStickAccess(db: Awaited<ReturnType<typeof createDatabaseClie
   return { error: NextResponse.json({ error: "Unauthorized" }, { status: 403 }) }
 }
 
-function validateInput(topic: string | undefined, content: string | undefined): NextResponse | null {
-  if (!topic && !content) {
-    return NextResponse.json({ error: "Missing topic or content" }, { status: 400 })
-  }
-  return null
-}
-
-async function generateHyperlinks(topic: string, content: string): Promise<Hyperlink[]> {
-  const searchQueries = generateSearchQueries(topic, content)
-  console.log(`[Generate Links] Search queries: ${JSON.stringify(searchQueries)}`)
-
-  const hyperlinks = await fetchHyperlinks(searchQueries)
-  return formatHyperlinks(hyperlinks)
-}
-
 function handleError(error: unknown): NextResponse {
   if (error instanceof Error && error.message === "RATE_LIMITED") {
     return createRateLimitResponse()
@@ -180,8 +152,10 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
 
     console.log(`[Generate Links] Request for stick ${stickId}, topic: "${topic}"`)
 
-    const inputError = validateInput(topic, content)
-    if (inputError) return inputError
+    const inputError = validateGenerateTagsInput(topic, content)
+    if (inputError) {
+      return NextResponse.json({ error: inputError }, { status: 400 })
+    }
 
     const authResult = await validateAndAuthorize()
     if ("error" in authResult) return authResult.error
@@ -202,18 +176,22 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       return NextResponse.json({ error: "No content to analyze" }, { status: 400 })
     }
 
-    const hyperlinks = await generateHyperlinks(topic || "", content || "")
-    console.log(`[Generate Links] Generated ${hyperlinks.length} hyperlinks`)
+    const searchQueries = generateSearchQueries(topic || "", content || "")
+    console.log(`[Generate Links] Search queries: ${JSON.stringify(searchQueries)}`)
 
-    if (hyperlinks.length > 0) {
-      await saveStickHyperlinks(db, stickId, hyperlinks, user.id, orgContext.orgId)
+    const hyperlinks = await fetchHyperlinks(searchQueries)
+    const formattedHyperlinks = formatHyperlinks(hyperlinks)
+    console.log(`[Generate Links] Generated ${formattedHyperlinks.length} hyperlinks`)
+
+    if (formattedHyperlinks.length > 0) {
+      await saveStickHyperlinks(db, stickId, formattedHyperlinks, user.id, orgContext.orgId)
     }
 
     // Return both tags (empty) and hyperlinks for backward compatibility
     return NextResponse.json({
       tags: [],
-      hyperlinks,
-      message: hyperlinks.length === 0 ? "No links found for this content." : undefined,
+      hyperlinks: formattedHyperlinks,
+      message: formattedHyperlinks.length === 0 ? "No links found for this content." : undefined,
     })
   } catch (error) {
     return handleError(error)

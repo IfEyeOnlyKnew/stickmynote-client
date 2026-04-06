@@ -1,8 +1,8 @@
 // v2 Calsticks Custom Fields API: production-quality, manage custom field definitions
 import { type NextRequest } from 'next/server'
-import { db } from '@/lib/database/pg-client'
 import { getCachedAuthUser } from '@/lib/auth/cached-auth'
 import { handleApiError } from '@/lib/api/handle-api-error'
+import { getCustomFields, createCustomField, deleteCustomField } from '@/lib/handlers/calsticks-custom-fields-handler'
 
 export const dynamic = 'force-dynamic'
 
@@ -19,14 +19,9 @@ export async function GET(request: NextRequest) {
     if (!authResult.user) {
       return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401 })
     }
-    const user = authResult.user
 
-    const result = await db.query(
-      `SELECT * FROM custom_field_definitions WHERE owner_id = $1 ORDER BY created_at ASC`,
-      [user.id]
-    )
-
-    return new Response(JSON.stringify({ fields: result.rows }), { status: 200 })
+    const result = await getCustomFields(authResult.user)
+    return new Response(JSON.stringify(result), { status: 200 })
   } catch (error) {
     return handleApiError(error)
   }
@@ -45,19 +40,10 @@ export async function POST(request: NextRequest) {
     if (!authResult.user) {
       return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401 })
     }
-    const user = authResult.user
 
     const body = await request.json()
-    const { name, type, options, description, is_required, pad_id } = body
-
-    const result = await db.query(
-      `INSERT INTO custom_field_definitions (owner_id, name, type, options, description, is_required, pad_id)
-       VALUES ($1, $2, $3, $4, $5, $6, $7)
-       RETURNING *`,
-      [user.id, name, type, options ? JSON.stringify(options) : null, description, is_required, pad_id || null]
-    )
-
-    return new Response(JSON.stringify({ field: result.rows[0] }), { status: 200 })
+    const result = await createCustomField(authResult.user, body)
+    return new Response(JSON.stringify(result), { status: 200 })
   } catch (error) {
     return handleApiError(error)
   }
@@ -76,7 +62,6 @@ export async function DELETE(request: NextRequest) {
     if (!authResult.user) {
       return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401 })
     }
-    const user = authResult.user
 
     const { searchParams } = new URL(request.url)
     const id = searchParams.get('id')
@@ -85,12 +70,8 @@ export async function DELETE(request: NextRequest) {
       return new Response(JSON.stringify({ error: 'Missing id' }), { status: 400 })
     }
 
-    await db.query(
-      `DELETE FROM custom_field_definitions WHERE id = $1 AND owner_id = $2`,
-      [id, user.id]
-    )
-
-    return new Response(JSON.stringify({ success: true }), { status: 200 })
+    const result = await deleteCustomField(authResult.user, id)
+    return new Response(JSON.stringify(result), { status: 200 })
   } catch (error) {
     return handleApiError(error)
   }

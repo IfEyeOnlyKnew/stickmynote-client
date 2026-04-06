@@ -1,51 +1,19 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { createServiceDatabaseClient, type DatabaseClient } from "@/lib/database/database-adapter"
 import { getCachedAuthUser, createRateLimitResponse, createUnauthorizedResponse } from "@/lib/auth/cached-auth"
+import {
+  REPLY_SELECT_FIELDS,
+  DEFAULT_REPLY_COLOR,
+  parseReplyInput,
+  type UpdateReplyInput,
+  type DeleteReplyInput,
+} from "@/lib/handlers/stick-replies-handler"
 
 // Types
 interface AuthResult {
   user: { id: string; email?: string } | null
   rateLimited?: boolean
 }
-
-interface ReplyInput {
-  content: string
-  color?: string
-  parent_reply_id?: string | null
-  is_calstick?: boolean
-  calstick_date?: string | null
-  calstick_status?: string | null
-  calstick_priority?: string | null
-  calstick_parent_id?: string | null
-  calstick_assignee_id?: string | null
-}
-
-interface UpdateReplyInput {
-  replyId: string
-  content: string
-  color?: string
-}
-
-interface DeleteReplyInput {
-  replyId: string
-}
-
-// Constants
-const DEFAULT_REPLY_COLOR = "#fef3c7"
-
-const REPLY_SELECT_FIELDS = `
-  id,
-  content,
-  color,
-  created_at,
-  updated_at,
-  user_id,
-  parent_reply_id,
-  is_calstick,
-  calstick_date,
-  calstick_completed,
-  calstick_completed_at
-`
 
 // Helper to attach user data to replies
 async function attachUsersToReplies(db: DatabaseClient, replies: any[]) {
@@ -237,20 +205,10 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
 
     const { user } = auth
 
-    const body: ReplyInput = await request.json()
-    const {
-      content,
-      color = DEFAULT_REPLY_COLOR,
-      parent_reply_id = null,
-      is_calstick = false,
-      calstick_date = null,
-      calstick_status = null,
-      calstick_priority = null,
-      calstick_parent_id = null,
-      calstick_assignee_id = null,
-    } = body
+    const body = await request.json()
+    const replyInput = parseReplyInput(body)
 
-    if (!content?.trim()) {
+    if (!replyInput.content?.trim()) {
       return NextResponse.json({ error: "Content is required" }, { status: 400 })
     }
 
@@ -275,15 +233,15 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
         stick_id: stickId,
         user_id: user!.id,
         org_id: stick.orgId,
-        content: content.trim(),
-        color,
-        parent_reply_id,
-        is_calstick,
-        calstick_date,
-        calstick_status,
-        calstick_priority,
-        calstick_parent_id,
-        calstick_assignee_id,
+        content: replyInput.content.trim(),
+        color: replyInput.color,
+        parent_reply_id: replyInput.parent_reply_id,
+        is_calstick: replyInput.is_calstick,
+        calstick_date: replyInput.calstick_date,
+        calstick_status: replyInput.calstick_status,
+        calstick_priority: replyInput.calstick_priority,
+        calstick_parent_id: replyInput.calstick_parent_id,
+        calstick_assignee_id: replyInput.calstick_assignee_id,
       })
       .select(REPLY_SELECT_FIELDS)
       .single()

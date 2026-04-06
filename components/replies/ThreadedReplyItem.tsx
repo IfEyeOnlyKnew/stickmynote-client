@@ -9,35 +9,9 @@ import { getTimestampDisplay } from "@/utils/noteUtils"
 import { CalStickControls } from "./CalStickControls"
 import type React from "react"
 
-// Depth-based colors for visual distinction
-const DEPTH_COLORS = [
-  { line: "border-blue-400", bg: "bg-blue-50", text: "text-blue-600" },
-  { line: "border-green-400", bg: "bg-green-50", text: "text-green-600" },
-  { line: "border-purple-400", bg: "bg-purple-50", text: "text-purple-600" },
-  { line: "border-orange-400", bg: "bg-orange-50", text: "text-orange-600" },
-  { line: "border-pink-400", bg: "bg-pink-50", text: "text-pink-600" },
-  { line: "border-cyan-400", bg: "bg-cyan-50", text: "text-cyan-600" },
-]
+import { DEPTH_COLORS, getReplyDisplayName, getReplyInitials, type BaseReply } from "./reply-shared"
 
-export interface ThreadedReply {
-  id: string
-  content: string
-  color?: string
-  created_at: string
-  updated_at?: string
-  user_id?: string
-  user?: {
-    username?: string
-    email?: string
-    full_name?: string
-  }
-  is_calstick?: boolean
-  calstick_date?: string | null
-  calstick_completed?: boolean
-  calstick_completed_at?: string | null
-  parent_reply_id?: string | null
-  replies?: ThreadedReply[]
-}
+export type ThreadedReply = BaseReply
 
 interface ThreadedReplyItemProps {
   reply: ThreadedReply
@@ -98,15 +72,9 @@ export const ThreadedReplyItem = memo(function ThreadedReplyItem({
   const depthColors = DEPTH_COLORS[depth % DEPTH_COLORS.length]
   const indentPx = depth * 24 // 24px per level
 
-  const getDisplayName = useCallback((r: ThreadedReply) => {
-    if (!r.user) return "User"
-    return r.user.full_name || r.user.username || r.user.email || "User"
-  }, [])
+  const getDisplayName = useCallback((r: ThreadedReply) => getReplyDisplayName(r), [])
 
-  const getInitials = useCallback((r: ThreadedReply) => {
-    const name = getDisplayName(r)
-    return name.substring(0, 2).toUpperCase()
-  }, [getDisplayName])
+  const getInitials = useCallback((r: ThreadedReply) => getReplyInitials(r), [])
 
   const handleStartEdit = () => {
     setEditContent(reply.content)

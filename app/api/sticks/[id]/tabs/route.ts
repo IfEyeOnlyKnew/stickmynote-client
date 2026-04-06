@@ -5,63 +5,17 @@ import { validateUUID } from "@/lib/input-validation-enhanced"
 import { applyRateLimit } from "@/lib/rate-limiter-enhanced"
 import { getOrgContext } from "@/lib/auth/get-org-context"
 import { getCachedAuthUser, createRateLimitResponse, createUnauthorizedResponse } from "@/lib/auth/cached-auth"
+import {
+  type StickTabRow,
+  normalizeTabData,
+  getTabName,
+  getTabOrder,
+  applyNewItemToTabData,
+  getDefaultTabInserts,
+  TAB_SELECT_COLUMNS,
+} from "@/lib/handlers/stick-tabs-handler"
 
 export const dynamic = "force-dynamic"
-
-// Types
-type DbTabType = "main" | "details" | "images" | "videos" | "tags" | "links"
-
-interface VideoInfo {
-  id: string
-  url: string
-  title?: string
-  thumbnail?: string
-  duration?: string | number
-  platform?: "youtube" | "vimeo" | "rumble"
-  embed_id?: string
-  embed_url?: string
-  added_at?: string
-}
-
-interface ImageInfo {
-  id: string
-  url: string
-  title?: string
-  alt?: string
-  caption?: string
-  size?: number
-  type?: string
-  width?: number
-  height?: number
-}
-
-interface ExportLink {
-  url: string
-  filename: string
-  created_at: string
-  type: string
-}
-
-interface StickTabRow {
-  id: string
-  stick_id: string
-  tab_name: string
-  tab_type: DbTabType
-  tab_content: string
-  tab_data: {
-    videos?: VideoInfo[]
-    images?: ImageInfo[]
-    content?: string
-    metadata?: Record<string, string | number | boolean>
-    tags?: string[]
-    links?: string[]
-    exports?: ExportLink[]
-  } | null
-  tab_order: number
-  created_at: string
-  updated_at: string
-  org_id: string
-}
 
 // Utilities
 async function safeRateLimit(request: NextRequest, userId: string, action: string) {
@@ -72,55 +26,6 @@ async function safeRateLimit(request: NextRequest, userId: string, action: strin
     console.warn("Rate limit provider error, allowing request:", err)
     return true
   }
-}
-
-// Helper: Get tab name based on tab_type
-function getTabName(tabType: string): string {
-  const tabNames: Record<string, string> = {
-    videos: "Videos",
-    images: "Images",
-    tags: "Tags",
-    links: "Links",
-  }
-  return tabNames[tabType] || "Details"
-}
-
-// Helper: Get tab order based on tab_type
-function getTabOrder(tabType: string): number {
-  const tabOrders: Record<string, number> = {
-    videos: 1,
-    images: 2,
-    tags: 3,
-    links: 4,
-  }
-  return tabOrders[tabType] ?? 5
-}
-
-function normalizeTabData(input: any): {
-  videos?: VideoInfo[]
-  images?: ImageInfo[]
-  content?: string
-  metadata?: Record<string, string | number | boolean>
-  tags?: string[]
-  links?: string[]
-  exports?: ExportLink[]
-  [k: string]: any
-} {
-  let obj: any = input
-  try {
-    if (obj && typeof obj === "string") {
-      obj = JSON.parse(obj)
-    }
-  } catch {
-    obj = {}
-  }
-  if (!obj || typeof obj !== "object") obj = {}
-  if (obj.videos && !Array.isArray(obj.videos)) obj.videos = []
-  if (obj.images && !Array.isArray(obj.images)) obj.images = []
-  if (obj.tags && !Array.isArray(obj.tags)) obj.tags = []
-  if (obj.links && !Array.isArray(obj.links)) obj.links = []
-  if (obj.exports && !Array.isArray(obj.exports)) obj.exports = []
-  return obj
 }
 
 async function checkStickPermissions(
@@ -229,7 +134,7 @@ export async function GET(request: NextRequest, context: { params: Promise<{ id:
 
     const { data, error } = await db
       .from("paks_pad_stick_tabs")
-      .select("id, stick_id, tab_name, tab_type, tab_content, tab_data, tab_order, created_at, updated_at, org_id")
+      .select(TAB_SELECT_COLUMNS)
       .eq("stick_id", stickId)
       .eq("org_id", stickOrgId)
       .order("tab_order", { ascending: true })
@@ -245,33 +150,12 @@ export async function GET(request: NextRequest, context: { params: Promise<{ id:
     }))
 
     if (normalized.length === 0) {
-      const defaultTabs = [
-        {
-          stick_id: stickId,
-          user_id: user.id,
-          org_id: stickOrgId,
-          tab_name: "Main",
-          tab_type: "main" as DbTabType,
-          tab_content: "",
-          tab_data: {},
-          tab_order: 0,
-        },
-        {
-          stick_id: stickId,
-          user_id: user.id,
-          org_id: stickOrgId,
-          tab_name: "Details",
-          tab_type: "details" as DbTabType,
-          tab_content: "",
-          tab_data: {},
-          tab_order: 1,
-        },
-      ]
+      const defaultTabs = getDefaultTabInserts(stickId, user.id, stickOrgId)
 
       const { data: createdTabs, error: createError } = await db
         .from("paks_pad_stick_tabs")
         .insert(defaultTabs)
-        .select("id, stick_id, tab_name, tab_type, tab_content, tab_data, tab_order, created_at, updated_at, org_id")
+        .select(TAB_SELECT_COLUMNS)
 
       if (createError) {
         console.error("Error creating default tabs:", createError)
@@ -288,55 +172,6 @@ export async function GET(request: NextRequest, context: { params: Promise<{ id:
     console.error("GET /api/sticks/[id]/tabs error:", err)
     return NextResponse.json({ error: "Internal server error" }, { status: 500 })
   }
-}
-
-// Helper: Create tab item based on type
-function createTabItem(
-  tabType: string,
-  url: string | undefined,
-  title: string | undefined,
-  type: string | undefined,
-  thumbnail: string | undefined,
-  metadata: Record<string, any> | undefined,
-): { key: string; item: any } | null {
-  const now = Date.now()
-  const isoNow = new Date().toISOString()
-
-  if (tabType === "videos" && url) {
-    return {
-      key: "videos",
-      item: {
-        id: `video_${now}`,
-        url,
-        title: title || `Video ${now}`,
-        thumbnail,
-        added_at: isoNow,
-        ...metadata,
-      } as VideoInfo,
-    }
-  }
-
-  if (tabType === "images" && url) {
-    return {
-      key: "images",
-      item: {
-        id: `image_${now}`,
-        url,
-        title: title || `Image ${now}`,
-        ...metadata,
-      } as ImageInfo,
-    }
-  }
-
-  if (tabType === "tags" && type) {
-    return { key: "tags", item: type }
-  }
-
-  if (tabType === "links" && url) {
-    return { key: "links", item: url }
-  }
-
-  return null
 }
 
 // POST /api/sticks/[id]/tabs
@@ -396,13 +231,8 @@ export async function POST(request: NextRequest, context: { params: Promise<{ id
 
     const tabData = normalizeTabData(existingTab?.tab_data || {})
 
-    // Add new item based on type using helper
-    const newItem = createTabItem(tab_type, url, title, type, thumbnail, metadata)
-    if (newItem) {
-      const key = newItem.key as keyof typeof tabData
-      const currentItems = (tabData[key] as any[]) || []
-      ;(tabData as any)[key] = [...currentItems, newItem.item]
-    }
+    // Add new item based on type using shared helper
+    applyNewItemToTabData(tabData, { tab_type, type, url, title, thumbnail, metadata })
 
     if (existingTab) {
       const { data: updatedTab, error } = await db
@@ -515,7 +345,7 @@ export async function PUT(request: NextRequest, context: { params: Promise<{ id:
         })
         .eq("id", existingTab.id)
         .eq("org_id", stickOrgId)
-        .select("id, stick_id, tab_name, tab_type, tab_content, tab_data, tab_order, created_at, updated_at, org_id")
+        .select(TAB_SELECT_COLUMNS)
         .single()
 
       if (error) {
@@ -537,7 +367,7 @@ export async function PUT(request: NextRequest, context: { params: Promise<{ id:
           tab_data: normalizeTabData(tab_data),
           tab_order: getTabOrder(tab_type),
         })
-        .select("id, stick_id, tab_name, tab_type, tab_content, tab_data, tab_order, created_at, updated_at, org_id")
+        .select(TAB_SELECT_COLUMNS)
         .single()
 
       if (error) {

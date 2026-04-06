@@ -4,23 +4,16 @@ import { db } from '@/lib/database/pg-client'
 import { getCachedAuthUser } from '@/lib/auth/cached-auth'
 import { handleApiError } from '@/lib/api/handle-api-error'
 import { isAIAvailable, generateText } from '@/lib/ai/ai-provider'
+import {
+  type Hyperlink,
+  formatHyperlinks,
+  validateGenerateTagsInput,
+  buildNoteText,
+  parseJsonArrayResponse,
+} from '@/lib/handlers/stick-generate-tags-handler'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 30
-
-type Hyperlink = { url: string; title: string }
-
-function parseJsonArrayResponse(response: string, fallback: string[] = []): string[] {
-  try {
-    const parsed = JSON.parse(response.trim())
-    if (!Array.isArray(parsed)) return fallback
-    return parsed
-      .filter((item) => typeof item === 'string' && item.trim().length > 0)
-      .map((item) => item.trim())
-  } catch {
-    return fallback
-  }
-}
 
 function parseTags(response: string): string[] {
   const tags = parseJsonArrayResponse(response)
@@ -82,6 +75,83 @@ async function fetchHyperlinks(searchQueries: string[]): Promise<Hyperlink[]> {
   return searchResults.flat().slice(0, 8)
 }
 
+// Auth + ownership guard: returns user or an error Response
+async function authenticateAndCheckOwnership(
+  stickId: string,
+): Promise<{ user: any } | { error: Response }> {
+  const authResult = await getCachedAuthUser()
+  if (authResult.rateLimited) {
+    return {
+      error: new Response(
+        JSON.stringify({ error: 'Rate limit exceeded. Please try again in a moment.' }),
+        { status: 429, headers: { 'Retry-After': '30' } }
+      ),
+    }
+  }
+  if (!authResult.user) {
+    return { error: new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401 }) }
+  }
+
+  const stickResult = await db.query(
+    `SELECT user_id FROM paks_pad_sticks WHERE id = $1`,
+    [stickId]
+  )
+
+  if (stickResult.rows.length === 0) {
+    return { error: new Response(JSON.stringify({ error: 'Stick not found' }), { status: 404 }) }
+  }
+
+  if (stickResult.rows[0].user_id !== authResult.user.id) {
+    return { error: new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 403 }) }
+  }
+
+  return { user: authResult.user }
+}
+
+async function saveTags(stickId: string, userId: string, tags: string[]): Promise<void> {
+  if (tags.length === 0) return
+
+  const existingTagsTab = await db.query(
+    `SELECT id FROM paks_pad_stick_tabs WHERE stick_id = $1 AND tab_type = 'tags'`,
+    [stickId]
+  )
+
+  if (existingTagsTab.rows.length > 0) {
+    await db.query(
+      `UPDATE paks_pad_stick_tabs SET tab_data = $1, updated_at = NOW() WHERE id = $2`,
+      [JSON.stringify({ tags }), existingTagsTab.rows[0].id]
+    )
+  } else {
+    await db.query(
+      `INSERT INTO paks_pad_stick_tabs (stick_id, user_id, tab_name, tab_type, tab_content, tab_data, tab_order)
+       VALUES ($1, $2, 'Tags', 'tags', '', $3, 97)`,
+      [stickId, userId, JSON.stringify({ tags })]
+    )
+  }
+}
+
+async function saveHyperlinks(stickId: string, userId: string, hyperlinks: Hyperlink[]): Promise<void> {
+  if (hyperlinks.length === 0) return
+
+  const existingLinksTab = await db.query(
+    `SELECT id FROM paks_pad_stick_tabs WHERE stick_id = $1 AND tab_type = 'links'`,
+    [stickId]
+  )
+
+  if (existingLinksTab.rows.length > 0) {
+    await db.query(
+      `UPDATE paks_pad_stick_tabs SET tab_data = $1, updated_at = NOW() WHERE id = $2`,
+      [JSON.stringify({ hyperlinks }), existingLinksTab.rows[0].id]
+    )
+  } else {
+    await db.query(
+      `INSERT INTO paks_pad_stick_tabs (stick_id, user_id, tab_name, tab_type, tab_content, tab_data, tab_order)
+       VALUES ($1, $2, 'Links', 'links', '', $3, 98)`,
+      [stickId, userId, JSON.stringify({ hyperlinks })]
+    )
+  }
+}
+
 // POST /api/v2/sticks/[id]/generate-tags - Generate AI tags and hyperlinks
 export async function POST(
   request: NextRequest,
@@ -91,44 +161,20 @@ export async function POST(
     const { id: stickId } = await params
     const { topic, content } = await request.json()
 
-    if (!topic && !content) {
-      return new Response(JSON.stringify({ error: 'Missing topic or content' }), { status: 400 })
+    const inputError = validateGenerateTagsInput(topic, content)
+    if (inputError) {
+      return new Response(JSON.stringify({ error: inputError }), { status: 400 })
     }
 
     if (!isAIAvailable()) {
       return new Response(JSON.stringify({ error: 'AI service not configured' }), { status: 500 })
     }
 
-    const authResult = await getCachedAuthUser()
-    if (authResult.rateLimited) {
-      return new Response(
-        JSON.stringify({ error: 'Rate limit exceeded. Please try again in a moment.' }),
-        { status: 429, headers: { 'Retry-After': '30' } }
-      )
-    }
-    if (!authResult.user) {
-      return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401 })
-    }
-    const user = authResult.user
+    const authGuard = await authenticateAndCheckOwnership(stickId)
+    if ('error' in authGuard) return authGuard.error
+    const user = authGuard.user
 
-    // Check ownership
-    const stickResult = await db.query(
-      `SELECT user_id FROM paks_pad_sticks WHERE id = $1`,
-      [stickId]
-    )
-
-    if (stickResult.rows.length === 0) {
-      return new Response(JSON.stringify({ error: 'Stick not found' }), { status: 404 })
-    }
-
-    if (stickResult.rows[0].user_id !== user.id) {
-      return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 403 })
-    }
-
-    const noteText = `${topic || ''} ${content || ''}`.trim()
-    if (!noteText) {
-      return new Response(JSON.stringify({ error: 'No content to analyze' }), { status: 400 })
-    }
+    const noteText = buildNoteText(topic, content)
 
     // Generate tags
     const tagsResult = await generateText({
@@ -154,52 +200,11 @@ Example response format: ["react hooks tutorial", "javascript best practices 202
 
     // Fetch hyperlinks
     const hyperlinks = await fetchHyperlinks(searchQueries)
-    const formattedHyperlinks = hyperlinks.map((link) => ({
-      url: link.url.startsWith('http') ? link.url : `https://${link.url}`,
-      title: link.title,
-    }))
+    const formattedHyperlinks = formatHyperlinks(hyperlinks)
 
-    // Save tags
-    if (tags.length > 0) {
-      const existingTagsTab = await db.query(
-        `SELECT id FROM paks_pad_stick_tabs WHERE stick_id = $1 AND tab_type = 'tags'`,
-        [stickId]
-      )
-
-      if (existingTagsTab.rows.length > 0) {
-        await db.query(
-          `UPDATE paks_pad_stick_tabs SET tab_data = $1, updated_at = NOW() WHERE id = $2`,
-          [JSON.stringify({ tags }), existingTagsTab.rows[0].id]
-        )
-      } else {
-        await db.query(
-          `INSERT INTO paks_pad_stick_tabs (stick_id, user_id, tab_name, tab_type, tab_content, tab_data, tab_order)
-           VALUES ($1, $2, 'Tags', 'tags', '', $3, 97)`,
-          [stickId, user.id, JSON.stringify({ tags })]
-        )
-      }
-    }
-
-    // Save hyperlinks
-    if (formattedHyperlinks.length > 0) {
-      const existingLinksTab = await db.query(
-        `SELECT id FROM paks_pad_stick_tabs WHERE stick_id = $1 AND tab_type = 'links'`,
-        [stickId]
-      )
-
-      if (existingLinksTab.rows.length > 0) {
-        await db.query(
-          `UPDATE paks_pad_stick_tabs SET tab_data = $1, updated_at = NOW() WHERE id = $2`,
-          [JSON.stringify({ hyperlinks: formattedHyperlinks }), existingLinksTab.rows[0].id]
-        )
-      } else {
-        await db.query(
-          `INSERT INTO paks_pad_stick_tabs (stick_id, user_id, tab_name, tab_type, tab_content, tab_data, tab_order)
-           VALUES ($1, $2, 'Links', 'links', '', $3, 98)`,
-          [stickId, user.id, JSON.stringify({ hyperlinks: formattedHyperlinks })]
-        )
-      }
-    }
+    // Save tags and hyperlinks
+    await saveTags(stickId, user.id, tags)
+    await saveHyperlinks(stickId, user.id, formattedHyperlinks)
 
     return new Response(
       JSON.stringify({

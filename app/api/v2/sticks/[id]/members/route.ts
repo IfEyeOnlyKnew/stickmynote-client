@@ -3,6 +3,7 @@ import { type NextRequest } from 'next/server'
 import { db } from '@/lib/database/pg-client'
 import { getCachedAuthUser } from '@/lib/auth/cached-auth'
 import { handleApiError } from '@/lib/api/handle-api-error'
+import { buildInviteLink, sendInvitationEmail } from '@/lib/handlers/stick-members-handler'
 
 export const dynamic = 'force-dynamic'
 
@@ -123,26 +124,16 @@ export async function POST(
 
     // Send invitation email
     const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'
-    const inviteLink = `${siteUrl}/pads/${stick.pad_id}?stick=${stickId}`
+    const inviteLink = buildInviteLink(siteUrl, stick.pad_id, stickId)
 
-    try {
-      await fetch(`${siteUrl}/api/send-email`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          to: email,
-          subject: `You've been invited to collaborate on "${stick.topic}"`,
-          html: `
-            <h2>Stick Invitation</h2>
-            <p>You've been invited to collaborate on the stick "${stick.topic}" in the pad "${stick.pad_title || 'Untitled Pad'}".</p>
-            <p>Role: ${role}</p>
-            <p><a href="${inviteLink}">Click here to view the stick</a></p>
-          `,
-        }),
-      })
-    } catch (emailError) {
-      console.error('Error sending invitation email:', emailError)
-    }
+    await sendInvitationEmail(
+      siteUrl,
+      email,
+      stick.topic,
+      stick.pad_title || 'Untitled Pad',
+      role,
+      inviteLink,
+    )
 
     return new Response(
       JSON.stringify({ success: true, message: 'Member added successfully', inviteLink }),

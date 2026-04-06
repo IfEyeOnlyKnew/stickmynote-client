@@ -23,67 +23,17 @@ const CollaborativeReplyForm = dynamic(
   }
 )
 import { toast } from "sonner"
+import { buildReplyTree as buildReplyTreeBase, sortNestedReplies, type BaseReply } from "@/components/replies/reply-shared"
 
-interface Reply {
-  id: string
-  content: string
-  color?: string
-  created_at: string
-  updated_at?: string
-  user_id?: string
-  user?: {
-    username?: string
-    email?: string
-    full_name?: string
-  }
-  is_calstick?: boolean
-  calstick_date?: string | null
-  calstick_completed?: boolean
-  calstick_completed_at?: string | null
-  parent_reply_id?: string | null
-  replies?: Reply[]
-}
+type Reply = BaseReply
 
-// Build a tree structure from flat replies array
+// Build a tree structure from flat replies array (oldest-first root sort for UnifiedReplies)
 function buildReplyTree(replies: Reply[]): Reply[] {
-  const replyMap = new Map<string, Reply>()
-  const rootReplies: Reply[] = []
-
-  // First pass: create map with empty replies array
-  replies.forEach((reply) => {
-    replyMap.set(reply.id, { ...reply, replies: [] })
-  })
-
-  // Second pass: build tree by parent_reply_id
-  replies.forEach((reply) => {
-    const replyWithChildren = replyMap.get(reply.id)!
-    if (reply.parent_reply_id && replyMap.has(reply.parent_reply_id)) {
-      const parent = replyMap.get(reply.parent_reply_id)!
-      parent.replies = parent.replies || []
-      parent.replies.push(replyWithChildren)
-    } else {
-      rootReplies.push(replyWithChildren)
-    }
-  })
-
+  const rootReplies = buildReplyTreeBase(replies)
   // All replies: oldest first (natural conversation flow, like chat)
-  rootReplies.sort((a, b) => {
-    const timeA = new Date(a.created_at).getTime()
-    const timeB = new Date(b.created_at).getTime()
-    return timeA - timeB // Oldest first (smaller timestamp first)
-  })
-
+  rootReplies.sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime())
   // Nested replies: also oldest first
-  const sortNestedReplies = (reps: Reply[]) => {
-    reps.forEach((reply) => {
-      if (reply.replies && reply.replies.length > 0) {
-        reply.replies.sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime())
-        sortNestedReplies(reply.replies)
-      }
-    })
-  }
   sortNestedReplies(rootReplies)
-
   return rootReplies
 }
 

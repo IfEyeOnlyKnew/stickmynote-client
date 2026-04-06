@@ -1,48 +1,34 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { getSession } from "@/lib/auth/local-auth"
-import { db } from "@/lib/database/pg-client"
 import { validateUUID } from "@/lib/input-validation-enhanced"
 import { sanitizeRequestBody } from "@/lib/html-sanitizer"
-import { checkDLPPolicy } from "@/lib/dlp/policy-checker"
-import { isUnderLegalHold } from "@/lib/legal-hold/check-hold"
+import {
+  getNoteWithDetails,
+  checkNoteDLP,
+  updateNoteFields,
+  deleteNoteById,
+} from "@/lib/handlers/notes-handler"
 
 export const runtime = "nodejs"
 export const dynamic = "force-dynamic"
 
-function extractTabData(tabs: any[]) {
-  let details = ""
-  let videos: any[] = []
-  let images: any[] = []
-  let hyperlinks: { url: string; title?: string }[] = []
+// ============================================================================
+// Auth + validation helper shared by all methods
+// ============================================================================
 
-  if (!tabs || !Array.isArray(tabs)) return { details, videos, images, hyperlinks }
-
-  for (const tab of tabs) {
-    if (tab.tab_type === "details" && tab.tab_data?.content) {
-      details = tab.tab_data.content
-    }
-    if ((tab.tab_type === "videos" || tab.tab_type === "video") && tab.tab_data) {
-      videos = Array.isArray(tab.tab_data) ? tab.tab_data : []
-    }
-    if (tab.tab_type === "images" && tab.tab_data) {
-      images = Array.isArray(tab.tab_data) ? tab.tab_data : []
-    }
-    if (tab.tab_name === "Tags" && tab.tags) {
-      hyperlinks = parseHyperlinks(tab.tags)
-    }
+async function authenticateAndValidate(context: { params: Promise<{ id: string }> }) {
+  const session = await getSession()
+  if (!session?.user) {
+    return { error: NextResponse.json({ error: "Unauthorized" }, { status: 401 }) }
   }
 
-  return { details, videos, images, hyperlinks }
-}
-
-function parseHyperlinks(tags: any): { url: string; title?: string }[] {
-  try {
-    if (Array.isArray(tags)) return tags
-    if (typeof tags === "string") return JSON.parse(tags || "[]")
-    return []
-  } catch {
-    return []
+  const params = await context.params
+  const noteId = params.id
+  if (!validateUUID(noteId)) {
+    return { error: NextResponse.json({ error: "Invalid note ID" }, { status: 400 }) }
   }
+
+  return { session, noteId }
 }
 
 // ============================================================================
@@ -51,56 +37,15 @@ function parseHyperlinks(tags: any): { url: string; title?: string }[] {
 
 export async function GET(request: NextRequest, context: { params: Promise<{ id: string }> }) {
   try {
-    const session = await getSession()
+    const auth = await authenticateAndValidate(context)
+    if ("error" in auth) return auth.error
 
-    if (!session?.user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
-    }
-
-    const params = await context.params
-    const noteId = params.id
-    if (!validateUUID(noteId)) {
-      return NextResponse.json({ error: "Invalid note ID" }, { status: 400 })
-    }
-
-    // Fetch the main note
-    const noteResult = await db.query(
-      `SELECT * FROM personal_sticks WHERE id = $1 AND user_id = $2`,
-      [noteId, session.user.id]
-    )
-
-    if (noteResult.rows.length === 0) {
+    const note = await getNoteWithDetails(auth.noteId, auth.session.user.id)
+    if (!note) {
       return NextResponse.json({ error: "Note not found" }, { status: 404 })
     }
 
-    const note = noteResult.rows[0]
-
-    // Fetch tabs data
-    const tabsResult = await db.query(
-      `SELECT tab_type, tab_data, tab_name, tags FROM personal_sticks_tabs WHERE personal_stick_id = $1`,
-      [noteId]
-    )
-    const noteTabs = tabsResult.rows
-
-    // Parse tabs for details, videos, images, hyperlinks
-    const { details, videos, images, hyperlinks } = extractTabData(noteTabs)
-
-    // Fetch tags data
-    const tagsResult = await db.query(
-      `SELECT tag_title, tag_content, tag_order FROM personal_sticks_tags WHERE personal_stick_id = $1 ORDER BY tag_order ASC`,
-      [noteId]
-    )
-    const tags = (tagsResult.rows || []).map((t: { tag_title: string }) => t.tag_title)
-
-    // Return note with all related data
-    return NextResponse.json({
-      ...note,
-      details,
-      tags,
-      images,
-      videos,
-      hyperlinks,
-    })
+    return NextResponse.json(note)
   } catch (err) {
     console.error("GET /api/notes/[id] error:", err)
     return NextResponse.json({ error: "Internal server error" }, { status: 500 })
@@ -113,75 +58,23 @@ export async function GET(request: NextRequest, context: { params: Promise<{ id:
 
 export async function PUT(request: NextRequest, context: { params: Promise<{ id: string }> }) {
   try {
-    const session = await getSession()
-
-    if (!session?.user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
-    }
-
-    const params = await context.params
-    const noteId = params.id
-    if (!validateUUID(noteId)) {
-      return NextResponse.json({ error: "Invalid note ID" }, { status: 400 })
-    }
+    const auth = await authenticateAndValidate(context)
+    if ("error" in auth) return auth.error
 
     const body = await request.json()
     const sanitizedBody = sanitizeRequestBody(body, ["topic", "content"])
 
-    // DLP check when sharing a note
-    if (sanitizedBody.is_shared === true) {
-      const noteForDLP = await db.query(
-        `SELECT org_id, topic, content, sensitivity_level FROM personal_sticks WHERE id = $1 AND user_id = $2`,
-        [noteId, session.user.id],
-      )
-      if (noteForDLP.rows.length > 0) {
-        const note = noteForDLP.rows[0]
-        const dlpResult = await checkDLPPolicy({
-          orgId: note.org_id,
-          action: "share_note",
-          userId: session.user.id,
-          content: `${note.topic || ""} ${note.content || ""} ${sanitizedBody.topic || ""} ${sanitizedBody.content || ""}`,
-          sensitivityLevel: note.sensitivity_level,
-        })
-        if (!dlpResult.allowed) {
-          return NextResponse.json({ error: dlpResult.reason }, { status: 403 })
-        }
-      }
+    const dlp = await checkNoteDLP(auth.noteId, auth.session.user.id, sanitizedBody)
+    if (!dlp.allowed) {
+      return NextResponse.json({ error: dlp.reason }, { status: 403 })
     }
 
-    const now = new Date().toISOString()
-
-    const result = await db.query(
-      `UPDATE personal_sticks SET
-        title = COALESCE($1, title),
-        topic = COALESCE($2, topic),
-        content = COALESCE($3, content),
-        color = COALESCE($4, color),
-        position_x = COALESCE($5, position_x),
-        position_y = COALESCE($6, position_y),
-        is_shared = COALESCE($7, is_shared),
-        updated_at = $8
-       WHERE id = $9 AND user_id = $10
-       RETURNING *`,
-      [
-        sanitizedBody.title ?? null,
-        sanitizedBody.topic ?? null,
-        sanitizedBody.content ?? null,
-        sanitizedBody.color ?? null,
-        sanitizedBody.position_x ?? null,
-        sanitizedBody.position_y ?? null,
-        sanitizedBody.is_shared ?? null,
-        now,
-        noteId,
-        session.user.id
-      ]
-    )
-
-    if (result.rows.length === 0) {
+    const result = await updateNoteFields(auth.noteId, auth.session.user.id, sanitizedBody)
+    if (!result) {
       return NextResponse.json({ error: "Note not found or update failed" }, { status: 404 })
     }
 
-    return NextResponse.json(result.rows[0])
+    return NextResponse.json(result)
   } catch (err) {
     console.error("PUT /api/notes/[id] error:", err)
     return NextResponse.json({ error: "Internal server error" }, { status: 500 })
@@ -194,76 +87,23 @@ export async function PUT(request: NextRequest, context: { params: Promise<{ id:
 
 export async function PATCH(request: NextRequest, context: { params: Promise<{ id: string }> }) {
   try {
-    const session = await getSession()
-
-    if (!session?.user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
-    }
-
-    const params = await context.params
-    const noteId = params.id
-
-    if (!validateUUID(noteId)) {
-      return NextResponse.json({ error: "Invalid note ID" }, { status: 400 })
-    }
+    const auth = await authenticateAndValidate(context)
+    if ("error" in auth) return auth.error
 
     const body = await request.json()
     const sanitizedBody = sanitizeRequestBody(body, ["topic", "content"])
 
-    // DLP check when sharing a note
-    if (sanitizedBody.is_shared === true) {
-      const noteForDLP = await db.query(
-        `SELECT org_id, topic, content, sensitivity_level FROM personal_sticks WHERE id = $1 AND user_id = $2`,
-        [noteId, session.user.id],
-      )
-      if (noteForDLP.rows.length > 0) {
-        const note = noteForDLP.rows[0]
-        const dlpResult = await checkDLPPolicy({
-          orgId: note.org_id,
-          action: "share_note",
-          userId: session.user.id,
-          content: `${note.topic || ""} ${note.content || ""} ${sanitizedBody.topic || ""} ${sanitizedBody.content || ""}`,
-          sensitivityLevel: note.sensitivity_level,
-        })
-        if (!dlpResult.allowed) {
-          return NextResponse.json({ error: dlpResult.reason }, { status: 403 })
-        }
-      }
+    const dlp = await checkNoteDLP(auth.noteId, auth.session.user.id, sanitizedBody)
+    if (!dlp.allowed) {
+      return NextResponse.json({ error: dlp.reason }, { status: 403 })
     }
 
-    const now = new Date().toISOString()
-
-    const result = await db.query(
-      `UPDATE personal_sticks SET
-        title = COALESCE($1, title),
-        topic = COALESCE($2, topic),
-        content = COALESCE($3, content),
-        color = COALESCE($4, color),
-        position_x = COALESCE($5, position_x),
-        position_y = COALESCE($6, position_y),
-        is_shared = COALESCE($7, is_shared),
-        updated_at = $8
-       WHERE id = $9 AND user_id = $10
-       RETURNING *`,
-      [
-        sanitizedBody.title ?? null,
-        sanitizedBody.topic ?? null,
-        sanitizedBody.content ?? null,
-        sanitizedBody.color ?? null,
-        sanitizedBody.position_x ?? null,
-        sanitizedBody.position_y ?? null,
-        sanitizedBody.is_shared ?? null,
-        now,
-        noteId,
-        session.user.id
-      ]
-    )
-
-    if (result.rows.length === 0) {
+    const result = await updateNoteFields(auth.noteId, auth.session.user.id, sanitizedBody)
+    if (!result) {
       return NextResponse.json({ error: "Note not found" }, { status: 404 })
     }
 
-    return NextResponse.json(result.rows[0])
+    return NextResponse.json(result)
   } catch (err) {
     console.error("PATCH /api/notes/[id] error:", err)
     return NextResponse.json({ error: "Internal server error" }, { status: 500 })
@@ -276,32 +116,11 @@ export async function PATCH(request: NextRequest, context: { params: Promise<{ i
 
 export async function DELETE(request: NextRequest, context: { params: Promise<{ id: string }> }) {
   try {
-    const session = await getSession()
+    const auth = await authenticateAndValidate(context)
+    if ("error" in auth) return auth.error
 
-    if (!session?.user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
-    }
-
-    const params = await context.params
-    const noteId = params.id
-    if (!validateUUID(noteId)) {
-      return NextResponse.json({ error: "Invalid note ID" }, { status: 400 })
-    }
-
-    if (await isUnderLegalHold(session.user.id)) {
-      return NextResponse.json({ error: "Content cannot be deleted: active legal hold" }, { status: 403 })
-    }
-
-    const result = await db.query(
-      `DELETE FROM personal_sticks WHERE id = $1 AND user_id = $2 RETURNING id`,
-      [noteId, session.user.id]
-    )
-
-    if (result.rows.length === 0) {
-      return NextResponse.json({ error: "Note not found" }, { status: 404 })
-    }
-
-    return NextResponse.json({ message: "Note deleted successfully" })
+    const { status, body } = await deleteNoteById(auth.noteId, auth.session.user.id)
+    return NextResponse.json(body, { status })
   } catch (err) {
     console.error("DELETE /api/notes/[id] error:", err)
     return NextResponse.json({ error: "Internal server error" }, { status: 500 })

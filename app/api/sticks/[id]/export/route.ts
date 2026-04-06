@@ -6,78 +6,19 @@ import type { DatabaseClient } from "@/lib/database/database-adapter";
 import { generateText as aiProviderGenerateText, isAIAvailable } from "@/lib/ai/ai-provider";
 import { writeFile, mkdir } from "node:fs/promises";
 import path from "node:path";
-
-let Document: typeof import("docx").Document | undefined;
-let Packer: typeof import("docx").Packer | undefined;
-let Paragraph: typeof import("docx").Paragraph | undefined;
-let TextRun: typeof import("docx").TextRun | undefined;
-let HeadingLevel: typeof import("docx").HeadingLevel | undefined;
-
-const initializeModules = async () => {
-  try {
-    const docxModule = await import("docx");
-    Document = docxModule.Document;
-    Packer = docxModule.Packer;
-    Paragraph = docxModule.Paragraph;
-    TextRun = docxModule.TextRun;
-    HeadingLevel = docxModule.HeadingLevel;
-  } catch {
-    // docx module is optional - continue without DOCX generation
-  }
-};
-
-interface ExportData {
-  exports?: Array<{
-    url: string;
-    filename: string;
-    created_at: string;
-    type: string;
-  }>;
-  [key: string]: any;
-}
-
-interface StickData {
-  id: string;
-  topic?: string;
-  content?: string;
-  created_at: string;
-  updated_at?: string;
-  pad_id: string;
-  pads?: {
-    name?: string;
-    multi_pak_id?: string;
-    owner_id?: string;
-    multi_paks?: { owner_id?: string };
-  };
-}
-
-interface Reply {
-  created_at: string;
-  content: string;
-  user?: { username?: string; email?: string };
-}
-
-interface MediaLink {
-  title?: string;
-  caption?: string;
-  url?: string;
-  embed_url?: string;
-}
-
-const toneInstructions: Record<string, string> = {
-  professional:
-    "Provide a professional, structured summary suitable for a business report. Use clear, objective language and organize key points logically with distinct paragraphs for different topics.",
-  casual:
-    "Write this summary in a conversational, friendly tone as if explaining to a friend. Use everyday language and focus on the main takeaways. Break into natural conversation paragraphs.",
-  friendly:
-    "Write this summary in a warm, approachable tone that's professional yet personable. Focus on collaboration and positive outcomes with clear paragraph breaks.",
-  formal:
-    "Provide a formal, detailed summary with precise language suitable for official documentation. Structure with clear sections and comprehensive coverage of all topics.",
-};
-
-function getTonePrompt(tone: string): string {
-  return toneInstructions[tone] || toneInstructions.professional;
-}
+import {
+  type StickData,
+  type Reply,
+  type MediaLink,
+  type ExportLink,
+  getTonePrompt,
+  formatVideoLinks,
+  formatImageLinks,
+  generateExportFilename,
+  buildExportLink,
+  initializeDocxModules,
+  splitSummaryIntoParagraphs,
+} from "@/lib/handlers/stick-export-handler";
 
 async function checkUserAccess(
   db: DatabaseClient,
@@ -145,33 +86,6 @@ async function checkUserAccess(
   return false;
 }
 
-function parseTabData(tabData: unknown): MediaLink[] {
-  try {
-    const data = typeof tabData === "string" ? JSON.parse(tabData) : tabData;
-    return data?.videos || data?.images || [];
-  } catch {
-    return [];
-  }
-}
-
-function formatVideoLinks(
-  videoTabs: Array<{ tab_data: unknown }>
-): MediaLink[] {
-  return videoTabs.flatMap((tab) => {
-    const videos = parseTabData(tab.tab_data);
-    return videos.map((video: MediaLink) => ({
-      ...video,
-      embed_url: video.embed_url || video.url,
-    }));
-  });
-}
-
-function formatImageLinks(
-  imageTabs: Array<{ tab_data: unknown }>
-): MediaLink[] {
-  return imageTabs.flatMap((tab) => parseTabData(tab.tab_data));
-}
-
 function buildPrompt(
   tone: string,
   stickData: StickData,
@@ -229,13 +143,6 @@ ${repliesFormatted}
 Please provide a well-structured, comprehensive summary that captures all aspects of this stick. Use clear paragraph breaks to separate different topics and themes. Format it as a professional document that could serve as a complete record of this stick's content and discussion.`;
 }
 
-interface ExportLink {
-  url: string;
-  filename: string;
-  created_at: string;
-  type: string;
-}
-
 async function saveExportLink(
   db: DatabaseClient,
   stickId: string,
@@ -252,7 +159,7 @@ async function saveExportLink(
     .maybeSingle();
 
   if (existingDetailsTab) {
-    let currentData: ExportData = {};
+    let currentData: { exports?: ExportLink[]; [key: string]: any } = {};
     try {
       if (typeof existingDetailsTab.tab_data === "string") {
         currentData = JSON.parse(existingDetailsTab.tab_data);
@@ -260,7 +167,7 @@ async function saveExportLink(
         existingDetailsTab.tab_data &&
         typeof existingDetailsTab.tab_data === "object"
       ) {
-        currentData = existingDetailsTab.tab_data as ExportData;
+        currentData = existingDetailsTab.tab_data as typeof currentData;
       }
     } catch {
       currentData = {};
@@ -295,7 +202,7 @@ export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  await initializeModules();
+  const docx = await initializeDocxModules();
 
   try {
     const { id: stickId } = await params;
@@ -439,24 +346,17 @@ export async function POST(
     });
 
     // Check if docx module is available
-    if (!Document || !Paragraph || !TextRun || !Packer) {
+    if (!docx) {
       return NextResponse.json(
         { error: "DOCX generation not available" },
         { status: 500 }
       );
     }
 
-    // Create local references to avoid TypeScript narrowing issues in callbacks
-    const DocxDocument = Document;
-    const DocxParagraph = Paragraph;
-    const DocxTextRun = TextRun;
-    const DocxPacker = Packer;
+    const { Document: DocxDocument, Paragraph: DocxParagraph, TextRun: DocxTextRun, Packer: DocxPacker, HeadingLevel } = docx;
 
     // Create DOCX document
-    const summaryParagraphs = comprehensiveSummary
-      .split(/\n\n+/)
-      .filter((paragraph: string) => paragraph.trim().length > 0)
-      .map((paragraph: string) => paragraph.trim());
+    const summaryParagraphs = splitSummaryIntoParagraphs(comprehensiveSummary);
 
     const doc = new DocxDocument({
       sections: [
@@ -697,13 +597,7 @@ export async function POST(
 
     const buffer = await DocxPacker.toBuffer(doc);
 
-    const sanitizedTopic = (stickDataWithPads.topic || "Untitled")
-      .replaceAll(/[^a-zA-Z0-9\s-]/g, "")
-      .replaceAll(/\s+/g, "-")
-      .toLowerCase()
-      .substring(0, 50);
-
-    const filename = `${sanitizedTopic}-export-${Date.now()}.docx`;
+    const filename = generateExportFilename(stickDataWithPads.topic);
 
     // Save to local public/exports directory
     const exportsDir = path.join(process.cwd(), "public", "exports");
@@ -715,12 +609,7 @@ export async function POST(
     const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
     const fileUrl = `${baseUrl}/exports/${filename}`;
 
-    const exportLink = {
-      url: fileUrl,
-      filename: filename,
-      created_at: new Date().toISOString(),
-      type: "complete_export",
-    };
+    const exportLink = buildExportLink(fileUrl, filename);
 
     await saveExportLink(db, stickId, user.id, stickOrgId, exportLink);
 

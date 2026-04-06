@@ -4,10 +4,12 @@ import { db } from '@/lib/database/pg-client'
 import { getCachedAuthUser } from '@/lib/auth/cached-auth'
 import { getOrgContext } from '@/lib/auth/get-org-context'
 import { handleApiError } from '@/lib/api/handle-api-error'
+import {
+  DEFAULT_REPLY_COLOR,
+  parseReplyInput,
+} from '@/lib/handlers/stick-replies-handler'
 
 export const dynamic = 'force-dynamic'
-
-const DEFAULT_REPLY_COLOR = '#fef3c7'
 
 async function checkPadAccess(padId: string, userId: string, orgId: string) {
   // Check pad ownership
@@ -118,18 +120,9 @@ export async function POST(
     }
 
     const body = await request.json()
-    const {
-      content,
-      color = DEFAULT_REPLY_COLOR,
-      is_calstick = false,
-      calstick_date = null,
-      calstick_status = null,
-      calstick_priority = null,
-      calstick_parent_id = null,
-      calstick_assignee_id = null,
-    } = body
+    const replyInput = parseReplyInput(body)
 
-    if (!content?.trim()) {
+    if (!replyInput.content?.trim()) {
       return new Response(JSON.stringify({ error: 'Content is required' }), { status: 400 })
     }
 
@@ -159,14 +152,14 @@ export async function POST(
         stickId,
         user.id,
         orgContext.orgId,
-        content.trim(),
-        color,
-        is_calstick,
-        calstick_date,
-        calstick_status,
-        calstick_priority,
-        calstick_parent_id,
-        calstick_assignee_id,
+        replyInput.content.trim(),
+        replyInput.color,
+        replyInput.is_calstick,
+        replyInput.calstick_date,
+        replyInput.calstick_status,
+        replyInput.calstick_priority,
+        replyInput.calstick_parent_id,
+        replyInput.calstick_assignee_id,
       ]
     )
 

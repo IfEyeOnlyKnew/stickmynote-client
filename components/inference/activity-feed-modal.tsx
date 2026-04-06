@@ -8,9 +8,10 @@ import { Badge } from "@/components/ui/badge"
 import { Skeleton } from "@/components/ui/skeleton"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { useInferenceActivityFeed, type InferenceActivity } from "@/hooks/use-inference-activity-feed"
-import { Activity, FileText, MessageSquare, Share2, Edit, RefreshCw, Loader2 } from "lucide-react"
-import { formatDistanceToNow, format, isToday, isYesterday } from "date-fns"
+import { Activity, RefreshCw, Loader2 } from "lucide-react"
+import { formatDistanceToNow } from "date-fns"
 import { StickDetailModal } from "@/components/inference/stick-detail-modal"
+import { getActivityIcon, getActivityMessage, groupActivitiesByDate } from "@/lib/inference/activity-helpers"
 
 interface ActivityFeedModalProps {
   readonly open: boolean
@@ -39,89 +40,7 @@ export function ActivityFeedModal({ open, onOpenChange }: ActivityFeedModalProps
     return () => observer.disconnect()
   }, [hasMore, loading, loadMore])
 
-  const getActivityIcon = (type: string) => {
-    switch (type) {
-      case "created":
-        return <FileText className="h-4 w-4" />
-      case "updated":
-        return <Edit className="h-4 w-4" />
-      case "replied":
-        return <MessageSquare className="h-4 w-4" />
-      case "shared":
-        return <Share2 className="h-4 w-4" />
-      default:
-        return <Activity className="h-4 w-4" />
-    }
-  }
-
-  const getActivityMessage = (activity: InferenceActivity) => {
-    const userName = activity.user?.full_name || activity.user?.email || "Someone"
-    const stickTopic = activity.social_stick?.topic || "a stick"
-    const padName = activity.social_stick?.social_pads?.name || "a pad"
-
-    switch (activity.activity_type) {
-      case "created":
-        return (
-          <>
-            <span className="font-semibold">{userName}</span> created a new stick{" "}
-            <span className="font-medium">&quot;{stickTopic}&quot;</span> in {padName}
-          </>
-        )
-      case "updated":
-        return (
-          <>
-            <span className="font-semibold">{userName}</span> updated the stick{" "}
-            <span className="font-medium">&quot;{stickTopic}&quot;</span> in {padName}
-          </>
-        )
-      case "replied":
-        return (
-          <>
-            <span className="font-semibold">{userName}</span> replied to{" "}
-            <span className="font-medium">&quot;{stickTopic}&quot;</span> in {padName}
-          </>
-        )
-      case "shared":
-        return (
-          <>
-            <span className="font-semibold">{userName}</span> shared the stick{" "}
-            <span className="font-medium">&quot;{stickTopic}&quot;</span>
-          </>
-        )
-      default:
-        return (
-          <>
-            <span className="font-semibold">{userName}</span> performed an action
-          </>
-        )
-    }
-  }
-
-  const groupActivitiesByDate = () => {
-    const grouped = new Map<string, InferenceActivity[]>()
-
-    activities.forEach((activity) => {
-      const date = new Date(activity.created_at)
-      let label: string
-
-      if (isToday(date)) {
-        label = "Today"
-      } else if (isYesterday(date)) {
-        label = "Yesterday"
-      } else {
-        label = format(date, "MMMM d, yyyy")
-      }
-
-      if (!grouped.has(label)) {
-        grouped.set(label, [])
-      }
-      grouped.get(label)!.push(activity)
-    })
-
-    return grouped
-  }
-
-  const groupedActivities = groupActivitiesByDate()
+  const groupedActivities = groupActivitiesByDate(activities)
 
   const handleActivityClick = (activity: InferenceActivity) => {
     if (activity.metadata?.stick_id) {

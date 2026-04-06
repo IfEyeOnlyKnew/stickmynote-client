@@ -9,6 +9,7 @@ import { ReplyForm } from "./ReplyForm"
 import type React from "react"
 import { useCallback, useState, useEffect, useMemo } from "react"
 import { toast } from "sonner"
+import { buildReplyTree, sortNestedReplies, countAllReplies, getReplyDisplayName } from "./reply-shared"
 
 // CollaborativeReplyForm uses Tiptap which requires client-side only rendering
 const CollaborativeReplyForm = dynamic(
@@ -77,55 +78,14 @@ interface ThreadedRepliesProps {
   onEditReply?: (noteId: string, replyId: string, content: string) => Promise<void>
 }
 
-// Helper function to build thread tree from flat replies array
-function buildReplyTree(replies: ThreadedReply[]): ThreadedReply[] {
-  const replyMap = new Map<string, ThreadedReply>()
-  const rootReplies: ThreadedReply[] = []
-
-  // First pass: create a map of all replies with empty children arrays
-  replies.forEach(reply => {
-    replyMap.set(reply.id, { ...reply, replies: [] })
-  })
-
-  // Second pass: build the tree structure
-  replies.forEach(reply => {
-    const replyWithChildren = replyMap.get(reply.id)!
-    if (reply.parent_reply_id && replyMap.has(reply.parent_reply_id)) {
-      const parent = replyMap.get(reply.parent_reply_id)!
-      parent.replies = parent.replies || []
-      parent.replies.push(replyWithChildren)
-    } else {
-      rootReplies.push(replyWithChildren)
-    }
-  })
-
-  // Sort root replies by created_at (newest first)
+// Helper function to build thread tree from flat replies array (newest-first root sort for ThreadedReplies)
+function buildThreadedReplyTree(replies: ThreadedReply[]): ThreadedReply[] {
+  const rootReplies = buildReplyTree(replies)
+  // Sort root replies by created_at (newest first) - ThreadedReplies-specific
   rootReplies.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
-
-  // Sort nested replies by created_at (oldest first for natural conversation flow)
-  const sortNestedReplies = (replies: ThreadedReply[]) => {
-    replies.forEach(reply => {
-      if (reply.replies && reply.replies.length > 0) {
-        reply.replies.sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime())
-        sortNestedReplies(reply.replies)
-      }
-    })
-  }
+  // Sort nested replies oldest first for natural conversation flow
   sortNestedReplies(rootReplies)
-
   return rootReplies
-}
-
-// Helper to count total replies including nested
-function countAllReplies(replies: ThreadedReply[]): number {
-  let count = 0
-  replies.forEach(reply => {
-    count += 1
-    if (reply.replies && reply.replies.length > 0) {
-      count += countAllReplies(reply.replies)
-    }
-  })
-  return count
 }
 
 export const ThreadedReplies: React.FC<ThreadedRepliesProps> = ({
@@ -180,7 +140,7 @@ export const ThreadedReplies: React.FC<ThreadedRepliesProps> = ({
         new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
       )
     }
-    return buildReplyTree(localReplies)
+    return buildThreadedReplyTree(localReplies)
   }, [localReplies, enableThreading])
 
   const totalReplyCount = useMemo(() => {
@@ -443,10 +403,7 @@ export const ThreadedReplies: React.FC<ThreadedRepliesProps> = ({
     }
   }, [])
 
-  const getDisplayName = useCallback((r: ThreadedReply) => {
-    if (!r.user) return "User"
-    return r.user.full_name || r.user.username || r.user.email || "User"
-  }, [])
+  const getDisplayName = useCallback((r: ThreadedReply) => getReplyDisplayName(r), [])
 
   if (isNewNote) return null
 

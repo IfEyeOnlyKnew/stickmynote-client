@@ -1,11 +1,14 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { createServiceDatabaseClient } from "@/lib/database/database-adapter"
 import { getCachedAuthUser } from "@/lib/auth/cached-auth"
+import {
+  bulkDeleteSavedEmails,
+  bulkAddSavedEmails,
+  parseCSVEmails,
+  validateAndParseEmails,
+} from "@/lib/handlers/saved-emails-handler"
 
 export async function DELETE(request: NextRequest) {
   try {
-    const db = await createServiceDatabaseClient()
-
     const authResult = await getCachedAuthUser()
     if (authResult.rateLimited) {
       return NextResponse.json(
@@ -16,128 +19,23 @@ export async function DELETE(request: NextRequest) {
     if (!authResult.user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
-    const user = authResult.user
 
     const body = await request.json()
     const { emailIds, teamId } = body
 
-    if (!emailIds || !Array.isArray(emailIds) || emailIds.length === 0) {
-      return NextResponse.json({ error: "Invalid email IDs array" }, { status: 400 })
+    const result = await bulkDeleteSavedEmails(authResult.user, emailIds, teamId)
+    return NextResponse.json(result)
+  } catch (error: any) {
+    if (error?.message === "Invalid email IDs array") {
+      return NextResponse.json({ error: error.message }, { status: 400 })
     }
-
-    let query = db.from("saved_emails").delete().eq("user_id", user.id).in("id", emailIds)
-
-    if (teamId) {
-      query = query.eq("team_id", teamId)
-    }
-
-    const { error } = await query
-
-    if (error) {
-      console.error("Error bulk deleting saved emails:", error)
-      return NextResponse.json({ error: "Failed to delete emails" }, { status: 500 })
-    }
-
-    return NextResponse.json({ success: true, deletedCount: emailIds.length })
-  } catch (error) {
     console.error("Bulk delete saved emails API error:", error)
     return NextResponse.json({ error: "Internal server error" }, { status: 500 })
   }
 }
 
-const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
-
-async function parseCSVEmails(request: NextRequest): Promise<{ email: string; name: string | null }[]> {
-  let formData: FormData
-  try {
-    formData = await request.formData()
-  } catch {
-    throw new Error("Failed to parse file upload. Please ensure you're uploading a valid CSV file.")
-  }
-
-  const file = formData.get("file") as File
-  if (!file) throw new Error("No CSV file provided")
-
-  let fileText: string
-  try {
-    fileText = await file.text()
-  } catch {
-    throw new Error("Failed to read CSV file content. Please ensure the file is not corrupted.")
-  }
-
-  if (!fileText.trim()) throw new Error("CSV file is empty")
-
-  const lines = fileText.split(/\r?\n/).filter((line) => line.trim())
-  if (lines.length === 0) throw new Error("No valid lines found in CSV file")
-
-  const emails = lines
-    .map((line) => {
-      const trimmedLine = line.trim().replaceAll(/^["']|["']$/g, "")
-      if (trimmedLine.includes(",")) {
-        const [email, name] = trimmedLine.split(",").map((s) => s.trim().replaceAll(/^["']|["']$/g, ""))
-        return { email: email?.toLowerCase(), name: name || null }
-      }
-      return { email: trimmedLine.toLowerCase(), name: null }
-    })
-    .filter((item) => item.email && EMAIL_REGEX.test(item.email))
-
-  if (emails.length === 0) {
-    throw new Error("No valid email addresses found in CSV file. Please check the format.")
-  }
-
-  return emails as { email: string; name: string | null }[]
-}
-
-function parseJSONEmails(emails: any[]): { email: string; name: string | null }[] {
-  const validEmails = emails.filter((emailItem) => {
-    const email = typeof emailItem === "string" ? emailItem : emailItem.email
-    return email && EMAIL_REGEX.test(email)
-  })
-
-  return validEmails.map((emailItem) => {
-    const email = typeof emailItem === "string" ? emailItem : emailItem.email
-    const name = typeof emailItem === "object" && emailItem.name ? emailItem.name : null
-    return { email: email.toLowerCase().trim(), name }
-  })
-}
-
-async function deduplicateAndInsert(
-  db: any,
-  userId: string,
-  emailsToInsert: { user_id: string; team_id: null; email: string; name: string | null; source: string }[],
-): Promise<NextResponse> {
-  const { data: existingEmails } = await db
-    .from("saved_emails")
-    .select("email")
-    .eq("user_id", userId)
-    .is("team_id", null)
-    .in("email", emailsToInsert.map((e) => e.email))
-
-  const existingEmailSet = new Set(existingEmails?.map((e: any) => e.email) || [])
-  const newEmails = emailsToInsert.filter((e) => !existingEmailSet.has(e.email))
-  const duplicateCount = emailsToInsert.length - newEmails.length
-
-  if (newEmails.length === 0) {
-    return NextResponse.json({ success: true, added: 0, skipped: duplicateCount, message: "All emails already exist" })
-  }
-
-  const { data: insertedEmails, error: insertError } = await db
-    .from("saved_emails")
-    .insert(newEmails)
-    .select()
-
-  if (insertError) {
-    console.error("[v0] Bulk saved emails API - Database error:", insertError)
-    return NextResponse.json({ error: "Failed to save emails to database. Please try again." }, { status: 500 })
-  }
-
-  return NextResponse.json({ success: true, added: insertedEmails?.length || 0, skipped: duplicateCount })
-}
-
 export async function POST(request: NextRequest) {
   try {
-    const db = await createServiceDatabaseClient()
-
     const authResult = await getCachedAuthUser()
     if (authResult.rateLimited) {
       return NextResponse.json(
@@ -155,18 +53,30 @@ export async function POST(request: NextRequest) {
     const isFormDataRequest = contentType?.includes("multipart/form-data") || uploadType === "csv-file"
 
     if (isFormDataRequest) {
+      let formData: FormData
+      try {
+        formData = await request.formData()
+      } catch {
+        return NextResponse.json(
+          { error: "Failed to parse file upload. Please ensure you're uploading a valid CSV file." },
+          { status: 400 },
+        )
+      }
+
+      const file = formData.get("file") as File
+      if (!file) {
+        return NextResponse.json({ error: "No CSV file provided" }, { status: 400 })
+      }
+
       let parsedEmails: { email: string; name: string | null }[]
       try {
-        parsedEmails = await parseCSVEmails(request)
+        parsedEmails = await parseCSVEmails(file)
       } catch (err) {
         return NextResponse.json({ error: (err as Error).message }, { status: 400 })
       }
 
-      const emailsToInsert = parsedEmails.map((e) => ({
-        user_id: user.id, team_id: null as null, email: e.email, name: e.name, source: "csv",
-      }))
-
-      return deduplicateAndInsert(db, user.id, emailsToInsert)
+      const result = await bulkAddSavedEmails(user, parsedEmails, "csv")
+      return NextResponse.json({ success: true, ...result })
     }
 
     // JSON bulk add
@@ -185,18 +95,15 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Invalid emails array" }, { status: 400 })
     }
 
-    const validEmails = parseJSONEmails(emails)
+    const validEmails = validateAndParseEmails(emails)
     if (validEmails.length === 0) {
       return NextResponse.json({ error: "No valid emails provided" }, { status: 400 })
     }
 
-    const emailsToInsert = validEmails.map((e) => ({
-      user_id: user.id, team_id: null as null, email: e.email, name: e.name, source: "bulk",
-    }))
-
-    return deduplicateAndInsert(db, user.id, emailsToInsert)
+    const result = await bulkAddSavedEmails(user, validEmails, "bulk")
+    return NextResponse.json({ success: true, ...result })
   } catch (error) {
-    console.error("[v0] Bulk saved emails API - Unexpected error:", error)
+    console.error("[saved-emails/bulk POST] error:", error)
     return NextResponse.json(
       { error: "Internal server error. Please try again or contact support if the problem persists." },
       { status: 500 },

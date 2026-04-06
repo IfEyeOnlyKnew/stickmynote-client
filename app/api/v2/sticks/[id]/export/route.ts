@@ -4,40 +4,115 @@ import { db } from '@/lib/database/pg-client'
 import { getCachedAuthUser } from '@/lib/auth/cached-auth'
 import { handleApiError } from '@/lib/api/handle-api-error'
 import { isAIAvailable, generateText as aiGenerateText } from '@/lib/ai/ai-provider'
+import { put } from '@/lib/storage/local-storage'
+import {
+  type ExportLink,
+  getTonePrompt,
+  generateExportFilename,
+  buildExportLink,
+  initializeDocxModules,
+  splitSummaryIntoParagraphs,
+} from '@/lib/handlers/stick-export-handler'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 60
 
-import { put } from '@/lib/storage/local-storage'
+// Auth guard: returns user or an error Response
+async function authenticateUser(): Promise<{ user: any } | { error: Response }> {
+  const authResult = await getCachedAuthUser()
+  if (authResult.rateLimited) {
+    return {
+      error: new Response(
+        JSON.stringify({ error: 'Rate limit exceeded. Please try again in a moment.' }),
+        { status: 429, headers: { 'Retry-After': '30' } }
+      ),
+    }
+  }
+  if (!authResult.user) {
+    return { error: new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401 }) }
+  }
+  return { user: authResult.user }
+}
 
-let Document: typeof import('docx').Document | undefined
-let Packer: typeof import('docx').Packer | undefined
-let Paragraph: typeof import('docx').Paragraph | undefined
-let TextRun: typeof import('docx').TextRun | undefined
-let HeadingLevel: typeof import('docx').HeadingLevel | undefined
+// Verify user can access the stick (pad owner or member)
+async function checkExportAccess(stickData: any, userId: string): Promise<Response | null> {
+  if (stickData.pad_owner_id === userId) return null
 
-const initializeModules = async () => {
-  try {
-    const docxModule = await import('docx')
-    Document = docxModule.Document
-    Packer = docxModule.Packer
-    Paragraph = docxModule.Paragraph
-    TextRun = docxModule.TextRun
-    HeadingLevel = docxModule.HeadingLevel
-  } catch {
-    // docx module is optional — DOCX export will be unavailable if import fails
+  const memberResult = await db.query(
+    `SELECT role FROM paks_pad_members WHERE pad_id = $1 AND user_id = $2 AND accepted = true`,
+    [stickData.pad_id, userId]
+  )
+  if (memberResult.rows.length === 0) {
+    return new Response(JSON.stringify({ error: 'Access denied' }), { status: 403 })
+  }
+  return null
+}
+
+// Extract media links from tabs
+function extractMediaFromTabs(tabs: any[]): { videoLinks: any[]; imageLinks: any[] } {
+  const videoTabs = tabs.filter((t: any) => t.tab_type === 'video')
+  const imageTabs = tabs.filter((t: any) => t.tab_type === 'images')
+
+  const parseTabMedia = (tab: any, key: string) => {
+    try {
+      const data = typeof tab.tab_data === 'string' ? JSON.parse(tab.tab_data) : tab.tab_data
+      return data?.[key] || []
+    } catch {
+      return []
+    }
+  }
+
+  return {
+    videoLinks: videoTabs.flatMap((tab: any) => parseTabMedia(tab, 'videos')),
+    imageLinks: imageTabs.flatMap((tab: any) => parseTabMedia(tab, 'images')),
   }
 }
 
-const toneInstructions: Record<string, string> = {
-  professional: 'Provide a professional, structured summary suitable for a business report.',
-  casual: 'Write this summary in a conversational, friendly tone.',
-  friendly: 'Write this summary in a warm, approachable tone.',
-  formal: 'Provide a formal, detailed summary with precise language.',
+// Generate AI summary, falling back gracefully
+async function generateSummary(prompt: string): Promise<string> {
+  try {
+    const result = await aiGenerateText({ prompt, maxTokens: 2000 })
+    return result.text
+  } catch (e) {
+    console.error('AI generation failed:', e)
+    return 'AI service unavailable'
+  }
 }
 
-function getTonePrompt(tone: string): string {
-  return toneInstructions[tone] || toneInstructions.professional
+// Save export link into the stick's details tab
+async function saveExportLinkToDetailsTab(
+  stickId: string,
+  userId: string,
+  orgId: string,
+  exportLink: ExportLink
+): Promise<void> {
+  const existingTab = await db.query(
+    `SELECT id, tab_data FROM paks_pad_stick_tabs WHERE stick_id = $1 AND tab_type = 'details' AND org_id = $2`,
+    [stickId, orgId]
+  )
+
+  if (existingTab.rows.length > 0) {
+    let currentData: any = {}
+    try {
+      currentData = typeof existingTab.rows[0].tab_data === 'string'
+        ? JSON.parse(existingTab.rows[0].tab_data)
+        : existingTab.rows[0].tab_data || {}
+    } catch {
+      // Parse error ignored — using empty default for tab_data
+    }
+
+    const updatedExports = [...(currentData.exports || []), exportLink]
+    await db.query(
+      `UPDATE paks_pad_stick_tabs SET tab_data = $1, updated_at = NOW() WHERE id = $2 AND org_id = $3`,
+      [JSON.stringify({ ...currentData, exports: updatedExports }), existingTab.rows[0].id, orgId]
+    )
+  } else {
+    await db.query(
+      `INSERT INTO paks_pad_stick_tabs (stick_id, user_id, org_id, tab_type, tab_name, tab_content, tab_data, tab_order)
+       VALUES ($1, $2, $3, 'details', 'Details', 'Stick details and exports', $4, 3)`,
+      [stickId, userId, orgId, JSON.stringify({ exports: [exportLink] })]
+    )
+  }
 }
 
 // POST /api/v2/sticks/[id]/export - Export stick to DOCX
@@ -45,7 +120,7 @@ export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  await initializeModules()
+  const docx = await initializeDocxModules()
 
   try {
     const { id: stickId } = await params
@@ -55,17 +130,9 @@ export async function POST(
       return new Response(JSON.stringify({ error: 'AI service not configured' }), { status: 500 })
     }
 
-    const authResult = await getCachedAuthUser()
-    if (authResult.rateLimited) {
-      return new Response(
-        JSON.stringify({ error: 'Rate limit exceeded. Please try again in a moment.' }),
-        { status: 429, headers: { 'Retry-After': '30' } }
-      )
-    }
-    if (!authResult.user) {
-      return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401 })
-    }
-    const user = authResult.user
+    const authGuard = await authenticateUser()
+    if ('error' in authGuard) return authGuard.error
+    const user = authGuard.user
 
     // Get stick with pad info
     const stickResult = await db.query(
@@ -82,16 +149,8 @@ export async function POST(
 
     const stickData = stickResult.rows[0]
 
-    // Check access
-    if (stickData.pad_owner_id !== user.id) {
-      const memberResult = await db.query(
-        `SELECT role FROM paks_pad_members WHERE pad_id = $1 AND user_id = $2 AND accepted = true`,
-        [stickData.pad_id, user.id]
-      )
-      if (memberResult.rows.length === 0) {
-        return new Response(JSON.stringify({ error: 'Access denied' }), { status: 403 })
-      }
-    }
+    const accessDenied = await checkExportAccess(stickData, user.id)
+    if (accessDenied) return accessDenied
 
     // Get replies
     const repliesResult = await db.query(
@@ -109,26 +168,7 @@ export async function POST(
       [stickId]
     )
 
-    const videoTabs = tabsResult.rows.filter((t: any) => t.tab_type === 'video')
-    const imageTabs = tabsResult.rows.filter((t: any) => t.tab_type === 'images')
-
-    const videoLinks = videoTabs.flatMap((tab: any) => {
-      try {
-        const data = typeof tab.tab_data === 'string' ? JSON.parse(tab.tab_data) : tab.tab_data
-        return data?.videos || []
-      } catch {
-        return []
-      }
-    })
-
-    const imageLinks = imageTabs.flatMap((tab: any) => {
-      try {
-        const data = typeof tab.tab_data === 'string' ? JSON.parse(tab.tab_data) : tab.tab_data
-        return data?.images || []
-      } catch {
-        return []
-      }
-    })
+    const { videoLinks, imageLinks } = extractMediaFromTabs(tabsResult.rows)
 
     // Build AI prompt
     const repliesFormatted = repliesResult.rows.length > 0
@@ -154,31 +194,16 @@ ${repliesFormatted}
 
 Provide a well-structured summary.`
 
-    // Generate AI summary
-    let summary = 'AI service unavailable'
-    if (isAIAvailable()) {
-      try {
-        const result = await aiGenerateText({
-          prompt,
-          maxTokens: 2000,
-        })
-        summary = result.text
-      } catch (e) {
-        console.error('AI generation failed:', e)
-      }
-    }
+    const summary = await generateSummary(prompt)
 
-    if (!Document || !Paragraph || !TextRun || !Packer) {
+    if (!docx) {
       return new Response(JSON.stringify({ error: 'DOCX generation not available' }), { status: 500 })
     }
 
-    const DocxDocument = Document
-    const DocxParagraph = Paragraph
-    const DocxTextRun = TextRun
-    const DocxPacker = Packer
+    const { Document: DocxDocument, Paragraph: DocxParagraph, TextRun: DocxTextRun, Packer: DocxPacker, HeadingLevel } = docx
 
     // Create DOCX
-    const summaryParagraphs = summary.split(/\n\n+/).filter((p: string) => p.trim()).map((p: string) => p.trim())
+    const summaryParagraphs = splitSummaryIntoParagraphs(summary)
 
     const doc = new DocxDocument({
       sections: [{
@@ -246,51 +271,12 @@ Provide a well-structured summary.`
       type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
     })
 
-    const sanitizedTopic = (stickData.topic || 'Untitled')
-      .replaceAll(/[^a-zA-Z0-9\s-]/g, '')
-      .replaceAll(/\s+/g, '-')
-      .toLowerCase()
-      .substring(0, 50)
-
-    const filename = `${sanitizedTopic}-export-${Date.now()}.docx`
+    const filename = generateExportFilename(stickData.topic)
     const blob = await put(filename, Buffer.from(await docxBlob.arrayBuffer()), { folder: 'documents' })
 
     // Save export link to details tab using stick's org_id
-    const stickOrgId = stickData.org_id
-    const exportLink = {
-      url: blob.url,
-      filename,
-      created_at: new Date().toISOString(),
-      type: 'complete_export',
-    }
-
-    const existingTab = await db.query(
-      `SELECT id, tab_data FROM paks_pad_stick_tabs WHERE stick_id = $1 AND tab_type = 'details' AND org_id = $2`,
-      [stickId, stickOrgId]
-    )
-
-    if (existingTab.rows.length > 0) {
-      let currentData: any = {}
-      try {
-        currentData = typeof existingTab.rows[0].tab_data === 'string'
-          ? JSON.parse(existingTab.rows[0].tab_data)
-          : existingTab.rows[0].tab_data || {}
-      } catch {
-        // Parse error ignored — using empty default for tab_data
-      }
-
-      const updatedExports = [...(currentData.exports || []), exportLink]
-      await db.query(
-        `UPDATE paks_pad_stick_tabs SET tab_data = $1, updated_at = NOW() WHERE id = $2 AND org_id = $3`,
-        [JSON.stringify({ ...currentData, exports: updatedExports }), existingTab.rows[0].id, stickOrgId]
-      )
-    } else {
-      await db.query(
-        `INSERT INTO paks_pad_stick_tabs (stick_id, user_id, org_id, tab_type, tab_name, tab_content, tab_data, tab_order)
-         VALUES ($1, $2, $3, 'details', 'Details', 'Stick details and exports', $4, 3)`,
-        [stickId, user.id, stickOrgId, JSON.stringify({ exports: [exportLink] })]
-      )
-    }
+    const exportLink = buildExportLink(blob.url, filename)
+    await saveExportLinkToDetailsTab(stickId, user.id, stickData.org_id, exportLink)
 
     return new Response(
       JSON.stringify({

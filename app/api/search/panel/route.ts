@@ -305,6 +305,8 @@ async function trackSearchAnalytics(
 }
 
 // Route handlers
+// NOTE: This v1 POST uses SearchCache, SearchAnalytics, and full reply fetching
+// which the v2/shared handler does not. Kept as-is for backward compatibility.
 export async function POST(request: Request) {
   const startTime = Date.now()
 
@@ -419,6 +421,7 @@ export async function POST(request: Request) {
   }
 }
 
+// GET: Suggestions - delegates to shared handler via database adapter (v1 uses trending_tags materialized view)
 export async function GET(request: Request) {
   try {
     const { user, error: authError } = await getCachedAuthUser()

@@ -5,6 +5,7 @@ import { getCachedAuthUser } from '@/lib/auth/cached-auth'
 import { getOrgContext } from '@/lib/auth/get-org-context'
 import { handleApiError } from '@/lib/api/handle-api-error'
 import { isUnderLegalHold } from '@/lib/legal-hold/check-hold'
+import { buildPatchUpdateData, canEditStick, canDeleteStick } from '@/lib/handlers/stick-detail-handler'
 
 export const dynamic = 'force-dynamic'
 
@@ -23,11 +24,6 @@ async function checkEditPermission(stickId: string, userId: string, orgId: strin
 
   const stick = stickResult.rows[0]
 
-  // Check ownership
-  if (stick.user_id === userId || stick.pad_owner_id === userId) {
-    return { hasPermission: true, stick }
-  }
-
   // Check membership
   const memberResult = await db.query(
     `SELECT role FROM paks_pad_members
@@ -35,10 +31,9 @@ async function checkEditPermission(stickId: string, userId: string, orgId: strin
     [stick.pad_id, userId, orgId]
   )
 
-  const canEdit =
-    memberResult.rows[0]?.role === 'admin' || memberResult.rows[0]?.role === 'edit'
+  const hasPermission = canEditStick(stick.user_id, stick.pad_owner_id, memberResult.rows[0]?.role, userId)
 
-  return { hasPermission: canEdit, stick }
+  return { hasPermission, stick }
 }
 
 // PUT /api/v2/sticks/[id] - Full update
@@ -129,36 +124,18 @@ export async function PATCH(
     }
 
     const body = await request.json()
+    const patchData = buildPatchUpdateData(body)
 
-    // Build dynamic update
+    // Build dynamic update from patchData (excluding updated_at which is handled by NOW())
     const updates: string[] = ['updated_at = NOW()']
     const values: any[] = []
     let paramCount = 0
 
-    if (body.topic !== undefined) {
+    for (const [key, value] of Object.entries(patchData)) {
+      if (key === 'updated_at') continue
       paramCount++
-      updates.push(`topic = $${paramCount}`)
-      values.push(body.topic)
-    }
-    if (body.content !== undefined) {
-      paramCount++
-      updates.push(`content = $${paramCount}`)
-      values.push(body.content)
-    }
-    if (body.details !== undefined) {
-      paramCount++
-      updates.push(`details = $${paramCount}`)
-      values.push(body.details)
-    }
-    if (body.color !== undefined) {
-      paramCount++
-      updates.push(`color = $${paramCount}`)
-      values.push(body.color)
-    }
-    if (body.is_quickstick !== undefined) {
-      paramCount++
-      updates.push(`is_quickstick = $${paramCount}`)
-      values.push(body.is_quickstick)
+      updates.push(`${key} = $${paramCount}`)
+      values.push(value)
     }
 
     paramCount++
@@ -221,19 +198,18 @@ export async function DELETE(
     const stick = stickResult.rows[0]
 
     // Check delete permission
-    const isStickOwner = stick.user_id === user.id
-    const isPadOwner = stick.pad_owner_id === user.id
-
-    if (!isStickOwner && !isPadOwner) {
+    let memberRole: string | undefined
+    if (stick.user_id !== user.id && stick.pad_owner_id !== user.id) {
       const memberResult = await db.query(
         `SELECT role FROM paks_pad_members
          WHERE pad_id = $1 AND user_id = $2 AND accepted = true AND org_id = $3`,
         [stick.pad_id, user.id, orgContext.orgId]
       )
+      memberRole = memberResult.rows[0]?.role
+    }
 
-      if (memberResult.rows[0]?.role !== 'admin') {
-        return new Response(JSON.stringify({ error: 'Permission denied' }), { status: 403 })
-      }
+    if (!canDeleteStick(stick.user_id, stick.pad_owner_id, memberRole, user.id)) {
+      return new Response(JSON.stringify({ error: 'Permission denied' }), { status: 403 })
     }
 
     if (await isUnderLegalHold(user.id, orgContext.orgId)) {

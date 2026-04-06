@@ -4,41 +4,15 @@ import { db } from '@/lib/database/pg-client'
 import { getCachedAuthUser } from '@/lib/auth/cached-auth'
 import { getOrgContext } from '@/lib/auth/get-org-context'
 import { handleApiError } from '@/lib/api/handle-api-error'
+import {
+  normalizeTabData,
+  getTabName,
+  getTabOrder,
+  getDefaultTabInserts,
+  TAB_SELECT_COLUMNS,
+} from '@/lib/handlers/stick-tabs-handler'
 
 export const dynamic = 'force-dynamic'
-
-function getTabName(tabType: string): string {
-  const tabNames: Record<string, string> = {
-    videos: 'Videos',
-    images: 'Images',
-    tags: 'Tags',
-    links: 'Links',
-  }
-  return tabNames[tabType] || 'Details'
-}
-
-function getTabOrder(tabType: string): number {
-  const tabOrders: Record<string, number> = {
-    videos: 1,
-    images: 2,
-    tags: 3,
-    links: 4,
-  }
-  return tabOrders[tabType] ?? 5
-}
-
-function normalizeTabData(input: any): Record<string, any> {
-  let obj = input
-  try {
-    if (obj && typeof obj === 'string') {
-      obj = JSON.parse(obj)
-    }
-  } catch {
-    obj = {}
-  }
-  if (!obj || typeof obj !== 'object') obj = {}
-  return obj
-}
 
 async function checkStickPermissions(stickId: string, userId: string, orgId: string, action: 'read' | 'write') {
   const stickResult = await db.query(
@@ -112,7 +86,7 @@ export async function GET(
     }
 
     const tabsResult = await db.query(
-      `SELECT id, stick_id, tab_name, tab_type, tab_content, tab_data, tab_order, created_at, updated_at, org_id
+      `SELECT ${TAB_SELECT_COLUMNS}
        FROM paks_pad_stick_tabs
        WHERE stick_id = $1 AND org_id = $2
        ORDER BY tab_order ASC`,
@@ -126,22 +100,19 @@ export async function GET(
 
     // Create default tabs if none exist
     if (tabs.length === 0) {
-      const defaultTabs = [
-        { tab_name: 'Main', tab_type: 'main', tab_order: 0 },
-        { tab_name: 'Details', tab_type: 'details', tab_order: 1 },
-      ]
+      const defaultTabs = getDefaultTabInserts(stickId, user.id, orgContext.orgId)
 
       for (const tab of defaultTabs) {
         await db.query(
           `INSERT INTO paks_pad_stick_tabs
            (stick_id, user_id, org_id, tab_name, tab_type, tab_content, tab_data, tab_order)
            VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
-          [stickId, user.id, orgContext.orgId, tab.tab_name, tab.tab_type, '', '{}', tab.tab_order]
+          [tab.stick_id, tab.user_id, tab.org_id, tab.tab_name, tab.tab_type, tab.tab_content, '{}', tab.tab_order]
         )
       }
 
       const newTabsResult = await db.query(
-        `SELECT id, stick_id, tab_name, tab_type, tab_content, tab_data, tab_order, created_at, updated_at, org_id
+        `SELECT ${TAB_SELECT_COLUMNS}
          FROM paks_pad_stick_tabs
          WHERE stick_id = $1 AND org_id = $2
          ORDER BY tab_order ASC`,
