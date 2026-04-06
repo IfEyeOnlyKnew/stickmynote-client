@@ -176,6 +176,8 @@ export function ImageTabContent({
   return (
     <div
       ref={dropZoneRef}
+      role="region"
+      aria-label="Image drop zone"
       className="space-y-4 px-2"
       onDrop={handleDrop}
       onDragOver={handleDragOver}

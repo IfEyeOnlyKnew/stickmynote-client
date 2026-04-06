@@ -121,6 +121,7 @@ export function NoteContentEditor({
       </div>
 
       {/* Native <dialog> with showModal() — renders in browser top layer, above ALL stacking contexts */}
+      {/* eslint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-noninteractive-element-interactions -- dialog backdrop close is standard UX */}
       <dialog
         ref={expandDialogRef}
         onClick={(e) => { if (e.target === expandDialogRef.current) expandDialogRef.current?.close() }}
