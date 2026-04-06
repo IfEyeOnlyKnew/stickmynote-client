@@ -299,6 +299,7 @@ export function NotedDrawingCanvas({
               type="button"
               key={color}
               onClick={() => setActiveColor(color)}
+              aria-label={`Select color ${color}`}
               className={cn(
                 "w-6 h-6 rounded-full border transition-all",
                 activeColor === color && "ring-2 ring-offset-1 ring-primary"

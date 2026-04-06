@@ -333,6 +333,7 @@ export function OptimisticSearchResultCard({
         <div className="flex items-center justify-between pt-3 border-t border-gray-200">
           <div className="flex items-center gap-4 text-sm text-gray-600">
             <button
+              type="button"
               onClick={handleLike}
               className={`flex items-center gap-1.5 hover:text-red-500 transition-colors ${
                 optimisticState.isLiked ? "text-red-500" : "text-gray-600"

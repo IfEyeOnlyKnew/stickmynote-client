@@ -275,12 +275,14 @@ export function Whiteboard({ onDrawAction, incomingActions, className }: Readonl
         <div className="flex gap-1 border-r pr-2">
           {COLORS.map((c) => (
             <button
+              type="button"
               key={c}
               className={`w-6 h-6 rounded-full border-2 transition-transform ${
                 color === c ? "scale-125 border-indigo-500" : "border-gray-300 hover:scale-110"
               }`}
               style={{ backgroundColor: c }}
               onClick={() => setColor(c)}
+              aria-label={`Select color ${c}`}
             />
           ))}
         </div>
@@ -289,11 +291,13 @@ export function Whiteboard({ onDrawAction, incomingActions, className }: Readonl
         <div className="flex gap-1 border-r pr-2">
           {LINE_WIDTHS.map((w) => (
             <button
+              type="button"
               key={w}
               className={`w-8 h-8 rounded flex items-center justify-center ${
                 lineWidth === w ? "bg-indigo-100" : "hover:bg-gray-100"
               }`}
               onClick={() => setLineWidth(w)}
+              aria-label={`Line width ${w}`}
             >
               <div
                 className="rounded-full bg-current"

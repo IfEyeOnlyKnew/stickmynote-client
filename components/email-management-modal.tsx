@@ -403,6 +403,7 @@ export function EmailManagementModal({ open, onOpenChange }: Readonly<EmailManag
                           checked={selectedEmails.includes(email.email)}
                           onChange={() => toggleEmailSelection(email.id, email.email)}
                           className="rounded"
+                          aria-label={`Select ${email.email}`}
                         />
                         <div>
                           <span className="font-medium">{email.email}</span>

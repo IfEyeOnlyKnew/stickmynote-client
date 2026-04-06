@@ -459,6 +459,7 @@ export function ChannelChatView({
               <div className="flex flex-wrap gap-1 mt-1.5">
                 {msg.reactions.map((r) => (
                   <button
+                    type="button"
                     key={r.emoji}
                     onClick={() => toggleReaction(msg.id, r.emoji)}
                     className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs border transition-colors ${
@@ -476,6 +477,7 @@ export function ChannelChatView({
             {/* Thread indicator */}
             {!isThreadView && msg.thread_reply_count > 0 && (
               <button
+                type="button"
                 onClick={() => openThread(msg.id)}
                 className="flex items-center gap-1 mt-1 text-xs text-indigo-600 hover:text-indigo-800 hover:underline"
               >
@@ -503,6 +505,7 @@ export function ChannelChatView({
                   <div className="flex gap-1">
                     {REACTION_EMOJIS.map((emoji) => (
                       <button
+                        type="button"
                         key={emoji}
                         onClick={() => toggleReaction(msg.id, emoji)}
                         className="text-lg hover:scale-125 transition-transform p-1"

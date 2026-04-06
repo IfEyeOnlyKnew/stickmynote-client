@@ -368,6 +368,7 @@ export function PersonalGroupsSidebar({
                 key={c}
                 type="button"
                 onClick={() => setNewGroupColor(c)}
+                aria-label={`Select group color ${c}`}
                 className={`w-5 h-5 rounded-full transition-transform ${
                   newGroupColor === c ? "ring-2 ring-offset-1 ring-gray-400 scale-110" : "hover:scale-105"
                 }`}

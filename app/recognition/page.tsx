@@ -134,6 +134,7 @@ export default function RecognitionPage() {
                   <CardContent className="pt-0">
                     <div className="space-y-1">
                       <button
+                        type="button"
                         onClick={() => { setFilterValueId(null); setFeedKey(k => k + 1) }}
                         className={`w-full text-left px-3 py-2 rounded-md text-sm transition-colors ${
                           filterValueId ? "hover:bg-gray-50" : "bg-gray-100 font-medium"
@@ -143,6 +144,7 @@ export default function RecognitionPage() {
                       </button>
                       {values.map(value => (
                         <button
+                          type="button"
                           key={value.id}
                           onClick={() => { setFilterValueId(value.id); setFeedKey(k => k + 1) }}
                           className={`w-full text-left px-3 py-2 rounded-md text-sm transition-colors flex items-center gap-2 ${

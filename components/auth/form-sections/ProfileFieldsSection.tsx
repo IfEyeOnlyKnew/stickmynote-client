@@ -329,6 +329,7 @@ export function ProfileFieldsSection({ formData, updateField, isLoading }: Reado
                 type="button"
                 onClick={clearAvatar}
                 className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                aria-label="Clear avatar"
               >
                 <X className="h-4 w-4" />
               </button>
@@ -340,6 +341,7 @@ export function ProfileFieldsSection({ formData, updateField, isLoading }: Reado
             accept="image/jpeg,image/jpg,image/png,image/webp,image/gif"
             onChange={handleAvatarUpload}
             className="hidden"
+            aria-label="Upload avatar image"
             disabled={isLoading || isUploading}
           />
           <Button

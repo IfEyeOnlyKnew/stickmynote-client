@@ -179,6 +179,7 @@ export function MediaUploadModal({ open, onClose, onUploadComplete, acceptedType
             type="file"
             accept={getAcceptString()}
             onChange={(e) => e.target.files?.[0] && handleFileSelect(e.target.files[0])}
+            aria-label="Upload media file"
             className="hidden"
           />
 

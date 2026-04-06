@@ -123,6 +123,7 @@ export function DayView({
                 >
                   <div className="flex items-start gap-3">
                     <button
+                      type="button"
                       onClick={(e) => {
                         e.stopPropagation()
                         onToggleComplete(task.id, task.calstick_completed)

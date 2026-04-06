@@ -226,6 +226,7 @@ export function EnhancedSearchInput({
             )}
             {suggestions.map((suggestion, index) => (
               <button
+                type="button"
                 key={`${suggestion.type}-${suggestion.value}-${index}`}
                 onClick={() => handleSuggestionClick(suggestion)}
                 className={`w-full px-4 py-3 flex items-center gap-3 hover:bg-indigo-50 transition-colors cursor-pointer ${

@@ -501,7 +501,7 @@ export function RecognitionTab() {
                   {userResults.length > 0 && (
                     <div className="absolute z-10 w-full mt-1 bg-white border rounded-lg shadow-lg max-h-40 overflow-y-auto">
                       {userResults.map(u => (
-                        <button key={u.id} onClick={() => { setSelectedAwardUser(u); setUserResults([]) }} className="w-full flex items-center gap-2 px-3 py-2 hover:bg-gray-50 text-left text-sm">
+                        <button type="button" key={u.id} onClick={() => { setSelectedAwardUser(u); setUserResults([]) }} className="w-full flex items-center gap-2 px-3 py-2 hover:bg-gray-50 text-left text-sm">
                           <Avatar className="h-6 w-6">
                             <AvatarImage src={u.avatar_url || undefined} />
                             <AvatarFallback className="text-[10px]">{getInitials(u.full_name)}</AvatarFallback>

@@ -903,6 +903,7 @@ export function PadChatSettingsDialog({
                         <div className="flex gap-2">
                           {DAYS_OF_WEEK.map((day) => (
                             <button
+                              type="button"
                               key={day.value}
                               onClick={() => toggleDay(day.value)}
                               className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${

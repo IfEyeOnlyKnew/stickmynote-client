@@ -98,6 +98,7 @@ export function Leaderboard({ compact = false, maxEntries }: Readonly<Leaderboar
           <div className="flex gap-1 bg-gray-100 rounded-lg p-1">
             {PERIOD_OPTIONS.map(opt => (
               <button
+                type="button"
                 key={opt.value}
                 onClick={() => setPeriod(opt.value)}
                 className={`px-3 py-1.5 text-sm rounded-md transition-colors ${
@@ -115,6 +116,7 @@ export function Leaderboard({ compact = false, maxEntries }: Readonly<Leaderboar
               const Icon = opt.icon
               return (
                 <button
+                  type="button"
                   key={opt.value}
                   onClick={() => setSortBy(opt.value)}
                   className={`flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-md transition-colors ${

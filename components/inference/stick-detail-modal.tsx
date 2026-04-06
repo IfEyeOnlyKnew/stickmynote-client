@@ -1127,6 +1127,7 @@ export function StickDetailModal({ open, onOpenChange, stickId, onUpdate }: Read
                           {/* View Mode Toggle */}
                           <div className="flex items-center bg-gray-100 rounded-lg p-0.5">
                             <button
+                              type="button"
                               onClick={() => setViewMode('grouped')}
                               className={`px-2 sm:px-3 py-1 sm:py-1.5 text-xs sm:text-sm font-medium rounded-md transition-all flex items-center gap-1 sm:gap-1.5 ${
                                 viewMode === 'grouped'
@@ -1138,6 +1139,7 @@ export function StickDetailModal({ open, onOpenChange, stickId, onUpdate }: Read
                               <span className="hidden sm:inline">Grouped</span>
                             </button>
                             <button
+                              type="button"
                               onClick={() => setViewMode('timeline')}
                               className={`px-2 sm:px-3 py-1 sm:py-1.5 text-xs sm:text-sm font-medium rounded-md transition-all flex items-center gap-1 sm:gap-1.5 ${
                                 viewMode === 'timeline'
@@ -1155,6 +1157,7 @@ export function StickDetailModal({ open, onOpenChange, stickId, onUpdate }: Read
                       {/* Category Tabs (Horizontal) */}
                       <div className="relative">
                         <button
+                          type="button"
                           onClick={() => scrollCategoryTabs('left')}
                           className="absolute left-0 top-1/2 -translate-y-1/2 z-10 bg-white/90 shadow-md rounded-full p-1 hover:bg-gray-100"
                           aria-label="Scroll left"
@@ -1167,6 +1170,7 @@ export function StickDetailModal({ open, onOpenChange, stickId, onUpdate }: Read
                           style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
                         >
                           <button
+                            type="button"
                             onClick={resetCategories}
                             className={`px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap transition-all border ${
                               selectedCategories.length === REPLY_CATEGORIES.length
@@ -1181,6 +1185,7 @@ export function StickDetailModal({ open, onOpenChange, stickId, onUpdate }: Read
                             const isSelected = selectedCategories.length === 1 && selectedCategories[0] === category.value
                             return (
                               <button
+                                type="button"
                                 key={category.value}
                                 onClick={() => selectOnlyCategory(category.value)}
                                 className={`px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap transition-all border ${
@@ -1195,6 +1200,7 @@ export function StickDetailModal({ open, onOpenChange, stickId, onUpdate }: Read
                           })}
                         </div>
                         <button
+                          type="button"
                           onClick={() => scrollCategoryTabs('right')}
                           className="absolute right-0 top-1/2 -translate-y-1/2 z-10 bg-white/90 shadow-md rounded-full p-1 hover:bg-gray-100"
                           aria-label="Scroll right"

@@ -375,7 +375,7 @@ function VideoCallContent({ roomName, onLeave, userName, isMinimized }: Readonly
         <PopoverContent className="w-full p-2 bg-slate-900 border-slate-800" side="top">
           <div className="flex gap-2">
             {["\u{1F44D}", "\u{1F44F}", "\u2764\uFE0F", "\u{1F602}", "\u{1F62E}", "\u{1F389}"].map((emoji) => (
-              <button key={emoji} className="text-2xl hover:scale-125 transition-transform" onClick={() => sendReaction(emoji)}>
+              <button type="button" key={emoji} className="text-2xl hover:scale-125 transition-transform" onClick={() => sendReaction(emoji)}>
                 {emoji}
               </button>
             ))}
@@ -559,6 +559,7 @@ function VideoEffectsSettings({ videoEffect, backgroundImage, applyVideoEffect, 
           <div className="grid grid-cols-2 gap-2 mt-2">
             {presetBackgrounds.map((bg) => (
               <button
+                type="button"
                 key={bg.name}
                 className={`relative aspect-video rounded-md overflow-hidden border-2 transition-all ${
                   backgroundImage === bg.url ? "border-indigo-500 ring-2 ring-indigo-500/50" : "border-slate-700 hover:border-slate-500"

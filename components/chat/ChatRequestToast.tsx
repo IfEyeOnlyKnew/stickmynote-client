@@ -115,8 +115,10 @@ export function ChatRequestToast({
 
           {/* Close button */}
           <button
+            type="button"
             onClick={handleDismiss}
             className="flex-shrink-0 p-1 hover:bg-gray-100 rounded transition-colors"
+            aria-label="Dismiss"
           >
             <X className="h-4 w-4 text-gray-400" />
           </button>

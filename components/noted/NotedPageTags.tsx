@@ -92,6 +92,7 @@ export function NotedPageTags({ pageId, title, content }: Readonly<NotedPageTags
             type="button"
             onClick={() => handleRemoveTag(tag.id)}
             className="hover:bg-muted rounded-sm p-0.5"
+            aria-label={`Remove tag ${tag.name}`}
           >
             <X className="h-2.5 w-2.5" />
           </button>
@@ -125,6 +126,7 @@ export function NotedPageTags({ pageId, title, content }: Readonly<NotedPageTags
                   type="button"
                   key={color}
                   onClick={() => setSelectedColor(color)}
+                  aria-label={`Select tag color ${color}`}
                   className={cn(
                     "w-5 h-5 rounded-full transition-all",
                     selectedColor === color && "ring-2 ring-offset-1 ring-primary"

@@ -185,6 +185,7 @@ export function SearchFiltersPanel({
                   const isSelected = filters.colors?.includes(color)
                   return (
                     <button
+                      type="button"
                       key={color}
                       onClick={() => handleColorToggle(color)}
                       className={`h-10 w-10 rounded-lg transition-all ${

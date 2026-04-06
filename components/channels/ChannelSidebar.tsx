@@ -120,6 +120,7 @@ export function ChannelSidebar({ orgId, currentUserId, onCreateChannel, onCreate
 
     return (
       <button
+        type="button"
         key={channel.id}
         onClick={() => navigateToChannel(channel.id)}
         className={`w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-sm transition-colors group ${
@@ -166,6 +167,7 @@ export function ChannelSidebar({ orgId, currentUserId, onCreateChannel, onCreate
     return (
       <div key={category.id} className="mb-1">
         <button
+          type="button"
           onClick={() => toggleCategory(category.id)}
           className="w-full flex items-center gap-1 px-2 py-1 text-xs font-semibold text-gray-500 uppercase tracking-wider hover:text-gray-700 group"
         >
@@ -233,6 +235,7 @@ export function ChannelSidebar({ orgId, currentUserId, onCreateChannel, onCreate
         <div className="p-2 space-y-1">
           {/* Direct Messages section */}
           <button
+            type="button"
             onClick={() => router.push("/chats")}
             className={`w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-sm transition-colors ${
               pathname === "/chats"

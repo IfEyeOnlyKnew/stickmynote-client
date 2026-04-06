@@ -1098,6 +1098,7 @@ body.fullscreen-modal-open .fixed:not([style*="z-index: 2147483647"]) {
 /* Enhanced Control Panel Styles */
 .glass-effect {
   background: rgba(255, 255, 255, 0.95);
+  -webkit-backdrop-filter: blur(10px);
   backdrop-filter: blur(10px);
 }
 
@@ -1319,6 +1320,7 @@ body.fullscreen-modal-open .fixed:not([style*="z-index: 2147483647"]) {
 /* Timestamp Subtle Style */
 .panel-timestamp {
   background: rgba(255, 255, 255, 0.9);
+  -webkit-backdrop-filter: blur(4px);
   backdrop-filter: blur(4px);
   padding: 4px 8px;
   border-radius: 4px;
@@ -1763,6 +1765,7 @@ body.fullscreen-modal-open .fixed:not([style*="z-index: 2147483647"]) {
   position: absolute;
   inset: 0;
   background: rgba(255, 255, 255, 0.9);
+  -webkit-backdrop-filter: blur(2px);
   backdrop-filter: blur(2px);
   display: flex;
   align-items: center;
@@ -1880,7 +1883,6 @@ body.fullscreen-modal-open .fixed:not([style*="z-index: 2147483647"]) {
 
 /* Smooth momentum scrolling for touch */
 .scroll-touch {
-  -webkit-overflow-scrolling: touch;
   overscroll-behavior: contain;
 }
 
@@ -2051,7 +2053,6 @@ body.fullscreen-modal-open .fixed:not([style*="z-index: 2147483647"]) {
 @media (max-width: 767px) {
   .table-responsive {
     overflow-x: auto;
-    -webkit-overflow-scrolling: touch;
   }
 
   .table-responsive table {

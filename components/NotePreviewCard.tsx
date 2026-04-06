@@ -115,6 +115,7 @@ export const NotePreviewCard: React.FC<NotePreviewCardProps> = ({
               <Popover open={colorPickerOpen} onOpenChange={setColorPickerOpen}>
                 <PopoverTrigger asChild>
                   <button
+                    type="button"
                     onClick={handleColorPickerClick}
                     className="p-1 rounded hover:bg-gray-100 transition-colors"
                     title="Change border color"
@@ -133,6 +134,7 @@ export const NotePreviewCard: React.FC<NotePreviewCardProps> = ({
                   <div className="grid grid-cols-4 gap-1">
                     {COLORS.map((color) => (
                       <button
+                        type="button"
                         key={color.value}
                         onClick={(e) => handleColorSelect(color.value, e)}
                         className={`

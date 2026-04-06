@@ -220,6 +220,7 @@ export function LibraryPanel({ stickId, stickType, readOnly, className, onFileCo
               multiple
               className="hidden"
               onChange={handleUpload}
+              aria-label="Upload files"
               accept=".jpg,.jpeg,.png,.gif,.webp,.svg,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.csv,.zip,.mp4,.webm,.mp3,.wav"
             />
             <Button

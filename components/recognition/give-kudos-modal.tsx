@@ -167,7 +167,7 @@ export function GiveKudosModal({ open, onOpenChange, onSuccess, preselectedUserI
                     <AvatarFallback className="text-[10px]">{getInitials(user.full_name)}</AvatarFallback>
                   </Avatar>
                   {user.full_name}
-                  <button onClick={() => removeUser(user.id)} className="ml-0.5 hover:text-red-500">
+                  <button type="button" onClick={() => removeUser(user.id)} className="ml-0.5 hover:text-red-500" aria-label="Remove user">
                     <X className="h-3 w-3" />
                   </button>
                 </Badge>
@@ -188,6 +188,7 @@ export function GiveKudosModal({ open, onOpenChange, onSuccess, preselectedUserI
               <div className="absolute z-10 w-full mt-1 bg-white border rounded-lg shadow-lg max-h-48 overflow-y-auto">
                 {searchResults.map(user => (
                   <button
+                    type="button"
                     key={user.id}
                     onClick={() => addUser(user)}
                     className="w-full flex items-center gap-3 px-3 py-2 hover:bg-gray-50 text-left"
@@ -218,6 +219,7 @@ export function GiveKudosModal({ open, onOpenChange, onSuccess, preselectedUserI
               <div className="flex flex-wrap gap-2">
                 {values.map(value => (
                   <button
+                    type="button"
                     key={value.id}
                     onClick={() => setSelectedValue(selectedValue === value.id ? null : value.id)}
                     className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm border transition-all ${

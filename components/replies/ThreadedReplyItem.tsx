@@ -357,6 +357,7 @@ export const ThreadedReplyItem = memo(function ThreadedReplyItem({
             {/* Collapse/expand button for nested replies */}
             {hasReplies && (
               <button
+                type="button"
                 onClick={toggleCollapse}
                 className={`flex items-center gap-1 text-xs ${depthColors.text} hover:underline mt-2`}
               >

@@ -108,6 +108,7 @@ export function PWAInstallPrompt() {
             )}
           </div>
           <button
+            type="button"
             onClick={handleDismiss}
             className="shrink-0 rounded-full p-1 hover:bg-muted transition-colors"
             aria-label="Dismiss install prompt"

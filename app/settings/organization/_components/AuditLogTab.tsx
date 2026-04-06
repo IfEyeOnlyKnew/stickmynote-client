@@ -415,7 +415,7 @@ export function AuditLogTab({ currentOrgId }: Readonly<AuditLogTabProps>) {
                     <th className="text-left p-3 font-medium">Action</th>
                     <th className="text-left p-3 font-medium">Resource</th>
                     <th className="text-left p-3 font-medium">IP Address</th>
-                    <th className="text-left p-3 font-medium w-10"></th>
+                    <th className="text-left p-3 font-medium w-10"><span className="sr-only">Details</span></th>
                   </tr>
                 </thead>
                 <tbody>

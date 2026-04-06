@@ -428,6 +428,7 @@ export const ReplyCard = memo(function ReplyCard({
             {/* Collapse/expand button for nested replies */}
             {hasReplies && (
               <button
+                type="button"
                 onClick={() => setIsCollapsed(!isCollapsed)}
                 className={`flex items-center gap-1 text-xs ${depthColors.text} hover:underline mt-2`}
               >

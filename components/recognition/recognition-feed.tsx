@@ -221,6 +221,7 @@ export function RecognitionFeed({ filterValueId }: Readonly<RecognitionFeedProps
               <div className="flex items-center gap-4 mt-4 pl-[52px]">
                 {/* Quick reaction */}
                 <button
+                  type="button"
                   onClick={() => toggleReaction(item.kudos_id, "celebrate")}
                   className={`flex items-center gap-1.5 text-sm px-3 py-1.5 rounded-full transition-all ${
                     item.user_has_reacted
@@ -236,6 +237,7 @@ export function RecognitionFeed({ filterValueId }: Readonly<RecognitionFeedProps
                 <div className="flex items-center gap-0.5">
                   {KUDOS_REACTION_TYPES.slice(1).map(rt => (
                     <button
+                      type="button"
                       key={rt.type}
                       onClick={() => toggleReaction(item.kudos_id, rt.type)}
                       className="p-1.5 rounded-full hover:bg-gray-100 text-sm transition-transform hover:scale-125"
@@ -248,6 +250,7 @@ export function RecognitionFeed({ filterValueId }: Readonly<RecognitionFeedProps
 
                 {/* Comments toggle */}
                 <button
+                  type="button"
                   onClick={() => toggleComments(item.kudos_id)}
                   className="flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-700 ml-auto"
                 >

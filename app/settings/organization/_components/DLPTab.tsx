@@ -274,7 +274,7 @@ export function DLPTab({ currentOrgId }: Readonly<DLPTabProps>) {
                   {(dlp.allowed_webhook_domains || []).map((domain) => (
                     <Badge key={domain} variant="secondary" className="gap-1">
                       {domain}
-                      <button onClick={() => removeDomain("webhook", domain)} className="ml-1 hover:text-destructive">
+                      <button type="button" onClick={() => removeDomain("webhook", domain)} className="ml-1 hover:text-destructive" aria-label={`Remove ${domain}`}>
                         <X className="h-3 w-3" />
                       </button>
                     </Badge>
@@ -305,7 +305,7 @@ export function DLPTab({ currentOrgId }: Readonly<DLPTabProps>) {
                   {(dlp.allowed_invite_domains || []).map((domain) => (
                     <Badge key={domain} variant="secondary" className="gap-1">
                       {domain}
-                      <button onClick={() => removeDomain("invite", domain)} className="ml-1 hover:text-destructive">
+                      <button type="button" onClick={() => removeDomain("invite", domain)} className="ml-1 hover:text-destructive" aria-label={`Remove ${domain}`}>
                         <X className="h-3 w-3" />
                       </button>
                     </Badge>
@@ -398,7 +398,7 @@ export function DLPTab({ currentOrgId }: Readonly<DLPTabProps>) {
                   {(dlp.scan_patterns || []).map((pattern) => (
                     <Badge key={pattern} variant="secondary" className="gap-1 font-mono text-xs">
                       {pattern}
-                      <button onClick={() => removeCustomPattern(pattern)} className="ml-1 hover:text-destructive">
+                      <button type="button" onClick={() => removeCustomPattern(pattern)} className="ml-1 hover:text-destructive" aria-label={`Remove ${pattern}`}>
                         <X className="h-3 w-3" />
                       </button>
                     </Badge>

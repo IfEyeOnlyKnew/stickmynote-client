@@ -176,6 +176,7 @@ export function CsvEmailUpload({ onEmailsUploaded, className }: Readonly<CsvEmai
                 type="file"
                 accept=".csv,text/csv"
                 onChange={handleFileInputChange}
+                aria-label="Upload CSV file"
                 className="hidden"
               />
             </div>
