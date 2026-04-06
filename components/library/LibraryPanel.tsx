@@ -312,7 +312,7 @@ export function LibraryPanel({ stickId, stickType, readOnly, className, onFileCo
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-0.5 flex-shrink-0" onClick={(e) => e.stopPropagation()}>
+                  <div role="toolbar" className="flex items-center gap-0.5 flex-shrink-0" onClick={(e) => e.stopPropagation()} onKeyDown={(e) => e.stopPropagation()}>
                     <Button
                       variant="ghost"
                       size="sm"

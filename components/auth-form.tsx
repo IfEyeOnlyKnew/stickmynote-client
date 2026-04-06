@@ -83,7 +83,7 @@ export function AuthForm({ mode = "signin" }: Readonly<AuthFormProps>) {
         <CardHeader className="space-y-1">
           <CardTitle className="text-2xl font-bold text-center">Welcome</CardTitle>
           <CardDescription className="text-center">
-            Sign in to your account or create a new one
+            Sign in to your account or create a new one{" "}
             <span className="block text-green-600 text-xs mt-1">✅ Access Code Verified</span>
           </CardDescription>
         </CardHeader>

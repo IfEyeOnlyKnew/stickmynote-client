@@ -215,7 +215,7 @@ export function GiveKudosModal({ open, onOpenChange, onSuccess, preselectedUserI
           {/* Recognition Values */}
           {values.length > 0 && (
             <div>
-              <label className="text-sm font-medium text-gray-700 mb-2 block">Recognize for</label>
+              <span className="text-sm font-medium text-gray-700 mb-2 block">Recognize for</span>
               <div className="flex flex-wrap gap-2">
                 {values.map(value => (
                   <button

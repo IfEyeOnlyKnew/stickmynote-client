@@ -159,6 +159,8 @@ export function CsvEmailUpload({ onEmailsUploaded, className }: Readonly<CsvEmai
         {!uploadResult && (
           <>
             <div
+              role="region"
+              aria-label="File drop zone"
               className={`border-2 border-dashed rounded-lg p-6 text-center transition-colors ${
                 isDragOver ? "border-blue-500 bg-blue-50" : "border-gray-300 hover:border-gray-400"
               }`}

@@ -152,7 +152,6 @@ export function StickContentEditor({
       <dialog
         ref={expandDialogRef}
         onClick={(e) => { if (e.target === expandDialogRef.current) expandDialogRef.current?.close() }}
-        onKeyDown={(e) => { if (e.key === "Escape") expandDialogRef.current?.close() }}
         className="backdrop:bg-black/50 bg-transparent p-0 border-none max-w-[700px] w-[90vw] max-h-[85vh] rounded-lg"
       >
         <div className="bg-white rounded-lg shadow-2xl flex flex-col max-h-[85vh]">

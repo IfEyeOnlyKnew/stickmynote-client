@@ -63,7 +63,7 @@ export async function encryptForOrg(plaintext: string, orgId: string): Promise<s
     combined.set(new Uint8Array(ciphertext), iv.length)
 
     // Return base64-encoded result
-    return btoa(String.fromCharCode(...combined))
+    return btoa(String.fromCodePoint(...combined))
   } catch (error) {
     console.error("[Encryption] Failed to encrypt data:", error)
     throw new Error("Encryption failed")
@@ -78,7 +78,7 @@ export async function decryptForOrg(encryptedData: string, orgId: string): Promi
     const key = await deriveOrgKey(orgId)
 
     // Decode base64
-    const combined = Uint8Array.from(atob(encryptedData), (c) => c.charCodeAt(0))
+    const combined = Uint8Array.from(atob(encryptedData), (c) => c.codePointAt(0)!)
 
     // Extract IV and ciphertext
     const iv = combined.slice(0, IV_LENGTH)

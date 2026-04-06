@@ -36,7 +36,7 @@ function diffLines(oldText: string, newText: string): { type: "same" | "added" |
 
   // Simple LCS-based diff
   const lcs: number[][] = Array.from({ length: oldLines.length + 1 }, () =>
-    Array(newLines.length + 1).fill(0)
+    new Array(newLines.length + 1).fill(0)
   )
   for (let i = 1; i <= oldLines.length; i++) {
     for (let j = 1; j <= newLines.length; j++) {

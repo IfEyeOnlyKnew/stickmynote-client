@@ -184,6 +184,8 @@ export function ImageTabContent({
     >
       {!readOnly && onPasteImage && (
         <div
+          role="region"
+          aria-label="Image drop zone"
           className={`border-2 border-dashed rounded-lg p-4 text-center transition-colors ${
             isDragOver
               ? "border-blue-500 bg-blue-50"

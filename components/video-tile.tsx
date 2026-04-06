@@ -76,7 +76,7 @@ export function VideoTile({
 
       {/* Audio Element (for remote participants) */}
       {!isLocal && (
-        <audio ref={audioRef} autoPlay playsInline>
+        <audio ref={audioRef} autoPlay>
           <track kind="captions" />
         </audio>
       )}

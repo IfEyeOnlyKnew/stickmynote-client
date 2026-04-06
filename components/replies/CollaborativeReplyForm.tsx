@@ -35,6 +35,7 @@ export const CollaborativeReplyForm: React.FC<CollaborativeReplyFormProps> = ({
   if (isCompact) {
     return (
       <div
+        role="group"
         className="reply-form-container space-y-3 p-4 bg-white rounded-md border-2 border-blue-300 shadow-lg"
         onClick={(e) => e.stopPropagation()}
         onKeyDown={(e) => e.stopPropagation()}

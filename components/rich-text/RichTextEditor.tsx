@@ -204,6 +204,7 @@ export function RichTextEditor({
 
   return (
     <div
+      role="group"
       tabIndex={0}
       className={cn("border border-gray-300 rounded-md", className)}
       onKeyDown={handleContainerKeyDown}

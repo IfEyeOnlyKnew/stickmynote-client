@@ -230,10 +230,11 @@ export function NotificationsModal({ open, onOpenChange }: Readonly<Notification
         <CardContent className="p-0">
           {/* Group header */}
           <div
+            role="button"
             tabIndex={0}
             className="flex items-center gap-3 p-4 cursor-pointer hover:bg-gray-50"
             onClick={() => group.notifications.length > 1 && toggleGroup(group.key)}
-            onKeyDown={(e) => e.key === "Enter" && group.notifications.length > 1 && toggleGroup(group.key)}
+            onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); group.notifications.length > 1 && toggleGroup(group.key) } }}
           >
             <div className="shrink-0">{getActivityIcon(group.activityTypes)}</div>
 

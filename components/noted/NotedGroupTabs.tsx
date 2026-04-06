@@ -192,9 +192,11 @@ export function NotedGroupTabs({
                     {/* Expand/collapse toggle */}
                     {hasChildren ? (
                       <span
+                        role="button"
+                        tabIndex={0}
                         aria-label={isExpanded ? "Collapse group" : "Expand group"}
                         onClick={(e) => toggleExpand(group.id, e)}
-                        onKeyDown={(e) => e.key === "Enter" && toggleExpand(group.id, e as unknown as React.MouseEvent)}
+                        onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); toggleExpand(group.id, e as unknown as React.MouseEvent) } }}
                         className="h-4 w-4 flex items-center justify-center shrink-0"
                       >
                         {isExpanded ? (
@@ -217,6 +219,8 @@ export function NotedGroupTabs({
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
                         <span
+                          role="button"
+                          tabIndex={0}
                           onClick={(e) => e.stopPropagation()}
                           onKeyDown={(e) => e.stopPropagation()}
                           className={cn(

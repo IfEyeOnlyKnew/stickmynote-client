@@ -248,7 +248,7 @@ export default function HomePage() {
                     {/* Topic field */}
                     <div>
                       <div className="flex items-center justify-between mb-1">
-                        <label className="text-xs font-medium text-gray-600">Topic</label>
+                        <span className="text-xs font-medium text-gray-600">Topic</span>
                         <span className="text-[10px] text-gray-400">
                           {(() => { if (typed.label === "Task") return "22"; if (typed.label === "Video") return "10"; if (typed.label === "Ask AI") return "14"; return "11" })()}/75
                         </span>
@@ -264,7 +264,7 @@ export default function HomePage() {
                     {/* Content field — typing happens here */}
                     <div>
                       <div className="flex items-center justify-between mb-1">
-                        <label className="text-xs font-medium text-gray-600">Content</label>
+                        <span className="text-xs font-medium text-gray-600">Content</span>
                         <span className="text-[10px] text-gray-400">{typed.text.length}/25000</span>
                       </div>
                       <div className="border border-gray-200 rounded-md px-2 py-2 min-h-[120px] bg-white">

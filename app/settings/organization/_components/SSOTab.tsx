@@ -490,7 +490,7 @@ export function SSOTab({ currentOrgId }: Readonly<SSOTabProps>) {
           {/* Callback URL Info */}
           <Alert>
             <AlertDescription>
-              <strong>Callback URL</strong> (add this to your IdP):
+              <strong>Callback URL</strong>{" "}(add this to your IdP):
               <code className="block mt-1 p-2 bg-muted rounded text-xs break-all">
                 {typeof globalThis.window === "undefined" ? "/api/auth/sso/callback" : `${globalThis.location.origin}/api/auth/sso/callback`}
               </code>

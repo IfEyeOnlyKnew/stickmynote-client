@@ -372,7 +372,7 @@ export const ReplyCard = memo(function ReplyCard({
 
             {/* Reply content */}
             {isEditing ? (
-              <div className="space-y-2" onClick={(e) => e.stopPropagation()} onKeyDown={(e) => e.stopPropagation()}>
+              <div role="group" className="space-y-2" onClick={(e) => e.stopPropagation()} onKeyDown={(e) => e.stopPropagation()}>
                 <Textarea
                   value={editContent}
                   onChange={(e) => setEditContent(e.target.value)}

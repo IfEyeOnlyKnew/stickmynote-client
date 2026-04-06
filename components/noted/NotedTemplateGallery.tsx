@@ -194,9 +194,10 @@ export function NotedTemplateGallery({
                   {filteredTemplates.map((template) => (
                     <div
                       key={template.id}
+                      role="button"
                       tabIndex={0}
                       onClick={() => setPreviewTemplate(template)}
-                      onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") setPreviewTemplate(template) }}
+                      onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setPreviewTemplate(template) } }}
                       className={cn(
                         "border rounded-lg p-3 cursor-pointer transition-all hover:shadow-sm",
                         previewTemplate?.id === template.id

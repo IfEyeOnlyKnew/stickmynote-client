@@ -119,9 +119,10 @@ export function NotedPageList({
             {pages.map((page) => (
               <div
                 key={page.id}
+                role="button"
                 tabIndex={0}
                 onClick={() => onSelectPage(page)}
-                onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") onSelectPage(page) }}
+                onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onSelectPage(page) } }}
                 className={cn(
                   "group flex items-start gap-2 p-3 rounded-lg cursor-pointer transition-colors",
                   selectedPageId === page.id
