@@ -49,6 +49,12 @@ interface CollaborativeRichTextEditorProps {
   enableCollaboration?: boolean
 }
 
+function getEditorExtraInfo(isUploading: boolean, enableCollab: boolean, connected: boolean): string | undefined {
+  if (isUploading) return "Uploading image..."
+  if (enableCollab && connected) return "Live collaboration enabled"
+  return undefined
+}
+
 export function CollaborativeRichTextEditor({
   documentId,
   content,
@@ -459,13 +465,7 @@ export function CollaborativeRichTextEditor({
       <EditorFooter
         currentLength={currentLength}
         maxLength={maxLength}
-        extraInfo={
-          isUploadingImage
-            ? "Uploading image..."
-            : shouldEnableCollaboration && isConnected
-              ? "Live collaboration enabled"
-              : undefined
-        }
+        extraInfo={getEditorExtraInfo(isUploadingImage, shouldEnableCollaboration, isConnected)}
       />
     </div>
   )

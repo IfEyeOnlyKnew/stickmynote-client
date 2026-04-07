@@ -19,7 +19,8 @@ export async function listMemberships(session: MembershipSession) {
       [session.user.org_id]
     )
     return { status: 200, body: { memberships } }
-  } catch (error) {
+  } catch {
+    // Expected - database query may fail safely
     return { status: 500, body: { error: 'Failed to list memberships' } }
   }
 }

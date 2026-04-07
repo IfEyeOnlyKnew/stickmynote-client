@@ -460,9 +460,9 @@ export async function POST(request: NextRequest) {
     const blob = await put(filename, Buffer.from(await docxBlob.arrayBuffer()), { folder: "documents" })
 
     const finalUrl = await tryCleanupDocx(blob.url, filename)
-    const message = finalUrl !== blob.url
-      ? "Complete note export generated and cleaned successfully"
-      : "Complete note export generated successfully"
+    const message = finalUrl === blob.url
+      ? "Complete note export generated successfully"
+      : "Complete note export generated and cleaned successfully"
 
     await saveExportLink(db, noteId, user.id, {
       url: finalUrl,

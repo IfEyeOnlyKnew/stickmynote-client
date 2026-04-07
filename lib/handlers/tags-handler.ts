@@ -24,7 +24,8 @@ export async function listTags(session: TagsSession) {
       [session.user.id, session.user.org_id]
     )
     return { status: 200, body: { tags } }
-  } catch (error) {
+  } catch {
+    // Expected - database query may fail safely
     return { status: 500, body: { error: 'Failed to list tags' } }
   }
 }
@@ -66,7 +67,8 @@ export async function updateTag(session: TagsSession, tagId: string, input: Upda
       return { status: 404, body: { error: 'Tag not found or not owned by user' } }
     }
     return { status: 200, body: { tag } }
-  } catch (error) {
+  } catch {
+    // Expected - database query may fail safely
     return { status: 500, body: { error: 'Failed to update tag' } }
   }
 }
@@ -82,7 +84,8 @@ export async function deleteTag(session: TagsSession, tagId: string) {
       return { status: 404, body: { error: 'Tag not found or not owned by user' } }
     }
     return { status: 200, body: { success: true } }
-  } catch (error) {
+  } catch {
+    // Expected - database query may fail safely
     return { status: 500, body: { error: 'Failed to delete tag' } }
   }
 }

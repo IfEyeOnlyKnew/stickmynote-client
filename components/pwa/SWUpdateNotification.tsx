@@ -9,7 +9,7 @@ export function SWUpdateNotification() {
   const [registration, setRegistration] = useState<ServiceWorkerRegistration | null>(null)
 
   useEffect(() => {
-    if (typeof globalThis.window === "undefined" || !("serviceWorker" in navigator)) return
+    if (globalThis.window === undefined || !("serviceWorker" in navigator)) return
     if (process.env.NODE_ENV !== "production") return
 
     // Listen for SW update messages

@@ -1,10 +1,10 @@
 // v1 Social Sticks API: thin wrapper over shared handler
 // Preserves v1-specific caching behavior via APICache
 import { NextResponse } from 'next/server'
-import { APICache, withCache } from '@/lib/api-cache'
+import { APICache } from '@/lib/api-cache'
 import { getCachedAuthUser, createRateLimitResponse, createUnauthorizedResponse } from '@/lib/auth/cached-auth'
 import { getOrgContext } from '@/lib/auth/get-org-context'
-import { listSticks, createStick, enrichSticksWithData } from '@/lib/handlers/inference-sticks-handler'
+import { listSticks, createStick } from '@/lib/handlers/inference-sticks-handler'
 import { toResponse } from '@/lib/handlers/inference-response'
 
 const LOG_PREFIX = '[InferenceSticks]'

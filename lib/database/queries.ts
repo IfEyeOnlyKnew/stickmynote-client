@@ -89,7 +89,9 @@ export async function getPersonalStickById(id: string, userId: string): Promise<
   )
 }
 
-export async function createPersonalStick(stick: Omit<PersonalStick, "id" | "created_at" | "updated_at">): Promise<PersonalStick | null> {
+type PersonalStickAutoFields = "id" | "created_at" | "updated_at"
+
+export async function createPersonalStick(stick: Omit<PersonalStick, PersonalStickAutoFields>): Promise<PersonalStick | null> {
   const fields = Object.keys(stick)
   const values = Object.values(stick)
   const placeholders = values.map((_, i) => `$${i + 1}`).join(", ")

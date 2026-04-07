@@ -61,6 +61,15 @@ function CalStickSyncIcon({ isCheckingSync, hasChanges }: Readonly<{ isCheckingS
   return <CheckSquare className="h-2.5 w-2.5" />
 }
 
+function getDepthStyles(depth: number) {
+  return {
+    depthColors: DEPTH_COLORS[depth % DEPTH_COLORS.length],
+    nextDepthColors: DEPTH_COLORS[(depth + 1) % DEPTH_COLORS.length],
+    indentPx: Math.min(depth * 16, 80),
+    threadLineLeft: depth > 0 ? Math.min((depth - 1) * 16, 64) + 6 : 0,
+  }
+}
+
 export const ReplyCard = memo(function ReplyCard({
   reply,
   depth = 0,
@@ -93,17 +102,12 @@ export const ReplyCard = memo(function ReplyCard({
   const isOwner = reply.user_id === currentUserId
   const canDelete = isOwner || isPadOwner || isAdmin
   const canEdit = isOwner
-  const hasReplies = reply.replies && reply.replies.length > 0
-  const replyCount = reply.replies?.length || 0
+  const hasReplies = (reply.replies?.length ?? 0) > 0
+  const replyCount = reply.replies?.length ?? 0
   const wasEdited = reply.updated_at !== reply.created_at
 
   // Get depth-based styling
-  const depthColors = DEPTH_COLORS[depth % DEPTH_COLORS.length]
-  const nextDepthColors = DEPTH_COLORS[(depth + 1) % DEPTH_COLORS.length]
-  // Reduce indentation for deeper nesting to prevent overflow (16px per level, max 80px)
-  const indentPx = Math.min(depth * 16, 80)
-  // Calculate thread line position based on reduced indentation
-  const threadLineLeft = depth > 0 ? Math.min((depth - 1) * 16, 64) + 6 : 0
+  const { depthColors, nextDepthColors, indentPx, threadLineLeft } = getDepthStyles(depth)
 
   // Focus textarea when opening reply form
   useEffect(() => {

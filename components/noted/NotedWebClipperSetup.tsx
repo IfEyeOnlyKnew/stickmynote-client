@@ -20,7 +20,7 @@ export function NotedWebClipperSetup({ open, onClose }: Readonly<NotedWebClipper
   const [copied, setCopied] = useState(false)
 
   // Bookmarklet code - clips selected text or page content to Noted
-  const bookmarkletCode = `javascript:void(function(){var s=window.getSelection().toString();var t=document.title;var u=window.location.href;var c=s||document.body.innerText.substring(0,2000);var d={title:t,url:u,selection:s?'<blockquote>'+s+'</blockquote>':'',content:s?'':'<p>'+c.substring(0,2000)+'</p>'};fetch('/api/noted/clip',{method:'POST',headers:{'Content-Type':'application/json'},credentials:'include',body:JSON.stringify(d)}).then(function(r){if(r.ok){alert('Clipped to Noted!')}else{alert('Failed to clip. Make sure you are logged in to Stick My Note.')}}).catch(function(){window.open('${typeof globalThis.window === "undefined" ? "" : globalThis.location.origin}/noted','_blank')})}())`
+  const bookmarkletCode = `javascript:void(function(){var s=window.getSelection().toString();var t=document.title;var u=window.location.href;var c=s||document.body.innerText.substring(0,2000);var d={title:t,url:u,selection:s?'<blockquote>'+s+'</blockquote>':'',content:s?'':'<p>'+c.substring(0,2000)+'</p>'};fetch('/api/noted/clip',{method:'POST',headers:{'Content-Type':'application/json'},credentials:'include',body:JSON.stringify(d)}).then(function(r){if(r.ok){alert('Clipped to Noted!')}else{alert('Failed to clip. Make sure you are logged in to Stick My Note.')}}).catch(function(){window.open('${globalThis.window === undefined ? "" : globalThis.location.origin}/noted','_blank')})}())`
 
   const handleCopy = () => {
     navigator.clipboard.writeText(bookmarkletCode)

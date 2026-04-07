@@ -99,6 +99,16 @@ function isSlotBusy(slotStart: Date, slotEnd: Date, busyTimes: BusyTime[]): Busy
   return null
 }
 
+function getSlotTitle(
+  myBusy: BusyTime | null,
+  participantConflicts: { email: string }[],
+  getDisplayName: (email: string) => string,
+): string {
+  if (myBusy) return `You: ${myBusy.title}`
+  if (participantConflicts.length > 0) return `Conflicts: ${participantConflicts.map((c) => getDisplayName(c.email)).join(", ")}`
+  return "Available"
+}
+
 // ----------------------------------------------------------------------------
 // Component
 // ----------------------------------------------------------------------------
@@ -451,13 +461,7 @@ export function SchedulingAssistant({
                             isSelected && "bg-green-100 dark:bg-green-900/30 ring-2 ring-green-500 ring-inset",
                             isToday(day) && !isSelected && "bg-orange-50/50 dark:bg-orange-950/10"
                           )}
-                          title={
-                            (() => {
-                              if (myBusy) return `You: ${myBusy.title}`
-                              if (participantConflicts.length > 0) return `Conflicts: ${participantConflicts.map((c) => getDisplayName(c.email)).join(", ")}`
-                              return "Available"
-                            })()
-                          }
+                          title={getSlotTitle(myBusy, participantConflicts, getDisplayName)}
                         >
                           {/* My busy indicator */}
                           {myBusy && (

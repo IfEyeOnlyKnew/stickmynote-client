@@ -20,7 +20,8 @@ export async function listWebhooks(session: WebhookSession) {
       [session.user.id, session.user.org_id]
     )
     return { status: 200, body: { webhooks } }
-  } catch (error) {
+  } catch {
+    // Expected - database query may fail safely
     return { status: 500, body: { error: 'Failed to list webhooks' } }
   }
 }

@@ -19,7 +19,8 @@ export async function listMultipaks(session: MultipakSession) {
       [session.user.id, session.user.org_id]
     )
     return { status: 200, body: { multipaks } }
-  } catch (error) {
+  } catch {
+    // Expected - database query may fail safely
     return { status: 500, body: { error: 'Failed to list multipaks' } }
   }
 }

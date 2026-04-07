@@ -39,6 +39,38 @@ interface StickSummaryCardProps {
   showGenerateButton?: boolean
 }
 
+function GenerateSummaryPlaceholder({ isLoading, onGenerate }: Readonly<{ isLoading: boolean; onGenerate: () => void }>) {
+  return (
+    <Card className="border-dashed border-blue-200 bg-blue-50/30 min-h-[140px]">
+      <CardContent className="py-6 text-center">
+        <Sparkles className="h-8 w-8 text-blue-400 mx-auto mb-3" />
+        <p className="text-sm text-gray-600 mb-3">
+          Generate an AI summary to track action items and suggested questions
+        </p>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={onGenerate}
+          disabled={isLoading}
+          className="border-blue-300 text-blue-700 hover:bg-blue-100 bg-transparent min-w-[160px]"
+        >
+          {isLoading ? (
+            <>
+              <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+              Generating...
+            </>
+          ) : (
+            <>
+              <Sparkles className="h-4 w-4 mr-2" />
+              Generate AI Summary
+            </>
+          )}
+        </Button>
+      </CardContent>
+    </Card>
+  )
+}
+
 export const StickSummaryCard = memo(function StickSummaryCard({
   summary,
   actionItems = [],
@@ -57,40 +89,11 @@ export const StickSummaryCard = memo(function StickSummaryCard({
   const isStale = summaryReplyCount !== undefined && replyCount > summaryReplyCount
   const newRepliesCount = isStale ? replyCount - summaryReplyCount : 0
 
-  if (!summary && !actionItems.length && !suggestedQuestions.length) {
-    if (showGenerateButton && onRegenerateSummary) {
-      return (
-        <Card className="border-dashed border-blue-200 bg-blue-50/30 min-h-[140px]">
-          <CardContent className="py-6 text-center">
-            <Sparkles className="h-8 w-8 text-blue-400 mx-auto mb-3" />
-            <p className="text-sm text-gray-600 mb-3">
-              Generate an AI summary to track action items and suggested questions
-            </p>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={onRegenerateSummary}
-              disabled={isLoading}
-              className="border-blue-300 text-blue-700 hover:bg-blue-100 bg-transparent min-w-[160px]"
-            >
-              {isLoading ? (
-                <>
-                  <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
-                  Generating...
-                </>
-              ) : (
-                <>
-                  <Sparkles className="h-4 w-4 mr-2" />
-                  Generate AI Summary
-                </>
-              )}
-            </Button>
-          </CardContent>
-        </Card>
-      )
-    }
-    return null
+  const hasContent = summary || actionItems.length > 0 || suggestedQuestions.length > 0
+  if (!hasContent && showGenerateButton && onRegenerateSummary) {
+    return <GenerateSummaryPlaceholder isLoading={isLoading} onGenerate={onRegenerateSummary} />
   }
+  if (!hasContent) return null
 
   const getStatusIcon = (status: string) => {
     switch (status) {

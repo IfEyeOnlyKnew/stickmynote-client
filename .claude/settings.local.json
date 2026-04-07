@@ -85,7 +85,23 @@
       "Bash(sed -i 's/social-gradient/inference-gradient/g' app/globals.css)",
       "Bash(sed -i 's/\\\\r$//' app/globals.css)",
       "Bash(mkdir -p \"c:/stick-my-note-dev/stickmynote-client-install/app/api/recognition/kudos/[kudosId]/reactions\")",
-      "Bash(mkdir -p \"c:/stick-my-note-dev/stickmynote-client-install/app/api/recognition/kudos/[kudosId]/comments\")"
+      "Bash(mkdir -p \"c:/stick-my-note-dev/stickmynote-client-install/app/api/recognition/kudos/[kudosId]/comments\")",
+      "WebSearch",
+      "Bash(npm install:*)",
+      "Bash(uipro init:*)",
+      "Bash(python3 .claude/skills/ui-ux-pro-max/scripts/search.py \"sticky notes playful creative board colorful skeuomorphic\" --design-system -p \"Stick My Note\")",
+      "Bash(python .claude/skills/ui-ux-pro-max/scripts/search.py \"sticky notes playful creative board colorful skeuomorphic\" --design-system -p \"Stick My Note\")",
+      "Bash(python .claude/skills/ui-ux-pro-max/scripts/search.py \"skeuomorphic paper texture handwritten craft\" --domain style -n 5)",
+      "Bash(python .claude/skills/ui-ux-pro-max/scripts/search.py \"creative playful warm colorful\" --domain color -n 5)",
+      "WebFetch(domain:ui-ux-pro-max-skill.nextlevelbuilder.io)",
+      "Skill(update-config)",
+      "Skill(update-config:*)",
+      "Bash(node -e \"let d='';process.stdin.on\\('data',c=>d+=c\\);process.stdin.on\\('end',\\(\\)=>{const j=JSON.parse\\(d\\);if\\(!j.tool_input.command.startsWith\\('git commit'\\)\\){process.exit\\(0\\)}const{execSync}=require\\('child_process'\\);try{const files=execSync\\('git diff --cached --name-only --diff-filter=d',{encoding:'utf8'}\\).trim\\(\\).split\\('\\\\n'\\).filter\\(f=>/\\\\.\\(ts|tsx\\)$/.test\\(f\\)\\);if\\(files.length===0\\){process.exit\\(0\\)}const result=execSync\\('npx eslint --no-warn-ignored '+files.join\\(' '\\),{encoding:'utf8',stdio:['pipe','pipe','pipe']}\\);console.log\\(JSON.stringify\\({hookSpecificOutput:{hookEventName:'PreToolUse',additionalContext:'ESLint passed on '+files.length+' staged file\\(s\\).'}}\\)\\);process.exit\\(0\\)}catch\\(e\\){console.log\\(JSON.stringify\\({hookSpecificOutput:{hookEventName:'PreToolUse',additionalContext:'ESLint found issues in staged files:\\\\\\\\n'+e.stdout+'\\\\\\\\nPlease fix these before committing.'}}\\)\\);process.exit\\(0\\)}}\\)\")",
+      "Bash(node -e \"let d='';process.stdin.on\\('data',c=>d+=c\\);process.stdin.on\\('end',\\(\\)=>{const j=JSON.parse\\(d\\);if\\(!j.tool_input.command.startsWith\\('git commit'\\)\\){process.exit\\(0\\)}console.log\\('would run eslint'\\)}\\)\")",
+      "Bash(node -e \"const fs=require\\('fs'\\);const j=JSON.parse\\(fs.readFileSync\\('.claude/settings.local.json','utf8'\\)\\);const hook=j.hooks.PreToolUse[0];console.log\\('matcher:',hook.matcher\\);console.log\\('if:',hook.if\\);console.log\\('type:',hook.hooks[0].type\\);console.log\\('timeout:',hook.hooks[0].timeout\\);console.log\\('statusMessage:',hook.hooks[0].statusMessage\\);console.log\\('JSON valid: OK'\\)\")",
+      "Bash(python3 -c ':*)",
+      "Bash(node -e ':*)",
+      "Read(//tmp/**)"
     ],
     "additionalDirectories": [
       "C:\\stick-my-note-ubuntu\\stickmynote-client\\scripts",
@@ -97,6 +113,22 @@
       "C:\\stick-my-note-dev\\stickmynote-client-install\\app\\api\\noted\\pages\\[id]",
       "c:\\stick-my-note-dev\\stickmynote-client-install\\app\\api\\sticks\\[id]",
       "c:\\stick-my-note-dev\\stickmynote-client-install\\app\\api\\personal-groups\\[id]"
+    ]
+  },
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node -e \"let d='';process.stdin.on('data',c=>d+=c);process.stdin.on('end',()=>{const{execSync}=require('child_process');try{const files=execSync('git diff --cached --name-only --diff-filter=d',{encoding:'utf8'}).trim().split('\\n').filter(f=>/\\.(ts|tsx)$/.test(f));if(files.length===0){process.exit(0)}execSync('npx eslint --no-warn-ignored '+files.join(' '),{encoding:'utf8',stdio:['pipe','pipe','pipe']});console.log(JSON.stringify({hookSpecificOutput:{hookEventName:'PreToolUse',additionalContext:'ESLint passed on '+files.length+' staged file(s).'}}));process.exit(0)}catch(e){console.log(JSON.stringify({hookSpecificOutput:{hookEventName:'PreToolUse',additionalContext:'ESLint found issues in staged files:\\n'+(e.stdout||'')+'\\nPlease fix these before committing.'}}));process.exit(0)}})\"",
+            "if": "Bash(git commit:*)",
+            "timeout": 60,
+            "statusMessage": "Running ESLint on staged files..."
+          }
+        ]
+      }
     ]
   }
 }

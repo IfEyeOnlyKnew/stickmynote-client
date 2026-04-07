@@ -22,7 +22,7 @@ export async function GET(request: NextRequest) {
 
     if (result.error) {
       return NextResponse.json(
-        { error: result.error, ...(result.data || {}) },
+        { error: result.error },
         { status: result.status },
       )
     }

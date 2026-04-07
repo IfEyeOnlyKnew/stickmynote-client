@@ -161,9 +161,9 @@ export function MobileStickCard({
       <Card className="w-full max-w-full min-w-0 overflow-hidden">
         <CardContent className="p-4 space-y-3">
           {/* Header: Checkbox, Color bar, Topic, Expand */}
-          <div className="flex items-start gap-2" role="button" tabIndex={0} onClick={handleCardClick} onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") handleCardClick?.(e as unknown as React.MouseEvent) }}>
+          <button type="button" className="flex items-start gap-2 bg-transparent border-none p-0 text-left w-full cursor-pointer" onClick={handleCardClick} onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") handleCardClick?.(e as unknown as React.MouseEvent) }}>
             {onSelect && (
-              <div role="presentation" onClick={(e) => e.stopPropagation()} onKeyDown={(e) => e.stopPropagation()}>
+              <div onClick={(e) => e.stopPropagation()} onKeyDown={(e) => e.stopPropagation()}>
                 <Checkbox
                   checked={isSelected}
                   onCheckedChange={handleCheckboxChange}
@@ -179,7 +179,7 @@ export function MobileStickCard({
                 {isExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
               </Button>
             )}
-          </div>
+          </button>
 
           {/* Status Badge */}
           <div className="flex items-center gap-2">

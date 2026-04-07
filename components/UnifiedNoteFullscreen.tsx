@@ -128,7 +128,7 @@ export const UnifiedNoteFullscreen: React.FC = () => {
         setReplySummary(data.summary || "Summary generated successfully.")
 
         // Refresh note tabs to show the new export in Details tab
-        if (typeof globalThis.window !== "undefined") {
+        if (globalThis.window !== undefined) {
           globalThis.dispatchEvent(new CustomEvent("refreshNoteTabs"))
         }
       } else {

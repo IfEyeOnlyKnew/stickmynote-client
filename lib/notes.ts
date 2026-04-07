@@ -15,13 +15,12 @@ import {
   transformDatabaseNote,
   transformPartialNote,
   buildNoteUpdatePayload,
-  buildNoteInsertPayload,
   getAuthenticatedUser,
 } from "@/lib/notes-shared"
 import type { Reply } from "@/types/note"
 
 // Re-export shared types for backward compatibility
-export type { Note, CreateNoteData, UpdateNoteData, CreateReplyData, NotesResponse }
+export type { Note, CreateNoteData, UpdateNoteData, CreateReplyData, NotesResponse } from "@/lib/notes-shared"
 
 /**
  * Upsert note tab data (tags, images, videos) via query builder

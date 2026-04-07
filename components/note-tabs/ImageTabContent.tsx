@@ -174,9 +174,8 @@ export function ImageTabContent({
   }, [])
 
   return (
-    <div
+    <section
       ref={dropZoneRef}
-      role="region"
       aria-label="Image drop zone"
       className="space-y-4 px-2"
       onDrop={handleDrop}
@@ -185,8 +184,7 @@ export function ImageTabContent({
       onDragLeave={handleDragLeave}
     >
       {!readOnly && onPasteImage && (
-        <div
-          role="region"
+        <section
           aria-label="Image drop zone"
           className={`border-2 border-dashed rounded-lg p-4 text-center transition-colors ${
             isDragOver
@@ -206,7 +204,7 @@ export function ImageTabContent({
               Copy an image and press Ctrl+V, or drag a file into this area
             </span>
           </div>
-        </div>
+        </section>
       )}
 
       {!readOnly && (
@@ -276,6 +274,6 @@ export function ImageTabContent({
           {!readOnly && <p className="text-sm">Paste, drop, or upload an image to get started</p>}
         </div>
       )}
-    </div>
+    </section>
   )
 }

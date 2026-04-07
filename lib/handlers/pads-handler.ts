@@ -28,7 +28,8 @@ export async function listPads(session: PadsSession, limit = 50, offset = 0) {
       [session.user.org_id, session.user.id, effectiveLimit, effectiveOffset]
     )
     return { status: 200, body: { pads } }
-  } catch (error) {
+  } catch {
+    // Expected - database query may fail safely
     return { status: 500, body: { error: 'Failed to list pads' } }
   }
 }

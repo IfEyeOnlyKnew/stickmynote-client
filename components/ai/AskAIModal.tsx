@@ -130,7 +130,7 @@ export function AskAIModal({ open, onOpenChange, stickId, stickType, onAnswerKep
 
       // Refresh note tabs to show the saved answer in Details tab
       // Dispatch both personal and stick tab refresh events
-      if (typeof globalThis.window !== "undefined") {
+      if (globalThis.window !== undefined) {
         globalThis.dispatchEvent(new CustomEvent("refreshNoteTabs"))
         globalThis.dispatchEvent(new CustomEvent("refreshStickTabs"))
       }

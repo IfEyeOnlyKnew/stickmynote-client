@@ -33,6 +33,10 @@ function plural(count: number): string {
   return count > 1 ? "s" : ""
 }
 
+function replyLabel(count: number): string {
+  return count > 1 ? "replies" : "reply"
+}
+
 export function generateDigestEmailHtml(data: DigestEmailData): string {
   const { userName, frequency, periodStart, periodEnd, totalNotifications, padSummaries, siteUrl } = data
 
@@ -50,7 +54,7 @@ export function generateDigestEmailHtml(data: DigestEmailData): string {
       </h3>
       <div style="display: flex; flex-wrap: wrap; gap: 12px; margin-bottom: 12px;">
         ${pad.newSticks > 0 ? `<span style="background: #dbeafe; color: #1e40af; padding: 4px 8px; border-radius: 4px; font-size: 12px;">📝 ${pad.newSticks} new stick${plural(pad.newSticks)}</span>` : ""}
-        ${pad.replies > 0 ? `<span style="background: #e0e7ff; color: #3730a3; padding: 4px 8px; border-radius: 4px; font-size: 12px;">💬 ${pad.replies} ${pad.replies > 1 ? "replies" : "reply"}</span>` : ""}
+        ${pad.replies > 0 ? `<span style="background: #e0e7ff; color: #3730a3; padding: 4px 8px; border-radius: 4px; font-size: 12px;">💬 ${pad.replies} ${replyLabel(pad.replies)}</span>` : ""}
         ${pad.statusChanges > 0 ? `<span style="background: #fef3c7; color: #92400e; padding: 4px 8px; border-radius: 4px; font-size: 12px;">🔄 ${pad.statusChanges} status change${plural(pad.statusChanges)}</span>` : ""}
         ${pad.unresolvedBlockers > 0 ? `<span style="background: #fee2e2; color: #991b1b; padding: 4px 8px; border-radius: 4px; font-size: 12px;">⚠️ ${pad.unresolvedBlockers} blocker${plural(pad.unresolvedBlockers)}</span>` : ""}
         ${pad.mentions > 0 ? `<span style="background: #f3e8ff; color: #6b21a8; padding: 4px 8px; border-radius: 4px; font-size: 12px;">@ ${pad.mentions} mention${plural(pad.mentions)}</span>` : ""}

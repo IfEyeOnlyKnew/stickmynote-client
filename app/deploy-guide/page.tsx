@@ -24,10 +24,17 @@ type RateHealth = {
   status: string
   redis: boolean
   fallback: boolean
-  provider?: "upstash-redis" | "upstash-kv" | "memory" | string
+  provider?: string
   envConfigured?: boolean
   warning?: string
   timestamp?: string
+}
+
+async function parseSettledJson<T>(result: PromiseSettledResult<Response>): Promise<T | null> {
+  if (result.status === "fulfilled" && result.value.ok) {
+    return await result.value.json() as T
+  }
+  return null
 }
 
 export default function DeployGuidePage() {
@@ -49,31 +56,13 @@ export default function DeployGuidePage() {
           fetch("/api/database-health", { cache: "no-store" }),
         ])
 
-        if (envR.status === "fulfilled" && envR.value.ok) {
-          const j = await envR.value.json()
-          setEnv(j)
-        } else {
-          setEnv(null)
-        }
-
-        if (rateR.status === "fulfilled" && rateR.value.ok) {
-          const j = (await rateR.value.json()) as RateHealth
-          setRate(j)
-        } else {
-          setRate(null)
-        }
-
+        setEnv(await parseSettledJson<EnvStatus>(envR))
+        setRate(await parseSettledJson<RateHealth>(rateR))
         setSeo({
           robots: robotsR.status === "fulfilled" && robotsR.value.ok,
           sitemap: sitemapR.status === "fulfilled" && sitemapR.value.ok,
         })
-
-        if (dbR.status === "fulfilled" && dbR.value.ok) {
-          const j = await dbR.value.json()
-          setDb(j)
-        } else {
-          setDb(null)
-        }
+        setDb(await parseSettledJson<{ ok?: boolean; message?: string }>(dbR))
       } catch {
         // ignore, show partial results
       } finally {

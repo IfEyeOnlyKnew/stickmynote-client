@@ -31,6 +31,9 @@
         "unarchiving"
     ],
     "jest.enable": false,
+    "webhint.enabledHints": {
+        "no-inline-styles": "off"
+    },
     "sonarlint.connectedMode.project": {
         "connectionId": "ifeyeonlyknew",
         "projectKey": "IfEyeOnlyKnew_stickmynote-client"

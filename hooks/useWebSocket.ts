@@ -19,7 +19,7 @@ const globalHandlers = new Map<string, Set<EventHandler>>()
 const globalListeners = new Set<() => void>()
 
 function getWsUrl(): string {
-  if (typeof globalThis.window === "undefined") return ""
+  if (globalThis.window === undefined) return ""
   const protocol = globalThis.location.protocol === "https:" ? "wss:" : "ws:"
   return `${protocol}//${globalThis.location.host}/ws`
 }
@@ -69,7 +69,7 @@ function isAlreadyConnected(): boolean {
 }
 
 function connect() {
-  if (typeof globalThis.window === "undefined") return
+  if (globalThis.window === undefined) return
   if (isAlreadyConnected()) return
 
   const url = getWsUrl()

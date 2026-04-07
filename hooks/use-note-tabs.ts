@@ -66,7 +66,7 @@ export function useNoteTabs(noteId: string, resetKey: number | undefined, config
   }, [noteId, resetKey, loadTabs])
 
   useEffect(() => {
-    if (typeof globalThis.window !== "undefined" && config.globalRefreshFunctionName) {
+    if (globalThis.window !== undefined && config.globalRefreshFunctionName) {
       ;(globalThis as any)[config.globalRefreshFunctionName] = refreshTabs
 
       // Also listen for custom event

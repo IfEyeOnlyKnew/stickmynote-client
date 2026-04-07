@@ -5,7 +5,6 @@ import { getCachedAuthUser } from '@/lib/auth/cached-auth'
 import { getOrgContext } from '@/lib/auth/get-org-context'
 import { handleApiError } from '@/lib/api/handle-api-error'
 import {
-  DEFAULT_REPLY_COLOR,
   parseReplyInput,
 } from '@/lib/handlers/stick-replies-handler'
 

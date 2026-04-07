@@ -117,14 +117,13 @@ export function NotedPageList({
         ) : (
           <div className="p-2 space-y-1">
             {pages.map((page) => (
-              <div
+              <button
                 key={page.id}
-                role="button"
-                tabIndex={0}
+                type="button"
                 onClick={() => onSelectPage(page)}
                 onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onSelectPage(page) } }}
                 className={cn(
-                  "group flex items-start gap-2 p-3 rounded-lg cursor-pointer transition-colors",
+                  "group flex items-start gap-2 p-3 rounded-lg cursor-pointer transition-colors bg-transparent border-none text-left w-full",
                   selectedPageId === page.id
                     ? "bg-primary/10 border border-primary/20"
                     : "hover:bg-muted/50"
@@ -202,7 +201,7 @@ export function NotedPageList({
                     </DropdownMenuItem>
                   </DropdownMenuContent>
                 </DropdownMenu>
-              </div>
+              </button>
             ))}
 
             {/* Infinite scroll sentinel */}

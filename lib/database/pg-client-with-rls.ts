@@ -19,9 +19,7 @@ class PostgresDatabase {
   }
 
   private getPool(): Pool {
-    if (!this.pool) {
-      this.pool = createPool(this.config)
-    }
+    this.pool ??= createPool(this.config)
     return this.pool
   }
 

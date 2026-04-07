@@ -28,11 +28,11 @@ export function SearchResultCard({ note, searchTerm, onOpen, currentUserId }: Re
       <>
         {parts.map((part, i) =>
           part.toLowerCase() === term.toLowerCase() ? (
-            <mark key={`highlight-${i}`} className="bg-yellow-200 text-gray-900 font-semibold px-0.5 rounded">
+            <mark key={`highlight-${i}-${part}`} className="bg-yellow-200 text-gray-900 font-semibold px-0.5 rounded">
               {part}
             </mark>
           ) : (
-            <span key={`text-${i}`}>{part}</span>
+            <span key={`text-${i}-${part}`}>{part}</span>
           ),
         )}
       </>

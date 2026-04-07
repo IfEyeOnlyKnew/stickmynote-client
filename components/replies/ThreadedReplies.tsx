@@ -254,7 +254,7 @@ export const ThreadedReplies: React.FC<ThreadedRepliesProps> = ({
         }
         setLocalReplies(prev => updateReply(prev))
       } catch (error) {
-        throw error
+        throw error instanceof Error ? error : new Error(String(error))
       }
     },
     [onEditReply, noteId],

@@ -144,7 +144,7 @@ export default function GoalsPage() {
   // Tree view: build nested structure
   const buildTree = (items: Objective[]): (Objective & { depth: number })[] => {
     const result: (Objective & { depth: number })[] = []
-    const roots = items.filter((o) => !o.parent_id || !items.find((p) => p.id === o.parent_id))
+    const roots = items.filter((o) => !o.parent_id || !items.some((p) => p.id === o.parent_id))
     const addChildren = (parentId: string | undefined, depth: number) => {
       items.filter((o) => o.parent_id === parentId).forEach((child) => {
         result.push({ ...child, depth })
@@ -330,10 +330,9 @@ export default function GoalsPage() {
 
             return (
               <Card key={obj.id} className="overflow-hidden" style={depth > 0 ? { marginLeft: depth * 24 } : undefined}>
-                <div
-                  role="button"
-                  tabIndex={0}
-                  className="p-4 cursor-pointer hover:bg-muted/30 transition-colors"
+                <button
+                  type="button"
+                  className="p-4 cursor-pointer hover:bg-muted/30 transition-colors bg-transparent border-none text-left w-full"
                   onClick={() => toggleExpanded(obj.id!)}
                   onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") toggleExpanded(obj.id!) }}
                 >
@@ -395,7 +394,7 @@ export default function GoalsPage() {
                       {isExpanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
                     </div>
                   </div>
-                </div>
+                </button>
 
                 {/* Expanded Key Results */}
                 {isExpanded && obj.key_results && obj.key_results.length > 0 && (

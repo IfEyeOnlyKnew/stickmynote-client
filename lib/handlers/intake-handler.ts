@@ -17,7 +17,8 @@ export async function listIntakeForms() {
   try {
     const intakeForms = await query('SELECT * FROM intake_forms ORDER BY submitted_at DESC LIMIT 100')
     return { status: 200, body: { intake: intakeForms } }
-  } catch (error) {
+  } catch {
+    // Expected - database query may fail safely
     return { status: 500, body: { error: 'Failed to list intake forms' } }
   }
 }

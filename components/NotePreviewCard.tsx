@@ -149,7 +149,7 @@ export const NotePreviewCard: React.FC<NotePreviewCardProps> = ({
                 </PopoverContent>
               </Popover>
             )}
-            <span role="button" tabIndex={0} title="Noted" onClick={(e) => e.stopPropagation()} onKeyDown={(e) => e.stopPropagation()}>
+            <button type="button" title="Noted" className="bg-transparent border-none p-0 cursor-pointer" onClick={(e) => e.stopPropagation()} onKeyDown={(e) => e.stopPropagation()}>
               <NotedIcon
                 stickId={note.id}
                 stickTopic={note.topic || note.title}
@@ -158,7 +158,7 @@ export const NotePreviewCard: React.FC<NotePreviewCardProps> = ({
                 size="sm"
                 className="h-6 w-6 p-0"
               />
-            </span>
+            </button>
             <Expand className="w-4 h-4 opacity-50 text-gray-500" />
           </div>
         </div>

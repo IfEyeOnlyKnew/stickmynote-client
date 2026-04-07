@@ -25,7 +25,7 @@ export async function GET(request: NextRequest) {
 
     if (result.error) {
       return new Response(
-        JSON.stringify({ error: result.error, ...(result.data || {}) }),
+        JSON.stringify({ error: result.error }),
         { status: result.status }
       )
     }

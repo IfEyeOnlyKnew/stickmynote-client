@@ -229,10 +229,9 @@ export function NotificationsModal({ open, onOpenChange }: Readonly<Notification
       >
         <CardContent className="p-0">
           {/* Group header */}
-          <div
-            role="button"
-            tabIndex={0}
-            className="flex items-center gap-3 p-4 cursor-pointer hover:bg-gray-50"
+          <button
+            type="button"
+            className="flex items-center gap-3 p-4 cursor-pointer hover:bg-gray-50 bg-transparent border-none text-left w-full"
             onClick={() => group.notifications.length > 1 && toggleGroup(group.key)}
             onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); group.notifications.length > 1 && toggleGroup(group.key) } }}
           >
@@ -306,7 +305,7 @@ export function NotificationsModal({ open, onOpenChange }: Readonly<Notification
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
-          </div>
+          </button>
 
           {/* Expanded individual notifications */}
           {isExpanded && group.notifications.length > 1 && (

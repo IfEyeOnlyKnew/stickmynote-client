@@ -163,12 +163,11 @@ export function DiscussionTemplatePicker({
                     const isSelecting = selecting === template.id
 
                     return (
-                      <div
+                      <button
                         key={template.id}
-                        role="button"
-                        tabIndex={0}
+                        type="button"
                         className={cn(
-                          "p-4 rounded-lg border-2 cursor-pointer transition-all",
+                          "p-4 rounded-lg border-2 cursor-pointer transition-all bg-transparent text-left w-full",
                           "hover:shadow-md",
                           isSelected
                             ? "border-primary bg-primary/5"
@@ -250,7 +249,7 @@ export function DiscussionTemplatePicker({
                             {!isSelecting && !isSelected && "Apply"}
                           </Button>
                         </div>
-                      </div>
+                      </button>
                     )
                   })
                 )}

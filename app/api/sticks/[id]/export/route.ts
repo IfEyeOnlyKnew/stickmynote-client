@@ -198,6 +198,31 @@ async function saveExportLink(
   }
 }
 
+type PadInfo = { name?: string; multi_pak_id?: string; owner_id?: string; multi_paks?: { owner_id?: string } }
+
+async function fetchPadData(db: any, padId: string | null): Promise<PadInfo | null> {
+  if (!padId) return null
+  const { data: pad } = await db
+    .from("paks_pads")
+    .select("name, multi_pak_id, owner_id")
+    .eq("id", padId)
+    .maybeSingle();
+  if (!pad) return null
+
+  const padsData: PadInfo = { ...pad }
+  if (pad.multi_pak_id) {
+    const { data: multiPak } = await db
+      .from("multi_paks")
+      .select("owner_id")
+      .eq("id", pad.multi_pak_id)
+      .maybeSingle();
+    if (multiPak) {
+      padsData.multi_paks = { owner_id: multiPak.owner_id };
+    }
+  }
+  return padsData
+}
+
 export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -254,28 +279,7 @@ export async function POST(
     }
 
     // Fetch pad and multi-pak info separately
-    let padsData: { name?: string; multi_pak_id?: string; owner_id?: string; multi_paks?: { owner_id?: string } } | null = null;
-    if (stickData.pad_id) {
-      const { data: pad } = await db
-        .from("paks_pads")
-        .select("name, multi_pak_id, owner_id")
-        .eq("id", stickData.pad_id)
-        .maybeSingle();
-
-      if (pad) {
-        padsData = { ...pad };
-        if (pad.multi_pak_id && padsData) {
-          const { data: multiPak } = await db
-            .from("multi_paks")
-            .select("owner_id")
-            .eq("id", pad.multi_pak_id)
-            .maybeSingle();
-          if (multiPak) {
-            padsData.multi_paks = { owner_id: multiPak.owner_id };
-          }
-        }
-      }
-    }
+    const padsData = await fetchPadData(db, stickData.pad_id);
     const stickDataWithPads = { ...stickData, pads: padsData };
 
     const hasAccess = await checkUserAccess(

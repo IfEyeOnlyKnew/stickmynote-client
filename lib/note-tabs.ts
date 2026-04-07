@@ -14,11 +14,10 @@ import {
   transformReplyFromRaw,
   transformPartialNote,
   buildNoteUpdatePayload,
-  buildNoteInsertPayload,
 } from "@/lib/notes-shared"
 
 // Re-export shared types for backward compatibility
-export type { Note, CreateNoteData, UpdateNoteData, CreateReplyData, NotesResponse }
+export type { Note, CreateNoteData, UpdateNoteData, CreateReplyData, NotesResponse } from "@/lib/notes-shared"
 
 // Local aliases for internal use
 const transformReply = transformReplyFromRaw

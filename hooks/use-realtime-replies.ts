@@ -16,7 +16,7 @@ interface Reply {
 
 export function useRealtimeReplies(stickId: string, initialReplies: Reply[] = []) {
   const [replies, setReplies] = useState<Reply[]>(initialReplies)
-  const [, setRealtimeSync] = useState<RealtimeSync | null>(null)
+  const [_realtimeSync, setRealtimeSync] = useState<RealtimeSync | null>(null)
 
   const handleInsert = useCallback(
     (payload: any) => {

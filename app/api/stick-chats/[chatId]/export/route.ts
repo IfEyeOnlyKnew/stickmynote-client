@@ -269,18 +269,14 @@ export async function POST(
       const userName = getDisplayName(msg.user)
       const msgDate = new Date(msg.created_at).toLocaleString()
 
-      // Author and timestamp
+      // Author, timestamp, message content, and spacer
       docChildren.push(
         new ParagraphClass({
           children: [
             new TextRunClass({ text: userName, bold: true }),
             new TextRunClass({ text: ` (${msgDate})`, italics: true }),
           ],
-        })
-      )
-
-      // Message content
-      docChildren.push(
+        }),
         new ParagraphClass({
           children: [new TextRunClass({ text: msg.content })],
         }),

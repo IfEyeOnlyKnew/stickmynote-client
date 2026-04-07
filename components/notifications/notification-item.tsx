@@ -41,11 +41,10 @@ export function NotificationItem({ notification }: Readonly<NotificationItemProp
   }
 
   return (
-    <div
-      role="button"
-      tabIndex={0}
+    <button
+      type="button"
       className={cn(
-        "flex items-start gap-3 p-4 hover:bg-muted/50 transition-colors cursor-pointer group",
+        "flex items-start gap-3 p-4 hover:bg-muted/50 transition-colors cursor-pointer group bg-transparent border-none text-left w-full",
         !notification.read && "bg-blue-50/50 dark:bg-blue-950/20",
       )}
       onClick={handleClick}
@@ -83,6 +82,6 @@ export function NotificationItem({ notification }: Readonly<NotificationItemProp
         <Trash2 className="h-4 w-4" />
         <span className="sr-only">Delete notification</span>
       </Button>
-    </div>
+    </button>
   )
 }

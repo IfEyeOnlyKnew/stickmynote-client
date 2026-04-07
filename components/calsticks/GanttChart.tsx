@@ -707,6 +707,10 @@ export default function GanttChart({ calsticks, dependencies = [], onTaskChange,
     }
   }
 
+  const ganttTooltip = useCallback((props: { task: Task }) => (
+    <GanttTooltipContent task={props.task} calsticks={calsticks} />
+  ), [calsticks])
+
   const styledTasks = useMemo(() => {
     const tasksToStyle = tasks.length > VIRTUAL_PAGE_SIZE ? visibleTasks : tasks
 
@@ -1315,9 +1319,7 @@ export default function GanttChart({ calsticks, dependencies = [], onTaskChange,
               columnWidth={getColumnWidth(viewMode)}
               todayColor="rgba(252, 211, 77, 0.4)"
               onDateChange={onTaskChange ? handleTaskChange : undefined}
-              TooltipContent={(props: { task: Task }) => (
-                <GanttTooltipContent task={props.task} calsticks={calsticks} />
-              )}
+              TooltipContent={ganttTooltip}
             />
 
             <style dangerouslySetInnerHTML={{ __html: `

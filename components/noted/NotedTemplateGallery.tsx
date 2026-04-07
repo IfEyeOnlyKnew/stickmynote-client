@@ -192,14 +192,13 @@ export function NotedTemplateGallery({
               {!loading && filteredTemplates.length > 0 && (
                 <div className="grid grid-cols-2 gap-3 pr-2">
                   {filteredTemplates.map((template) => (
-                    <div
+                    <button
                       key={template.id}
-                      role="button"
-                      tabIndex={0}
+                      type="button"
                       onClick={() => setPreviewTemplate(template)}
                       onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setPreviewTemplate(template) } }}
                       className={cn(
-                        "border rounded-lg p-3 cursor-pointer transition-all hover:shadow-sm",
+                        "border rounded-lg p-3 cursor-pointer transition-all hover:shadow-sm bg-transparent text-left w-full",
                         previewTemplate?.id === template.id
                           ? "border-primary ring-1 ring-primary/20"
                           : "hover:border-muted-foreground/30"
@@ -269,7 +268,7 @@ export function NotedTemplateGallery({
                           </>
                         )}
                       </div>
-                    </div>
+                    </button>
                   ))}
                 </div>
               )}

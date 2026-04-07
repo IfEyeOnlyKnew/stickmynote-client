@@ -165,7 +165,9 @@ function VideoChatSidebar({ chatMessages, localIdentity, chatInput, onChatInputC
   )
 }
 
-function createVideoProcessor(effect: "none" | "blur" | "image", imageUrl: string): BackgroundProcessorWrapper | null {
+type VideoEffect = "none" | "blur" | "image"
+
+function createVideoProcessor(effect: VideoEffect, imageUrl: string): BackgroundProcessorWrapper | null {
   if (effect === "blur") {
     return BackgroundProcessor({ mode: "background-blur", blurRadius: 10 })
   }
@@ -200,7 +202,7 @@ function VideoCallContent({ roomName, onLeave, userName, isMinimized }: Readonly
   const [backgroundImage, setBackgroundImage] = useState<string>(
     "https://images.unsplash.com/photo-1497366216548-37526070297c?w=800&q=80",
   )
-  const [, setBgProcessor] = useState<BackgroundProcessorWrapper | null>(null)
+  const [_bgProcessor, setBgProcessor] = useState<BackgroundProcessorWrapper | null>(null)
 
   // Reaction data channel handler extracted to reduce nesting depth
   const handleReactionData = useCallback((msg: { payload: BufferSource }) => {

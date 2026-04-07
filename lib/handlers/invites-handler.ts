@@ -18,7 +18,8 @@ export async function listInvites(session: InviteSession) {
       [session.user.org_id]
     )
     return { status: 200, body: { invites } }
-  } catch (error) {
+  } catch {
+    // Expected - database query may fail safely
     return { status: 500, body: { error: 'Failed to list invites' } }
   }
 }

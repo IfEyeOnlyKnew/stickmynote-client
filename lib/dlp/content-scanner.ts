@@ -32,7 +32,7 @@ const BUILT_IN_PATTERNS: BuiltInPattern[] = [
     id: "credit_card",
     label: "Credit Card Number",
     // Visa, Mastercard, Amex, Discover — 13-19 digits with optional separators
-    regex: /\b(?:4\d{3}|5[1-5]\d{2}|3[47]\d{2}|6\d{3})[\s-]?\d{4}[\s-]?\d{4}[\s-]?\d{1,7}\b/g,
+    regex: /\b[3-6]\d{3}(?:[\s-]?\d{4}){2}[\s-]?\d{1,7}\b/g,
   },
   {
     id: "phone_us",

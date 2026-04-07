@@ -70,7 +70,8 @@ export default function ResetPasswordConfirmPage() {
       } else {
         setFieldError("password", data.error || "Failed to update password")
       }
-    } catch (err) {
+    } catch {
+      // Expected - password reset request may fail
       setFieldError("password", "An unexpected error occurred. Please try again.")
     } finally {
       setIsSubmitting(false)

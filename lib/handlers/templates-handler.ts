@@ -20,7 +20,8 @@ export async function listTemplates(session: TemplatesSession) {
       [session.user.id, session.user.org_id]
     )
     return { status: 200, body: { templates } }
-  } catch (error) {
+  } catch {
+    // Expected - database query may fail safely
     return { status: 500, body: { error: 'Failed to list templates' } }
   }
 }

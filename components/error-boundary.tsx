@@ -30,7 +30,7 @@ export class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoun
     console.error("Error caught by ErrorBoundary:", error, errorInfo)
     
     // Try to log to our error_logs API endpoint
-    if (typeof globalThis.window !== "undefined" && process.env.NODE_ENV === "production") {
+    if (globalThis.window !== undefined && process.env.NODE_ENV === "production") {
       try {
         fetch("/api/log-error", {
           method: "POST",

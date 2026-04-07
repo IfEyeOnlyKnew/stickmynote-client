@@ -2,7 +2,6 @@
 import { type NextRequest } from 'next/server'
 import { getCachedAuthUser } from '@/lib/auth/cached-auth'
 import { getOrgContext } from '@/lib/auth/get-org-context'
-import { isUnderLegalHold } from '@/lib/legal-hold/check-hold'
 import { getPadDetail, updatePadDetail, deletePadDetail } from '@/lib/handlers/inference-pads-handler'
 import { toResponse, rateLimitResponse, unauthorizedResponse, noOrgResponse } from '@/lib/handlers/inference-response'
 import { handleApiError } from '@/lib/api/handle-api-error'

@@ -11,7 +11,7 @@ class PerformanceMonitor {
   private observers: PerformanceObserver[] = [];
 
   constructor() {
-    if (typeof globalThis.window !== "undefined") {
+    if (globalThis.window !== undefined) {
       this.initializeWebVitals();
     }
   }

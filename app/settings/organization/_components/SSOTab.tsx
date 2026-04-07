@@ -193,7 +193,8 @@ export function SSOTab({ currentOrgId }: Readonly<SSOTabProps>) {
       setHasIdp(true)
       setClientSecret("")
       await loadConfig()
-    } catch (err) {
+    } catch {
+      // Expected - network request may fail
       toast({ title: "Error", description: "Failed to save SSO configuration", variant: "destructive" })
     } finally {
       setSaving(false)
@@ -216,7 +217,8 @@ export function SSOTab({ currentOrgId }: Readonly<SSOTabProps>) {
         const data = await res.json()
         toast({ title: "Error", description: data.error, variant: "destructive" })
       }
-    } catch (err) {
+    } catch {
+      // Expected - network request may fail
       toast({ title: "Error", description: "Failed to activate SSO", variant: "destructive" })
     }
   }
@@ -237,7 +239,8 @@ export function SSOTab({ currentOrgId }: Readonly<SSOTabProps>) {
         const data = await res.json()
         toast({ title: "Error", description: data.error, variant: "destructive" })
       }
-    } catch (err) {
+    } catch {
+      // Expected - network request may fail
       toast({ title: "Error", description: "Failed to deactivate SSO", variant: "destructive" })
     }
   }
@@ -264,7 +267,8 @@ export function SSOTab({ currentOrgId }: Readonly<SSOTabProps>) {
         const data = await res.json()
         toast({ title: "Error", description: data.error, variant: "destructive" })
       }
-    } catch (err) {
+    } catch {
+      // Expected - network request may fail
       toast({ title: "Error", description: "Failed to remove SSO configuration", variant: "destructive" })
     }
   }
@@ -296,7 +300,8 @@ export function SSOTab({ currentOrgId }: Readonly<SSOTabProps>) {
       } else {
         setTestResult({ success: false, error: "Test request failed" })
       }
-    } catch (err) {
+    } catch {
+      // Expected - SSO test connection may fail
       setTestResult({ success: false, error: "Connection failed" })
     } finally {
       setTesting(false)
@@ -492,7 +497,7 @@ export function SSOTab({ currentOrgId }: Readonly<SSOTabProps>) {
             <AlertDescription>
               <strong>Callback URL</strong>{" "}(add this to your IdP):
               <code className="block mt-1 p-2 bg-muted rounded text-xs break-all">
-                {typeof globalThis.window === "undefined" ? "/api/auth/sso/callback" : `${globalThis.location.origin}/api/auth/sso/callback`}
+                {globalThis.window === undefined ? "/api/auth/sso/callback" : `${globalThis.location.origin}/api/auth/sso/callback`}
               </code>
             </AlertDescription>
           </Alert>

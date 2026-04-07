@@ -1,7 +1,6 @@
 // Inference Pads handler - shared logic between v1 and v2 API routes
 import { db } from '@/lib/database/pg-client'
-import { getCachedAuthUser } from '@/lib/auth/cached-auth'
-import { getOrgContext, type OrgContext } from '@/lib/auth/get-org-context'
+import type { OrgContext } from '@/lib/auth/get-org-context'
 import { isUnderLegalHold } from '@/lib/legal-hold/check-hold'
 
 // ============================================================================

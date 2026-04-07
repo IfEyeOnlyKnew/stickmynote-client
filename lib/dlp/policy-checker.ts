@@ -116,7 +116,7 @@ export async function checkDLPPolicy(params: DLPCheckParams): Promise<DLPCheckRe
   const classificationBlock = checkClassificationControls(params, dlp)
   if (classificationBlock) {
     if (classificationBlock.event) {
-      await logDLPEvent(classificationBlock.event, params, classificationBlock.detail!)
+      await logDLPEvent(classificationBlock.event, params, classificationBlock.detail ?? "")
     }
     return { allowed: false, reason: classificationBlock.reason }
   }

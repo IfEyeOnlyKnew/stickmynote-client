@@ -3,7 +3,7 @@ import { type NextRequest } from 'next/server'
 import { getCachedAuthUser } from '@/lib/auth/cached-auth'
 import { getOrgContext } from '@/lib/auth/get-org-context'
 import { listSticks, createStick } from '@/lib/handlers/inference-sticks-handler'
-import { toResponse, rateLimitResponse, unauthorizedResponse, noOrgResponse, errorResponse } from '@/lib/handlers/inference-response'
+import { toResponse, rateLimitResponse, unauthorizedResponse, noOrgResponse } from '@/lib/handlers/inference-response'
 import { handleApiError } from '@/lib/api/handle-api-error'
 
 export const dynamic = 'force-dynamic'

@@ -16,7 +16,8 @@ export async function listAccessRequests() {
       `SELECT * FROM access_requests ORDER BY submitted_at DESC LIMIT 100`
     )
     return { status: 200, body: { 'request-access': requests } }
-  } catch (error) {
+  } catch {
+    // Expected - database query may fail safely
     return { status: 500, body: { error: 'Failed to list access requests' } }
   }
 }

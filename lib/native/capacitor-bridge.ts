@@ -11,21 +11,21 @@
 
 /** Check if running inside a Capacitor native app */
 export function isNativeApp(): boolean {
-  if (typeof globalThis.window === "undefined") return false
+  if (globalThis.window === undefined) return false
   return !!(globalThis as unknown as { Capacitor?: { isNativePlatform?: () => boolean } }).Capacitor
     ?.isNativePlatform?.()
 }
 
 /** Get the current platform */
 export function getPlatform(): "ios" | "android" | "web" {
-  if (typeof globalThis.window === "undefined") return "web"
+  if (globalThis.window === undefined) return "web"
   const cap = (globalThis as unknown as { Capacitor?: { getPlatform?: () => string } }).Capacitor
   return (cap?.getPlatform?.() as "ios" | "android") || "web"
 }
 
 /** Check if the app is running as a PWA (standalone) */
 export function isPWA(): boolean {
-  if (typeof globalThis.window === "undefined") return false
+  if (globalThis.window === undefined) return false
   return (
     globalThis.matchMedia("(display-mode: standalone)").matches ||
     (globalThis.navigator as unknown as { standalone?: boolean }).standalone === true
@@ -183,7 +183,7 @@ export async function configureStatusBar(dark: boolean): Promise<void> {
  * Handle safe area insets for notched devices.
  */
 export function getSafeAreaInsets(): { top: number; bottom: number; left: number; right: number } {
-  if (typeof globalThis.window === "undefined") return { top: 0, bottom: 0, left: 0, right: 0 }
+  if (globalThis.window === undefined) return { top: 0, bottom: 0, left: 0, right: 0 }
 
   const style = getComputedStyle(document.documentElement)
   return {

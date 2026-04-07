@@ -22,7 +22,7 @@ import { z } from "zod"
  * DO NOT import in client components or client-side code.
  */
 
-if (typeof globalThis.window !== "undefined") {
+if (globalThis.window !== undefined) {
   throw new Error(
     "lib/env.ts should only be imported in server-side code. " +
       "Use process.env.NEXT_PUBLIC_* directly in client components.",

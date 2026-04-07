@@ -19,7 +19,8 @@ export async function listQuicksticks(session: QuickstickSession) {
       [session.user.id, session.user.org_id]
     )
     return { status: 200, body: { quicksticks } }
-  } catch (error) {
+  } catch {
+    // Expected - database query may fail safely
     return { status: 500, body: { error: 'Failed to list quicksticks' } }
   }
 }

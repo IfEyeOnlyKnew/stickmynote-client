@@ -316,22 +316,17 @@ export function NotesClient({ initialNotes, userId, stats }: Readonly<NotesClien
 
   // Extracted state updaters to reduce function nesting depth
   const updateNoteReply = useCallback((replyId: string, updatedReply: any) => {
+    const updateReplies = (replies: any[]) =>
+      replies.map((r) => (r.id === replyId ? { ...r, ...updatedReply } : r))
     setAllNotes((prev) =>
-      prev.map((note) => ({
-        ...note,
-        replies: (note.replies || []).map((r) =>
-          r.id === replyId ? { ...r, ...updatedReply } : r
-        ),
-      }))
+      prev.map((note) => ({ ...note, replies: updateReplies(note.replies || []) }))
     )
   }, [setAllNotes])
 
   const removeNoteReply = useCallback((replyId: string) => {
+    const filterReplies = (replies: any[]) => replies.filter((r) => r.id !== replyId)
     setAllNotes((prev) =>
-      prev.map((note) => ({
-        ...note,
-        replies: (note.replies || []).filter((r) => r.id !== replyId),
-      }))
+      prev.map((note) => ({ ...note, replies: filterReplies(note.replies || []) }))
     )
   }, [setAllNotes])
 

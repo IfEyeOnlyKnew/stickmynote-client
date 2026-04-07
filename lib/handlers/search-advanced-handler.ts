@@ -29,7 +29,7 @@ export interface AdvancedSearchResult {
 // Core Logic
 // ============================================================================
 
-const ALLOWED_SORT_COLUMNS = ['created_at', 'updated_at', 'topic', 'title']
+const ALLOWED_SORT_COLUMNS = new Set(['created_at', 'updated_at', 'topic', 'title'])
 
 /**
  * Build WHERE conditions and params for advanced search.
@@ -97,7 +97,7 @@ export function buildAdvancedSearchQuery(
   const whereClause = conditions.join(' AND ')
 
   // Validate sort column
-  const safeSortBy = ALLOWED_SORT_COLUMNS.includes(sortBy) ? sortBy : 'created_at'
+  const safeSortBy = ALLOWED_SORT_COLUMNS.has(sortBy) ? sortBy : 'created_at'
   const safeSortOrder = sortOrder === 'asc' ? 'ASC' : 'DESC'
 
   const offset = (page - 1) * limit

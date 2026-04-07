@@ -240,7 +240,7 @@ export function Whiteboard({ onDrawAction, incomingActions, className }: Readonl
 
   const redo = () => {
     if (redoStack.length === 0) return
-    const action = redoStack[redoStack.length - 1]
+    const action = redoStack.at(-1)!
     setRedoStack((prev) => prev.slice(0, -1))
     setHistory((prev) => [...prev, action])
     drawAction(action)

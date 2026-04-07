@@ -29,10 +29,13 @@ function stripHtml(html: string): string {
   return html.replaceAll(/<[^>]*>/g, "")
 }
 
-function diffLines(oldText: string, newText: string): { type: "same" | "added" | "removed"; text: string }[] {
+type DiffLineType = "same" | "added" | "removed"
+type DiffLine = { type: DiffLineType; text: string }
+
+function diffLines(oldText: string, newText: string): DiffLine[] {
   const oldLines = oldText.split("\n")
   const newLines = newText.split("\n")
-  const result: { type: "same" | "added" | "removed"; text: string }[] = []
+  const result: DiffLine[] = []
 
   // Simple LCS-based diff
   const lcs: number[][] = Array.from({ length: oldLines.length + 1 }, () =>
@@ -209,7 +212,7 @@ export function NotedVersionHistory({
                         )}
                       >
                         <span className="select-none mr-2 text-muted-foreground/50">
-                          {(() => { if (line.type === "added") return "+"; if (line.type === "removed") return "-"; return " " })()}
+                          {line.type === "added" ? "+" : line.type === "removed" ? "-" : " "}
                         </span>
                         {line.text || "\u00A0"}
                       </div>

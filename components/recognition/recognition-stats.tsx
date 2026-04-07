@@ -89,7 +89,7 @@ export function RecognitionStats() {
       value: givingStreak,
       subtitle: (() => {
         if (givingStreak <= 0) return "Start giving!"
-        return `${givingStreak} day${givingStreak !== 1 ? "s" : ""}`
+        return `${givingStreak} day${givingStreak === 1 ? "" : "s"}`
       })(),
       color: "text-orange-500",
       bg: "bg-orange-50",

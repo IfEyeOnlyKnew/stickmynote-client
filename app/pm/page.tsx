@@ -53,6 +53,13 @@ interface DashboardData {
   }
 }
 
+function getWeekStart() {
+  const d = new Date()
+  d.setDate(d.getDate() - d.getDay())
+  d.setHours(0, 0, 0, 0)
+  return d.toISOString()
+}
+
 export default function PMDashboard() {
   const [data, setData] = useState<DashboardData | null>(null)
   const [loading, setLoading] = useState(true)
@@ -145,13 +152,6 @@ export default function PMDashboard() {
     } finally {
       setLoading(false)
     }
-  }
-
-  function getWeekStart() {
-    const d = new Date()
-    d.setDate(d.getDate() - d.getDay())
-    d.setHours(0, 0, 0, 0)
-    return d.toISOString()
   }
 
   const fmt = (cents: number) => "$" + (cents / 100).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })

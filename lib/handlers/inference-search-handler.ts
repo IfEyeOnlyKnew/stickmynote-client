@@ -63,7 +63,8 @@ function addOptionalFilter(
   clause: string,
 ): void {
   if (!value) return
-  builder.query += ` AND ${clause.replace('?', `$${builder.paramIndex}`)}`
+  const placeholder = `$${builder.paramIndex}`
+  builder.query += ` AND ${clause.replace('?', placeholder)}`
   builder.params.push(value)
   builder.paramIndex++
 }

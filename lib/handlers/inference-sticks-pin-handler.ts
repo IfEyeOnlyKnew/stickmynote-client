@@ -115,7 +115,7 @@ export async function reorderPin(
   pinOrder: number
 ): Promise<{ status: number; body: any }> {
   const stick = await getStickForPin(stickId, orgId)
-  if (!stick || !stick.is_pinned) {
+  if (!stick?.is_pinned) {
     return { status: 404, body: { error: 'Stick not found or not pinned' } }
   }
 

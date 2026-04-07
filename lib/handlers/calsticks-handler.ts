@@ -29,7 +29,8 @@ export async function listCalsticks(session: CalstickSession, limit = 50) {
       [session.user.id, session.user.org_id, effectiveLimit]
     )
     return { status: 200, body: { events } }
-  } catch (error) {
+  } catch {
+    // Expected - database query may fail safely
     return { status: 500, body: { error: 'Failed to list calsticks' } }
   }
 }
@@ -76,7 +77,8 @@ export async function updateCalstick(session: CalstickSession, eventId: string, 
       return { status: 404, body: { error: 'Event not found or not owned by user' } }
     }
     return { status: 200, body: { event } }
-  } catch (error) {
+  } catch {
+    // Expected - database query may fail safely
     return { status: 500, body: { error: 'Failed to update calstick' } }
   }
 }
@@ -92,7 +94,8 @@ export async function deleteCalstick(session: CalstickSession, eventId: string) 
       return { status: 404, body: { error: 'Event not found or not owned by user' } }
     }
     return { status: 200, body: { success: true } }
-  } catch (error) {
+  } catch {
+    // Expected - database query may fail safely
     return { status: 500, body: { error: 'Failed to delete calstick' } }
   }
 }

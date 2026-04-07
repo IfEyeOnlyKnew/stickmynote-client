@@ -22,16 +22,10 @@ const initializeModules = async () => {
     HeadingLevel = docxModule.HeadingLevel
   } catch (error) {
     console.error("[summarize-replies] Docx module load error:", error)
-    Document = class {
-      constructor() {}
-    }
+    Document = class {}
     Packer = { toBuffer: async () => Buffer.from("") }
-    Paragraph = class {
-      constructor() {}
-    }
-    TextRun = class {
-      constructor() {}
-    }
+    Paragraph = class {}
+    TextRun = class {}
     HeadingLevel = { TITLE: 0, HEADING_1: 1, HEADING_2: 2 }
   }
 }

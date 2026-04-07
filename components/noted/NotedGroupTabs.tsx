@@ -191,20 +191,19 @@ export function NotedGroupTabs({
                   >
                     {/* Expand/collapse toggle */}
                     {hasChildren ? (
-                      <span
-                        role="button"
-                        tabIndex={0}
+                      <button
+                        type="button"
                         aria-label={isExpanded ? "Collapse group" : "Expand group"}
                         onClick={(e) => toggleExpand(group.id, e)}
                         onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); toggleExpand(group.id, e as unknown as React.MouseEvent) } }}
-                        className="h-4 w-4 flex items-center justify-center shrink-0"
+                        className="h-4 w-4 flex items-center justify-center shrink-0 bg-transparent border-none p-0 cursor-pointer"
                       >
                         {isExpanded ? (
                           <ChevronDown className="h-3 w-3" />
                         ) : (
                           <ChevronRight className="h-3 w-3" />
                         )}
-                      </span>
+                      </button>
                     ) : (
                       <span className="w-4 shrink-0" />
                     )}
@@ -218,18 +217,18 @@ export function NotedGroupTabs({
                     {/* Context menu */}
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
-                        <span
-                          role="button"
-                          tabIndex={0}
+                        <button
+                          type="button"
+                          aria-label="Group options"
                           onClick={(e) => e.stopPropagation()}
                           onKeyDown={(e) => e.stopPropagation()}
                           className={cn(
-                            "h-5 w-5 rounded flex items-center justify-center shrink-0 opacity-0 group-hover:opacity-100 transition-opacity",
+                            "h-5 w-5 rounded flex items-center justify-center shrink-0 opacity-0 group-hover:opacity-100 transition-opacity bg-transparent border-none p-0 cursor-pointer",
                             isActive ? "hover:bg-primary-foreground/20" : "hover:bg-muted-foreground/20"
                           )}
                         >
                           <Pencil className="h-3 w-3" />
-                        </span>
+                        </button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end" side="left">
                         <DropdownMenuItem onClick={(e) => openEdit(group, e as unknown as React.MouseEvent)}>
@@ -265,19 +264,18 @@ export function NotedGroupTabs({
                             style={{ backgroundColor: sub.color }}
                           />
                           <span className="truncate flex-1">{sub.name}</span>
-                          <span
+                          <button
+                            type="button"
                             title="Edit sub-group"
-                            role="button"
-                            tabIndex={0}
                             onClick={(e) => { e.stopPropagation(); openEdit(sub, e) }}
                             onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); e.stopPropagation(); openEdit(sub, e as unknown as React.MouseEvent) } }}
                             className={cn(
-                              "h-4 w-4 rounded flex items-center justify-center shrink-0 opacity-0 group-hover/sub:opacity-100 transition-opacity",
+                              "h-4 w-4 rounded flex items-center justify-center shrink-0 opacity-0 group-hover/sub:opacity-100 transition-opacity bg-transparent border-none p-0 cursor-pointer",
                               activeGroupId === sub.id ? "hover:bg-primary-foreground/20" : "hover:bg-muted-foreground/20"
                             )}
                           >
                             <Pencil className="h-2.5 w-2.5" />
-                          </span>
+                          </button>
                         </button>
                       ))}
                     </div>

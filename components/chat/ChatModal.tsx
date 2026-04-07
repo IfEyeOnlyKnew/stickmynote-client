@@ -425,7 +425,7 @@ export function ChatModal({
           </div>
         )
 
-      case "give_me_5_minutes":
+      case "give_me_5_minutes": {
         const canProceed = waitCountdown === 0
         return (
           <div className="flex flex-col items-center justify-center py-12 px-6 text-center">
@@ -456,6 +456,7 @@ export function ChatModal({
             )}
           </div>
         )
+      }
 
       default:
         return null

@@ -108,7 +108,7 @@ function extractVideoInfo(url: string): VideoInfo | null {
 
     // Vimeo
     if (u.hostname.includes("vimeo.com")) {
-      const id = u.pathname.split("/").filter(Boolean)[0]
+      const [id] = u.pathname.split("/").filter(Boolean)
       if (id) {
         return {
           id,
@@ -301,7 +301,7 @@ export async function POST(request: NextRequest) {
     if (!tab) return NextResponse.json({ error: "Failed to create or find tab" }, { status: 500 })
 
     const baseData = normalizeTabData(tab.tab_data)
-    const currentArr = (baseData?.[tabType] || []) as (VideoInfo | ImageInfo)[]
+    const currentArr = (baseData?.[tabType] ?? []) as (VideoInfo | ImageInfo)[]
     const normalizedIncoming = normalizeIncomingItems(tabType, items)
     const merged = dedupeByIdOrUrl([...currentArr, ...normalizedIncoming])
 
@@ -343,7 +343,7 @@ export async function DELETE(request: NextRequest) {
     if (!tab) return NextResponse.json({ success: true, count: 0 })
 
     const baseData = normalizeTabData(tab.tab_data)
-    const currentArr = (baseData?.[tabType] || []) as (VideoInfo | ImageInfo)[]
+    const currentArr = (baseData?.[tabType] ?? []) as (VideoInfo | ImageInfo)[]
     const filtered = currentArr.filter((i) => (i?.id || i?.url || "") !== itemId)
 
     await db.query(

@@ -20,6 +20,16 @@ export interface OccurrenceDate {
   instanceDate: string // YYYY-MM-DD
 }
 
+interface ExpansionOptions {
+  startDate: Date
+  interval: number
+  duration: number
+  maxCount: number
+  recurrenceEnd: Date | null
+  rangeStart: Date
+  rangeEnd: Date
+}
+
 const MAX_OCCURRENCES = 365 // safety limit
 
 /**
@@ -44,25 +54,22 @@ export function expandRecurrence(
     : null
   const maxCount = meeting.recurrence_count || MAX_OCCURRENCES
 
+  const opts: ExpansionOptions = { startDate, interval, duration, maxCount, recurrenceEnd, rangeStart, rangeEnd }
+
   // For weekly with specific days
   if (type === "weekly" && meeting.recurrence_days_of_week?.length) {
-    return expandWeeklyWithDays(meeting.recurrence_days_of_week, startDate, interval, duration, maxCount, recurrenceEnd, rangeStart, rangeEnd)
+    return expandWeeklyWithDays(meeting.recurrence_days_of_week, opts)
   }
 
   // For daily, weekly (no specific days), monthly, yearly
-  return expandSimpleRecurrence(type, meeting, startDate, interval, duration, maxCount, recurrenceEnd, rangeStart, rangeEnd)
+  return expandSimpleRecurrence(type, meeting, opts)
 }
 
 function expandWeeklyWithDays(
   daysOfWeek: number[],
-  startDate: Date,
-  interval: number,
-  duration: number,
-  maxCount: number,
-  recurrenceEnd: Date | null,
-  rangeStart: Date,
-  rangeEnd: Date,
+  opts: ExpansionOptions,
 ): OccurrenceDate[] {
+  const { startDate, interval, duration, maxCount, recurrenceEnd, rangeStart, rangeEnd } = opts
   const occurrences: OccurrenceDate[] = []
   let count = 0
   const days = daysOfWeek.toSorted((a, b) => a - b)
@@ -100,14 +107,9 @@ function expandWeeklyWithDays(
 function expandSimpleRecurrence(
   type: string,
   meeting: RecurrenceParams,
-  startDate: Date,
-  interval: number,
-  duration: number,
-  maxCount: number,
-  recurrenceEnd: Date | null,
-  rangeStart: Date,
-  rangeEnd: Date,
+  opts: ExpansionOptions,
 ): OccurrenceDate[] {
+  const { startDate, interval, duration, maxCount, recurrenceEnd, rangeStart, rangeEnd } = opts
   const occurrences: OccurrenceDate[] = []
   let count = 0
   const current = new Date(startDate)

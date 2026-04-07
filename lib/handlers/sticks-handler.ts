@@ -30,7 +30,8 @@ export async function listSticks(session: SticksSession, limit = 50, offset = 0)
       [session.user.org_id, session.user.id, effectiveLimit, effectiveOffset]
     )
     return { status: 200, body: { sticks } }
-  } catch (error) {
+  } catch {
+    // Expected - database query may fail safely
     return { status: 500, body: { error: 'Failed to list sticks' } }
   }
 }

@@ -51,6 +51,29 @@ interface ScheduleMeetingModalProps {
 // Helper Functions
 // ----------------------------------------------------------------------------
 
+function buildRecurrenceConfig(
+  recurrenceType: string, recurrenceInterval: number, recurrenceDays: number[],
+  recurrenceDayOfMonth: number, recurrenceEndType: string, recurrenceEndDate: string, recurrenceCount: number,
+): RecurrenceConfig | undefined {
+  if (recurrenceType === "none") return undefined
+  const recurrence: RecurrenceConfig = {
+    type: recurrenceType as RecurrenceType,
+    interval: recurrenceInterval,
+  }
+  if (recurrenceType === "weekly" && recurrenceDays.length > 0) {
+    recurrence.days_of_week = recurrenceDays
+  }
+  if (recurrenceType === "monthly") {
+    recurrence.day_of_month = recurrenceDayOfMonth
+  }
+  if (recurrenceEndType === "date") {
+    recurrence.end_date = new Date(recurrenceEndDate).toISOString()
+  } else if (recurrenceEndType === "count") {
+    recurrence.count = recurrenceCount
+  }
+  return recurrence
+}
+
 function generateTimeSlots() {
   const slots: { value: string; label: string }[] = []
   const baseDate = startOfDay(new Date())
@@ -185,24 +208,10 @@ export function ScheduleMeetingModal({
       }
 
       // Build recurrence config
-      let recurrence: RecurrenceConfig | undefined
-      if (recurrenceType !== "none") {
-        recurrence = {
-          type: recurrenceType,
-          interval: recurrenceInterval,
-        }
-        if (recurrenceType === "weekly" && recurrenceDays.length > 0) {
-          recurrence.days_of_week = recurrenceDays
-        }
-        if (recurrenceType === "monthly") {
-          recurrence.day_of_month = recurrenceDayOfMonth
-        }
-        if (recurrenceEndType === "date") {
-          recurrence.end_date = new Date(recurrenceEndDate).toISOString()
-        } else if (recurrenceEndType === "count") {
-          recurrence.count = recurrenceCount
-        }
-      }
+      const recurrence = buildRecurrenceConfig(
+        recurrenceType, recurrenceInterval, recurrenceDays,
+        recurrenceDayOfMonth, recurrenceEndType, recurrenceEndDate, recurrenceCount,
+      )
 
       const response = await fetch("/api/meetings", {
         method: "POST",

@@ -76,7 +76,8 @@ export function VideoRoomModal({ roomUrl, livekitRoomName, onClose }: Readonly<V
         if (!res.ok) throw new Error("Failed to get token")
         const data = await res.json()
         setToken(data.token)
-      } catch (err) {
+      } catch {
+        // Expected - video token fetch may fail
         setError("Failed to connect to video service")
         setIsJoining(false)
       }

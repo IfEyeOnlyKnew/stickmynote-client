@@ -27,7 +27,7 @@ export function TemplatePicker({ onTemplateSelect }: Readonly<TemplatePickerProp
   const [selectedCategory, setSelectedCategory] = useState<string>("all")
   const [searchQuery, setSearchQuery] = useState("")
   const [open, setOpen] = useState(false)
-  const [, setLoading] = useState(false)
+  const [_loading, setLoading] = useState(false)
 
   useEffect(() => {
     if (open) {

@@ -22,6 +22,61 @@ import { db } from "@/lib/database/pg-client"
 import { NotesClient } from "./NotesClient"
 import type { Note } from "@/types/note"
 
+async function fetchNoteRelatedData(noteIds: string[]) {
+  const tabsMap = new Map<string, { url: string; title?: string }[]>()
+  const repliesMap = new Map<string, any[]>()
+
+  if (noteIds.length === 0) return { tabsMap, repliesMap }
+
+  const tabsResult = await db.query(
+    `SELECT personal_stick_id, tab_name, tags
+     FROM personal_sticks_tabs
+     WHERE personal_stick_id = ANY($1) AND tab_name = 'Tags'`,
+    [noteIds]
+  )
+
+  for (const tab of tabsResult.rows || []) {
+    if (!tab.tags) continue
+    try {
+      const hyperlinks = typeof tab.tags === 'string' ? JSON.parse(tab.tags) : tab.tags
+      tabsMap.set(tab.personal_stick_id, hyperlinks)
+    } catch {
+      // Ignore parse errors
+    }
+  }
+
+  const repliesResult = await db.query(
+    `SELECT r.id, r.content, r.color, r.created_at, r.updated_at, r.user_id, r.personal_stick_id, r.parent_reply_id,
+            u.full_name, u.email
+     FROM personal_sticks_replies r
+     LEFT JOIN users u ON u.id = r.user_id
+     WHERE r.personal_stick_id = ANY($1)
+     ORDER BY r.created_at ASC`,
+    [noteIds]
+  )
+
+  for (const reply of repliesResult.rows || []) {
+    const arr = repliesMap.get(reply.personal_stick_id) || []
+    arr.push({
+      id: reply.id,
+      content: reply.content || "",
+      color: reply.color || "#ffffff",
+      created_at: reply.created_at,
+      updated_at: reply.updated_at || reply.created_at,
+      user_id: reply.user_id,
+      note_id: reply.personal_stick_id,
+      parent_reply_id: reply.parent_reply_id || null,
+      user: {
+        username: reply.full_name || null,
+        email: reply.email || null,
+      },
+    })
+    repliesMap.set(reply.personal_stick_id, arr)
+  }
+
+  return { tabsMap, repliesMap }
+}
+
 export default async function NotesPage() {
   try {
     // Get session from JWT cookie
@@ -48,62 +103,7 @@ export default async function NotesPage() {
     // Get note IDs to fetch related tabs (hyperlinks)
     const noteIds = rawNotes.map((n: { id: string }) => n.id)
 
-    // Fetch tabs that contain hyperlinks
-    let tabsMap = new Map<string, { url: string; title?: string }[]>()
-    // Fetch replies for all notes
-    let repliesMap = new Map<string, any[]>()
-
-    if (noteIds.length > 0) {
-      const tabsResult = await db.query(
-        `SELECT personal_stick_id, tab_name, tags
-         FROM personal_sticks_tabs
-         WHERE personal_stick_id = ANY($1) AND tab_name = 'Tags'`,
-        [noteIds]
-      )
-
-      for (const tab of tabsResult.rows || []) {
-        if (tab.tags) {
-          try {
-            const hyperlinks = typeof tab.tags === 'string'
-              ? JSON.parse(tab.tags)
-              : tab.tags
-            tabsMap.set(tab.personal_stick_id, hyperlinks)
-          } catch {
-            // Ignore parse errors
-          }
-        }
-      }
-
-      // Fetch replies with user info (include parent_reply_id for threading)
-      const repliesResult = await db.query(
-        `SELECT r.id, r.content, r.color, r.created_at, r.updated_at, r.user_id, r.personal_stick_id, r.parent_reply_id,
-                u.full_name, u.email
-         FROM personal_sticks_replies r
-         LEFT JOIN users u ON u.id = r.user_id
-         WHERE r.personal_stick_id = ANY($1)
-         ORDER BY r.created_at ASC`,
-        [noteIds]
-      )
-
-      for (const reply of repliesResult.rows || []) {
-        const arr = repliesMap.get(reply.personal_stick_id) || []
-        arr.push({
-          id: reply.id,
-          content: reply.content || "",
-          color: reply.color || "#ffffff",
-          created_at: reply.created_at,
-          updated_at: reply.updated_at || reply.created_at,
-          user_id: reply.user_id,
-          note_id: reply.personal_stick_id,
-          parent_reply_id: reply.parent_reply_id || null,
-          user: {
-            username: reply.full_name || null,
-            email: reply.email || null,
-          },
-        })
-        repliesMap.set(reply.personal_stick_id, arr)
-      }
-    }
+    const { tabsMap, repliesMap } = await fetchNoteRelatedData(noteIds)
 
     // Merge hyperlinks and replies into notes
     const initialNotes: Note[] = rawNotes.map((note: any) => ({

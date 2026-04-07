@@ -25,7 +25,7 @@ import type { CreateStickChatRequest, StickChatFilters, StickType } from "@/type
 async function findExistingChat(
   stickId: string | undefined, stickType: StickType | undefined,
   name: string | undefined, userId: string, orgId: string | null,
-): Promise<any | null> {
+): Promise<any> {
   if (stickId && stickType) {
     const chat = await findChatForStick(stickId, stickType, userId)
     if (chat) return chat

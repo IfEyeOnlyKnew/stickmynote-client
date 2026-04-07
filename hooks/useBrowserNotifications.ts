@@ -15,7 +15,7 @@ export function useBrowserNotifications() {
   const [isSupported, setIsSupported] = useState(false)
 
   useEffect(() => {
-    if (typeof globalThis.window !== "undefined" && "Notification" in globalThis) {
+    if (globalThis.window !== undefined && "Notification" in globalThis) {
       setIsSupported(true)
       setPermission(Notification.permission)
     }
@@ -83,7 +83,7 @@ export function useChatNotifications(padId: string, padName: string, isModerator
 
   // Load notification preference from localStorage
   useEffect(() => {
-    if (typeof globalThis.window !== "undefined") {
+    if (globalThis.window !== undefined) {
       const stored = localStorage.getItem(`chat-notifications-${padId}`)
       setNotificationsEnabled(stored === "true")
     }

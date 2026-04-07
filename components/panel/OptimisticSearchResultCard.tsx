@@ -34,7 +34,7 @@ export function OptimisticSearchResultCard({
 
   const [isHovered, setIsHovered] = useState(false)
   const [viewCount, setViewCount] = useState<number>(0)
-  const [, setIsLoadingCounts] = useState(true)
+  const [_isLoadingCounts, setIsLoadingCounts] = useState(true)
   const fetchedRef = useRef(false)
   const pendingActionRef = useRef(false)
 
@@ -217,11 +217,11 @@ export function OptimisticSearchResultCard({
       <>
         {parts.map((part, i) =>
           part.toLowerCase() === term.toLowerCase() ? (
-            <mark key={`highlight-${i}`} className="bg-yellow-200 text-gray-900 font-semibold px-0.5 rounded">
+            <mark key={`highlight-${i}-${part}`} className="bg-yellow-200 text-gray-900 font-semibold px-0.5 rounded">
               {part}
             </mark>
           ) : (
-            <span key={`text-${i}`}>{part}</span>
+            <span key={`text-${i}-${part}`}>{part}</span>
           ),
         )}
       </>

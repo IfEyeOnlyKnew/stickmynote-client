@@ -148,64 +148,57 @@ export async function enrichSticksWithData(sticks: any[]): Promise<EnrichedStick
 // GET: List sticks
 // ============================================================================
 
+async function queryAndEnrich(sql: string, params?: any[], extra?: Record<string, any>): Promise<{ status: number; body: any }> {
+  const result = await db.query(sql, params)
+  const sticks = await enrichSticksWithData(result.rows)
+  return { status: 200, body: { sticks, ...extra } }
+}
+
 export async function listSticks(
   params: ListSticksParams,
   user: { id: string; email?: string } | null,
   orgContext: OrgContext | null
 ): Promise<{ status: number; body: any }> {
-  const { isPublic, isAdmin, isPrivate, limit, offset, userId } = params
+  const { isPublic, isAdmin, isPrivate } = params
 
   // Public sticks - no auth required
   if (isPublic) {
-    const result = await db.query(
+    return queryAndEnrich(
       `SELECT ss.*, sp.id as pad_id, sp.name as pad_name, sp.is_public
        FROM social_sticks ss
        INNER JOIN social_pads sp ON ss.social_pad_id = sp.id
        WHERE sp.is_public = true
        ORDER BY ss.created_at DESC`
     )
-    const sticks = await enrichSticksWithData(result.rows)
-    return { status: 200, body: { sticks } }
   }
 
-  // All other requests require authentication
-  if (!user) {
-    return { status: 401, body: { error: 'Unauthorized' } }
-  }
+  if (!user) return { status: 401, body: { error: 'Unauthorized' } }
 
   // Admin view
   if (isAdmin) {
-    const isUserAdmin = user.email && ADMIN_EMAILS.has(user.email)
-    if (!isUserAdmin) {
+    if (!user.email || !ADMIN_EMAILS.has(user.email)) {
       return { status: 403, body: { error: 'Forbidden' } }
     }
-
-    const result = await db.query(
+    return queryAndEnrich(
       `SELECT ss.*, sp.id as pad_id, sp.name as pad_name
        FROM social_sticks ss
        LEFT JOIN social_pads sp ON ss.social_pad_id = sp.id
        ORDER BY ss.created_at DESC`
     )
-    const sticks = await enrichSticksWithData(result.rows)
-    return { status: 200, body: { sticks } }
   }
 
   if (!orgContext) {
-    // Fallback to public sticks only
-    const result = await db.query(
+    return queryAndEnrich(
       `SELECT ss.*, sp.id as pad_id, sp.name as pad_name
        FROM social_sticks ss
        INNER JOIN social_pads sp ON ss.social_pad_id = sp.id
        WHERE sp.is_public = true
        ORDER BY ss.created_at DESC`
     )
-    const sticks = await enrichSticksWithData(result.rows)
-    return { status: 200, body: { sticks } }
   }
 
-  // Private sticks only
   if (isPrivate) {
-    const result = await db.query(
+    return queryAndEnrich(
       `SELECT DISTINCT ss.*, sp.id as pad_id, sp.name as pad_name
        FROM social_sticks ss
        INNER JOIN social_pads sp ON ss.social_pad_id = sp.id
@@ -213,26 +206,23 @@ export async function listSticks(
        WHERE ss.org_id = $2 AND sp.is_public = false
          AND (sp.owner_id = $1 OR spm.user_id IS NOT NULL)
        ORDER BY ss.created_at DESC`,
-      [user.id, orgContext.orgId]
+      [user.id, orgContext.orgId],
+      { hasMore: false },
     )
-    const sticks = await enrichSticksWithData(result.rows)
-    return { status: 200, body: { sticks, hasMore: false } }
   }
 
   // Default: all accessible sticks (owned, member, and public)
-  let query = `SELECT DISTINCT ss.*, sp.id as pad_id, sp.name as pad_name, sp.is_public
+  return queryAndEnrich(
+    `SELECT DISTINCT ss.*, sp.id as pad_id, sp.name as pad_name, sp.is_public
      FROM social_sticks ss
      INNER JOIN social_pads sp ON ss.social_pad_id = sp.id
      LEFT JOIN social_pad_members spm ON sp.id = spm.social_pad_id AND spm.user_id = $1 AND spm.accepted = true
      WHERE sp.is_public = true
         OR sp.owner_id = $1
         OR spm.user_id IS NOT NULL
-     ORDER BY ss.created_at DESC`
-  const queryParams: any[] = [user.id]
-
-  const result = await db.query(query, queryParams)
-  const sticks = await enrichSticksWithData(result.rows)
-  return { status: 200, body: { sticks } }
+     ORDER BY ss.created_at DESC`,
+    [user.id],
+  )
 }
 
 // ============================================================================

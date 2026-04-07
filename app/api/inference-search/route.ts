@@ -5,7 +5,6 @@ import { getCachedAuthUser } from '@/lib/auth/cached-auth'
 import { getOrgContext } from '@/lib/auth/get-org-context'
 import { cache } from '@/lib/cache'
 import { searchSticks, parseSearchParams } from '@/lib/handlers/inference-search-handler'
-import { toResponse } from '@/lib/handlers/inference-response'
 
 const RATE_LIMIT_HEADERS = { 'Retry-After': '30' }
 

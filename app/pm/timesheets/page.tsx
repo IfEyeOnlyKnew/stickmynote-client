@@ -175,7 +175,7 @@ export default function TimesheetsPage() {
         body: JSON.stringify({ action, entryIds: [...selectedIds], note }),
       })
       const data = await res.json()
-      const actionLabel = (() => { if (action === "submit") return "submitted"; if (action === "approve") return "approved"; return "rejected" })()
+      const actionLabel = (action === "submit" ? "submitted" : action === "approve" ? "approved" : "rejected")
       toast({ title: `${data.updated || 0} entries ${actionLabel}` })
       setSelectedIds(new Set())
       fetchEntries()

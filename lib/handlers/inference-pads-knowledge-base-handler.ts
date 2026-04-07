@@ -57,7 +57,8 @@ export async function createKnowledgeBaseArticle(
     return null
   }
 
-  return attachAuthor(result.rows[0])
+  const [firstRow] = result.rows
+  return attachAuthor(firstRow)
 }
 
 /**
@@ -67,7 +68,7 @@ export async function updateKnowledgeBaseArticle(
   padId: string,
   articleId: string,
   fields: { title?: string; content?: string; category?: string; tags?: string[]; is_pinned?: boolean; pin_order?: number }
-): Promise<any | null> {
+): Promise<any> {
   const updates: string[] = []
   const values: any[] = []
   let paramIndex = 1

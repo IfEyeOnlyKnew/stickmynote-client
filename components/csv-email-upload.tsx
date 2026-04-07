@@ -158,8 +158,7 @@ export function CsvEmailUpload({ onEmailsUploaded, className }: Readonly<CsvEmai
       <CardContent className="space-y-4">
         {!uploadResult && (
           <>
-            <div
-              role="region"
+            <section
               aria-label="File drop zone"
               className={`border-2 border-dashed rounded-lg p-6 text-center transition-colors ${
                 isDragOver ? "border-blue-500 bg-blue-50" : "border-gray-300 hover:border-gray-400"
@@ -181,7 +180,7 @@ export function CsvEmailUpload({ onEmailsUploaded, className }: Readonly<CsvEmai
                 aria-label="Upload CSV file"
                 className="hidden"
               />
-            </div>
+            </section>
 
             <div className="text-xs text-gray-500 space-y-1">
               <p>• Simple format: one email per line</p>
@@ -198,7 +197,7 @@ export function CsvEmailUpload({ onEmailsUploaded, className }: Readonly<CsvEmai
               <Alert>
                 <Check className="h-4 w-4" />
                 <AlertDescription>
-                  {uploadResult.added > 0 && `Successfully added ${uploadResult.added} email${uploadResult.added !== 1 ? "s" : ""}`}
+                  {uploadResult.added > 0 && `Successfully added ${uploadResult.added} email${uploadResult.added === 1 ? "" : "s"}`}
                   {uploadResult.added === 0 && "Upload completed"}
                   {uploadResult.skipped > 0 && ` (${uploadResult.skipped} duplicates skipped)`}
                   {uploadResult.message && `. ${uploadResult.message}`}

@@ -196,7 +196,7 @@ export async function createReplyOnNote(
   return {
     status: 200,
     body: { reply: completeReply },
-    noteOwnerId: note.user_id !== session.user.id ? note.user_id : null,
+    noteOwnerId: note.user_id === session.user.id ? null : note.user_id,
     replyId: reply.id,
   }
 }

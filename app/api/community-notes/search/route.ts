@@ -60,6 +60,30 @@ export interface Note {
 
 const DEFAULT_LIMIT = 20
 
+function extractTabTags(tab: any, tagsOut: string[]): void {
+  if (!tab.tags) return
+  try {
+    const tabTags = typeof tab.tags === "string" ? JSON.parse(tab.tags) : tab.tags
+    if (Array.isArray(tabTags)) {
+      const stringTags = tabTags.filter((tag: any) => typeof tag === "string").map(String)
+      tagsOut.push(...stringTags)
+    }
+  } catch (e) {
+    console.warn("Failed to parse tab tags:", e)
+  }
+}
+
+function extractTabMedia(tab: any, videosOut: VideoItem[], imagesOut: ImageItem[]): void {
+  if (!tab.tab_data) return
+  try {
+    const tabData = typeof tab.tab_data === "string" ? JSON.parse(tab.tab_data) : tab.tab_data
+    if (Array.isArray(tabData.videos)) videosOut.push(...tabData.videos)
+    if (Array.isArray(tabData.images)) imagesOut.push(...tabData.images)
+  } catch (e) {
+    console.warn("Failed to parse tab_data:", e)
+  }
+}
+
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url)
@@ -137,55 +161,34 @@ export async function GET(request: NextRequest) {
     }
 
     // Group by note_id
-    const repliesByNoteId = (repliesResult.data || []).reduce((acc: any, reply: any) => {
-      if (!acc[reply.note_id]) acc[reply.note_id] = []
-      acc[reply.note_id].push(reply)
-      return acc
-    }, {})
+    const repliesByNoteId = new Map<string, any[]>()
+    for (const reply of (repliesResult.data || [])) {
+      const arr = repliesByNoteId.get(reply.note_id) || []
+      arr.push(reply)
+      repliesByNoteId.set(reply.note_id, arr)
+    }
 
-    const noteTabsByNoteId = (noteTabsResult.data || []).reduce((acc: any, tab: any) => {
-      if (!acc[tab.note_id]) acc[tab.note_id] = []
-      acc[tab.note_id].push(tab)
-      return acc
-    }, {})
+    const noteTabsByNoteId = new Map<string, any[]>()
+    for (const tab of (noteTabsResult.data || [])) {
+      const arr = noteTabsByNoteId.get(tab.note_id) || []
+      arr.push(tab)
+      noteTabsByNoteId.set(tab.note_id, arr)
+    }
 
     // Process notes
     const processedNotes: Note[] = (notes || []).map((note: any) => {
-      const noteTabs = noteTabsByNoteId[note.id] || []
+      const noteTabs = noteTabsByNoteId.get(note.id) || []
       const tabVideos: VideoItem[] = []
       const tabImages: ImageItem[] = []
       const tagsFromNoteTabs: string[] = []
 
       noteTabs.forEach((tab: any) => {
-        if (tab.tags) {
-          try {
-            const tabTags = typeof tab.tags === "string" ? JSON.parse(tab.tags) : tab.tags
-            if (Array.isArray(tabTags)) {
-              const stringTags = tabTags.filter((tag: any) => typeof tag === "string").map((tag: any) => String(tag))
-              tagsFromNoteTabs.push(...stringTags)
-            }
-          } catch (e) {
-            console.warn("Failed to parse tab tags:", e)
-          }
-        }
-
-        if (tab.tab_data) {
-          try {
-            const tabData = typeof tab.tab_data === "string" ? JSON.parse(tab.tab_data) : tab.tab_data
-            if (tabData.videos && Array.isArray(tabData.videos)) {
-              tabVideos.push(...tabData.videos)
-            }
-            if (tabData.images && Array.isArray(tabData.images)) {
-              tabImages.push(...tabData.images)
-            }
-          } catch (e) {
-            console.warn("Failed to parse tab_data:", e)
-          }
-        }
+        extractTabTags(tab, tagsFromNoteTabs)
+        extractTabMedia(tab, tabVideos, tabImages)
       })
 
       const allTags = [...new Set(tagsFromNoteTabs)].filter((tag) => typeof tag === "string" && tag.trim().length > 0)
-      const noteReplies = repliesByNoteId[note.id] || []
+      const noteReplies = repliesByNoteId.get(note.id) || []
       const replies: Reply[] = noteReplies.map((reply: any) => ({
         id: reply.id,
         note_id: reply.note_id,

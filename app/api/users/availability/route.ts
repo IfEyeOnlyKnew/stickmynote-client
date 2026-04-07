@@ -138,7 +138,7 @@ export async function GET(request: NextRequest) {
     conditions.push(`m.status IN ('scheduled', 'in_progress')`)
 
     // User filter - either by user_id in meeting_attendees or organizer_id
-    paramIndex = addUserFilter(conditions, values, paramIndex, userIds, emails)
+    addUserFilter(conditions, values, paramIndex, userIds, emails)
 
     const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : ""
 

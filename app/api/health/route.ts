@@ -21,8 +21,7 @@ export async function GET() {
     }
 
     let statusCode = 503
-    if (healthCheck.overall === "healthy") statusCode = 200
-    else if (healthCheck.overall === "degraded") statusCode = 200
+    if (healthCheck.overall === "healthy" || healthCheck.overall === "degraded") statusCode = 200
 
     return NextResponse.json(healthData, { status: statusCode })
   } catch (error) {

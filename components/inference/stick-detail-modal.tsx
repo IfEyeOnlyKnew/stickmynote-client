@@ -475,7 +475,7 @@ export function StickDetailModal({ open, onOpenChange, stickId, onUpdate }: Read
 
         // Update reply locally instead of refetching entire stick
         setStick((prev) => {
-          if (!prev || !prev.replies) return prev
+          if (!prev?.replies) return prev
           return { ...prev, replies: updateReplyInTree(prev.replies, replyId, (r) => ({ ...r, content, updated_at: new Date().toISOString() })) }
         })
         onUpdate?.()
@@ -511,7 +511,7 @@ export function StickDetailModal({ open, onOpenChange, stickId, onUpdate }: Read
       if (response.ok) {
         // Update reply locally
         setStick((prev) => {
-          if (!prev || !prev.replies) return prev
+          if (!prev?.replies) return prev
           return { ...prev, replies: updateReplyInTree(prev.replies, replyId, (r) => ({ ...r, content: newContent, updated_at: new Date().toISOString() })) }
         })
         onUpdate?.()

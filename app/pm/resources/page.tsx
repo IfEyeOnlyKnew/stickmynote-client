@@ -27,6 +27,22 @@ interface WorkloadUser {
   tasks: WorkloadTask[]
 }
 
+function getUtilColor(pct: number): string {
+  if (pct > 100) return "bg-red-500 text-white"
+  if (pct >= 80) return "bg-amber-400 text-amber-950"
+  if (pct >= 40) return "bg-green-400 text-green-950"
+  if (pct > 0) return "bg-green-200 text-green-800"
+  return "bg-muted text-muted-foreground"
+}
+
+function getCellColor(hours: number, capacity: number): string {
+  if (hours === 0) return "bg-muted/50"
+  const pct = (hours / capacity) * 100
+  if (pct > 100) return "bg-red-100 dark:bg-red-950 border-red-300 dark:border-red-800"
+  if (pct >= 80) return "bg-amber-50 dark:bg-amber-950 border-amber-300 dark:border-amber-800"
+  return "bg-green-50 dark:bg-green-950 border-green-300 dark:border-green-800"
+}
+
 export default function ResourcesPage() {
   const [users, setUsers] = useState<WorkloadUser[]>([])
   const [currentWeek, setCurrentWeek] = useState(new Date())
@@ -72,22 +88,6 @@ export default function ResourcesPage() {
     const weekCapacity = user.capacityHoursPerDay * 5
     if (weekCapacity === 0) return 0
     return (getUserWeekHours(user) / weekCapacity) * 100
-  }
-
-  function getUtilColor(pct: number): string {
-    if (pct > 100) return "bg-red-500 text-white"
-    if (pct >= 80) return "bg-amber-400 text-amber-950"
-    if (pct >= 40) return "bg-green-400 text-green-950"
-    if (pct > 0) return "bg-green-200 text-green-800"
-    return "bg-muted text-muted-foreground"
-  }
-
-  function getCellColor(hours: number, capacity: number): string {
-    if (hours === 0) return "bg-muted/50"
-    const pct = (hours / capacity) * 100
-    if (pct > 100) return "bg-red-100 dark:bg-red-950 border-red-300 dark:border-red-800"
-    if (pct >= 80) return "bg-amber-50 dark:bg-amber-950 border-amber-300 dark:border-amber-800"
-    return "bg-green-50 dark:bg-green-950 border-green-300 dark:border-green-800"
   }
 
   function getStatusBadge(pct: number) {
@@ -166,7 +166,7 @@ export default function ResourcesPage() {
         <Card>
           <CardContent className="pt-4">
             <div className="text-sm text-muted-foreground">Utilization</div>
-            <div className={`text-2xl font-bold ${(() => { if (overallUtilization > 100) return "text-red-600"; if (overallUtilization >= 80) return "text-amber-600"; return "text-green-600" })()}`}>
+            <div className={`text-2xl font-bold ${overallUtilization > 100 ? "text-red-600" : overallUtilization >= 80 ? "text-amber-600" : "text-green-600"}`}>
               {overallUtilization.toFixed(0)}%
             </div>
           </CardContent>

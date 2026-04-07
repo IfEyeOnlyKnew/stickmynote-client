@@ -19,7 +19,8 @@ export async function GET(request: NextRequest) {
       keyCount: stats.keyCount,
       userId: authResult.userId,
     })
-  } catch (error) {
+  } catch {
+    // Expected - cache operation may fail safely
     return NextResponse.json({ error: "Internal server error" }, { status: 500 })
   }
 }
@@ -40,7 +41,8 @@ export async function DELETE(request: NextRequest) {
       success: true,
       message: "Cache invalidated for user",
     })
-  } catch (error) {
+  } catch {
+    // Expected - cache operation may fail safely
     return NextResponse.json({ error: "Internal server error" }, { status: 500 })
   }
 }

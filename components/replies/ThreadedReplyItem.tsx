@@ -65,26 +65,17 @@ export const ThreadedReplyItem = memo(function ThreadedReplyItem({
   const wasEdited = reply.updated_at && reply.updated_at !== reply.created_at
 
   const isOwner = currentUserId && reply.user_id && currentUserId === reply.user_id
-  const hasReplies = reply.replies && reply.replies.length > 0
-  const replyCount = reply.replies?.length || 0
+  const hasReplies = (reply.replies?.length ?? 0) > 0
+  const replyCount = reply.replies?.length ?? 0
 
-  // Get depth-based styling
   const depthColors = DEPTH_COLORS[depth % DEPTH_COLORS.length]
-  const indentPx = depth * 24 // 24px per level
+  const indentPx = depth * 24
 
-  const getDisplayName = useCallback((r: ThreadedReply) => getReplyDisplayName(r), [])
+  const getDisplayName = useCallback(getReplyDisplayName, [])
+  const getInitials = useCallback(getReplyInitials, [])
 
-  const getInitials = useCallback((r: ThreadedReply) => getReplyInitials(r), [])
-
-  const handleStartEdit = () => {
-    setEditContent(reply.content)
-    setIsEditing(true)
-  }
-
-  const handleCancelEdit = () => {
-    setEditContent(reply.content)
-    setIsEditing(false)
-  }
+  const handleStartEdit = () => { setEditContent(reply.content); setIsEditing(true) }
+  const handleCancelEdit = () => { setEditContent(reply.content); setIsEditing(false) }
 
   const handleSaveEdit = async () => {
     if (!onEdit || !editContent.trim() || editContent.trim() === reply.content) {

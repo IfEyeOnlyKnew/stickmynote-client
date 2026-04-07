@@ -19,7 +19,8 @@ export async function listSocialNotifications(session: SocialSession, limit = 50
       [session.user.org_id, session.user.id, limit, offset]
     )
     return { status: 200, body: { social: notifications } }
-  } catch (error) {
+  } catch {
+    // Expected - database query may fail safely
     return { status: 500, body: { error: 'Failed to list social notifications' } }
   }
 }
@@ -72,7 +73,8 @@ export async function markAllNotificationsRead(session: SocialSession) {
       [session.user.id, session.user.org_id]
     )
     return { status: 200, body: { success: true } }
-  } catch (error) {
+  } catch {
+    // Expected - database query may fail safely
     return { status: 500, body: { error: 'Failed to mark all notifications as read' } }
   }
 }

@@ -32,7 +32,7 @@ interface PermissionPresetsManagerProps {
 export function PermissionPresetsManager({ onApplyPreset }: Readonly<PermissionPresetsManagerProps>) {
   const [presets, setPresets] = useState<PermissionPreset[]>([])
   const [dialogOpen, setDialogOpen] = useState(false)
-  const [, setEditingPreset] = useState<PermissionPreset | null>(null)
+  const [_editingPreset, setEditingPreset] = useState<PermissionPreset | null>(null)
   const [presetName, setPresetName] = useState("")
   const [presetDescription, setPresetDescription] = useState("")
 

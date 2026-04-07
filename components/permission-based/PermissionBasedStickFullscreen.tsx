@@ -79,7 +79,7 @@ export function PermissionBasedStickFullscreen({
   const [replySummary, setReplySummary] = useState<string | null>(null)
   const [selectedTone, setSelectedTone] = useState("professional")
   const [replyCount, setReplyCount] = useState(0)
-  const [isExporting, setIsExporting] = useState(false)
+  const [isExporting] = useState(false)
 
   const [isQuickStick, setIsQuickStick] = useState(stick.is_quickstick || false)
 
@@ -331,7 +331,8 @@ export function PermissionBasedStickFullscreen({
           variant: "destructive",
         })
       }
-    } catch (error) {
+    } catch {
+      // Expected - summarize request may fail
       toast({
         title: "Error",
         description: "Failed to summarize links. Please try again.",

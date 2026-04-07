@@ -49,6 +49,29 @@ interface ChannelChatViewProps {
 
 const REACTION_EMOJIS = ["👍", "❤️", "😂", "😮", "🎉", "🔥", "👀", "✅"]
 
+function applyReaction(reactions: any[], emoji: string, added: boolean, userId?: string, userName?: string): any[] {
+  const existing = reactions.find((r) => r.emoji === emoji)
+  if (added) {
+    if (existing) {
+      existing.count++
+      if (userId) existing.users.push({ id: userId, full_name: userName || "" })
+      else existing.hasReacted = true
+    } else {
+      reactions.push(
+        userId
+          ? { emoji, count: 1, users: [{ id: userId, full_name: userName || "" }], hasReacted: false }
+          : { emoji, count: 1, users: [], hasReacted: true }
+      )
+    }
+  } else if (existing) {
+    existing.count--
+    if (userId) existing.users = existing.users.filter((u: any) => u.id !== userId)
+    else existing.hasReacted = false
+    if (existing.count <= 0) reactions.splice(reactions.indexOf(existing), 1)
+  }
+  return reactions
+}
+
 export function ChannelChatView({
   chat,
   currentUserId,
@@ -152,27 +175,7 @@ export function ChannelChatView({
     setMessages((prev) =>
       prev.map((m) => {
         if (m.id !== messageId) return m
-        const reactions = [...(m.reactions || [])]
-        const existing = reactions.find((r) => r.emoji === emoji)
-        if (added) {
-          if (existing) {
-            existing.count++
-            if (userId) existing.users.push({ id: userId, full_name: userName || "" })
-            else existing.hasReacted = true
-          } else {
-            reactions.push(
-              userId
-                ? { emoji, count: 1, users: [{ id: userId, full_name: userName || "" }], hasReacted: false }
-                : { emoji, count: 1, users: [], hasReacted: true }
-            )
-          }
-        } else if (existing) {
-            existing.count--
-            if (userId) existing.users = existing.users.filter((u) => u.id !== userId)
-            else existing.hasReacted = false
-            if (existing.count <= 0) reactions.splice(reactions.indexOf(existing), 1)
-        }
-        return { ...m, reactions }
+        return { ...m, reactions: applyReaction([...(m.reactions || [])], emoji, added, userId, userName) }
       })
     )
   }, [])
@@ -792,7 +795,7 @@ export function ChannelChatView({
             </h3>
 
             {/* Online members */}
-            {memberIds.filter((id) => presence[id]?.isOnline).length > 0 && (
+            {memberIds.some((id) => presence[id]?.isOnline) && (
               <>
                 <p className="text-xs text-gray-400 font-medium mb-1 mt-3">
                   Online — {onlineCount}
@@ -804,7 +807,7 @@ export function ChannelChatView({
             )}
 
             {/* Offline members */}
-            {memberIds.filter((id) => !presence[id]?.isOnline).length > 0 && (
+            {memberIds.some((id) => !presence[id]?.isOnline) && (
               <>
                 <p className="text-xs text-gray-400 font-medium mb-1 mt-3">
                   Offline — {memberIds.length - onlineCount}

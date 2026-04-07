@@ -21,7 +21,8 @@ export async function listUploads(session: UploadSession) {
       [session.user.id, session.user.org_id]
     )
     return { status: 200, body: { uploads } }
-  } catch (error) {
+  } catch {
+    // Expected - database query may fail safely
     return { status: 500, body: { error: 'Failed to list uploads' } }
   }
 }

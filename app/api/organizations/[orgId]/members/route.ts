@@ -61,13 +61,9 @@ async function buildUsersMap(
 async function addExistingUserAsMember(
   serviceClient: Awaited<ReturnType<typeof createDatabaseClient>>,
   orgId: string,
-  existingUser: { id: string },
-  role: string,
-  context: OrgContext,
-  normalizedEmail: string,
-  organizationName: string,
-  inviterName: string,
+  params: { existingUser: { id: string }; role: string; context: OrgContext; normalizedEmail: string; organizationName: string; inviterName: string },
 ) {
+  const { existingUser, role, context, normalizedEmail, organizationName, inviterName } = params
   const { data: existingMember } = await serviceClient
     .from("organization_members")
     .select("id")
@@ -251,8 +247,8 @@ export async function POST(req: Request, { params }: { params: Promise<{ orgId: 
 
     if (existingUser) {
       return addExistingUserAsMember(
-        serviceClient, orgId, existingUser, role, context,
-        normalizedEmail, organizationName, inviterName,
+        serviceClient, orgId,
+        { existingUser, role, context, normalizedEmail, organizationName, inviterName },
       )
     }
 

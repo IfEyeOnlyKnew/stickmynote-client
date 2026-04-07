@@ -18,7 +18,7 @@ export function ChatRequestNotifications() {
   const [toastRequest, setToastRequest] = useState<ChatRequest | null>(null)
   const [modalRequest, setModalRequest] = useState<ChatRequest | null>(null)
   const [showToast, setShowToast] = useState(false)
-  const [, setRespondingId] = useState<string | null>(null)
+  const [_respondingId, setRespondingId] = useState<string | null>(null)
   // Track which requests we've already shown toasts for
   const shownToastsRef = useRef<Set<string>>(new Set())
 

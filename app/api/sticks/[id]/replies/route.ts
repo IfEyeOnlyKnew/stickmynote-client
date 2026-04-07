@@ -3,7 +3,6 @@ import { createServiceDatabaseClient, type DatabaseClient } from "@/lib/database
 import { getCachedAuthUser, createRateLimitResponse, createUnauthorizedResponse } from "@/lib/auth/cached-auth"
 import {
   REPLY_SELECT_FIELDS,
-  DEFAULT_REPLY_COLOR,
   parseReplyInput,
   type UpdateReplyInput,
   type DeleteReplyInput,

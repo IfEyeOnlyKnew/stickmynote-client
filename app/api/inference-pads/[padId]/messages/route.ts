@@ -276,6 +276,22 @@ function applyPrivateModeFilter(
 // For polling, use: ?after=<lastMessageId> to only get new messages
 // ============================================================================
 
+async function applyCursorPagination(db: any, query: any, afterCursor: string | null, beforeCursor: string | null) {
+  const cursorId = afterCursor || beforeCursor
+  if (!cursorId) return query
+
+  const { data: cursorMsg } = await db
+    .from("social_pad_messages")
+    .select("created_at")
+    .eq("id", cursorId)
+    .single()
+
+  if (!cursorMsg) return query
+  return afterCursor
+    ? query.gt("created_at", cursorMsg.created_at)
+    : query.lt("created_at", cursorMsg.created_at)
+}
+
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ padId: string }> }
@@ -338,28 +354,7 @@ export async function GET(
       .eq("social_pad_id", padId)
 
     // Apply cursor-based pagination
-    if (afterCursor) {
-      // Get the timestamp of the cursor message for efficient filtering
-      const { data: cursorMsg } = await db
-        .from("social_pad_messages")
-        .select("created_at")
-        .eq("id", afterCursor)
-        .single()
-
-      if (cursorMsg) {
-        query = query.gt("created_at", cursorMsg.created_at)
-      }
-    } else if (beforeCursor) {
-      const { data: cursorMsg } = await db
-        .from("social_pad_messages")
-        .select("created_at")
-        .eq("id", beforeCursor)
-        .single()
-
-      if (cursorMsg) {
-        query = query.lt("created_at", cursorMsg.created_at)
-      }
-    }
+    query = await applyCursorPagination(db, query, afterCursor, beforeCursor)
 
     // For private mode, filter at database level where possible
     if (isPrivateMode) {
