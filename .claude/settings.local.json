@@ -101,7 +101,11 @@
       "Bash(node -e \"const fs=require\\('fs'\\);const j=JSON.parse\\(fs.readFileSync\\('.claude/settings.local.json','utf8'\\)\\);const hook=j.hooks.PreToolUse[0];console.log\\('matcher:',hook.matcher\\);console.log\\('if:',hook.if\\);console.log\\('type:',hook.hooks[0].type\\);console.log\\('timeout:',hook.hooks[0].timeout\\);console.log\\('statusMessage:',hook.hooks[0].statusMessage\\);console.log\\('JSON valid: OK'\\)\")",
       "Bash(python3 -c ':*)",
       "Bash(node -e ':*)",
-      "Read(//tmp/**)"
+      "Read(//tmp/**)",
+      "Bash(wc -l app/api/v2/sticks/[id]/replies/route.ts app/api/sticks/[id]/replies/route.ts)",
+      "Bash(wc -l app/api/v2/sticks/[id]/tabs/route.ts app/api/sticks/[id]/tabs/route.ts)",
+      "Bash(wc -l app/api/v2/sticks/[id]/route.ts app/api/sticks/[id]/route.ts)",
+      "Bash(wc -l app/api/v2/notes/[id]/tabs/route.ts app/api/notes/[id]/tabs/route.ts)"
     ],
     "additionalDirectories": [
       "C:\\stick-my-note-ubuntu\\stickmynote-client\\scripts",

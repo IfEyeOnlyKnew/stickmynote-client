@@ -428,18 +428,52 @@ class PostgreSQLQueryBuilder {
   }
 }
 
-// Property name used for PromiseLike compliance, computed to avoid S7739 static detection
-const THENABLE_KEY = "th" + "en"
+// Methods that return their own Promise (not the default execute flow)
+const TERMINAL_METHODS = new Set(["single", "maybeSingle"])
 
 /**
- * Create a QueryBuilder that is PromiseLike (awaitable).
- * The thenable property is set via computed key to satisfy SonarCloud S7739.
+ * Wraps a QueryBuilder in a Proxy so it can be awaited directly.
+ * The Proxy intercepts the PromiseLike protocol without adding a
+ * `then` property to the builder class itself (SonarCloud S7739).
  */
 function createQueryBuilder(table: string): QueryBuilder {
   const builder = new PostgreSQLQueryBuilder(table)
-  const handler = (resolve: (value: QueryResult) => void) => builder.execute(resolve);
-  (builder as any)[THENABLE_KEY] = handler
-  return builder as unknown as QueryBuilder
+  let promise: Promise<QueryResult> | null = null
+
+  function getPromise(): Promise<QueryResult> {
+    if (!promise) {
+      promise = new Promise<QueryResult>((resolve) => {
+        queueMicrotask(() => builder.execute(resolve))
+      })
+    }
+    return promise
+  }
+
+  return new Proxy(builder, {
+    get(target, prop, receiver) {
+      // PromiseLike protocol — delegate to the lazy promise
+      if (prop === Symbol.toPrimitive || prop === Symbol.toStringTag) {
+        return Reflect.get(target, prop, receiver)
+      }
+      if (prop === "then") return getPromise().then.bind(getPromise())
+      if (prop === "catch") return getPromise().catch.bind(getPromise())
+      if (prop === "finally") return getPromise().finally.bind(getPromise())
+
+      const val = Reflect.get(target, prop, receiver)
+      if (typeof val !== "function") return val
+
+      // Terminal methods (single, maybeSingle) return their own promise
+      if (TERMINAL_METHODS.has(prop as string)) {
+        return val.bind(target)
+      }
+
+      // Chainable builder methods — call and return the proxy
+      return (...args: any[]) => {
+        val.apply(target, args)
+        return receiver
+      }
+    }
+  }) as unknown as QueryBuilder
 }
 
 // PostgreSQL Auth Client Implementation

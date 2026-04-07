@@ -163,12 +163,12 @@ export function MobileStickCard({
           {/* Header: Checkbox, Color bar, Topic, Expand */}
           <button type="button" className="flex items-start gap-2 bg-transparent border-none p-0 text-left w-full cursor-pointer" onClick={handleCardClick} onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") handleCardClick?.(e as unknown as React.MouseEvent) }}>
             {onSelect && (
-              <div onClick={(e) => e.stopPropagation()} onKeyDown={(e) => e.stopPropagation()}>
+              <span role="none" onClick={(e) => e.stopPropagation()} onKeyDown={(e) => e.stopPropagation()}>
                 <Checkbox
                   checked={isSelected}
                   onCheckedChange={handleCheckboxChange}
                 />
-              </div>
+              </span>
             )}
             <div className="w-1 h-8 rounded flex-shrink-0" style={{ backgroundColor: stick.color }} />
             <div className="flex-1 min-w-0">
