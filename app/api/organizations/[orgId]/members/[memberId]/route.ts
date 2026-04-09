@@ -1,25 +1,15 @@
 import { NextResponse } from "next/server"
 import { createServiceDatabaseClient } from "@/lib/database/database-adapter"
-import { getCachedAuthUser } from "@/lib/auth/cached-auth"
+import { requireAuth } from "@/lib/api/route-helpers"
 
 // PATCH /api/organizations/[orgId]/members/[memberId] - Update member role
 export async function PATCH(req: Request, { params }: { params: Promise<{ orgId: string; memberId: string }> }) {
   try {
     const { orgId, memberId } = await params
-    const authResult = await getCachedAuthUser()
+    const auth = await requireAuth()
+    if ("response" in auth) return auth.response
 
-    if (authResult.rateLimited) {
-      return NextResponse.json(
-        { error: "Rate limit exceeded. Please try again in a moment." },
-        { status: 429, headers: { "Retry-After": "30" } },
-      )
-    }
-
-    if (!authResult.user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
-    }
-
-    const user = authResult.user
+    const { user } = auth
     const serviceDb = await createServiceDatabaseClient()
 
     // Check admin/owner role
@@ -93,20 +83,10 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ orgId:
 export async function DELETE(req: Request, { params }: { params: Promise<{ orgId: string; memberId: string }> }) {
   try {
     const { orgId, memberId } = await params
-    const authResult = await getCachedAuthUser()
+    const auth = await requireAuth()
+    if ("response" in auth) return auth.response
 
-    if (authResult.rateLimited) {
-      return NextResponse.json(
-        { error: "Rate limit exceeded. Please try again in a moment." },
-        { status: 429, headers: { "Retry-After": "30" } },
-      )
-    }
-
-    if (!authResult.user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
-    }
-
-    const user = authResult.user
+    const { user } = auth
     const serviceDb = await createServiceDatabaseClient()
 
     // Check admin/owner role

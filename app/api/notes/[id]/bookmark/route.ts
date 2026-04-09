@@ -1,38 +1,18 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { createDatabaseClient } from "@/lib/database/database-adapter"
-import { getCachedAuthUser } from "@/lib/auth/cached-auth"
+import { requireAuthAndOrg } from "@/lib/api/route-helpers"
 
 export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await params
     const db = await createDatabaseClient()
 
-    const authResult = await getCachedAuthUser()
-    if (authResult.rateLimited) {
-      return NextResponse.json(
-        { error: "Rate limit exceeded. Please try again in a moment." },
-        { status: 429, headers: { "Retry-After": "30" } },
-      )
-    }
-    const user = authResult.user
-    if (!user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
-    }
-
-    // Get org context directly
-    const { data: membership } = await db
-      .from("organization_members")
-      .select("org_id")
-      .eq("user_id", user.id)
-      .limit(1)
-      .maybeSingle()
-
-    if (!membership?.org_id) {
-      return NextResponse.json({ error: "No organization context" }, { status: 403 })
-    }
+    const auth = await requireAuthAndOrg()
+    if ("response" in auth) return auth.response
+    const { user, orgContext } = auth
 
     const noteId = id
-    const orgId = membership.org_id
+    const orgId = orgContext.orgId
 
     const { data: note, error: noteError } = await db
       .from("personal_sticks")
@@ -89,26 +69,9 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     const db = await createDatabaseClient()
     const noteId = id
 
-    const authResult = await getCachedAuthUser()
-    if (authResult.rateLimited) {
-      return NextResponse.json({ isBookmarked: false })
-    }
-    const user = authResult.user
-    if (!user) {
-      return NextResponse.json({ isBookmarked: false })
-    }
-
-    // Get org context directly
-    const { data: membership } = await db
-      .from("organization_members")
-      .select("org_id")
-      .eq("user_id", user.id)
-      .limit(1)
-      .maybeSingle()
-
-    if (!membership?.org_id) {
-      return NextResponse.json({ isBookmarked: false })
-    }
+    const auth = await requireAuthAndOrg()
+    if ("response" in auth) return NextResponse.json({ isBookmarked: false })
+    const { user } = auth
 
     const { data: bookmark } = await db
       .from("personal_sticks_reactions")

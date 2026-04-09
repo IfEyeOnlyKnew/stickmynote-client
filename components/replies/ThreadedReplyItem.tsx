@@ -7,6 +7,8 @@ import { Textarea } from "@/components/ui/textarea"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { getTimestampDisplay } from "@/utils/noteUtils"
 import { CalStickControls } from "./CalStickControls"
+import { ReplyEditForm } from "./ReplyEditForm"
+import { useReplyEdit, useInlineReply } from "@/hooks/use-reply-edit"
 import type React from "react"
 
 import { DEPTH_COLORS, getReplyDisplayName, getReplyInitials, type BaseReply } from "./reply-shared"
@@ -52,13 +54,13 @@ export const ThreadedReplyItem = memo(function ThreadedReplyItem({
   onCancelCalStickEdit,
   onToggleCalStickComplete,
 }: ThreadedReplyItemProps) {
-  const [isEditing, setIsEditing] = useState(false)
-  const [editContent, setEditContent] = useState(reply.content)
-  const [isSaving, setIsSaving] = useState(false)
+  const { isEditing, editContent, setEditContent, isSaving, handleStartEdit, handleCancelEdit, handleSaveEdit } =
+    useReplyEdit(reply.id, reply.content, onEdit)
+
+  const { isReplying, inlineReplyContent, setInlineReplyContent, isSubmittingInlineReply, handleReply, handleCancelInlineReply, handleSubmitInlineReply } =
+    useInlineReply(reply.id, onSubmitInlineReply, onReply, reply)
+
   const [isCollapsed, setIsCollapsed] = useState(false)
-  const [isReplying, setIsReplying] = useState(false)
-  const [inlineReplyContent, setInlineReplyContent] = useState("")
-  const [isSubmittingInlineReply, setIsSubmittingInlineReply] = useState(false)
 
   const timestamp = reply.updated_at || reply.created_at
   const displayTime = timestamp ? getTimestampDisplay(timestamp) : "Just now"
@@ -73,56 +75,6 @@ export const ThreadedReplyItem = memo(function ThreadedReplyItem({
 
   const getDisplayName = useCallback(getReplyDisplayName, [])
   const getInitials = useCallback(getReplyInitials, [])
-
-  const handleStartEdit = () => { setEditContent(reply.content); setIsEditing(true) }
-  const handleCancelEdit = () => { setEditContent(reply.content); setIsEditing(false) }
-
-  const handleSaveEdit = async () => {
-    if (!onEdit || !editContent.trim() || editContent.trim() === reply.content) {
-      setIsEditing(false)
-      return
-    }
-
-    setIsSaving(true)
-    try {
-      await onEdit(reply.id, editContent.trim())
-      setIsEditing(false)
-    } catch (error) {
-      console.error("Error saving reply edit:", error)
-    } finally {
-      setIsSaving(false)
-    }
-  }
-
-  const handleReply = () => {
-    if (onSubmitInlineReply) {
-      // Use inline reply form
-      setIsReplying(true)
-    } else if (onReply) {
-      // Fallback to scrolling to main reply form
-      onReply(reply)
-    }
-  }
-
-  const handleCancelInlineReply = () => {
-    setIsReplying(false)
-    setInlineReplyContent("")
-  }
-
-  const handleSubmitInlineReply = async () => {
-    if (!onSubmitInlineReply || !inlineReplyContent.trim() || isSubmittingInlineReply) return
-
-    setIsSubmittingInlineReply(true)
-    try {
-      await onSubmitInlineReply(inlineReplyContent.trim(), reply.id)
-      setInlineReplyContent("")
-      setIsReplying(false)
-    } catch (error) {
-      console.error("Error submitting inline reply:", error)
-    } finally {
-      setIsSubmittingInlineReply(false)
-    }
-  }
 
   const toggleCollapse = () => {
     setIsCollapsed(!isCollapsed)
@@ -228,48 +180,13 @@ export const ThreadedReplyItem = memo(function ThreadedReplyItem({
 
             {/* Reply content */}
             {isEditing ? (
-              <div className="space-y-2">
-                <Textarea
-                  value={editContent}
-                  onChange={(e) => setEditContent(e.target.value)}
-                  className="text-sm text-gray-900 min-h-[60px] resize-none"
-                  maxLength={1000}
-                  autoFocus
-                />
-                <div className="flex items-center justify-between">
-                  <span className="text-xs text-gray-500">{editContent.length}/1000</span>
-                  <div className="flex gap-1">
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      onClick={handleCancelEdit}
-                      disabled={isSaving}
-                      className="h-6 px-2 text-xs"
-                    >
-                      <X className="h-3 w-3 mr-1" />
-                      Cancel
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="default"
-                      size="sm"
-                      onClick={handleSaveEdit}
-                      disabled={isSaving || !editContent.trim()}
-                      className="h-6 px-2 text-xs"
-                    >
-                      {isSaving ? (
-                        <div className="h-3 w-3 animate-spin rounded-full border-2 border-white border-t-transparent" />
-                      ) : (
-                        <>
-                          <Check className="h-3 w-3 mr-1" />
-                          Save
-                        </>
-                      )}
-                    </Button>
-                  </div>
-                </div>
-              </div>
+              <ReplyEditForm
+                editContent={editContent}
+                onContentChange={setEditContent}
+                onSave={handleSaveEdit}
+                onCancel={handleCancelEdit}
+                isSaving={isSaving}
+              />
             ) : (
               <div className="text-sm text-gray-900 whitespace-pre-wrap break-words">
                 {reply.content}

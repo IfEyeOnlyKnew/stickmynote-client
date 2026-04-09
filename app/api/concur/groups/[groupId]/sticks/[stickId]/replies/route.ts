@@ -28,26 +28,28 @@ const USER_SELECT_FIELDS = "id, full_name, username, email, avatar_url"
 // Auth & Access Helpers
 // ============================================================================
 
-async function getAuthenticatedOrgContext() {
+async function getAuthAndMembership(groupId: string) {
   const { user, error: authError } = await getCachedAuthUser()
-  if (authError === "rate_limited") return { error: "RATE_LIMITED" as const }
-  if (!user) return { error: "UNAUTHORIZED" as const }
+  if (authError === "rate_limited") return { response: createRateLimitResponse() }
+  if (!user) return { response: createUnauthorizedResponse() }
 
   const orgContext = await getOrgContext()
-  if (!orgContext) return { error: "NO_ORG" as const }
+  if (!orgContext) return { response: NextResponse.json({ error: "No organization context" }, { status: 403 }) }
 
-  return { user, orgContext }
-}
+  const db = await createDatabaseClient()
+  const serviceDb = await createServiceDatabaseClient()
 
-async function checkGroupMembership(db: any, groupId: string, userId: string, orgId: string) {
-  const { data } = await db
+  const { data: membership } = await db
     .from("concur_group_members")
     .select("role")
     .eq("group_id", groupId)
-    .eq("user_id", userId)
-    .eq("org_id", orgId)
+    .eq("user_id", user.id)
+    .eq("org_id", orgContext.orgId)
     .maybeSingle()
-  return data
+
+  if (!membership) return { response: NextResponse.json({ error: "Access denied" }, { status: 403 }) }
+
+  return { user, orgContext, db, serviceDb, membership }
 }
 
 // ============================================================================
@@ -60,20 +62,9 @@ export async function GET(
 ) {
   try {
     const { groupId, stickId } = await params
-    const authResult = await getAuthenticatedOrgContext()
-    if ("error" in authResult) {
-      if (authResult.error === "RATE_LIMITED") return createRateLimitResponse()
-      if (authResult.error === "UNAUTHORIZED") return createUnauthorizedResponse()
-      return NextResponse.json({ error: "No organization context" }, { status: 403 })
-    }
-
-    const { user, orgContext } = authResult
-    const db = await createDatabaseClient()
-    const serviceDb = await createServiceDatabaseClient()
-
-    // Check membership
-    const membership = await checkGroupMembership(db, groupId, user.id, orgContext.orgId)
-    if (!membership) return NextResponse.json({ error: "Access denied" }, { status: 403 })
+    const auth = await getAuthAndMembership(groupId)
+    if ("response" in auth) return auth.response
+    const { orgContext, db, serviceDb } = auth
 
     // Fetch all replies for this stick
     const { data: replies, error } = await db
@@ -123,20 +114,9 @@ export async function POST(
 ) {
   try {
     const { groupId, stickId } = await params
-    const authResult = await getAuthenticatedOrgContext()
-    if ("error" in authResult) {
-      if (authResult.error === "RATE_LIMITED") return createRateLimitResponse()
-      if (authResult.error === "UNAUTHORIZED") return createUnauthorizedResponse()
-      return NextResponse.json({ error: "No organization context" }, { status: 403 })
-    }
-
-    const { user, orgContext } = authResult
-    const db = await createDatabaseClient()
-    const serviceDb = await createServiceDatabaseClient()
-
-    // Check membership
-    const membership = await checkGroupMembership(db, groupId, user.id, orgContext.orgId)
-    if (!membership) return NextResponse.json({ error: "Access denied" }, { status: 403 })
+    const auth = await getAuthAndMembership(groupId)
+    if ("response" in auth) return auth.response
+    const { user, orgContext, db, serviceDb } = auth
 
     // Verify stick exists in this group
     const { data: stick } = await db
@@ -205,16 +185,10 @@ export async function PUT(
   { params }: { params: Promise<{ groupId: string; stickId: string }> }
 ) {
   try {
-    await params
-    const authResult = await getAuthenticatedOrgContext()
-    if ("error" in authResult) {
-      if (authResult.error === "RATE_LIMITED") return createRateLimitResponse()
-      if (authResult.error === "UNAUTHORIZED") return createUnauthorizedResponse()
-      return NextResponse.json({ error: "No organization context" }, { status: 403 })
-    }
-
-    const { user, orgContext } = authResult
-    const db = await createDatabaseClient()
+    const { groupId } = await params
+    const auth = await getAuthAndMembership(groupId)
+    if ("response" in auth) return auth.response
+    const { user, orgContext, db } = auth
 
     const { reply_id, content } = await request.json()
     if (!reply_id || !content?.trim()) {
@@ -264,23 +238,13 @@ export async function DELETE(
 ) {
   try {
     const { groupId } = await params
-    const authResult = await getAuthenticatedOrgContext()
-    if ("error" in authResult) {
-      if (authResult.error === "RATE_LIMITED") return createRateLimitResponse()
-      if (authResult.error === "UNAUTHORIZED") return createUnauthorizedResponse()
-      return NextResponse.json({ error: "No organization context" }, { status: 403 })
-    }
-
-    const { user, orgContext } = authResult
-    const db = await createDatabaseClient()
+    const auth = await getAuthAndMembership(groupId)
+    if ("response" in auth) return auth.response
+    const { user, orgContext, db, membership } = auth
 
     const { searchParams } = new URL(request.url)
     const replyId = searchParams.get("replyId")
     if (!replyId) return NextResponse.json({ error: "replyId is required" }, { status: 400 })
-
-    // Check group membership for owner check
-    const membership = await checkGroupMembership(db, groupId, user.id, orgContext.orgId)
-    if (!membership) return NextResponse.json({ error: "Access denied" }, { status: 403 })
 
     // Check reply ownership
     const { data: reply } = await db

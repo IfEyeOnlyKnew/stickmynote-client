@@ -1,15 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { applyRateLimit } from "@/lib/rate-limiter-enhanced"
+import { safeRateLimit } from "@/lib/api/route-helpers"
 import { getCachedAuthUser, createRateLimitResponse, createUnauthorizedResponse } from "@/lib/auth/cached-auth"
-
-async function safeRateLimit(request: NextRequest, userId: string, action: string) {
-  try {
-    const res = await applyRateLimit(request, userId, action)
-    return res.success
-  } catch {
-    return true
-  }
-}
 
 // POST /api/noted/transcribe - Transcribe audio via Whisper on Ollama
 export async function POST(request: NextRequest) {

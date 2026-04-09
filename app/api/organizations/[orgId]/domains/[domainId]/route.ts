@@ -1,6 +1,6 @@
-import { getCachedAuthUser } from "@/lib/auth/cached-auth"
 import { createDatabaseClient } from "@/lib/database/database-adapter"
 import { type NextRequest, NextResponse } from "next/server"
+import { requireAuth } from "@/lib/api/route-helpers"
 
 interface RouteContext {
   params: Promise<{ orgId: string; domainId: string }>
@@ -12,20 +12,10 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
     const { orgId, domainId } = await context.params
     const db = await createDatabaseClient()
 
-    const authResult = await getCachedAuthUser()
+    const auth = await requireAuth()
+    if ("response" in auth) return auth.response
 
-    if (authResult.rateLimited) {
-      return NextResponse.json(
-        { error: "Rate limit exceeded. Please try again in a moment." },
-        { status: 429, headers: { "Retry-After": "30" } },
-      )
-    }
-
-    if (!authResult.user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
-    }
-
-    const user = authResult.user
+    const { user } = auth
 
     // Check permissions
     const { data: org } = await db
@@ -90,20 +80,10 @@ export async function DELETE(request: NextRequest, context: RouteContext) {
     const { orgId, domainId } = await context.params
     const db = await createDatabaseClient()
 
-    const authResult = await getCachedAuthUser()
+    const auth = await requireAuth()
+    if ("response" in auth) return auth.response
 
-    if (authResult.rateLimited) {
-      return NextResponse.json(
-        { error: "Rate limit exceeded. Please try again in a moment." },
-        { status: 429, headers: { "Retry-After": "30" } },
-      )
-    }
-
-    if (!authResult.user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
-    }
-
-    const user = authResult.user
+    const { user } = auth
 
     // Check permissions
     const { data: org } = await db

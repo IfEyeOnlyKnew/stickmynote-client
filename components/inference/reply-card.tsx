@@ -9,6 +9,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import { Pencil, Trash2, MessageSquare, CheckSquare, AlertCircle, RefreshCw, ChevronDown, ChevronRight, CornerDownRight, Send, X, Check } from "lucide-react"
 import { formatDistanceToNow } from "date-fns"
 import { DEPTH_COLORS } from "@/components/replies/reply-shared"
+import { ReplyEditForm } from "@/components/replies/ReplyEditForm"
 
 // Maximum nesting depth before showing message
 export const MAX_REPLY_DEPTH = 5
@@ -376,47 +377,14 @@ export const ReplyCard = memo(function ReplyCard({
 
             {/* Reply content */}
             {isEditing ? (
-              <div role="none" className="space-y-2" onClick={(e) => e.stopPropagation()} onKeyDown={(e) => e.stopPropagation()}>
-                <Textarea
-                  value={editContent}
-                  onChange={(e) => setEditContent(e.target.value)}
-                  className="text-sm text-gray-900 min-h-[60px] resize-none"
-                  maxLength={1000}
-                  autoFocus
+              <div role="none" onClick={(e) => e.stopPropagation()} onKeyDown={(e) => e.stopPropagation()}>
+                <ReplyEditForm
+                  editContent={editContent}
+                  onContentChange={setEditContent}
+                  onSave={handleSaveEdit}
+                  onCancel={handleCancelEdit}
+                  isSaving={isSaving}
                 />
-                <div className="flex items-center justify-between">
-                  <span className="text-xs text-gray-500">{editContent.length}/1000</span>
-                  <div className="flex gap-1">
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      onClick={handleCancelEdit}
-                      disabled={isSaving}
-                      className="h-6 px-2 text-xs"
-                    >
-                      <X className="h-3 w-3 mr-1" />
-                      Cancel
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="default"
-                      size="sm"
-                      onClick={handleSaveEdit}
-                      disabled={isSaving || !editContent.trim()}
-                      className="h-6 px-2 text-xs"
-                    >
-                      {isSaving ? (
-                        <div className="h-3 w-3 animate-spin rounded-full border-2 border-white border-t-transparent" />
-                      ) : (
-                        <>
-                          <Check className="h-3 w-3 mr-1" />
-                          Save
-                        </>
-                      )}
-                    </Button>
-                  </div>
-                </div>
               </div>
             ) : (
               <div className="text-sm text-gray-900 whitespace-pre-wrap break-words">{reply.content}</div>

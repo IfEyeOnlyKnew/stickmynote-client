@@ -1,20 +1,9 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { createDatabaseClient } from "@/lib/database/database-adapter"
-import { applyRateLimit } from "@/lib/rate-limiter-enhanced"
 import { createSafeAction, success, error } from "@/lib/safe-action"
 import { createPadSchema } from "@/types/schemas"
 import { getOrgContext } from "@/lib/auth/get-org-context"
-import { getCachedAuthUser, createRateLimitResponse, createUnauthorizedResponse } from "@/lib/auth/cached-auth"
-
-async function safeRateLimit(request: NextRequest, userId: string, action: string) {
-  try {
-    const res = await applyRateLimit(request, userId, action)
-    return res.success
-  } catch (err) {
-    console.warn("Rate limit provider error, allowing request:", err)
-    return true
-  }
-}
+import { requireAuthAndOrg } from "@/lib/api/route-helpers"
 
 const createPadAction = createSafeAction(
   {
@@ -57,22 +46,11 @@ export async function POST(request: NextRequest) {
 
 export async function GET(request: NextRequest) {
   try {
-    const { user, error: authError } = await getCachedAuthUser()
-
-    if (authError === "rate_limited") {
-      return createRateLimitResponse()
-    }
-
-    if (!user) {
-      return createUnauthorizedResponse()
-    }
+    const auth = await requireAuthAndOrg()
+    if ("response" in auth) return auth.response
+    const { user, orgContext } = auth
 
     const db = await createDatabaseClient()
-
-    const orgContext = await getOrgContext()
-    if (!orgContext) {
-      return NextResponse.json({ error: "No organization context" }, { status: 403 })
-    }
 
     const { data: calstickReplies, error: repliesError } = await db
       .from("paks_pad_stick_replies")

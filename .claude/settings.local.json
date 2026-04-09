@@ -105,7 +105,12 @@
       "Bash(wc -l app/api/v2/sticks/[id]/replies/route.ts app/api/sticks/[id]/replies/route.ts)",
       "Bash(wc -l app/api/v2/sticks/[id]/tabs/route.ts app/api/sticks/[id]/tabs/route.ts)",
       "Bash(wc -l app/api/v2/sticks/[id]/route.ts app/api/sticks/[id]/route.ts)",
-      "Bash(wc -l app/api/v2/notes/[id]/tabs/route.ts app/api/notes/[id]/tabs/route.ts)"
+      "Bash(wc -l app/api/v2/notes/[id]/tabs/route.ts app/api/notes/[id]/tabs/route.ts)",
+      "Bash(python -m json.tool)",
+      "Bash(rm -rf .jscpd-report)",
+      "Bash(npx jscpd:*)",
+      "Bash(python -c ':*)",
+      "Bash(read route:*)"
     ],
     "additionalDirectories": [
       "C:\\stick-my-note-ubuntu\\stickmynote-client\\scripts",

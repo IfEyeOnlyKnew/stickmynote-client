@@ -26,6 +26,17 @@ const buildTransformedNote = (noteData: any, tabData: ExtractedTabData, replies:
 const buildUpdatePayload = buildNoteUpdatePayload
 
 // ============================================================================
+// AUTH HELPER
+// ============================================================================
+
+async function getAuthenticatedUser() {
+  const db = await createDatabaseClient()
+  const { data: { user }, error: authError } = await db.auth.getUser()
+  if (authError || !user) throw new Error("User not authenticated")
+  return { db, user }
+}
+
+// ============================================================================
 // NOTES FUNCTIONS
 // ============================================================================
 
@@ -38,16 +49,7 @@ export async function getNotes(
   filter: "all" | "personal" | "shared" = "all",
 ): Promise<NotesResponse> {
   try {
-    // Use database adapter for auth
-    const db = await createDatabaseClient()
-    const {
-      data: { user },
-      error: authError,
-    } = await db.auth.getUser()
-    if (authError || !user) {
-      console.error("Authentication error:", authError)
-      throw new Error("User not authenticated")
-    }
+    const { user } = await getAuthenticatedUser()
 
     // Build query based on filter
     let whereClause = "user_id = $1"
@@ -144,16 +146,7 @@ export async function getNotes(
  */
 export async function createNote(noteData: CreateNoteData): Promise<Note> {
   try {
-    // Use database adapter for auth
-    const db = await createDatabaseClient()
-    const {
-      data: { user },
-      error: authError,
-    } = await db.auth.getUser()
-    if (authError || !user) {
-      console.error("Authentication error:", authError)
-      throw new Error("User not authenticated")
-    }
+    const { user } = await getAuthenticatedUser()
 
     interface NotesInsertPayload {
       user_id: string
@@ -252,16 +245,7 @@ export async function createNote(noteData: CreateNoteData): Promise<Note> {
  */
 export async function updateNote(noteData: UpdateNoteData): Promise<Note> {
   try {
-    // Use database adapter for auth
-    const db = await createDatabaseClient()
-    const {
-      data: { user },
-      error: authError,
-    } = await db.auth.getUser()
-    if (authError || !user) {
-      console.error("Authentication error:", authError)
-      throw new Error("User not authenticated")
-    }
+    const { user } = await getAuthenticatedUser()
 
     const { id, ...updateData } = noteData
     const updatePayload = buildUpdatePayload(updateData)
@@ -344,16 +328,7 @@ export async function updateNote(noteData: UpdateNoteData): Promise<Note> {
  */
 export async function updateNotePosition(noteId: string, x: number, y: number): Promise<Note> {
   try {
-    // Use database adapter for auth
-    const db = await createDatabaseClient()
-    const {
-      data: { user },
-      error: authError,
-    } = await db.auth.getUser()
-    if (authError || !user) {
-      console.error("Authentication error:", authError)
-      throw new Error("User not authenticated")
-    }
+    const { user } = await getAuthenticatedUser()
 
     const note = await queryOne<DatabaseNoteRow>(
       `UPDATE personal_sticks
@@ -397,16 +372,7 @@ export async function updateNotePosition(noteId: string, x: number, y: number): 
  */
 export async function deleteNote(noteId: string): Promise<void> {
   try {
-    // Use database adapter for auth
-    const db = await createDatabaseClient()
-    const {
-      data: { user },
-      error: authError,
-    } = await db.auth.getUser()
-    if (authError || !user) {
-      console.error("Authentication error:", authError)
-      throw new Error("User not authenticated")
-    }
+    const { user } = await getAuthenticatedUser()
 
     await execute(
       `DELETE FROM personal_sticks WHERE id = $1 AND user_id = $2`,
@@ -423,16 +389,7 @@ export async function deleteNote(noteId: string): Promise<void> {
  */
 export async function createReply(replyData: CreateReplyData): Promise<Reply> {
   try {
-    // Use database adapter for auth
-    const db = await createDatabaseClient()
-    const {
-      data: { user },
-      error: authError,
-    } = await db.auth.getUser()
-    if (authError || !user) {
-      console.error("Authentication error:", authError)
-      throw new Error("User not authenticated")
-    }
+    const { user } = await getAuthenticatedUser()
 
     const reply = await queryOne<DatabaseReplyRow>(
       `INSERT INTO personal_sticks_replies

@@ -1,7 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { validateCSRFMiddleware } from "@/lib/csrf"
-import { getCachedAuthUser, createRateLimitResponse, createUnauthorizedResponse } from "@/lib/auth/cached-auth"
-import { getOrgContext } from "@/lib/auth/get-org-context"
+import { requireAuthAndOrg } from "@/lib/api/route-helpers"
 import { put } from "@/lib/storage/local-storage"
 import { generateText as aiGenerateText, isAIAvailable } from "@/lib/ai/ai-provider"
 import {
@@ -20,15 +19,6 @@ import { getChatDisplayName } from "@/types/stick-chat"
 // ============================================================================
 // Types
 // ============================================================================
-
-interface OrgContext {
-  orgId: string
-  organizationId?: string
-}
-
-interface RateLimitedResult {
-  rateLimited: true
-}
 
 // Dynamic module references
 let Document: typeof import("docx").Document | undefined
@@ -64,32 +54,6 @@ const Errors = {
   exportFailed: () => NextResponse.json({ error: "Failed to export chat" }, { status: 500 }),
   internal: () => NextResponse.json({ error: "Internal server error" }, { status: 500 }),
 } as const
-
-// ============================================================================
-// Auth Helpers
-// ============================================================================
-
-function isRateLimited(result: OrgContext | RateLimitedResult | null): result is RateLimitedResult {
-  return result !== null && "rateLimited" in result
-}
-
-async function safeGetOrgContext(userId: string): Promise<OrgContext | RateLimitedResult | null> {
-  try {
-    return await getOrgContext(userId)
-  } catch (error) {
-    if (error instanceof Error && error.message === "RATE_LIMITED") {
-      return { rateLimited: true }
-    }
-    throw error
-  }
-}
-
-function handleRateLimitError(error: unknown): NextResponse | null {
-  if (error instanceof Error && error.message === "RATE_LIMITED") {
-    return createRateLimitResponse()
-  }
-  return null
-}
 
 // ============================================================================
 // Helper Functions
@@ -145,12 +109,9 @@ async function validateExportRequest(
   request: NextRequest,
   chatId: string,
 ): Promise<{ ctx: ExportContext } | { error: NextResponse }> {
-  const { user, error: authError } = await getCachedAuthUser()
-  if (authError === "rate_limited") return { error: createRateLimitResponse() }
-  if (!user) return { error: createUnauthorizedResponse() }
-
-  const orgContextResult = await safeGetOrgContext(user.id)
-  if (isRateLimited(orgContextResult)) return { error: createRateLimitResponse() }
+  const auth = await requireAuthAndOrg()
+  if ("response" in auth) return { error: auth.response! }
+  const { user } = auth
 
   const isMember = await isChatMember(chatId, user.id)
   if (!isMember) return { error: Errors.notMember() }
@@ -330,9 +291,6 @@ export async function POST(
       messageCount: messages.length,
     })
   } catch (error) {
-    const rateLimitResponse = handleRateLimitError(error)
-    if (rateLimitResponse) return rateLimitResponse
-
     console.error("[StickChatExport] Export error:", error)
     return Errors.exportFailed()
   }

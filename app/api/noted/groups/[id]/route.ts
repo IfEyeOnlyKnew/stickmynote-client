@@ -1,28 +1,14 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { createServiceDatabaseClient } from "@/lib/database/database-adapter"
 import { validateUUID } from "@/lib/input-validation-enhanced"
-import { applyRateLimit } from "@/lib/rate-limiter-enhanced"
-import { getCachedAuthUser, createRateLimitResponse, createUnauthorizedResponse } from "@/lib/auth/cached-auth"
-import { getOrgContext } from "@/lib/auth/get-org-context"
-
-async function safeRateLimit(request: NextRequest, userId: string, action: string) {
-  try {
-    const res = await applyRateLimit(request, userId, action)
-    return res.success
-  } catch {
-    return true
-  }
-}
+import { requireAuthAndOrg, safeRateLimit } from "@/lib/api/route-helpers"
 
 // PUT /api/noted/groups/[id] - Update a group
 export async function PUT(request: NextRequest, context: { params: Promise<{ id: string }> }) {
   try {
-    const { user, error: authError } = await getCachedAuthUser()
-    if (authError === "rate_limited") return createRateLimitResponse()
-    if (!user) return createUnauthorizedResponse()
-
-    const orgContext = await getOrgContext()
-    if (!orgContext) return NextResponse.json({ error: "No organization context" }, { status: 403 })
+    const auth = await requireAuthAndOrg()
+    if ("response" in auth) return auth.response
+    const { user, orgContext } = auth
 
     const params = await context.params
     if (!validateUUID(params.id)) return NextResponse.json({ error: "Invalid ID" }, { status: 400 })
@@ -68,12 +54,9 @@ export async function PUT(request: NextRequest, context: { params: Promise<{ id:
 // DELETE /api/noted/groups/[id] - Delete a group (pages become ungrouped)
 export async function DELETE(request: NextRequest, context: { params: Promise<{ id: string }> }) {
   try {
-    const { user, error: authError } = await getCachedAuthUser()
-    if (authError === "rate_limited") return createRateLimitResponse()
-    if (!user) return createUnauthorizedResponse()
-
-    const orgContext = await getOrgContext()
-    if (!orgContext) return NextResponse.json({ error: "No organization context" }, { status: 403 })
+    const auth = await requireAuthAndOrg()
+    if ("response" in auth) return auth.response
+    const { user, orgContext } = auth
 
     const params = await context.params
     if (!validateUUID(params.id)) return NextResponse.json({ error: "Invalid ID" }, { status: 400 })

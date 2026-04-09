@@ -1,39 +1,16 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { createServiceDatabaseClient } from "@/lib/database/database-adapter"
 import { validateUUID } from "@/lib/input-validation-enhanced"
-import { applyRateLimit } from "@/lib/rate-limiter-enhanced"
-import { getOrgContext } from "@/lib/auth/get-org-context"
-import { getCachedAuthUser, createRateLimitResponse, createUnauthorizedResponse } from "@/lib/auth/cached-auth"
+import { requireAuthAndOrg, safeRateLimit } from "@/lib/api/route-helpers"
 import { isUnderLegalHold } from "@/lib/legal-hold/check-hold"
-
-async function safeRateLimit(request: NextRequest, userId: string, action: string) {
-  try {
-    const res = await applyRateLimit(request, userId, action)
-    return res.success
-  } catch (err) {
-    console.warn("Rate limit provider error, allowing request:", err)
-    return true
-  }
-}
 
 export async function DELETE(request: NextRequest, context: { params: Promise<{ padId: string }> }) {
   try {
-    const { user, error: authError } = await getCachedAuthUser()
-
-    if (authError === "rate_limited") {
-      return createRateLimitResponse()
-    }
-
-    if (!user) {
-      return createUnauthorizedResponse()
-    }
+    const auth = await requireAuthAndOrg()
+    if ("response" in auth) return auth.response
+    const { user, orgContext } = auth
 
     const db = await createServiceDatabaseClient()
-
-    const orgContext = await getOrgContext()
-    if (!orgContext) {
-      return NextResponse.json({ error: "No organization context" }, { status: 403 })
-    }
 
     const params = await context.params
     const padId = params.padId
@@ -104,22 +81,11 @@ export async function DELETE(request: NextRequest, context: { params: Promise<{ 
 
 export async function POST(request: NextRequest, context: { params: Promise<{ padId: string }> }) {
   try {
-    const { user, error: authError } = await getCachedAuthUser()
-
-    if (authError === "rate_limited") {
-      return createRateLimitResponse()
-    }
-
-    if (!user) {
-      return createUnauthorizedResponse()
-    }
+    const auth = await requireAuthAndOrg()
+    if ("response" in auth) return auth.response
+    const { user, orgContext } = auth
 
     const db = await createServiceDatabaseClient()
-
-    const orgContext = await getOrgContext()
-    if (!orgContext) {
-      return NextResponse.json({ error: "No organization context" }, { status: 403 })
-    }
 
     const params = await context.params
     const padId = params.padId

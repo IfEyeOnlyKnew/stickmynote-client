@@ -1,6 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { createDatabaseClient } from "@/lib/database/database-adapter"
-import { getCachedAuthUser } from "@/lib/auth/cached-auth"
+import { requireAuth } from "@/lib/api/route-helpers"
 
 // POST: Mark article as helpful
 export async function POST(request: NextRequest, { params }: { params: Promise<{ padId: string; articleId: string }> }) {
@@ -8,17 +8,9 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     const { articleId } = await params
     const db = await createDatabaseClient()
 
-    const authResult = await getCachedAuthUser()
-    if (authResult.rateLimited) {
-      return NextResponse.json(
-        { error: "Rate limit exceeded. Please try again in a moment." },
-        { status: 429, headers: { "Retry-After": "30" } },
-      )
-    }
-    if (!authResult.user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
-    }
-    const user = authResult.user
+    const auth = await requireAuth()
+    if ("response" in auth) return auth.response
+    const { user } = auth
 
     // Insert helpful vote
     const { error } = await db.from("social_kb_helpful_votes").insert({
@@ -47,17 +39,9 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
     const { articleId } = await params
     const db = await createDatabaseClient()
 
-    const authResult = await getCachedAuthUser()
-    if (authResult.rateLimited) {
-      return NextResponse.json(
-        { error: "Rate limit exceeded. Please try again in a moment." },
-        { status: 429, headers: { "Retry-After": "30" } },
-      )
-    }
-    if (!authResult.user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
-    }
-    const user = authResult.user
+    const auth = await requireAuth()
+    if ("response" in auth) return auth.response
+    const { user } = auth
 
     const { error } = await db
       .from("social_kb_helpful_votes")

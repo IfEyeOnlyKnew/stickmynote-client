@@ -1,5 +1,5 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { getCachedAuthUser } from "@/lib/auth/cached-auth"
+import { requireAuth } from "@/lib/api/route-helpers"
 import {
   bulkDeleteSavedEmails,
   bulkAddSavedEmails,
@@ -9,21 +9,13 @@ import {
 
 export async function DELETE(request: NextRequest) {
   try {
-    const authResult = await getCachedAuthUser()
-    if (authResult.rateLimited) {
-      return NextResponse.json(
-        { error: "Rate limit exceeded. Please try again in a moment." },
-        { status: 429, headers: { "Retry-After": "30" } },
-      )
-    }
-    if (!authResult.user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
-    }
+    const auth = await requireAuth()
+    if ("response" in auth) return auth.response
 
     const body = await request.json()
     const { emailIds, teamId } = body
 
-    const result = await bulkDeleteSavedEmails(authResult.user, emailIds, teamId)
+    const result = await bulkDeleteSavedEmails(auth.user, emailIds, teamId)
     return NextResponse.json(result)
   } catch (error: any) {
     if (error?.message === "Invalid email IDs array") {
@@ -36,17 +28,9 @@ export async function DELETE(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const authResult = await getCachedAuthUser()
-    if (authResult.rateLimited) {
-      return NextResponse.json(
-        { error: "Rate limit exceeded. Please try again in a moment." },
-        { status: 429, headers: { "Retry-After": "30" } },
-      )
-    }
-    if (!authResult.user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
-    }
-    const user = authResult.user
+    const auth = await requireAuth()
+    if ("response" in auth) return auth.response
+    const user = auth.user
 
     const contentType = request.headers.get("content-type")
     const uploadType = request.headers.get("x-upload-type")

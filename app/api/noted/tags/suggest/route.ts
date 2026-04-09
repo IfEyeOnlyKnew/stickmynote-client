@@ -1,27 +1,14 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { applyRateLimit } from "@/lib/rate-limiter-enhanced"
-import { getCachedAuthUser, createRateLimitResponse, createUnauthorizedResponse } from "@/lib/auth/cached-auth"
-import { getOrgContext } from "@/lib/auth/get-org-context"
+import { requireAuthAndOrg, safeRateLimit } from "@/lib/api/route-helpers"
+import { createRateLimitResponse } from "@/lib/auth/cached-auth"
 import { db as pgClient } from "@/lib/database/pg-client"
-
-async function safeRateLimit(request: NextRequest, userId: string, action: string) {
-  try {
-    const res = await applyRateLimit(request, userId, action)
-    return res.success
-  } catch {
-    return true
-  }
-}
 
 // POST /api/noted/tags/suggest - AI-powered tag suggestions
 export async function POST(request: NextRequest) {
   try {
-    const { user, error: authError } = await getCachedAuthUser()
-    if (authError === "rate_limited") return createRateLimitResponse()
-    if (!user) return createUnauthorizedResponse()
-
-    const orgContext = await getOrgContext()
-    if (!orgContext) return NextResponse.json({ error: "No organization context" }, { status: 403 })
+    const auth = await requireAuthAndOrg()
+    if ("response" in auth) return auth.response
+    const { user, orgContext } = auth
 
     const allowed = await safeRateLimit(request, user.id, "noted_tag_suggest")
     if (!allowed) return createRateLimitResponse()

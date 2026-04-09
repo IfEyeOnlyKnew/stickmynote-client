@@ -1,28 +1,15 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { validateUUID } from "@/lib/input-validation-enhanced"
-import { applyRateLimit } from "@/lib/rate-limiter-enhanced"
-import { getCachedAuthUser, createRateLimitResponse, createUnauthorizedResponse } from "@/lib/auth/cached-auth"
-import { getOrgContext } from "@/lib/auth/get-org-context"
+import { createRateLimitResponse } from "@/lib/auth/cached-auth"
+import { requireAuthAndOrg, safeRateLimit } from "@/lib/api/route-helpers"
 import { db as pgClient } from "@/lib/database/pg-client"
-
-async function safeRateLimit(request: NextRequest, userId: string, action: string) {
-  try {
-    const res = await applyRateLimit(request, userId, action)
-    return res.success
-  } catch {
-    return true
-  }
-}
 
 // GET /api/noted/pages/[id]/tags - Get tags for a page
 export async function GET(request: NextRequest, context: { params: Promise<{ id: string }> }) {
   try {
-    const { user, error: authError } = await getCachedAuthUser()
-    if (authError === "rate_limited") return createRateLimitResponse()
-    if (!user) return createUnauthorizedResponse()
-
-    const orgContext = await getOrgContext()
-    if (!orgContext) return NextResponse.json({ error: "No organization context" }, { status: 403 })
+    const auth = await requireAuthAndOrg()
+    if ("response" in auth) return auth.response
+    const { user, orgContext } = auth
 
     const params = await context.params
     if (!validateUUID(params.id)) return NextResponse.json({ error: "Invalid ID" }, { status: 400 })
@@ -45,12 +32,9 @@ export async function GET(request: NextRequest, context: { params: Promise<{ id:
 // POST /api/noted/pages/[id]/tags - Add a tag to a page (or create + add)
 export async function POST(request: NextRequest, context: { params: Promise<{ id: string }> }) {
   try {
-    const { user, error: authError } = await getCachedAuthUser()
-    if (authError === "rate_limited") return createRateLimitResponse()
-    if (!user) return createUnauthorizedResponse()
-
-    const orgContext = await getOrgContext()
-    if (!orgContext) return NextResponse.json({ error: "No organization context" }, { status: 403 })
+    const auth = await requireAuthAndOrg()
+    if ("response" in auth) return auth.response
+    const { user, orgContext } = auth
 
     const allowed = await safeRateLimit(request, user.id, "noted_page_tag_add")
     if (!allowed) return createRateLimitResponse()
@@ -113,12 +97,9 @@ export async function POST(request: NextRequest, context: { params: Promise<{ id
 // DELETE /api/noted/pages/[id]/tags - Remove a tag from a page
 export async function DELETE(request: NextRequest, context: { params: Promise<{ id: string }> }) {
   try {
-    const { user, error: authError } = await getCachedAuthUser()
-    if (authError === "rate_limited") return createRateLimitResponse()
-    if (!user) return createUnauthorizedResponse()
-
-    const orgContext = await getOrgContext()
-    if (!orgContext) return NextResponse.json({ error: "No organization context" }, { status: 403 })
+    const auth = await requireAuthAndOrg()
+    if ("response" in auth) return auth.response
+    const { user, orgContext } = auth
 
     const params = await context.params
     if (!validateUUID(params.id)) return NextResponse.json({ error: "Invalid ID" }, { status: 400 })

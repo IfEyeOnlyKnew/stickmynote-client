@@ -32,32 +32,8 @@ import {
   Building2,
   UserIcon,
 } from "lucide-react"
-
-interface InferencePad {
-  id: string
-  name: string
-  description: string
-  owner_id: string
-  is_public: boolean
-  created_at: string
-  stick_count?: number
-  hub_type?: string
-  hub_email?: string
-}
-
-interface Member {
-  id: string
-  user_id: string
-  role: string
-  accepted: boolean
-  users: {
-    id: string
-    full_name: string | null
-    username: string | null
-    email: string
-    avatar_url: string | null
-  }
-}
+import type { InferencePad, InferencePadMember } from "@/types/inference-pad"
+import { InferenceLoadingSpinner } from "@/components/inference/inference-loading-spinner"
 
 export default function EditPadPage() {
   const { user, loading: userLoading } = useUser()
@@ -66,7 +42,7 @@ export default function EditPadPage() {
   const padId = params.padId as string
 
   const [pad, setPad] = useState<InferencePad | null>(null)
-  const [members, setMembers] = useState<Member[]>([])
+  const [members, setMembers] = useState<InferencePadMember[]>([])
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [isOwner, setIsOwner] = useState(false)
@@ -292,11 +268,11 @@ export default function EditPadPage() {
     }
   }
 
-  const getDisplayName = (member: Member) => {
+  const getDisplayName = (member: InferencePadMember) => {
     return member.users.full_name || member.users.username || member.users.email
   }
 
-  const getInitials = (member: Member) => {
+  const getInitials = (member: InferencePadMember) => {
     const name = member.users.full_name || member.users.username || member.users.email
     return name.substring(0, 2).toUpperCase()
   }
@@ -340,14 +316,7 @@ export default function EditPadPage() {
   }
 
   if (userLoading || loading) {
-    return (
-      <div className="flex items-center justify-center min-h-screen bg-gray-50">
-        <div className="flex flex-col items-center gap-4">
-          <div className="animate-spin rounded-full h-12 w-12 border-4 border-purple-600 border-t-transparent" />
-          <p className="text-purple-600 font-medium">Loading pad settings...</p>
-        </div>
-      </div>
-    )
+    return <InferenceLoadingSpinner message="Loading pad settings..." />
   }
 
   if (!user || !pad || !isOwner) {

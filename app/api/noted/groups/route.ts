@@ -1,27 +1,13 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { createServiceDatabaseClient } from "@/lib/database/database-adapter"
-import { getCachedAuthUser, createRateLimitResponse, createUnauthorizedResponse } from "@/lib/auth/cached-auth"
-import { getOrgContext } from "@/lib/auth/get-org-context"
-import { applyRateLimit } from "@/lib/rate-limiter-enhanced"
-
-async function safeRateLimit(request: NextRequest, userId: string, action: string) {
-  try {
-    const res = await applyRateLimit(request, userId, action)
-    return res.success
-  } catch {
-    return true
-  }
-}
+import { requireAuthAndOrg, safeRateLimit } from "@/lib/api/route-helpers"
 
 // GET /api/noted/groups - List user's groups
 export async function GET(request: NextRequest) {
   try {
-    const { user, error: authError } = await getCachedAuthUser()
-    if (authError === "rate_limited") return createRateLimitResponse()
-    if (!user) return createUnauthorizedResponse()
-
-    const orgContext = await getOrgContext()
-    if (!orgContext) return NextResponse.json({ error: "No organization context" }, { status: 403 })
+    const auth = await requireAuthAndOrg()
+    if ("response" in auth) return auth.response
+    const { user, orgContext } = auth
 
     const db = await createServiceDatabaseClient()
 
@@ -47,12 +33,9 @@ export async function GET(request: NextRequest) {
 // POST /api/noted/groups - Create a new group
 export async function POST(request: NextRequest) {
   try {
-    const { user, error: authError } = await getCachedAuthUser()
-    if (authError === "rate_limited") return createRateLimitResponse()
-    if (!user) return createUnauthorizedResponse()
-
-    const orgContext = await getOrgContext()
-    if (!orgContext) return NextResponse.json({ error: "No organization context" }, { status: 403 })
+    const auth = await requireAuthAndOrg()
+    if ("response" in auth) return auth.response
+    const { user, orgContext } = auth
 
     if (!(await safeRateLimit(request, user.id, "noted_group_create"))) {
       return NextResponse.json({ error: "Rate limit exceeded" }, { status: 429, headers: { "Retry-After": "60" } })

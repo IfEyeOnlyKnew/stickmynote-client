@@ -1,5 +1,5 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { getCachedAuthUser } from "@/lib/auth/cached-auth"
+import { requireAuth } from "@/lib/api/route-helpers"
 import {
   getKnowledgeBaseArticles,
   createKnowledgeBaseArticle,
@@ -12,16 +12,8 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
   try {
     const { padId } = await params
 
-    const authResult = await getCachedAuthUser()
-    if (authResult.rateLimited) {
-      return NextResponse.json(
-        { error: "Rate limit exceeded. Please try again in a moment." },
-        { status: 429, headers: { "Retry-After": "30" } },
-      )
-    }
-    if (!authResult.user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
-    }
+    const auth = await requireAuth()
+    if ("response" in auth) return auth.response
 
     const articles = await getKnowledgeBaseArticles(padId)
     return NextResponse.json({ articles })
@@ -36,16 +28,9 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   try {
     const { padId } = await params
 
-    const authResult = await getCachedAuthUser()
-    if (authResult.rateLimited) {
-      return NextResponse.json(
-        { error: "Rate limit exceeded. Please try again in a moment." },
-        { status: 429, headers: { "Retry-After": "30" } },
-      )
-    }
-    if (!authResult.user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
-    }
+    const auth = await requireAuth()
+    if ("response" in auth) return auth.response
+    const { user } = auth
 
     const body = await request.json()
     const { title, content, category, tags } = body
@@ -54,7 +39,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       return NextResponse.json({ error: "Title and content are required" }, { status: 400 })
     }
 
-    const article = await createKnowledgeBaseArticle(padId, authResult.user.id, { title, content, category, tags })
+    const article = await createKnowledgeBaseArticle(padId, user.id, { title, content, category, tags })
     if (!article) {
       return NextResponse.json({ error: "Failed to create article" }, { status: 500 })
     }
@@ -71,16 +56,8 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
   try {
     const { padId } = await params
 
-    const authResult = await getCachedAuthUser()
-    if (authResult.rateLimited) {
-      return NextResponse.json(
-        { error: "Rate limit exceeded. Please try again in a moment." },
-        { status: 429, headers: { "Retry-After": "30" } },
-      )
-    }
-    if (!authResult.user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
-    }
+    const auth = await requireAuth()
+    if ("response" in auth) return auth.response
 
     const body = await request.json()
     const { articleId, title, content, category, tags, is_pinned, pin_order } = body
@@ -110,16 +87,8 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
   try {
     const { padId } = await params
 
-    const authResult = await getCachedAuthUser()
-    if (authResult.rateLimited) {
-      return NextResponse.json(
-        { error: "Rate limit exceeded. Please try again in a moment." },
-        { status: 429, headers: { "Retry-After": "30" } },
-      )
-    }
-    if (!authResult.user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
-    }
+    const auth = await requireAuth()
+    if ("response" in auth) return auth.response
 
     const { searchParams } = new URL(request.url)
     const articleId = searchParams.get("articleId")

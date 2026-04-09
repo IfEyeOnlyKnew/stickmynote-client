@@ -1,7 +1,7 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { createServiceDatabaseClient, type DatabaseClient } from "@/lib/database/database-adapter"
 import { validateCSRFMiddleware } from "@/lib/csrf"
-import { getCachedAuthUser, createRateLimitResponse, createUnauthorizedResponse } from "@/lib/auth/cached-auth"
+import { requireAuth } from "@/lib/api/route-helpers"
 import { put } from "@/lib/storage/local-storage"
 import { generateText as aiGenerateText, isAIAvailable } from "@/lib/ai/ai-provider"
 
@@ -295,15 +295,9 @@ export async function POST(
     const PackerClass = Packer
 
     // Auth check
-    const { user, error: authError } = await getCachedAuthUser()
-
-    if (authError === "rate_limited") {
-      return createRateLimitResponse()
-    }
-
-    if (!user) {
-      return createUnauthorizedResponse()
-    }
+    const auth = await requireAuth()
+    if ("response" in auth) return auth.response
+    const { user } = auth
 
     const db = await createServiceDatabaseClient()
 

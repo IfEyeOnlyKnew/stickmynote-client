@@ -1,21 +1,15 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { createDatabaseClient } from "@/lib/database/database-adapter"
-import { getCachedAuthUser } from "@/lib/auth/cached-auth"
+import { requireAuth } from "@/lib/api/route-helpers"
 
 export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await params
     const db = await createDatabaseClient()
 
-    const { user, error: authError, rateLimited } = await getCachedAuthUser()
-
-    if (rateLimited) {
-      return NextResponse.json({ error: "Too many requests" }, { status: 429 })
-    }
-
-    if (authError || !user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
-    }
+    const auth = await requireAuth()
+    if ("response" in auth) return auth.response
+    const { user } = auth
 
     const { data: entry, error: fetchError } = await db
       .from("time_entries")

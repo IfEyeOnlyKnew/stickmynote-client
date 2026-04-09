@@ -1,9 +1,10 @@
 "use client"
 
 import dynamic from "next/dynamic"
-import { MessageSquare, Plus, ChevronDown, X } from "lucide-react"
+import { MessageSquare, Plus, X } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
+import { ExportDropdown, SummaryDropdown } from "@/components/replies/ReplyDropdowns"
+import { useCalStickHandlers } from "@/hooks/use-calstick-handlers"
 import { ReplyItem } from "@/components/replies/ReplyItem"
 import { ReplyForm } from "@/components/replies/ReplyForm"
 import { ChatModal } from "@/components/chat/ChatModal"
@@ -22,7 +23,6 @@ const CollaborativeReplyForm = dynamic(
     )
   }
 )
-import { toast } from "sonner"
 import { buildReplyTree as buildReplyTreeBase, sortNestedReplies, type BaseReply } from "@/components/replies/reply-shared"
 
 type Reply = BaseReply
@@ -139,6 +139,9 @@ export const UnifiedReplies: React.FC<UnifiedRepliesProps> = ({
   const [editingCalStick, setEditingCalStick] = useState<string | null>(null)
   const [calStickDates, setCalStickDates] = useState<Record<string, string>>({})
   const [localReplies, setLocalReplies] = useState<Reply[]>(replies)
+
+  const { handleToggleCalStick, handleCalStickDateChange, handleSaveCalStickDate, handleToggleCalStickComplete } =
+    useCalStickHandlers(setLocalReplies, setEditingCalStick, calStickDates, setCalStickDates)
   const [replyingTo, setReplyingTo] = useState<Reply | null>(null)
 
   // Chat modal state
@@ -330,129 +333,6 @@ export const UnifiedReplies: React.FC<UnifiedRepliesProps> = ({
     [onEditReply, noteId],
   )
 
-  const handleToggleCalStick = useCallback(
-    async (replyId: string, currentIsCalStick: boolean, currentDate: string | null) => {
-      try {
-        const newIsCalStick = !currentIsCalStick
-
-        if (newIsCalStick) {
-          setEditingCalStick(replyId)
-          setCalStickDates((prev) => ({
-            ...prev,
-            [replyId]: currentDate || new Date().toISOString().split("T")[0],
-          }))
-          return
-        }
-
-        const response = await fetch(`/api/sticks/replies/${replyId}`, {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            is_calstick: false,
-            calstick_date: null,
-            calstick_completed: false,
-            calstick_completed_at: null,
-          }),
-        })
-
-        if (!response.ok) throw new Error("Failed to update CalStick")
-
-        setLocalReplies((prev) =>
-          prev.map((r) =>
-            r.id === replyId
-              ? {
-                  ...r,
-                  is_calstick: false,
-                  calstick_date: null,
-                  calstick_completed: false,
-                  calstick_completed_at: null,
-                }
-              : r,
-          ),
-        )
-
-        toast.success("CalStick removed")
-      } catch (error) {
-        console.error("Error toggling CalStick:", error)
-        toast.error("Failed to update CalStick")
-      }
-    },
-    [],
-  )
-
-  const handleCalStickDateChange = useCallback((replyId: string, date: string) => {
-    setCalStickDates((prev) => ({
-      ...prev,
-      [replyId]: date,
-    }))
-  }, [])
-
-  const handleSaveCalStickDate = useCallback(
-    async (replyId: string) => {
-      try {
-        const date = calStickDates[replyId]
-        if (!date) {
-          toast.error("Please select a date")
-          return
-        }
-
-        const response = await fetch(`/api/sticks/replies/${replyId}`, {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            is_calstick: true,
-            calstick_date: date,
-          }),
-        })
-
-        if (!response.ok) throw new Error("Failed to save CalStick date")
-
-        setLocalReplies((prev) =>
-          prev.map((r) => (r.id === replyId ? { ...r, is_calstick: true, calstick_date: date } : r)),
-        )
-
-        toast.success("CalStick task created")
-        setEditingCalStick(null)
-      } catch (error) {
-        console.error("Error saving CalStick date:", error)
-        toast.error("Failed to save CalStick date")
-      }
-    },
-    [calStickDates],
-  )
-
-  const handleToggleCalStickComplete = useCallback(async (replyId: string, currentCompleted: boolean) => {
-    try {
-      const newCompleted = !currentCompleted
-      const response = await fetch(`/api/sticks/replies/${replyId}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          calstick_completed: newCompleted,
-          calstick_completed_at: newCompleted ? new Date().toISOString() : null,
-        }),
-      })
-
-      if (!response.ok) throw new Error("Failed to update completion status")
-
-      setLocalReplies((prev) =>
-        prev.map((r) =>
-          r.id === replyId
-            ? {
-                ...r,
-                calstick_completed: newCompleted,
-                calstick_completed_at: newCompleted ? new Date().toISOString() : null,
-              }
-            : r,
-        ),
-      )
-
-      toast.success(newCompleted ? "Task completed!" : "Task marked incomplete")
-    } catch (error) {
-      console.error("Error toggling completion:", error)
-      toast.error("Failed to update task")
-    }
-  }, [])
 
   // Build threaded reply tree from flat list
   // Use localReplies if it has data, otherwise fall back to props.replies
@@ -597,85 +477,15 @@ export const UnifiedReplies: React.FC<UnifiedRepliesProps> = ({
         {replies.length > 0 ? (
           <div className="flex items-center gap-2">
             {enableExport && onExportAll && (
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="outline" size="sm" disabled={isExporting} className="text-xs h-7 bg-transparent">
-                    {isExporting ? (
-                      <>
-                        <div className="h-3 w-3 mr-1 animate-spin rounded-full border-2 border-gray-300 border-t-gray-600" />
-                        Exporting...
-                      </>
-                    ) : (
-                      <>
-                        Export
-                        <ChevronDown className="h-3 w-3 ml-1" />
-                      </>
-                    )}
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="bg-white border shadow-lg">
-                  {tones.map((tone) => (
-                    <DropdownMenuItem
-                      key={tone.value}
-                      onClick={() => {
-                        onExportAll()
-                      }}
-                      className="text-xs cursor-pointer hover:bg-gray-100 px-3 py-2"
-                    >
-                      Export as {tone.label}
-                    </DropdownMenuItem>
-                  ))}
-                </DropdownMenuContent>
-              </DropdownMenu>
+              <ExportDropdown tones={tones} isExporting={isExporting} onExportAll={onExportAll} />
             )}
             {enableSummary && (
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    disabled={isGeneratingSummary}
-                    className="text-xs h-7 bg-transparent"
-                  >
-                    {isGeneratingSummary ? (
-                      <>
-                        <div className="h-3 w-3 mr-1 animate-spin rounded-full border-2 border-gray-300 border-t-gray-600" />
-                        Generating...
-                      </>
-                    ) : (
-                      <>
-                        Summary
-                        <ChevronDown className="h-3 w-3 ml-1" />
-                      </>
-                    )}
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="bg-white border shadow-lg">
-                  {tones.map((tone) => (
-                    <DropdownMenuItem
-                      key={`text-${tone.value}`}
-                      onClick={() => handleGenerateSummary(tone.value)}
-                      className="text-xs cursor-pointer hover:bg-gray-100 px-3 py-2"
-                    >
-                      {tone.label}
-                    </DropdownMenuItem>
-                  ))}
-                  {onGenerateSummaryDocx && (
-                    <>
-                      <div className="border-t border-gray-200 my-1"></div>
-                      {tones.map((tone) => (
-                        <DropdownMenuItem
-                          key={`docx-${tone.value}`}
-                          onClick={() => onGenerateSummaryDocx(tone.value)}
-                          className="text-xs cursor-pointer hover:bg-gray-100 px-3 py-2"
-                        >
-                          {tone.label} (Word Doc)
-                        </DropdownMenuItem>
-                      ))}
-                    </>
-                  )}
-                </DropdownMenuContent>
-              </DropdownMenu>
+              <SummaryDropdown
+                tones={tones}
+                isGeneratingSummary={isGeneratingSummary}
+                onGenerateSummary={handleGenerateSummary}
+                onGenerateSummaryDocx={onGenerateSummaryDocx}
+              />
             )}
           </div>
         ) : (

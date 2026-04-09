@@ -1,6 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { createServiceDatabaseClient } from "@/lib/database/database-adapter"
-import { getCachedAuthUser, createRateLimitResponse, createUnauthorizedResponse } from "@/lib/auth/cached-auth"
+import { requireAuth } from "@/lib/api/route-helpers"
 import { isUnderLegalHold } from "@/lib/legal-hold/check-hold"
 import { generateChatResponse } from "@/lib/ai/chat-ai-responder"
 import { padChatCache, type CachedSettings, type CachedUserInfo } from "@/lib/cache/pad-chat-cache"
@@ -298,17 +298,10 @@ export async function GET(
 ) {
   try {
     const { padId } = await params
-    const authResult = await getCachedAuthUser()
+    const auth = await requireAuth()
+    if ("response" in auth) return auth.response
 
-    if (authResult.rateLimited) {
-      return createRateLimitResponse()
-    }
-
-    if (!authResult.user) {
-      return createUnauthorizedResponse()
-    }
-
-    const userId = authResult.user.id
+    const userId = auth.user.id
     const db = await createServiceDatabaseClient()
 
     // Parse pagination params
@@ -438,17 +431,10 @@ export async function POST(
 ) {
   try {
     const { padId } = await params
-    const authResult = await getCachedAuthUser()
+    const auth = await requireAuth()
+    if ("response" in auth) return auth.response
 
-    if (authResult.rateLimited) {
-      return createRateLimitResponse()
-    }
-
-    if (!authResult.user) {
-      return createUnauthorizedResponse()
-    }
-
-    const user = authResult.user
+    const user = auth.user
     const db = await createServiceDatabaseClient()
 
     // Verify access (optimized)
@@ -583,15 +569,8 @@ export async function DELETE(
 ) {
   try {
     const { padId } = await params
-    const authResult = await getCachedAuthUser()
-
-    if (authResult.rateLimited) {
-      return createRateLimitResponse()
-    }
-
-    if (!authResult.user) {
-      return createUnauthorizedResponse()
-    }
+    const auth = await requireAuth()
+    if ("response" in auth) return auth.response
 
     const db = await createServiceDatabaseClient()
 
@@ -606,7 +585,7 @@ export async function DELETE(
       return NextResponse.json({ error: "Pad not found" }, { status: 404 })
     }
 
-    if (pad.owner_id !== authResult.user.id) {
+    if (pad.owner_id !== auth.user.id) {
       return NextResponse.json({ error: "Only the pad owner can clear all messages" }, { status: 403 })
     }
 
@@ -614,7 +593,7 @@ export async function DELETE(
     const { searchParams } = new URL(request.url)
     const keepPinned = searchParams.get("keepPinned") === "true"
 
-    if (await isUnderLegalHold(authResult.user.id)) {
+    if (await isUnderLegalHold(auth.user.id)) {
       return NextResponse.json({ error: "Content cannot be deleted: active legal hold" }, { status: 403 })
     }
 
@@ -635,7 +614,7 @@ export async function DELETE(
       return NextResponse.json({ error: "Failed to clear messages" }, { status: 500 })
     }
 
-    console.log(`[PadMessages] Cleared ${count || 0} messages from pad ${padId} by owner ${authResult.user.id}`)
+    console.log(`[PadMessages] Cleared ${count || 0} messages from pad ${padId} by owner ${auth.user.id}`)
 
     return NextResponse.json({
       success: true,

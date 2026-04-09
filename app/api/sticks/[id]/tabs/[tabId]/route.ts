@@ -2,18 +2,8 @@ import { type NextRequest, NextResponse } from "next/server"
 import { createServiceDatabaseClient } from "@/lib/database/database-adapter"
 import type { DatabaseClient } from "@/lib/database/database-adapter"
 import { validateUUID } from "@/lib/input-validation-enhanced"
-import { applyRateLimit } from "@/lib/rate-limiter-enhanced"
+import { safeRateLimit } from "@/lib/api/route-helpers"
 import { getCachedAuthUser, createRateLimitResponse, createUnauthorizedResponse } from "@/lib/auth/cached-auth"
-
-async function safeRateLimit(request: NextRequest, userId: string, action: string) {
-  try {
-    const res = await applyRateLimit(request, userId, action)
-    return res.success
-  } catch (err) {
-    console.warn("Rate limit provider error, allowing request:", err)
-    return true
-  }
-}
 
 async function checkStickPermissions(db: DatabaseClient, stickId: string, userId: string) {
   const { data: stick } = await db

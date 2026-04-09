@@ -16,6 +16,39 @@ import { useInviteEmails } from "@/hooks/useInviteEmails"
 
 type PadRole = "admin" | "editor" | "viewer"
 
+/** Role select items with descriptions, shared across invite/manage/upload tabs */
+const ROLE_OPTIONS: Array<{ value: PadRole; label: string; description: string }> = [
+  { value: "admin", label: "Admin", description: "Full control - manage pad, invite others" },
+  { value: "editor", label: "Editor", description: "Can create and edit sticks" },
+  { value: "viewer", label: "Viewer", description: "Can view sticks and add replies" },
+]
+
+function PadRoleSelect({
+  value,
+  onValueChange,
+}: Readonly<{
+  value: PadRole
+  onValueChange: (value: PadRole) => void
+}>) {
+  return (
+    <Select value={value} onValueChange={onValueChange}>
+      <SelectTrigger className="w-full h-12 text-base border-2">
+        <SelectValue />
+      </SelectTrigger>
+      <SelectContent>
+        {ROLE_OPTIONS.map((opt) => (
+          <SelectItem key={opt.value} value={opt.value}>
+            <div className="py-1">
+              <div className="font-semibold">{opt.label}</div>
+              <div className="text-xs text-gray-500">{opt.description}</div>
+            </div>
+          </SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
+  )
+}
+
 interface PadInviteModalProps {
   open: boolean
   onOpenChange: (open: boolean) => void
@@ -179,31 +212,7 @@ export function PadInviteModal({ open, onOpenChange, padId, onInviteSubmit }: Re
                 </CardTitle>
               </CardHeader>
               <CardContent className="pt-4">
-                <Select value={inviteRole} onValueChange={handleRoleChange}>
-                  <SelectTrigger className="w-full h-12 text-base border-2">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="admin">
-                      <div className="py-1">
-                        <div className="font-semibold">Admin</div>
-                        <div className="text-xs text-gray-500">Full control - manage pad, invite others</div>
-                      </div>
-                    </SelectItem>
-                    <SelectItem value="editor">
-                      <div className="py-1">
-                        <div className="font-semibold">Editor</div>
-                        <div className="text-xs text-gray-500">Can create and edit sticks</div>
-                      </div>
-                    </SelectItem>
-                    <SelectItem value="viewer">
-                      <div className="py-1">
-                        <div className="font-semibold">Viewer</div>
-                        <div className="text-xs text-gray-500">Can view sticks and add replies</div>
-                      </div>
-                    </SelectItem>
-                  </SelectContent>
-                </Select>
+                <PadRoleSelect value={inviteRole} onValueChange={handleRoleChange} />
                 <div className="mt-3 flex items-center gap-2 text-sm text-gray-700">
                   <Badge className="bg-blue-600">{inviteRole.toUpperCase()}</Badge>
                   <span>will be granted to all invited users</span>
@@ -343,34 +352,7 @@ export function PadInviteModal({ open, onOpenChange, padId, onInviteSubmit }: Re
                 </CardTitle>
               </CardHeader>
               <CardContent className="pt-4">
-                <Select
-                  value={defaultManageRole}
-                  onValueChange={(value: PadRole) => setDefaultManageRole(value)}
-                >
-                  <SelectTrigger className="w-full h-12 text-base border-2">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="admin">
-                      <div className="py-1">
-                        <div className="font-semibold">Admin</div>
-                        <div className="text-xs text-gray-500">Full control - manage pad, invite others</div>
-                      </div>
-                    </SelectItem>
-                    <SelectItem value="editor">
-                      <div className="py-1">
-                        <div className="font-semibold">Editor</div>
-                        <div className="text-xs text-gray-500">Can create and edit sticks</div>
-                      </div>
-                    </SelectItem>
-                    <SelectItem value="viewer">
-                      <div className="py-1">
-                        <div className="font-semibold">Viewer</div>
-                        <div className="text-xs text-gray-500">Can view sticks and add replies</div>
-                      </div>
-                    </SelectItem>
-                  </SelectContent>
-                </Select>
+                <PadRoleSelect value={defaultManageRole} onValueChange={setDefaultManageRole} />
                 <div className="mt-3 flex items-center gap-2 text-sm text-gray-700">
                   <Badge className="bg-green-600">{defaultManageRole.toUpperCase()}</Badge>
                   <span>will be applied to all invitations</span>
@@ -489,34 +471,7 @@ export function PadInviteModal({ open, onOpenChange, padId, onInviteSubmit }: Re
                 </CardTitle>
               </CardHeader>
               <CardContent className="pt-4">
-                <Select
-                  value={defaultManageRole}
-                  onValueChange={(value: PadRole) => setDefaultManageRole(value)}
-                >
-                  <SelectTrigger className="w-full h-12 text-base border-2">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="admin">
-                      <div className="py-1">
-                        <div className="font-semibold">Admin</div>
-                        <div className="text-xs text-gray-500">Full control - manage everything</div>
-                      </div>
-                    </SelectItem>
-                    <SelectItem value="editor">
-                      <div className="py-1">
-                        <div className="font-semibold">Editor</div>
-                        <div className="text-xs text-gray-500">Can create and edit sticks</div>
-                      </div>
-                    </SelectItem>
-                    <SelectItem value="viewer">
-                      <div className="py-1">
-                        <div className="font-semibold">Viewer</div>
-                        <div className="text-xs text-gray-500">Can view sticks and add replies</div>
-                      </div>
-                    </SelectItem>
-                  </SelectContent>
-                </Select>
+                <PadRoleSelect value={defaultManageRole} onValueChange={setDefaultManageRole} />
                 <div className="mt-3 flex items-center gap-2 text-sm text-gray-700">
                   <Badge className="bg-purple-600">{defaultManageRole.toUpperCase()}</Badge>
                   <span>will be applied to uploaded users</span>

@@ -6,7 +6,7 @@ import { useState, useEffect } from "react"
 import { useUser } from "@/contexts/user-context"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { UserMenu } from "@/components/user-menu"
 import { BreadcrumbNav } from "@/components/breadcrumb-nav"
@@ -21,18 +21,16 @@ import {
   Globe,
   Lock,
   FileText,
-  Clock,
-  Heart,
-  MessageCircle,
   MessagesSquare,
-  Video,
   Sparkles,
   Plus,
   Pin,
-  PinOff,
   BarChart3,
   Calendar,
 } from "lucide-react"
+import type { InferencePad, InferenceStick } from "@/types/inference-pad"
+import { InferenceLoadingSpinner } from "@/components/inference/inference-loading-spinner"
+import { StickCard } from "@/components/inference/stick-card"
 import { CreateChatModal } from "@/components/stick-chats/CreateChatModal"
 import { PadChatPanel } from "@/components/inference/pad-chat-panel"
 import { PadPresenceIndicator } from "@/components/inference/pad-presence-indicator"
@@ -41,35 +39,6 @@ import {
   CommunicationModals,
   useCommunicationPaletteContextSafe,
 } from "@/components/communication"
-
-interface InferencePad {
-  id: string
-  name: string
-  description: string
-  owner_id: string
-  created_at: string
-  is_public: boolean
-  access_mode?: string
-  social_pad_members?: Array<{ count: number }>
-  profiles?: { email: string; full_name: string | null }
-}
-
-interface InferenceStick {
-  id: string
-  topic: string
-  content: string
-  social_pad_id: string
-  user_id: string
-  created_at: string
-  color: string
-  is_pinned?: boolean
-  pin_order?: number
-  pinned_at?: string
-  pinned_by?: string
-  profiles?: { email: string; full_name: string | null }
-  social_stick_replies?: Array<{ count: number }>
-  reaction_counts?: Record<string, number>
-}
 
 // Schedule Meeting Button - uses communication palette context
 function ScheduleMeetingButton({
@@ -304,14 +273,7 @@ export default function InferencePadPage({ params }: Readonly<{ params: { padId:
   }
 
   if (loading || loadingData) {
-    return (
-      <div className="flex items-center justify-center min-h-screen bg-gray-50">
-        <div className="flex flex-col items-center gap-4">
-          <div className="animate-spin rounded-full h-12 w-12 border-4 border-purple-600 border-t-transparent" />
-          <p className="text-purple-600 font-medium">Loading pad...</p>
-        </div>
-      </div>
-    )
+    return <InferenceLoadingSpinner message="Loading pad..." />
   }
 
   if (!pad) return null
@@ -466,90 +428,20 @@ export default function InferencePadPage({ params }: Readonly<{ params: { padId:
                   Pinned Sticks
                 </h2>
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                  {pinnedSticks.map((stick) => {
-                    const replyCount = stick.social_stick_replies?.[0]?.count || 0
-                    const reactionCount = stick.reaction_counts
-                      ? Object.values(stick.reaction_counts).reduce((sum, count) => sum + count, 0)
-                      : 0
-                    return (
-                      <Card
-                        key={stick.id}
-                        className="cursor-pointer hover:shadow-2xl transition-all duration-300 border-2 border-amber-300 overflow-hidden group bg-gradient-to-br from-amber-50 to-white shadow-lg"
-                        onClick={() => handleStickClick(stick.id)}
-                      >
-                        <CardHeader className="pb-3">
-                          <div className="flex items-start justify-between gap-2">
-                            <CardTitle className="text-base font-bold line-clamp-2 group-hover:text-purple-600 transition-colors">
-                              {stick.topic}
-                            </CardTitle>
-                            <div className="flex items-center gap-1">
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                className="h-7 w-7 p-0"
-                                onClick={(e) => handleChatClick(e, stick.topic)}
-                                title="New chat"
-                              >
-                                <MessagesSquare className="h-4 w-4 text-purple-500 hover:text-purple-600" />
-                              </Button>
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                className="h-7 w-7 p-0"
-                                onClick={handleVideoClick}
-                                title="Start video call"
-                              >
-                                <Video className="h-4 w-4 text-blue-500 hover:text-blue-600" />
-                              </Button>
-                              <ScheduleMeetingButton stickId={stick.id} stickTopic={stick.topic} />
-                              {canManageSticks && (
-                                <>
-                                  <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    className="h-7 w-7 p-0"
-                                    onClick={(e) => handlePinToggle(e, stick.id)}
-                                    title="Unpin this stick"
-                                  >
-                                    <PinOff className="h-4 w-4 text-amber-600" />
-                                  </Button>
-                                  <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    className="h-7 w-7 p-0"
-                                    onClick={(e) => handleManageStickMembers(e, stick)}
-                                    title="Manage stick settings and members"
-                                  >
-                                    <Settings className="h-4 w-4 text-gray-600" />
-                                  </Button>
-                                </>
-                              )}
-                              <Pin className="h-4 w-4 text-amber-500 flex-shrink-0" />
-                            </div>
-                          </div>
-                        </CardHeader>
-                        <CardContent className="space-y-3">
-                          <p className="text-sm text-gray-700 line-clamp-3 leading-relaxed">{stick.content}</p>
-                          <div className="flex items-center justify-between pt-2 border-t border-amber-200/50">
-                            <div className="flex items-center gap-1 text-xs text-gray-500">
-                              <Clock className="h-3 w-3" />
-                              {new Date(stick.created_at).toLocaleDateString()}
-                            </div>
-                            <div className="flex items-center gap-2">
-                              <div className="flex items-center gap-1 text-xs text-gray-500">
-                                <Heart className="h-3 w-3" />
-                                <span>{reactionCount}</span>
-                              </div>
-                              <div className="flex items-center gap-1 text-xs text-gray-500">
-                                <MessageCircle className="h-3 w-3" />
-                                <span>{replyCount}</span>
-                              </div>
-                            </div>
-                          </div>
-                        </CardContent>
-                      </Card>
-                    )
-                  })}
+                  {pinnedSticks.map((stick) => (
+                    <StickCard
+                      key={stick.id}
+                      stick={stick}
+                      isPinned
+                      canManageSticks={canManageSticks}
+                      onStickClick={handleStickClick}
+                      onChatClick={handleChatClick}
+                      onVideoClick={handleVideoClick}
+                      onPinToggle={handlePinToggle}
+                      onManageMembers={handleManageStickMembers}
+                      scheduleMeetingButton={<ScheduleMeetingButton stickId={stick.id} stickTopic={stick.topic} />}
+                    />
+                  ))}
                 </div>
               </div>
             )}
@@ -558,89 +450,20 @@ export default function InferencePadPage({ params }: Readonly<{ params: { padId:
               <div>
                 {pinnedSticks.length > 0 && <h2 className="text-xl font-bold mb-4 text-gray-900">All Sticks</h2>}
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                  {regularSticks.map((stick) => {
-                    const replyCount = stick.social_stick_replies?.[0]?.count || 0
-                    const reactionCount = stick.reaction_counts
-                      ? Object.values(stick.reaction_counts).reduce((sum, count) => sum + count, 0)
-                      : 0
-                    return (
-                      <Card
-                        key={stick.id}
-                        className="cursor-pointer hover:shadow-2xl transition-all duration-300 border-2 border-gray-300 overflow-hidden group bg-white shadow-lg"
-                        onClick={() => handleStickClick(stick.id)}
-                      >
-                        <CardHeader className="pb-3">
-                          <div className="flex items-start justify-between gap-2">
-                            <CardTitle className="text-base font-bold line-clamp-2 group-hover:text-purple-600 transition-colors">
-                              {stick.topic}
-                            </CardTitle>
-                            <div className="flex items-center gap-1">
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                className="h-7 w-7 p-0"
-                                onClick={(e) => handleChatClick(e, stick.topic)}
-                                title="New chat"
-                              >
-                                <MessagesSquare className="h-4 w-4 text-purple-500 hover:text-purple-600" />
-                              </Button>
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                className="h-7 w-7 p-0"
-                                onClick={handleVideoClick}
-                                title="Start video call"
-                              >
-                                <Video className="h-4 w-4 text-blue-500 hover:text-blue-600" />
-                              </Button>
-                              <ScheduleMeetingButton stickId={stick.id} stickTopic={stick.topic} />
-                              {canManageSticks && (
-                                <>
-                                  <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    className="h-7 w-7 p-0"
-                                    onClick={(e) => handlePinToggle(e, stick.id)}
-                                    title="Pin this stick"
-                                  >
-                                    <Pin className="h-4 w-4 text-gray-400 hover:text-amber-500" />
-                                  </Button>
-                                  <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    className="h-7 w-7 p-0"
-                                    onClick={(e) => handleManageStickMembers(e, stick)}
-                                    title="Manage stick settings and members"
-                                  >
-                                    <Settings className="h-4 w-4 text-gray-600" />
-                                  </Button>
-                                </>
-                              )}
-                            </div>
-                          </div>
-                        </CardHeader>
-                        <CardContent className="space-y-3">
-                          <p className="text-sm text-gray-700 line-clamp-3 leading-relaxed">{stick.content}</p>
-                          <div className="flex items-center justify-between pt-2 border-t border-gray-200/50">
-                            <div className="flex items-center gap-1 text-xs text-gray-500">
-                              <Clock className="h-3 w-3" />
-                              {new Date(stick.created_at).toLocaleDateString()}
-                            </div>
-                            <div className="flex items-center gap-2">
-                              <div className="flex items-center gap-1 text-xs text-gray-500">
-                                <Heart className="h-3 w-3" />
-                                <span>{reactionCount}</span>
-                              </div>
-                              <div className="flex items-center gap-1 text-xs text-gray-500">
-                                <MessageCircle className="h-3 w-3" />
-                                <span>{replyCount}</span>
-                              </div>
-                            </div>
-                          </div>
-                        </CardContent>
-                      </Card>
-                    )
-                  })}
+                  {regularSticks.map((stick) => (
+                    <StickCard
+                      key={stick.id}
+                      stick={stick}
+                      isPinned={false}
+                      canManageSticks={canManageSticks}
+                      onStickClick={handleStickClick}
+                      onChatClick={handleChatClick}
+                      onVideoClick={handleVideoClick}
+                      onPinToggle={handlePinToggle}
+                      onManageMembers={handleManageStickMembers}
+                      scheduleMeetingButton={<ScheduleMeetingButton stickId={stick.id} stickTopic={stick.topic} />}
+                    />
+                  ))}
                 </div>
               </div>
             )}

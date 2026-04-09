@@ -1,14 +1,14 @@
 "use client"
 
 import dynamic from "next/dynamic"
-import { MessageSquare, Plus, ChevronDown, X } from "lucide-react"
+import { MessageSquare, Plus, X } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
+import { ExportDropdown, SummaryDropdown } from "@/components/replies/ReplyDropdowns"
+import { useCalStickHandlers } from "@/hooks/use-calstick-handlers"
 import { ThreadedReplyItem, type ThreadedReply } from "./ThreadedReplyItem"
 import { ReplyForm } from "./ReplyForm"
 import type React from "react"
 import { useCallback, useState, useEffect, useMemo } from "react"
-import { toast } from "sonner"
 import { buildReplyTree, sortNestedReplies, countAllReplies, getReplyDisplayName } from "./reply-shared"
 
 // CollaborativeReplyForm uses Tiptap which requires client-side only rendering
@@ -127,6 +127,9 @@ export const ThreadedReplies: React.FC<ThreadedRepliesProps> = ({
   const [calStickDates, setCalStickDates] = useState<Record<string, string>>({})
   const [localReplies, setLocalReplies] = useState<ThreadedReply[]>(replies)
   const [replyingTo, setReplyingTo] = useState<ThreadedReply | null>(null)
+
+  const { handleToggleCalStick, handleCalStickDateChange, handleSaveCalStickDate, handleToggleCalStickComplete } =
+    useCalStickHandlers(setLocalReplies, setEditingCalStick, calStickDates, setCalStickDates, { recursive: true })
 
   useEffect(() => {
     setLocalReplies(replies)
@@ -260,148 +263,6 @@ export const ThreadedReplies: React.FC<ThreadedRepliesProps> = ({
     [onEditReply, noteId],
   )
 
-  const handleToggleCalStick = useCallback(
-    async (replyId: string, currentIsCalStick: boolean, currentDate: string | null) => {
-      try {
-        const newIsCalStick = !currentIsCalStick
-
-        if (newIsCalStick) {
-          setEditingCalStick(replyId)
-          setCalStickDates((prev) => ({
-            ...prev,
-            [replyId]: currentDate || new Date().toISOString().split("T")[0],
-          }))
-          return
-        }
-
-        const response = await fetch(`/api/sticks/replies/${replyId}`, {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            is_calstick: false,
-            calstick_date: null,
-            calstick_completed: false,
-            calstick_completed_at: null,
-          }),
-        })
-
-        if (!response.ok) throw new Error("Failed to update CalStick")
-
-        const updateCalStick = (replies: ThreadedReply[]): ThreadedReply[] => {
-          return replies.map(r => {
-            if (r.id === replyId) {
-              return {
-                ...r,
-                is_calstick: false,
-                calstick_date: null,
-                calstick_completed: false,
-                calstick_completed_at: null,
-              }
-            }
-            if (r.replies && r.replies.length > 0) {
-              return { ...r, replies: updateCalStick(r.replies) }
-            }
-            return r
-          })
-        }
-        setLocalReplies(prev => updateCalStick(prev))
-
-        toast.success("CalStick removed")
-      } catch (error) {
-        console.error("Error toggling CalStick:", error)
-        toast.error("Failed to update CalStick")
-      }
-    },
-    [],
-  )
-
-  const handleCalStickDateChange = useCallback((replyId: string, date: string) => {
-    setCalStickDates((prev) => ({
-      ...prev,
-      [replyId]: date,
-    }))
-  }, [])
-
-  const handleSaveCalStickDate = useCallback(
-    async (replyId: string) => {
-      try {
-        const date = calStickDates[replyId]
-        if (!date) {
-          toast.error("Please select a date")
-          return
-        }
-
-        const response = await fetch(`/api/sticks/replies/${replyId}`, {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            is_calstick: true,
-            calstick_date: date,
-          }),
-        })
-
-        if (!response.ok) throw new Error("Failed to save CalStick date")
-
-        const updateCalStick = (replies: ThreadedReply[]): ThreadedReply[] => {
-          return replies.map(r => {
-            if (r.id === replyId) {
-              return { ...r, is_calstick: true, calstick_date: date }
-            }
-            if (r.replies && r.replies.length > 0) {
-              return { ...r, replies: updateCalStick(r.replies) }
-            }
-            return r
-          })
-        }
-        setLocalReplies(prev => updateCalStick(prev))
-
-        toast.success("CalStick task created")
-        setEditingCalStick(null)
-      } catch (error) {
-        console.error("Error saving CalStick date:", error)
-        toast.error("Failed to save CalStick date")
-      }
-    },
-    [calStickDates],
-  )
-
-  const handleToggleCalStickComplete = useCallback(async (replyId: string, currentCompleted: boolean) => {
-    try {
-      const newCompleted = !currentCompleted
-      const response = await fetch(`/api/sticks/replies/${replyId}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          calstick_completed: newCompleted,
-          calstick_completed_at: newCompleted ? new Date().toISOString() : null,
-        }),
-      })
-
-      if (!response.ok) throw new Error("Failed to update completion status")
-
-      const updateCalStick = (replies: ThreadedReply[]): ThreadedReply[] => {
-        return replies.map(r => {
-          if (r.id === replyId) {
-            return {
-              ...r,
-              calstick_completed: newCompleted,
-              calstick_completed_at: newCompleted ? new Date().toISOString() : null,
-            }
-          }
-          if (r.replies && r.replies.length > 0) {
-            return { ...r, replies: updateCalStick(r.replies) }
-          }
-          return r
-        })
-      }
-      setLocalReplies(prev => updateCalStick(prev))
-
-      toast.success(newCompleted ? "Task completed!" : "Task marked incomplete")
-    } catch (error) {
-      console.error("Error toggling completion:", error)
-      toast.error("Failed to update task")
-    }
-  }, [])
 
   const getDisplayName = useCallback((r: ThreadedReply) => getReplyDisplayName(r), [])
 
@@ -464,85 +325,15 @@ export const ThreadedReplies: React.FC<ThreadedRepliesProps> = ({
         {localReplies.length > 0 ? (
           <div className="flex items-center gap-2">
             {enableExport && onExportAll && (
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="outline" size="sm" disabled={isExporting} className="text-xs h-7 bg-transparent">
-                    {isExporting ? (
-                      <>
-                        <div className="h-3 w-3 mr-1 animate-spin rounded-full border-2 border-gray-300 border-t-gray-600" />
-                        Exporting...
-                      </>
-                    ) : (
-                      <>
-                        Export
-                        <ChevronDown className="h-3 w-3 ml-1" />
-                      </>
-                    )}
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="z-[9999] bg-white border shadow-lg">
-                  {tones.map((tone) => (
-                    <DropdownMenuItem
-                      key={tone.value}
-                      onClick={() => {
-                        onExportAll()
-                      }}
-                      className="text-xs cursor-pointer hover:bg-gray-100 px-3 py-2"
-                    >
-                      Export as {tone.label}
-                    </DropdownMenuItem>
-                  ))}
-                </DropdownMenuContent>
-              </DropdownMenu>
+              <ExportDropdown tones={tones} isExporting={isExporting} onExportAll={onExportAll} />
             )}
             {enableSummary && (
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    disabled={isGeneratingSummary}
-                    className="text-xs h-7 bg-transparent"
-                  >
-                    {isGeneratingSummary ? (
-                      <>
-                        <div className="h-3 w-3 mr-1 animate-spin rounded-full border-2 border-gray-300 border-t-gray-600" />
-                        Generating...
-                      </>
-                    ) : (
-                      <>
-                        Summary
-                        <ChevronDown className="h-3 w-3 ml-1" />
-                      </>
-                    )}
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="z-[9999] bg-white border shadow-lg">
-                  {tones.map((tone) => (
-                    <DropdownMenuItem
-                      key={`text-${tone.value}`}
-                      onClick={() => handleGenerateSummary(tone.value)}
-                      className="text-xs cursor-pointer hover:bg-gray-100 px-3 py-2"
-                    >
-                      {tone.label}
-                    </DropdownMenuItem>
-                  ))}
-                  {onGenerateSummaryDocx && (
-                    <>
-                      <div className="border-t border-gray-200 my-1"></div>
-                      {tones.map((tone) => (
-                        <DropdownMenuItem
-                          key={`docx-${tone.value}`}
-                          onClick={() => onGenerateSummaryDocx(tone.value)}
-                          className="text-xs cursor-pointer hover:bg-gray-100 px-3 py-2"
-                        >
-                          {tone.label} (Word Doc)
-                        </DropdownMenuItem>
-                      ))}
-                    </>
-                  )}
-                </DropdownMenuContent>
-              </DropdownMenu>
+              <SummaryDropdown
+                tones={tones}
+                isGeneratingSummary={isGeneratingSummary}
+                onGenerateSummary={handleGenerateSummary}
+                onGenerateSummaryDocx={onGenerateSummaryDocx}
+              />
             )}
           </div>
         ) : (

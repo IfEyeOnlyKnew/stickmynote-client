@@ -70,6 +70,55 @@ interface ManageMembersDialogProps {
 
 type InviteRole = "admin" | "editor" | "viewer"
 
+/** Reusable role select for viewer/editor/admin */
+function InviteRoleSelect({
+  value,
+  onValueChange,
+  className,
+}: Readonly<{
+  value: InviteRole
+  onValueChange: (value: InviteRole) => void
+  className?: string
+}>) {
+  return (
+    <Select value={value} onValueChange={(v) => onValueChange(v as InviteRole)}>
+      <SelectTrigger className={className}>
+        <SelectValue />
+      </SelectTrigger>
+      <SelectContent>
+        <SelectItem value="viewer">Viewer</SelectItem>
+        <SelectItem value="editor">Editor</SelectItem>
+        <SelectItem value="admin">Admin</SelectItem>
+      </SelectContent>
+    </Select>
+  )
+}
+
+/** Creates a debounced search handler with consistent pattern */
+function useDebouncedSearch(
+  searchFn: (query: string) => Promise<void>,
+  minLength: number = 2,
+  delay: number = 300,
+) {
+  const timeoutRef = useRef<NodeJS.Timeout | null>(null)
+
+  const handleChange = useCallback(
+    (value: string, setValueFn: (v: string) => void) => {
+      setValueFn(value)
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current)
+      }
+      if (value.length < minLength) return
+      timeoutRef.current = setTimeout(() => {
+        searchFn(value)
+      }, delay)
+    },
+    [searchFn, minLength, delay],
+  )
+
+  return { handleChange, timeoutRef }
+}
+
 export function ManageMembersDialog({ open, onOpenChange, padId, padName }: Readonly<ManageMembersDialogProps>) {
   const [members, setMembers] = useState<Member[]>([])
   const [pendingInvites, setPendingInvites] = useState<PendingInvite[]>([])
@@ -86,7 +135,6 @@ export function ManageMembersDialog({ open, onOpenChange, padId, padName }: Read
   const [ldapSearchResults, setLdapSearchResults] = useState<LDAPUser[]>([])
   const [ldapSearching, setLdapSearching] = useState(false)
   const [showLdapDropdown, setShowLdapDropdown] = useState(false)
-  const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   const searchContainerRef = useRef<HTMLDivElement>(null)
 
   // AD Group Search state
@@ -95,7 +143,6 @@ export function ManageMembersDialog({ open, onOpenChange, padId, padName }: Read
   const [groupSearching, setGroupSearching] = useState(false)
   const [showGroupDropdown, setShowGroupDropdown] = useState(false)
   const [invitingGroup, setInvitingGroup] = useState(false)
-  const groupSearchTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   const groupSearchContainerRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -143,18 +190,10 @@ export function ManageMembersDialog({ open, onOpenChange, padId, padName }: Read
     }
   }, [])
 
-  // Debounced search handler
+  const { handleChange: debouncedLdapSearch } = useDebouncedSearch(searchLdapUsers)
   const handleEmailInputChange = useCallback((value: string) => {
-    setInviteEmail(value)
-
-    if (searchTimeoutRef.current) {
-      clearTimeout(searchTimeoutRef.current)
-    }
-
-    searchTimeoutRef.current = setTimeout(() => {
-      searchLdapUsers(value)
-    }, 300)
-  }, [searchLdapUsers])
+    debouncedLdapSearch(value, setInviteEmail)
+  }, [debouncedLdapSearch])
 
   // Select user from LDAP search
   const handleSelectLdapUser = useCallback((user: LDAPUser) => {
@@ -188,18 +227,10 @@ export function ManageMembersDialog({ open, onOpenChange, padId, padName }: Read
     }
   }, [])
 
-  // Debounced group search
+  const { handleChange: debouncedGroupSearch } = useDebouncedSearch(searchAdGroups)
   const handleGroupSearchChange = useCallback((value: string) => {
-    setGroupSearchQuery(value)
-
-    if (groupSearchTimeoutRef.current) {
-      clearTimeout(groupSearchTimeoutRef.current)
-    }
-
-    groupSearchTimeoutRef.current = setTimeout(() => {
-      searchAdGroups(value)
-    }, 300)
-  }, [searchAdGroups])
+    debouncedGroupSearch(value, setGroupSearchQuery)
+  }, [debouncedGroupSearch])
 
   // Invite all members of an AD group
   const handleInviteGroup = useCallback(async (group: ADGroup) => {
@@ -374,12 +405,11 @@ export function ManageMembersDialog({ open, onOpenChange, padId, padName }: Read
     }
   }
 
-  const handleCsvUpload = async (emails: Array<{ email: string; name?: string }>) => {
+  /** Shared bulk invite API call — used by both CSV upload and manual bulk invite */
+  const sendBulkInvites = async (emailList: string[], onSuccess?: () => void) => {
     try {
       setInviting(true)
       setFeedbackMessage(null)
-      const emailList = emails.map((e) => e.email)
-
       const response = await fetch(`/api/inference-pads/${padId}/members/bulk`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -393,8 +423,9 @@ export function ManageMembersDialog({ open, onOpenChange, padId, padName }: Read
         const data = await response.json()
         setFeedbackMessage({
           type: "success",
-          text: data.message || `Successfully processed ${emails.length} email(s)`,
+          text: data.message || `Successfully processed ${emailList.length} email(s)`,
         })
+        onSuccess?.()
         fetchMembers()
         fetchPendingInvites()
         setActiveTab("invite")
@@ -410,6 +441,10 @@ export function ManageMembersDialog({ open, onOpenChange, padId, padName }: Read
     }
   }
 
+  const handleCsvUpload = async (emails: Array<{ email: string; name?: string }>) => {
+    await sendBulkInvites(emails.map((e) => e.email))
+  }
+
   const handleBulkInvite = async () => {
     if (!bulkEmails.trim()) return
 
@@ -423,38 +458,7 @@ export function ManageMembersDialog({ open, onOpenChange, padId, padName }: Read
       return
     }
 
-    try {
-      setInviting(true)
-      setFeedbackMessage(null)
-      const response = await fetch(`/api/inference-pads/${padId}/members/bulk`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          emails,
-          role: inviteRole,
-        }),
-      })
-
-      if (response.ok) {
-        const data = await response.json()
-        setFeedbackMessage({
-          type: "success",
-          text: data.message || `Successfully processed ${emails.length} email(s)`,
-        })
-        setBulkEmails("")
-        fetchMembers()
-        fetchPendingInvites()
-        setActiveTab("invite")
-      } else {
-        const data = await response.json()
-        setFeedbackMessage({ type: "error", text: data.error || "Failed to invite members" })
-      }
-    } catch (error) {
-      console.error("Error inviting members:", error)
-      setFeedbackMessage({ type: "error", text: "Failed to invite members" })
-    } finally {
-      setInviting(false)
-    }
+    await sendBulkInvites(emails, () => setBulkEmails(""))
   }
 
   const handleCancelInvite = async (inviteId: string) => {
@@ -586,19 +590,7 @@ export function ManageMembersDialog({ open, onOpenChange, padId, padName }: Read
                       </div>
                     )}
                   </div>
-                  <Select
-                    value={inviteRole}
-                    onValueChange={(value) => setInviteRole(value as InviteRole)}
-                  >
-                    <SelectTrigger className="w-32">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="viewer">Viewer</SelectItem>
-                      <SelectItem value="editor">Editor</SelectItem>
-                      <SelectItem value="admin">Admin</SelectItem>
-                    </SelectContent>
-                  </Select>
+                  <InviteRoleSelect value={inviteRole} onValueChange={setInviteRole} className="w-32" />
                   <Button onClick={handleInviteMember} disabled={!inviteEmail.trim() || inviting}>
                     {inviting ? "Inviting..." : "Invite"}
                   </Button>
@@ -704,16 +696,11 @@ export function ManageMembersDialog({ open, onOpenChange, padId, padName }: Read
                         )}
 
                         {isOwner && member.role !== "owner" ? (
-                          <Select value={member.role} onValueChange={(value) => handleUpdateRole(member.id, value)}>
-                            <SelectTrigger className="w-28">
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="viewer">Viewer</SelectItem>
-                              <SelectItem value="editor">Editor</SelectItem>
-                              <SelectItem value="admin">Admin</SelectItem>
-                            </SelectContent>
-                          </Select>
+                          <InviteRoleSelect
+                            value={member.role as InviteRole}
+                            onValueChange={(value) => handleUpdateRole(member.id, value)}
+                            className="w-28"
+                          />
                         ) : (
                           <Badge variant={getRoleBadgeVariant(member.role)}>{member.role}</Badge>
                         )}
@@ -742,19 +729,7 @@ export function ManageMembersDialog({ open, onOpenChange, padId, padName }: Read
 
                   <div className="space-y-2">
                     <Label>Select Role for Group Members</Label>
-                    <Select
-                      value={inviteRole}
-                      onValueChange={(value) => setInviteRole(value as InviteRole)}
-                    >
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="viewer">Viewer</SelectItem>
-                        <SelectItem value="editor">Editor</SelectItem>
-                        <SelectItem value="admin">Admin</SelectItem>
-                      </SelectContent>
-                    </Select>
+                    <InviteRoleSelect value={inviteRole} onValueChange={setInviteRole} />
                   </div>
 
                   <div className="relative" ref={groupSearchContainerRef}>
@@ -824,19 +799,7 @@ export function ManageMembersDialog({ open, onOpenChange, padId, padName }: Read
               <>
                 <div className="space-y-2">
                   <Label>Select Role for Bulk Invites</Label>
-                  <Select
-                    value={inviteRole}
-                    onValueChange={(value) => setInviteRole(value as InviteRole)}
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="viewer">Viewer</SelectItem>
-                      <SelectItem value="editor">Editor</SelectItem>
-                      <SelectItem value="admin">Admin</SelectItem>
-                    </SelectContent>
-                  </Select>
+                  <InviteRoleSelect value={inviteRole} onValueChange={setInviteRole} />
                 </div>
 
                 <CsvEmailUpload onEmailsUploaded={handleCsvUpload} />
