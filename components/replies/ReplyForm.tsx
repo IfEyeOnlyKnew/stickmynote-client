@@ -7,13 +7,13 @@ import { Button } from "@/components/ui/button"
 import { TextAreaField } from "@/components/forms/TextAreaField"
 
 interface ReplyFormProps {
-  content: string
-  onContentChange: (content: string) => void
-  onSubmit: (e: React.MouseEvent) => void
-  onCancel?: (e: React.MouseEvent) => void
-  isSubmitting: boolean
-  isCompact?: boolean
-  maxLength?: number
+  readonly content: string
+  readonly onContentChange: (content: string) => void
+  readonly onSubmit: (e: React.MouseEvent) => void
+  readonly onCancel?: (e: React.MouseEvent) => void
+  readonly isSubmitting: boolean
+  readonly isCompact?: boolean
+  readonly maxLength?: number
 }
 
 export const ReplyForm: React.FC<ReplyFormProps> = ({

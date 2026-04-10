@@ -5,18 +5,18 @@ import { Badge } from "@/components/ui/badge"
 import type React from "react"
 
 interface NoteCardMetadataProps {
-  noteId: string
-  tags?: string[]
-  hyperlinks?: any[]
-  isNewNote: boolean
-  hideGenerateTags: boolean
-  generatingTags: string | null | undefined
-  summarizingLinks?: string | null | undefined
-  topic?: string
-  title?: string
-  content?: string
-  onGenerateTags: (noteId: string, topic: string) => void
-  onSummarizeLinks?: (noteId: string) => void
+  readonly noteId: string
+  readonly tags?: string[]
+  readonly hyperlinks?: any[]
+  readonly isNewNote: boolean
+  readonly hideGenerateTags: boolean
+  readonly generatingTags: string | null | undefined
+  readonly summarizingLinks?: string | null | undefined
+  readonly topic?: string
+  readonly title?: string
+  readonly content?: string
+  readonly onGenerateTags: (noteId: string, topic: string) => void
+  readonly onSummarizeLinks?: (noteId: string) => void
 }
 
 export const NoteCardMetadata: React.FC<NoteCardMetadataProps> = ({

@@ -56,7 +56,8 @@ export function NotedClient({ userId }: Readonly<NotedClientProps>) {
   const [saveAsTemplateData, setSaveAsTemplateData] = useState<{ title: string; content: string } | null>(null)
 
   // Mobile view: which panel is showing (groups, list, editor)
-  const [mobilePanel, setMobilePanel] = useState<"groups" | "list" | "editor">("list")
+  type MobilePanel = "groups" | "list" | "editor"
+  const [mobilePanel, setMobilePanel] = useState<MobilePanel>("list")
   // Desktop: toggle the page list (search) column
   const [showPageList, setShowPageList] = useState(true)
 

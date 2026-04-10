@@ -17,16 +17,16 @@ import { Loader2, Users, User } from "lucide-react"
 import { useCSRF } from "@/hooks/useCSRF"
 
 interface CreateChatModalProps {
-  open: boolean
-  onOpenChange: (open: boolean) => void
+  readonly open: boolean
+  readonly onOpenChange: (open: boolean) => void
   /** Pre-fill the chat name (e.g., from a stick topic) */
-  defaultName?: string
+  readonly defaultName?: string
   /** Automatically create the chat when modal opens (skips the form) */
-  autoSubmit?: boolean
+  readonly autoSubmit?: boolean
   /** Link chat to a specific stick */
-  stickId?: string
+  readonly stickId?: string
   /** Type of stick being linked */
-  stickType?: "personal" | "social" | "pad"
+  readonly stickType?: "personal" | "social" | "pad"
 }
 
 /**

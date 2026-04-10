@@ -108,7 +108,7 @@ function extractVideoInfo(url: string): VideoInfo | null {
 
     // Vimeo
     if (u.hostname.includes("vimeo.com")) {
-      const [id] = u.pathname.split("/").filter(Boolean)
+      const id = u.pathname.split("/").find(Boolean)
       if (id) {
         return {
           id,
@@ -297,7 +297,7 @@ export async function POST(request: NextRequest) {
     if (ownershipError) return ownershipError
 
     let tab = await findMediaTab(noteId, tabType)
-    if (!tab) tab = await createMediaTab(noteId, userId, tabType)
+    tab ??= await createMediaTab(noteId, userId, tabType)
     if (!tab) return NextResponse.json({ error: "Failed to create or find tab" }, { status: 500 })
 
     const baseData = normalizeTabData(tab.tab_data)

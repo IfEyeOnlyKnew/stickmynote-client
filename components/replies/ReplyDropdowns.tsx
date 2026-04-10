@@ -10,9 +10,9 @@ interface Tone {
 }
 
 interface ExportDropdownProps {
-  tones: Tone[]
-  isExporting: boolean
-  onExportAll: () => void
+  readonly tones: Tone[]
+  readonly isExporting: boolean
+  readonly onExportAll: () => void
 }
 
 export function ExportDropdown({ tones, isExporting, onExportAll }: ExportDropdownProps) {
@@ -49,10 +49,10 @@ export function ExportDropdown({ tones, isExporting, onExportAll }: ExportDropdo
 }
 
 interface SummaryDropdownProps {
-  tones: Tone[]
-  isGeneratingSummary: boolean
-  onGenerateSummary: (tone: string) => void
-  onGenerateSummaryDocx?: (tone: string) => void
+  readonly tones: Tone[]
+  readonly isGeneratingSummary: boolean
+  readonly onGenerateSummary: (tone: string) => void
+  readonly onGenerateSummaryDocx?: (tone: string) => void
 }
 
 export function SummaryDropdown({ tones, isGeneratingSummary, onGenerateSummary, onGenerateSummaryDocx }: SummaryDropdownProps) {

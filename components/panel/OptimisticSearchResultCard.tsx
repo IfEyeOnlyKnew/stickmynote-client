@@ -34,7 +34,7 @@ export function OptimisticSearchResultCard({
 
   const [isHovered, setIsHovered] = useState(false)
   const [viewCount, setViewCount] = useState<number>(0)
-  const [_isLoadingCounts, setIsLoadingCounts] = useState(true)
+  const [, setIsLoadingCounts] = useState(true)
   const fetchedRef = useRef(false)
   const pendingActionRef = useRef(false)
 

@@ -224,15 +224,15 @@ interface InferenceStick {
 }
 
 interface StickTableRowProps {
-  stick: InferenceStick
-  replies: Reply[]
-  isExpanded: boolean
-  isSelected: boolean
-  onToggle: (stickId: string) => void
-  onSelect: (stickId: string) => void
-  onOpen: (stickId: string) => void
-  onPromoteReply: (stickId: string, topic: string, stickContent: string, replyId: string, replyContent: string) => void
-  onNavigateToCalstick: (calstickId: string) => void
+  readonly stick: InferenceStick
+  readonly replies: Reply[]
+  readonly isExpanded: boolean
+  readonly isSelected: boolean
+  readonly onToggle: (stickId: string) => void
+  readonly onSelect: (stickId: string) => void
+  readonly onOpen: (stickId: string) => void
+  readonly onPromoteReply: (stickId: string, topic: string, stickContent: string, replyId: string, replyContent: string) => void
+  readonly onNavigateToCalstick: (calstickId: string) => void
 }
 
 const StickTableRow = React.memo(function StickTableRow({

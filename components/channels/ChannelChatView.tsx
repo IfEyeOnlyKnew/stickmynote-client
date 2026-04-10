@@ -49,26 +49,33 @@ interface ChannelChatViewProps {
 
 const REACTION_EMOJIS = ["👍", "❤️", "😂", "😮", "🎉", "🔥", "👀", "✅"]
 
-function applyReaction(reactions: any[], emoji: string, added: boolean, userId?: string, userName?: string): any[] {
+function addReactionEntry(reactions: any[], emoji: string, userId?: string, userName?: string): void {
   const existing = reactions.find((r) => r.emoji === emoji)
-  if (added) {
-    if (existing) {
-      existing.count++
-      if (userId) existing.users.push({ id: userId, full_name: userName || "" })
-      else existing.hasReacted = true
-    } else {
-      reactions.push(
-        userId
-          ? { emoji, count: 1, users: [{ id: userId, full_name: userName || "" }], hasReacted: false }
-          : { emoji, count: 1, users: [], hasReacted: true }
-      )
-    }
-  } else if (existing) {
-    existing.count--
-    if (userId) existing.users = existing.users.filter((u: any) => u.id !== userId)
-    else existing.hasReacted = false
-    if (existing.count <= 0) reactions.splice(reactions.indexOf(existing), 1)
+  if (existing) {
+    existing.count++
+    if (userId) existing.users.push({ id: userId, full_name: userName || "" })
+    else existing.hasReacted = true
+  } else {
+    reactions.push(
+      userId
+        ? { emoji, count: 1, users: [{ id: userId, full_name: userName || "" }], hasReacted: false }
+        : { emoji, count: 1, users: [], hasReacted: true }
+    )
   }
+}
+
+function removeReactionEntry(reactions: any[], emoji: string, userId?: string): void {
+  const existing = reactions.find((r) => r.emoji === emoji)
+  if (!existing) return
+  existing.count--
+  if (userId) existing.users = existing.users.filter((u: any) => u.id !== userId)
+  else existing.hasReacted = false
+  if (existing.count <= 0) reactions.splice(reactions.indexOf(existing), 1)
+}
+
+function applyReaction(reactions: any[], emoji: string, added: boolean, userId?: string, userName?: string): any[] {
+  if (added) addReactionEntry(reactions, emoji, userId, userName)
+  else removeReactionEntry(reactions, emoji, userId)
   return reactions
 }
 

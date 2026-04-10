@@ -37,7 +37,7 @@ export function PadTemplatePicker({ hubType, onTemplateSelect }: Readonly<PadTem
   const [selectedCategory, setSelectedCategory] = useState<string>("all")
   const [searchQuery, setSearchQuery] = useState("")
   const [open, setOpen] = useState(false)
-  const [_loading, setLoading] = useState(false)
+  const [, setLoading] = useState(false)
 
   /* eslint-disable react-hooks/exhaustive-deps */
   useEffect(() => {

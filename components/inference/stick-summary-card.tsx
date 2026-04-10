@@ -26,17 +26,17 @@ interface ActionItem {
 }
 
 interface StickSummaryCardProps {
-  summary?: string
-  actionItems?: ActionItem[]
-  suggestedQuestions?: string[]
-  lastSummarizedAt?: string
-  replyCount?: number
-  summaryReplyCount?: number
-  onRegenerateSummary?: () => void
-  onInsertQuestion?: (question: string) => void
-  onViewHistory?: () => void
-  isLoading?: boolean
-  showGenerateButton?: boolean
+  readonly summary?: string
+  readonly actionItems?: ActionItem[]
+  readonly suggestedQuestions?: string[]
+  readonly lastSummarizedAt?: string
+  readonly replyCount?: number
+  readonly summaryReplyCount?: number
+  readonly onRegenerateSummary?: () => void
+  readonly onInsertQuestion?: (question: string) => void
+  readonly onViewHistory?: () => void
+  readonly isLoading?: boolean
+  readonly showGenerateButton?: boolean
 }
 
 function GenerateSummaryPlaceholder({ isLoading, onGenerate }: Readonly<{ isLoading: boolean; onGenerate: () => void }>) {

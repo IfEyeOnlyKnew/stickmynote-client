@@ -27,6 +27,12 @@ interface WorkloadUser {
   tasks: WorkloadTask[]
 }
 
+function utilizationColor(pct: number): string {
+  if (pct > 100) return "text-red-600"
+  if (pct >= 80) return "text-amber-600"
+  return "text-green-600"
+}
+
 function getUtilColor(pct: number): string {
   if (pct > 100) return "bg-red-500 text-white"
   if (pct >= 80) return "bg-amber-400 text-amber-950"
@@ -166,7 +172,7 @@ export default function ResourcesPage() {
         <Card>
           <CardContent className="pt-4">
             <div className="text-sm text-muted-foreground">Utilization</div>
-            <div className={`text-2xl font-bold ${overallUtilization > 100 ? "text-red-600" : overallUtilization >= 80 ? "text-amber-600" : "text-green-600"}`}>
+            <div className={`text-2xl font-bold ${utilizationColor(overallUtilization)}`}>
               {overallUtilization.toFixed(0)}%
             </div>
           </CardContent>

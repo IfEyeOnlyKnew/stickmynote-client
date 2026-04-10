@@ -14,10 +14,10 @@ import { formatDistanceToNow } from "date-fns"
 import { COLORS } from "@/utils/noteUtils"
 
 interface NotePreviewCardProps {
-  note: Note
-  onClick: () => void
-  onUpdateColor?: (noteId: string, color: string) => void
-  isLoading?: boolean
+  readonly note: Note
+  readonly onClick: () => void
+  readonly onUpdateColor?: (noteId: string, color: string) => void
+  readonly isLoading?: boolean
 }
 
 export const NotePreviewCard: React.FC<NotePreviewCardProps> = ({

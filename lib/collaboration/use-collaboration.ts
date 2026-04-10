@@ -20,17 +20,6 @@ export interface CollaborationOptions {
   onUsersChange?: (users: Array<{ id: string; name: string; color: string }>) => void
 }
 
-const USER_COLORS = [
-  "#FF6B6B", // red
-  "#4ECDC4", // teal
-  "#45B7D1", // blue
-  "#FFA07A", // salmon
-  "#98D8C8", // mint
-  "#F7DC6F", // yellow
-  "#BB8FCE", // purple
-  "#85C1E2", // sky blue
-]
-
 export function useCollaboration(options: CollaborationOptions) {
   const { documentId, enabled = true, onConnectionChange, onUsersChange } = options
   useUser()

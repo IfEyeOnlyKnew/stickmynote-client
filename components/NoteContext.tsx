@@ -57,8 +57,8 @@ export const useNoteContext = () => {
 }
 
 interface NoteProviderProps {
-  children: React.ReactNode
-  value: NoteContextValue
+  readonly children: React.ReactNode
+  readonly value: NoteContextValue
 }
 
 export const NoteProvider: React.FC<NoteProviderProps> = ({ children, value }) => {

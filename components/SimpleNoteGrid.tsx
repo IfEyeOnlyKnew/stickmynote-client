@@ -6,13 +6,13 @@ import type { Note } from "@/types/note"
 import { Loader2 } from "lucide-react"
 
 interface SimpleNoteGridProps {
-  notes: Note[]
-  onNoteClick: (noteId: string) => void
-  onUpdateColor?: (noteId: string, color: string) => void
-  onLoadMore?: () => Promise<void>
-  hasMore?: boolean
-  isLoadingMore?: boolean
-  loadingNoteId?: string | null
+  readonly notes: Note[]
+  readonly onNoteClick: (noteId: string) => void
+  readonly onUpdateColor?: (noteId: string, color: string) => void
+  readonly onLoadMore?: () => Promise<void>
+  readonly hasMore?: boolean
+  readonly isLoadingMore?: boolean
+  readonly loadingNoteId?: string | null
 }
 
 export const SimpleNoteGrid: React.FC<SimpleNoteGridProps> = ({

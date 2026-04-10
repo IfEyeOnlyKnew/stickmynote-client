@@ -12,10 +12,7 @@ import { checkDLPPolicy } from "@/lib/dlp/policy-checker"
 // Types
 // ============================================================================
 
-interface OrgContext {
-  orgId: string
-  organizationId?: string
-}
+// OrgContext interface removed — unused after route-helpers refactor
 
 interface NoteRecord {
   id: string

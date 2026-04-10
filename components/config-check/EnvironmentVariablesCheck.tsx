@@ -3,7 +3,7 @@
 import { Badge } from "@/components/ui/badge"
 
 interface EnvironmentVariablesCheckProps {
-  envVars: Record<string, string>
+  readonly envVars: Record<string, string>
 }
 
 export function EnvironmentVariablesCheck({ envVars }: Readonly<EnvironmentVariablesCheckProps>) {

@@ -28,7 +28,8 @@ export function TwoFactorSetupDialog({
   onOpenChange,
   onSuccess,
 }: Readonly<TwoFactorSetupDialogProps>) {
-  const [step, setStep] = useState<"qr" | "verify" | "backup">("qr")
+  type SetupStep = "qr" | "verify" | "backup"
+  const [step, setStep] = useState<SetupStep>("qr")
   const tfa = useTwoFactorSetup()
 
   async function handleSetupStart() {

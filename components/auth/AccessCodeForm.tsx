@@ -5,9 +5,9 @@ import { InputOTP, InputOTPGroup, InputOTPSeparator, InputOTPSlot } from "@/comp
 import { Lock } from "lucide-react"
 
 interface AccessCodeFormProps {
-  accessCode: string
-  error: string
-  onAccessCodeChange: (value: string) => void
+  readonly accessCode: string
+  readonly error: string
+  readonly onAccessCodeChange: (value: string) => void
 }
 
 export function AccessCodeForm({ accessCode, error, onAccessCodeChange }: Readonly<AccessCodeFormProps>) {

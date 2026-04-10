@@ -6,7 +6,7 @@ import { useState } from "react"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Progress } from "@/components/ui/progress"
-import { Upload, X, type File, ImageIcon, Video, FileText } from "lucide-react"
+import { Upload, X, ImageIcon, Video, FileText } from "lucide-react"
 import { cn } from "@/lib/utils"
 
 interface MediaUploadModalProps {

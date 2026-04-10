@@ -21,15 +21,6 @@ function uint8ArrayToHex(arr: Uint8Array): string {
     .join("")
 }
 
-// Convert hex string to Uint8Array
-function hexToUint8Array(hex: string): Uint8Array {
-  const bytes = new Uint8Array(hex.length / 2)
-  for (let i = 0; i < hex.length; i += 2) {
-    bytes[i / 2] = Number.parseInt(hex.substring(i, i + 2), 16)
-  }
-  return bytes
-}
-
 // Generate random token
 function generateRandomToken(): string {
   const array = new Uint8Array(32)

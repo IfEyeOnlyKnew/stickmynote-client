@@ -18,11 +18,6 @@ import type { ChatRequest } from "@/types/chat-request"
 // Types
 // ============================================================================
 
-interface AuthUser {
-  id: string
-  email?: string
-}
-
 interface OrgContext {
   orgId: string
   organizationId?: string
@@ -30,14 +25,6 @@ interface OrgContext {
 
 interface RateLimitedResult {
   rateLimited: true
-}
-
-interface UserInfo {
-  id: string
-  email?: string
-  full_name?: string
-  avatar_url?: string
-  username?: string
 }
 
 // ============================================================================

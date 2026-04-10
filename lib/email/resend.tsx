@@ -1,17 +1,3 @@
-import { Resend } from "resend"
-
-let resendInstance: Resend | null = null
-
-function getResend(): Resend | null {
-  if (!process.env.RESEND_API_KEY) {
-    return null
-  }
-  resendInstance ??= new Resend(process.env.RESEND_API_KEY)
-  return resendInstance
-}
-
-const FROM_EMAIL = process.env.RESEND_FROM_EMAIL || "noreply@stickmynote.com"
-
 export interface SendEmailOptions {
   to: string
   subject: string

@@ -198,11 +198,12 @@ function VideoCallContent({ roomName, onLeave, userName, isMinimized }: Readonly
   const [layout, setLayout] = useState<"grid" | "speaker">("grid")
   const [reactions, setReactions] = useState<{ id: string; emoji: string; x: number }[]>([])
   const [showWhiteboard, setShowWhiteboard] = useState(false)
-  const [videoEffect, setVideoEffect] = useState<"none" | "blur" | "image">("none")
+  type VideoEffect = "none" | "blur" | "image"
+  const [videoEffect, setVideoEffect] = useState<VideoEffect>("none")
   const [backgroundImage, setBackgroundImage] = useState<string>(
     "https://images.unsplash.com/photo-1497366216548-37526070297c?w=800&q=80",
   )
-  const [_bgProcessor, setBgProcessor] = useState<BackgroundProcessorWrapper | null>(null)
+  const [, setBgProcessor] = useState<BackgroundProcessorWrapper | null>(null)
 
   // Reaction data channel handler extracted to reduce nesting depth
   const handleReactionData = useCallback((msg: { payload: BufferSource }) => {

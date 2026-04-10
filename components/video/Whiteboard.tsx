@@ -94,7 +94,8 @@ const DRAW_TOOL_MAP: Record<string, (ctx: CanvasRenderingContext2D, action: Draw
 export function Whiteboard({ onDrawAction, incomingActions, className }: Readonly<WhiteboardProps>) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const [isDrawing, setIsDrawing] = useState(false)
-  const [tool, setTool] = useState<"pen" | "line" | "rect" | "circle" | "eraser" | "text">("pen")
+  type DrawTool = "pen" | "line" | "rect" | "circle" | "eraser" | "text"
+  const [tool, setTool] = useState<DrawTool>("pen")
   const [color, setColor] = useState("#000000")
   const [lineWidth, setLineWidth] = useState(4)
   const [currentPoints, setCurrentPoints] = useState<Point[]>([])

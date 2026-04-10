@@ -19,14 +19,14 @@ const CollaborativeRichTextModal = dynamic(
 type TabWithData = NoteTab | StickTab
 
 interface DetailsTabContentProps {
-  noteId: string
-  details: string
-  noteTabs: TabWithData[]
-  readOnly?: boolean
-  config: NoteTabsConfig
-  onDetailsChange: (value: string) => Promise<void> | void
-  onRefreshTabs: () => void
-  enableCollaboration?: boolean
+  readonly noteId: string
+  readonly details: string
+  readonly noteTabs: TabWithData[]
+  readonly readOnly?: boolean
+  readonly config: NoteTabsConfig
+  readonly onDetailsChange: (value: string) => Promise<void> | void
+  readonly onRefreshTabs: () => void
+  readonly enableCollaboration?: boolean
 }
 
 export const DetailsTabContent = memo(function DetailsTabContent({

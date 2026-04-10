@@ -27,10 +27,10 @@ const colorOptions: ColorOption[] = [
 ]
 
 interface ColorPaletteProps {
-  currentColor?: string
-  onColorChange: (color: string) => void
-  size?: "sm" | "md"
-  disabled?: boolean
+  readonly currentColor?: string
+  readonly onColorChange: (color: string) => void
+  readonly size?: "sm" | "md"
+  readonly disabled?: boolean
 }
 
 export const ColorPalette: React.FC<ColorPaletteProps> = ({

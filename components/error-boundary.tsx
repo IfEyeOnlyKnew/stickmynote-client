@@ -6,8 +6,8 @@ import { AlertTriangle } from "lucide-react"
 import { isDevelopment } from "@/lib/client-env"
 
 interface ErrorBoundaryProps {
-  children: React.ReactNode
-  fallback?: React.ReactNode
+  readonly children: React.ReactNode
+  readonly fallback?: React.ReactNode
 }
 
 interface ErrorBoundaryState {

@@ -110,7 +110,8 @@ function OrganizationSettingsPage() {
   const [members, setMembers] = useState<OrgMember[]>([])
   const [loadingMembers, setLoadingMembers] = useState(true)
   const [inviteEmail, setInviteEmail] = useState("")
-  const [inviteRole, setInviteRole] = useState<"admin" | "member" | "viewer">("member")
+  type InviteRole = "admin" | "member" | "viewer"
+  const [inviteRole, setInviteRole] = useState<InviteRole>("member")
   const [inviting, setInviting] = useState(false)
   const [orgName, setOrgName] = useState("")
   const [saving, setSaving] = useState(false)

@@ -50,13 +50,6 @@ interface Epic {
   order: number
 }
 
-interface UserActivity {
-  id: string
-  name: string
-  epicId: string
-  order: number
-}
-
 interface Release {
   id: string
   name: string

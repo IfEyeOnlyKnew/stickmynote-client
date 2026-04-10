@@ -16,7 +16,7 @@ export class PresenceService {
   private pollInterval: NodeJS.Timeout | null = null
   private currentUser: { id: string; name: string; email: string; avatarUrl?: string } | null = null
 
-  constructor(private readonly roomId: string) {}
+  constructor(_roomId: string) {}
 
   async join(user: { id: string; name: string; email: string; avatarUrl?: string }) {
     this.currentUser = user

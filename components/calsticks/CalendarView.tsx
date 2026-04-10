@@ -41,7 +41,8 @@ export function CalendarView({
   onUpdateDate,
   onUpdateTime,
 }: Readonly<CalendarViewProps>) {
-  const [viewMode, setViewMode] = useState<"month" | "week" | "day">("month")
+  type CalendarViewMode = "month" | "week" | "day"
+  const [viewMode, setViewMode] = useState<CalendarViewMode>("month")
   const [currentMonth, setCurrentMonth] = useState(new Date())
   const [currentWeek, setCurrentWeek] = useState(new Date())
   const [currentDay, setCurrentDay] = useState(new Date())

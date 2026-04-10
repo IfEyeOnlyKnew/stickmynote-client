@@ -11,17 +11,18 @@ interface CloudPickerModalProps {
   readonly open: boolean
   readonly onClose: () => void
   readonly onFileSelect: (file: {
-    name: string
-    url: string
-    size: number
-    type: string
-    provider: string
-    provider_id: string
+    readonly name: string
+    readonly url: string
+    readonly size: number
+    readonly type: string
+    readonly provider: string
+    readonly provider_id: string
   }) => void
 }
 
 export function CloudPickerModal({ open, onClose, onFileSelect }: CloudPickerModalProps) {
-  const [selectedProvider, setSelectedProvider] = useState<"google-drive" | "onedrive" | "dropbox">("google-drive")
+  type CloudProvider = "google-drive" | "onedrive" | "dropbox"
+  const [selectedProvider, setSelectedProvider] = useState<CloudProvider>("google-drive")
 
   const handleGoogleDrivePicker = () => {
     toast.info("Google Drive integration", {

@@ -175,7 +175,8 @@ export default function TimesheetsPage() {
         body: JSON.stringify({ action, entryIds: [...selectedIds], note }),
       })
       const data = await res.json()
-      const actionLabel = (action === "submit" ? "submitted" : action === "approve" ? "approved" : "rejected")
+      const actionLabels: Record<string, string> = { submit: "submitted", approve: "approved" }
+      const actionLabel = actionLabels[action] ?? "rejected"
       toast({ title: `${data.updated || 0} entries ${actionLabel}` })
       setSelectedIds(new Set())
       fetchEntries()
@@ -279,13 +280,16 @@ export default function TimesheetsPage() {
           ))}
           {entriesByDay.map(({ day, total }) => {
             const intensity = total > 0 ? Math.max(0.15, total / maxDayTotal) : 0
+            const cellStyle = intensity > 0
+              ? { backgroundColor: `hsl(var(--primary) / ${intensity})`, color: intensity > 0.5 ? "white" : undefined }
+              : undefined
             return (
               <TooltipProvider key={day.toISOString()}>
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <div
                       className="aspect-square rounded-md border flex items-center justify-center text-xs cursor-default transition-colors"
-                      style={intensity > 0 ? { backgroundColor: `hsl(var(--primary) / ${intensity})`, color: intensity > 0.5 ? "white" : undefined } : undefined}
+                      style={cellStyle}
                     >
                       {format(day, "d")}
                     </div>

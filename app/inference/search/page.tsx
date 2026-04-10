@@ -149,11 +149,13 @@ export default function InferenceSearchPage() {
   // Filter states
   const [dateFrom, setDateFrom] = useState("")
   const [dateTo, setDateTo] = useState("")
-  const [visibility, setVisibility] = useState<"public" | "private" | "all">("all")
+  type VisibilityFilter = "public" | "private" | "all"
+  const [visibility, setVisibility] = useState<VisibilityFilter>("all")
   const [selectedAuthor, setSelectedAuthor] = useState<string>("")
   const [selectedPad, setSelectedPad] = useState<string>("")
   const [includeReplies, setIncludeReplies] = useState(true)
-  const [sortBy, setSortBy] = useState<"created_at" | "replies" | "updated_at">("created_at")
+  type SortField = "created_at" | "replies" | "updated_at"
+  const [sortBy, setSortBy] = useState<SortField>("created_at")
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc")
 
   useEffect(() => {

@@ -4,18 +4,18 @@ import { NoteTabs } from "@/components/note-tabs"
 import type React from "react"
 
 interface NoteCardContentProps {
-  noteId: string
-  initialTopic: string
-  initialContent: string
-  onTopicChange: (value: string) => void
-  onContentChange: (value: string) => void
-  onDetailsChange: (value: string) => void
-  onTopicFocus: () => void
-  onContentFocus: () => void
-  readOnly: boolean
-  resetKey: number
-  onTabChange: (tabName: string) => void
-  onNoteInteraction?: (noteId: string) => void
+  readonly noteId: string
+  readonly initialTopic: string
+  readonly initialContent: string
+  readonly onTopicChange: (value: string) => void
+  readonly onContentChange: (value: string) => void
+  readonly onDetailsChange: (value: string) => void
+  readonly onTopicFocus: () => void
+  readonly onContentFocus: () => void
+  readonly readOnly: boolean
+  readonly resetKey: number
+  readonly onTabChange: (tabName: string) => void
+  readonly onNoteInteraction?: (noteId: string) => void
 }
 
 export const NoteCardContent: React.FC<NoteCardContentProps> = ({

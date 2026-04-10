@@ -257,7 +257,7 @@ async function checkStickPermissions(stickId: string, userId: string, orgId: str
       return { hasPermission: true as const, stick }
     }
     const canWrite = member.role === "admin" || member.role === "edit"
-    return { hasPermission: canWrite as boolean, stick }
+    return { hasPermission: canWrite, stick }
   }
 
   return { hasPermission: false as const, error: "Permission denied" }

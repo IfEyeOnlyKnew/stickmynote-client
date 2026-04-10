@@ -27,7 +27,8 @@ function getIntervalLabel(frequency: "daily" | "weekly" | "monthly"): string {
 }
 
 export function RecurringTaskModal({ isOpen, onClose, taskId }: RecurringTaskModalProps) {
-  const [frequency, setFrequency] = useState<"daily" | "weekly" | "monthly">("weekly")
+  type Frequency = "daily" | "weekly" | "monthly"
+  const [frequency, setFrequency] = useState<Frequency>("weekly")
   const [interval, setInterval] = useState(1)
   const [endDate, setEndDate] = useState<Date>()
   const [selectedDays, setSelectedDays] = useState<number[]>([])

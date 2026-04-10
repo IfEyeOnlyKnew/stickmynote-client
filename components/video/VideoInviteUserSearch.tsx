@@ -9,8 +9,8 @@ import { UserSearchResults } from "@/components/shared/UserSearchResults"
 import { SelectedUserBadges } from "@/components/shared/SelectedUserBadges"
 
 interface VideoInviteUserSearchProps {
-  selectedEmails: string[]
-  onEmailsChange: (emails: string[]) => void
+  readonly selectedEmails: string[]
+  readonly onEmailsChange: (emails: string[]) => void
 }
 
 /**

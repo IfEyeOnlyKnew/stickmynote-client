@@ -9,7 +9,7 @@ export async function GET(request: NextRequest, context: { params: Promise<{ id:
   try {
     const auth = await requireAuthAndOrg()
     if ("response" in auth) return auth.response
-    const { user, orgContext } = auth
+    const { orgContext } = auth
 
     const params = await context.params
     if (!validateUUID(params.id)) return NextResponse.json({ error: "Invalid ID" }, { status: 400 })
@@ -99,8 +99,6 @@ export async function DELETE(request: NextRequest, context: { params: Promise<{ 
   try {
     const auth = await requireAuthAndOrg()
     if ("response" in auth) return auth.response
-    const { user, orgContext } = auth
-
     const params = await context.params
     if (!validateUUID(params.id)) return NextResponse.json({ error: "Invalid ID" }, { status: 400 })
 

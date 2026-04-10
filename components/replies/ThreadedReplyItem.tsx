@@ -16,23 +16,23 @@ import { DEPTH_COLORS, getReplyDisplayName, getReplyInitials, type BaseReply } f
 export type ThreadedReply = BaseReply
 
 interface ThreadedReplyItemProps {
-  reply: ThreadedReply
-  depth?: number
-  context: string
-  supportsCalStick: boolean
-  editingCalStick: string | null
-  calStickDate: string
-  currentUserId?: string | null
-  parentAuthor?: string
-  onDelete?: (replyId: string) => void
-  onEdit?: (replyId: string, content: string) => Promise<void>
-  onReply?: (parentReply: ThreadedReply) => void
-  onSubmitInlineReply?: (content: string, parentReplyId: string) => Promise<void>
-  onToggleCalStick: (replyId: string, currentIsCalStick: boolean, currentDate: string | null) => void
-  onCalStickDateChange: (replyId: string, date: string) => void
-  onSaveCalStickDate: (replyId: string) => void
-  onCancelCalStickEdit: () => void
-  onToggleCalStickComplete: (replyId: string, currentCompleted: boolean) => void
+  readonly reply: ThreadedReply
+  readonly depth?: number
+  readonly context: string
+  readonly supportsCalStick: boolean
+  readonly editingCalStick: string | null
+  readonly calStickDate: string
+  readonly currentUserId?: string | null
+  readonly parentAuthor?: string
+  readonly onDelete?: (replyId: string) => void
+  readonly onEdit?: (replyId: string, content: string) => Promise<void>
+  readonly onReply?: (parentReply: ThreadedReply) => void
+  readonly onSubmitInlineReply?: (content: string, parentReplyId: string) => Promise<void>
+  readonly onToggleCalStick: (replyId: string, currentIsCalStick: boolean, currentDate: string | null) => void
+  readonly onCalStickDateChange: (replyId: string, date: string) => void
+  readonly onSaveCalStickDate: (replyId: string) => void
+  readonly onCancelCalStickEdit: () => void
+  readonly onToggleCalStickComplete: (replyId: string, currentCompleted: boolean) => void
 }
 
 export const ThreadedReplyItem = memo(function ThreadedReplyItem({

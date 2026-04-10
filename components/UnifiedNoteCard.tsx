@@ -13,7 +13,7 @@ import { NoteCardMetadata } from "./note-card/NoteCardMetadata"
 import { NoteCardReplies } from "./note-card/NoteCardReplies"
 
 interface UnifiedNoteCardProps {
-  windowSize?: { width: number; height: number }
+  readonly windowSize?: { width: number; height: number }
   draggedNote?: string | null
   lastInteractedNote?: string | null
 }

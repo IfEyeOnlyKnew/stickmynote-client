@@ -24,16 +24,6 @@ interface Point {
   y: number
 }
 
-interface DrawAction {
-  tool: Tool
-  color: string
-  lineWidth: number
-  points?: Point[]
-  start?: Point
-  end?: Point
-  text?: string
-}
-
 const COLORS = [
   "#000000", "#ffffff", "#ef4444", "#f97316", "#eab308",
   "#22c55e", "#06b6d4", "#3b82f6", "#8b5cf6", "#ec4899",

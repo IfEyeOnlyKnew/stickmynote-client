@@ -7,15 +7,15 @@ import { useState } from "react"
 import { CollaborativeRichTextEditor } from "@/components/rich-text/CollaborativeRichTextEditorDynamic"
 
 interface CollaborativeReplyFormProps {
-  replyId: string
-  content: string
-  onContentChange: (content: string) => void
-  onSubmit: (e: React.MouseEvent) => void
-  onCancel?: (e: React.MouseEvent) => void
-  isSubmitting: boolean
-  isCompact?: boolean
-  maxLength?: number
-  enableCollaboration?: boolean
+  readonly replyId: string
+  readonly content: string
+  readonly onContentChange: (content: string) => void
+  readonly onSubmit: (e: React.MouseEvent) => void
+  readonly onCancel?: (e: React.MouseEvent) => void
+  readonly isSubmitting: boolean
+  readonly isCompact?: boolean
+  readonly maxLength?: number
+  readonly enableCollaboration?: boolean
 }
 
 export const CollaborativeReplyForm: React.FC<CollaborativeReplyFormProps> = ({

@@ -20,7 +20,6 @@ import {
 export type { Note, CreateNoteData, UpdateNoteData, CreateReplyData, NotesResponse } from "@/lib/notes-shared"
 
 // Local aliases for internal use
-const transformReply = transformReplyFromRaw
 const buildTransformedNote = (noteData: any, tabData: ExtractedTabData, replies: unknown[]) =>
   transformPartialNote(noteData, tabData, (replies as any[]).map(transformReplyFromRaw))
 const buildUpdatePayload = buildNoteUpdatePayload

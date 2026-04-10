@@ -250,7 +250,7 @@ export default function HomePage() {
                       <div className="flex items-center justify-between mb-1">
                         <span className="text-xs font-medium text-gray-600">Topic</span>
                         <span className="text-[10px] text-gray-400">
-                          {typed.label === "Task" ? "22" : typed.label === "Video" ? "10" : typed.label === "Ask AI" ? "14" : "11"}/75
+                          {{ Task: "22", Video: "10", "Ask AI": "14" }[typed.label] ?? "11"}/75
                         </span>
                       </div>
                       <div className="border border-gray-200 rounded-md px-2 py-1.5 text-sm text-gray-800 bg-white">

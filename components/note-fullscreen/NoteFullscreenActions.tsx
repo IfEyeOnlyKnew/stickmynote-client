@@ -4,18 +4,18 @@ import { Button } from "@/components/ui/button"
 import type React from "react"
 
 interface NoteFullscreenActionsProps {
-  isNewNote: boolean
-  isEditing: boolean
-  hasChanges: boolean
-  editedTopic: string
-  editedContent: string
-  isSaving: boolean
-  noteId: string
-  onCancelNewNote?: (noteId: string) => void
-  onStickNewNote?: (noteId: string) => void
-  onCancelEdit: (e: React.MouseEvent) => void
-  onStickEdit: (e: React.MouseEvent) => Promise<void>
-  setIsEditing: (editing: boolean) => void
+  readonly isNewNote: boolean
+  readonly isEditing: boolean
+  readonly hasChanges: boolean
+  readonly editedTopic: string
+  readonly editedContent: string
+  readonly isSaving: boolean
+  readonly noteId: string
+  readonly onCancelNewNote?: (noteId: string) => void
+  readonly onStickNewNote?: (noteId: string) => void
+  readonly onCancelEdit: (e: React.MouseEvent) => void
+  readonly onStickEdit: (e: React.MouseEvent) => Promise<void>
+  readonly setIsEditing: (editing: boolean) => void
 }
 
 export const NoteFullscreenActions: React.FC<NoteFullscreenActionsProps> = ({

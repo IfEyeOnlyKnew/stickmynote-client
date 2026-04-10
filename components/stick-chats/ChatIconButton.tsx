@@ -6,8 +6,8 @@ import { Badge } from "@/components/ui/badge"
 import { CreateChatModal } from "@/components/stick-chats/CreateChatModal"
 
 interface ChatIconButtonProps {
-  unreadCount?: number
-  className?: string
+  readonly unreadCount?: number
+  readonly className?: string
 }
 
 /**

@@ -11,12 +11,10 @@ interface UploadResult {
 
 class LocalFileStorage {
   private readonly baseDir: string
-  private readonly baseUrl: string
 
   constructor() {
     // Windows Server path: C:\inetpub\stickmynote\uploads
     this.baseDir = process.env.UPLOAD_DIR || path.join(process.cwd(), "uploads")
-    this.baseUrl = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000"
   }
 
   private async ensureDirectory(dirPath: string): Promise<void> {

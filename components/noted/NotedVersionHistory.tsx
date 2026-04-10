@@ -212,7 +212,7 @@ export function NotedVersionHistory({
                         )}
                       >
                         <span className="select-none mr-2 text-muted-foreground/50">
-                          {line.type === "added" ? "+" : line.type === "removed" ? "-" : " "}
+                          {{ added: "+", removed: "-" }[line.type] ?? " "}
                         </span>
                         {line.text || "\u00A0"}
                       </div>

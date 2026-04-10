@@ -6,11 +6,11 @@ import { Button } from "@/components/ui/button"
 import type { Note } from "@/types/note"
 
 interface NotePanelActionsProps {
-  note: Note
-  isNewNote: boolean
-  onCancelNewNote?: (noteId: string) => void
-  onStickNewNote?: (noteId: string) => void
-  onEditingChange: (isEditing: boolean) => void
+  readonly note: Note
+  readonly isNewNote: boolean
+  readonly onCancelNewNote?: (noteId: string) => void
+  readonly onStickNewNote?: (noteId: string) => void
+  readonly onEditingChange: (isEditing: boolean) => void
 }
 
 export const NotePanelActions: React.FC<NotePanelActionsProps> = ({

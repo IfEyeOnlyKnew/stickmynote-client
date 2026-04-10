@@ -18,10 +18,7 @@ import type { ChatRequest, ChatRequestStatus } from "@/types/chat-request"
 // Types
 // ============================================================================
 
-interface AuthUser {
-  id: string
-  email?: string
-}
+// AuthUser interface removed — unused after route-helpers refactor
 
 interface OrgContext {
   orgId: string

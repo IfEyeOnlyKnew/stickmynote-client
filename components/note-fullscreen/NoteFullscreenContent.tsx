@@ -4,23 +4,23 @@ import { NoteTabs } from "@/components/note-tabs"
 import type React from "react"
 
 interface NoteFullscreenContentProps {
-  noteId: string
-  topic: string
-  content: string
-  onTopicChange: (value: string) => void
-  onContentChange: (value: string) => void
-  onDetailsChange: (value: string) => void
-  onTopicFocus: () => void
-  onContentFocus: () => void
-  readOnly: boolean
-  resetKey: number
-  onTabChange: (tabName: string) => void
-  onNoteInteraction?: (noteId: string) => void
-  isEditing?: boolean
-  isNewNote?: boolean
-  onCancel?: () => void
-  onStick?: () => void
-  isSaving?: boolean
+  readonly noteId: string
+  readonly topic: string
+  readonly content: string
+  readonly onTopicChange: (value: string) => void
+  readonly onContentChange: (value: string) => void
+  readonly onDetailsChange: (value: string) => void
+  readonly onTopicFocus: () => void
+  readonly onContentFocus: () => void
+  readonly readOnly: boolean
+  readonly resetKey: number
+  readonly onTabChange: (tabName: string) => void
+  readonly onNoteInteraction?: (noteId: string) => void
+  readonly isEditing?: boolean
+  readonly isNewNote?: boolean
+  readonly onCancel?: () => void
+  readonly onStick?: () => void
+  readonly isSaving?: boolean
 }
 
 export const NoteFullscreenContent: React.FC<NoteFullscreenContentProps> = ({

@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useRef, useEffect } from "react"
-import { Trash2, Pencil, Check, X, MessageSquare, ChevronDown, ChevronRight, CornerDownRight, Send, MessageCircle } from "lucide-react"
+import { Trash2, Pencil, X, MessageSquare, ChevronDown, ChevronRight, CornerDownRight, Send, MessageCircle } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
@@ -19,26 +19,26 @@ export const MAX_REPLY_DEPTH = 5
 type Reply = BaseReply
 
 interface ReplyItemProps {
-  reply: Reply
-  depth?: number
-  context: string
-  supportsCalStick: boolean
-  editingCalStick: string | null
-  calStickDate: string
-  currentUserId?: string | null
-  parentAuthor?: string
-  onDelete?: (replyId: string) => void
-  onEdit?: (replyId: string, content: string) => Promise<void>
-  onReply?: (reply: Reply) => void
+  readonly reply: Reply
+  readonly depth?: number
+  readonly context: string
+  readonly supportsCalStick: boolean
+  readonly editingCalStick: string | null
+  readonly calStickDate: string
+  readonly currentUserId?: string | null
+  readonly parentAuthor?: string
+  readonly onDelete?: (replyId: string) => void
+  readonly onEdit?: (replyId: string, content: string) => Promise<void>
+  readonly onReply?: (reply: Reply) => void
   // New: direct submit handler for inline reply
-  onSubmitReply?: (content: string, parentReplyId: string) => Promise<void>
+  readonly onSubmitReply?: (content: string, parentReplyId: string) => Promise<void>
   // Start a chat when depth >= MAX_REPLY_DEPTH
-  onStartChat?: (parentReply: Reply) => void
-  onToggleCalStick: (replyId: string, currentIsCalStick: boolean, currentDate: string | null) => void
-  onCalStickDateChange: (replyId: string, date: string) => void
-  onSaveCalStickDate: (replyId: string) => void
-  onCancelCalStickEdit: () => void
-  onToggleCalStickComplete: (replyId: string, currentCompleted: boolean) => void
+  readonly onStartChat?: (parentReply: Reply) => void
+  readonly onToggleCalStick: (replyId: string, currentIsCalStick: boolean, currentDate: string | null) => void
+  readonly onCalStickDateChange: (replyId: string, date: string) => void
+  readonly onSaveCalStickDate: (replyId: string) => void
+  readonly onCancelCalStickEdit: () => void
+  readonly onToggleCalStickComplete: (replyId: string, currentCompleted: boolean) => void
 }
 
 // --- Extracted sub-components to reduce cognitive complexity ---

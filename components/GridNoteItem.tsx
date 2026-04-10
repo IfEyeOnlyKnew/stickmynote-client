@@ -6,13 +6,13 @@ import { UnifiedNote } from "./UnifiedNote"
 import type { NoteEventHandlers, NoteReplyHandlers, NoteStateManagement, NoteConfiguration } from "@/types/note-props"
 
 interface GridNoteItemProps {
-  note: Note
-  itemWidth: number
-  eventHandlers: NoteEventHandlers
-  replyHandlers: NoteReplyHandlers
-  stateManagement: NoteStateManagement
-  configuration: NoteConfiguration
-  hasActiveReplyForm?: (noteId: string) => boolean
+  readonly note: Note
+  readonly itemWidth: number
+  readonly eventHandlers: NoteEventHandlers
+  readonly replyHandlers: NoteReplyHandlers
+  readonly stateManagement: NoteStateManagement
+  readonly configuration: NoteConfiguration
+  readonly hasActiveReplyForm?: (noteId: string) => boolean
 }
 
 export const GridNoteItem = memo<GridNoteItemProps>(

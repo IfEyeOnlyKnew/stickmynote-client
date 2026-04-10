@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button"
 import type React from "react"
 
 interface NoteFullscreenHeaderProps {
-  onClose?: () => void
+  readonly onClose?: () => void
 }
 
 export const NoteFullscreenHeader: React.FC<NoteFullscreenHeaderProps> = ({ onClose }) => {

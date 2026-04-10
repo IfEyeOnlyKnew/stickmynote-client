@@ -7,10 +7,10 @@ import { Heart, MessageCircle, Share2, TrendingUp } from "lucide-react"
 import type { CommunityNote } from "@/hooks/use-community-notes"
 
 interface CommunityNoteCardProps {
-  note: CommunityNote
-  onLike: (noteId: string, note: CommunityNote) => void
-  onShare: (note: CommunityNote) => void
-  onComment: (noteId: string) => void
+  readonly note: CommunityNote
+  readonly onLike: (noteId: string, note: CommunityNote) => void
+  readonly onShare: (note: CommunityNote) => void
+  readonly onComment: (noteId: string) => void
 }
 
 export const CommunityNoteCard = ({ note, onLike, onShare, onComment }: CommunityNoteCardProps) => {

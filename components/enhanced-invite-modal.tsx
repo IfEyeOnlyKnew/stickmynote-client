@@ -48,7 +48,8 @@ export function EnhancedInviteModal({ open, onOpenChange, teamId, onInviteSubmit
     loadSavedEmails,
   } = useInviteEmails({ entityId: teamId, entityParam: "teamId", open })
 
-  const [inviteRole, setInviteRole] = useState<"admin" | "editor" | "viewer">("viewer")
+  type InviteRole = "admin" | "editor" | "viewer"
+  const [inviteRole, setInviteRole] = useState<InviteRole>("viewer")
   const [activeTab, setActiveTab] = useState("invite")
 
   const handleCsvUpload = async (emails: Array<{ email: string; name?: string }>) => {

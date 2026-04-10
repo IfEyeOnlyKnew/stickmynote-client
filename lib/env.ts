@@ -30,7 +30,6 @@ if (globalThis.window !== undefined) {
 }
 
 const isProduction = process.env.NODE_ENV === "production"
-const isVercel = process.env.VERCEL === "1"
 
 const serverSchema = z.object({
   // Database (PostgreSQL) - REQUIRED

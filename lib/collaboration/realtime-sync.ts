@@ -60,7 +60,6 @@ const LOG_PREFIX = "[RealtimeSync]"
 export class RealtimeSync {
   private pollingTimer: ReturnType<typeof setInterval> | null = null
   private status: SubscriptionStatus = "UNSUBSCRIBED"
-  private lastCheckTime: Date = new Date()
   private readonly pollingInterval: number
 
   constructor(
@@ -86,7 +85,6 @@ export class RealtimeSync {
     )
 
     this.status = "SUBSCRIBED"
-    this.lastCheckTime = new Date()
 
     // Placeholder: Start polling timer (actual polling logic not implemented)
     // In a real implementation, this would poll an API endpoint
@@ -145,7 +143,6 @@ export class RealtimeSync {
     //   if (change.type === 'DELETE') this.options.onDelete?.(payload)
     // }
 
-    this.lastCheckTime = new Date()
   }
 
   /**

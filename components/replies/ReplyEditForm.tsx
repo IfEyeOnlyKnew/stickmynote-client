@@ -5,13 +5,13 @@ import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
 
 interface ReplyEditFormProps {
-  editContent: string
-  onContentChange: (content: string) => void
-  onSave: () => void
-  onCancel: () => void
-  isSaving: boolean
-  maxLength?: number
-  saveLabel?: string
+  readonly editContent: string
+  readonly onContentChange: (content: string) => void
+  readonly onSave: () => void
+  readonly onCancel: () => void
+  readonly isSaving: boolean
+  readonly maxLength?: number
+  readonly saveLabel?: string
 }
 
 export function ReplyEditForm({

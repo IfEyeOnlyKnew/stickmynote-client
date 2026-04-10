@@ -8,18 +8,18 @@ import { Label } from "@/components/ui/label"
 import { Input } from "@/components/ui/input"
 
 interface CalStickControlsProps {
-  replyId: string
-  context: string
-  isCalStick: boolean
-  calStickDate: string | null
-  calStickCompleted: boolean
-  isEditing: boolean
-  editingDate: string
-  onToggle: (replyId: string, currentIsCalStick: boolean, currentDate: string | null) => void
-  onDateChange: (date: string) => void
-  onSave: (replyId: string) => void
-  onCancel: () => void
-  onToggleComplete: (replyId: string, currentCompleted: boolean) => void
+  readonly replyId: string
+  readonly context: string
+  readonly isCalStick: boolean
+  readonly calStickDate: string | null
+  readonly calStickCompleted: boolean
+  readonly isEditing: boolean
+  readonly editingDate: string
+  readonly onToggle: (replyId: string, currentIsCalStick: boolean, currentDate: string | null) => void
+  readonly onDateChange: (date: string) => void
+  readonly onSave: (replyId: string) => void
+  readonly onCancel: () => void
+  readonly onToggleComplete: (replyId: string, currentCompleted: boolean) => void
 }
 
 export const CalStickControls: React.FC<CalStickControlsProps> = ({

@@ -21,7 +21,6 @@ export interface CacheResult<T> {
 
 export class CalstickCache {
   private static readonly PREFIX = "calsticks:"
-  private static readonly DEFAULT_TTL = 60 // 1 minute
   private static readonly STALE_TTL = 300 // 5 minutes for stale-while-revalidate
   private static readonly GANTT_TTL = 120 // 2 minutes for Gantt data
 

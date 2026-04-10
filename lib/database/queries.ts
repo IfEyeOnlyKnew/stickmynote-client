@@ -155,7 +155,9 @@ export async function getStickReplies(stickId: string): Promise<PersonalStickRep
   )
 }
 
-export async function createStickReply(reply: Omit<PersonalStickReply, "id" | "created_at" | "updated_at">): Promise<PersonalStickReply | null> {
+type CreateStickReplyInput = Omit<PersonalStickReply, "id" | "created_at" | "updated_at">
+
+export async function createStickReply(reply: CreateStickReplyInput): Promise<PersonalStickReply | null> {
   return queryOne<PersonalStickReply>(
     `INSERT INTO personal_sticks_replies (stick_id, user_id, content)
      VALUES ($1, $2, $3)

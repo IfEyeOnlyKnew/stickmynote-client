@@ -138,7 +138,8 @@ export function ScheduleMeetingModal({
   const [recurrenceInterval, setRecurrenceInterval] = useState(1)
   const [recurrenceDays, setRecurrenceDays] = useState<number[]>([])
   const [recurrenceDayOfMonth, setRecurrenceDayOfMonth] = useState<number>(1)
-  const [recurrenceEndType, setRecurrenceEndType] = useState<"never" | "date" | "count">("never")
+  type RecurrenceEndType = "never" | "date" | "count"
+  const [recurrenceEndType, setRecurrenceEndType] = useState<RecurrenceEndType>("never")
   const [recurrenceEndDate, setRecurrenceEndDate] = useState(format(addMonths(new Date(), 3), "yyyy-MM-dd"))
   const [recurrenceCount, setRecurrenceCount] = useState(10)
 

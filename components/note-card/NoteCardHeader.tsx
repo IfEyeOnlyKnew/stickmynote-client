@@ -8,14 +8,14 @@ import { AskAIModal } from "@/components/ai/AskAIModal"
 import type React from "react"
 
 interface NoteCardHeaderProps {
-  noteId: string
-  isShared: boolean
-  currentColor?: string
-  onOpenFullscreen?: (noteId: string) => void
-  onUpdateSharing: (noteId: string, isShared: boolean) => void
-  onDeleteNote: (noteId: string) => void
-  onColorChange?: (noteId: string, color: string) => void
-  onAIAnswerKept?: () => void
+  readonly noteId: string
+  readonly isShared: boolean
+  readonly currentColor?: string
+  readonly onOpenFullscreen?: (noteId: string) => void
+  readonly onUpdateSharing: (noteId: string, isShared: boolean) => void
+  readonly onDeleteNote: (noteId: string) => void
+  readonly onColorChange?: (noteId: string, color: string) => void
+  readonly onAIAnswerKept?: () => void
 }
 
 export const NoteCardHeader: React.FC<NoteCardHeaderProps> = ({

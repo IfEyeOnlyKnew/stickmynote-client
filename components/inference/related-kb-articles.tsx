@@ -23,11 +23,11 @@ interface KBArticle {
 }
 
 interface RelatedKBArticlesProps {
-  padId: string
-  stickTags?: string[]
-  stickContent?: string
-  onCiteArticle?: (article: KBArticle) => void
-  className?: string
+  readonly padId: string
+  readonly stickTags?: string[]
+  readonly stickContent?: string
+  readonly onCiteArticle?: (article: KBArticle) => void
+  readonly className?: string
 }
 
 export const RelatedKBArticles = memo(function RelatedKBArticles({

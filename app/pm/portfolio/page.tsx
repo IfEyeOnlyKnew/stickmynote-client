@@ -171,7 +171,7 @@ export default function PortfolioPage() {
             <div className="space-y-2">
               {metrics.risks.map((risk) => (
                 <div key={risk.message} className="flex items-center gap-3 p-3 border rounded-lg">
-                  <AlertTriangle className={`h-4 w-4 shrink-0 ${risk.severity === "high" ? "text-red-500" : risk.severity === "medium" ? "text-amber-500" : "text-blue-500"}`} />
+                  <AlertTriangle className={`h-4 w-4 shrink-0 ${{ high: "text-red-500", medium: "text-amber-500", low: "text-blue-500" }[risk.severity] ?? "text-blue-500"}`} />
                   <span className="flex-1 text-sm">{risk.message}</span>
                   <Badge className={SEVERITY_COLORS[risk.severity]} variant="outline">
                     {risk.severity}

@@ -29,11 +29,11 @@ import type {
 import { getChatDisplayName, isChatExpiringSoon, getDaysUntilExpiry } from "@/types/stick-chat"
 
 interface ChatRoomViewProps {
-  chat: StickChatWithDetails
-  currentUserId: string
-  onExport?: () => void
-  onInviteMembers?: () => void
-  onSettings?: () => void
+  readonly chat: StickChatWithDetails
+  readonly currentUserId: string
+  readonly onExport?: () => void
+  readonly onInviteMembers?: () => void
+  readonly onSettings?: () => void
 }
 
 /**

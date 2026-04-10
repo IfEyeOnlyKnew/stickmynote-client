@@ -8,7 +8,7 @@ export async function GET(request: NextRequest) {
   try {
     const auth = await requireAuthAndOrg()
     if ("response" in auth) return auth.response
-    const { user, orgContext } = auth
+    const { orgContext } = auth
 
     const result = await pgClient.query(
       `SELECT t.*,

@@ -17,7 +17,8 @@ import {
 export default function Setup2FAPage() {
   const router = useRouter()
   useSearchParams()
-  const [step, setStep] = useState<"info" | "qr" | "verify" | "backup">("info")
+  type SetupStep = "info" | "qr" | "verify" | "backup"
+  const [step, setStep] = useState<SetupStep>("info")
   const tfa = useTwoFactorSetup()
 
   // No grace period - setup is required immediately

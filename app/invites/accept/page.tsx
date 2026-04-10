@@ -42,7 +42,8 @@ export default function AcceptInvitePage() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const { user, loading: userLoading } = useUser()
-  const [status, setStatus] = useState<"checking" | "processing" | "error" | "email_mismatch" | "expired">("checking")
+  type InviteStatus = "checking" | "processing" | "error" | "email_mismatch" | "expired"
+  const [status, setStatus] = useState<InviteStatus>("checking")
   const [errorMessage, setErrorMessage] = useState<string>("")
   const [inviteDetails, setInviteDetails] = useState<{
     email?: string

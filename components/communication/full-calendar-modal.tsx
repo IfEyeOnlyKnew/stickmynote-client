@@ -612,7 +612,7 @@ function MeetingCard({ meeting }: Readonly<{ meeting: MeetingWithDetails }>) {
               className={cn("h-5 px-1.5 text-[10px]", myAttendee.status === s && ATTENDEE_STATUS_COLORS[s])}
               onClick={() => handleRsvp(s)}
             >
-              {s === "accepted" ? "Accept" : s === "tentative" ? "Maybe" : "Decline"}
+              {{ accepted: "Accept", tentative: "Maybe", declined: "Decline" }[s] ?? s}
             </Button>
           ))}
         </div>

@@ -27,10 +27,10 @@ import type { StickChatWithDetails } from "@/types/stick-chat"
 import { getChatDisplayName, isChatExpiringSoon, getDaysUntilExpiry } from "@/types/stick-chat"
 
 interface ChatCardProps {
-  chat: StickChatWithDetails
-  currentUserId?: string
-  onDelete?: (chatId: string) => void
-  onExport?: (chatId: string) => void
+  readonly chat: StickChatWithDetails
+  readonly currentUserId?: string
+  readonly onDelete?: (chatId: string) => void
+  readonly onExport?: (chatId: string) => void
 }
 
 export const ChatCard: React.FC<ChatCardProps> = ({

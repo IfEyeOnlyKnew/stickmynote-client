@@ -20,12 +20,12 @@ import { SelectedUserBadges } from "@/components/shared/SelectedUserBadges"
 import type { StickChatMemberWithUser } from "@/types/stick-chat"
 
 interface ChatInviteModalProps {
-  open: boolean
-  onOpenChange: (open: boolean) => void
-  chatId: string
-  chatName: string
-  currentMembers: StickChatMemberWithUser[]
-  onMembersUpdated: (members: StickChatMemberWithUser[]) => void
+  readonly open: boolean
+  readonly onOpenChange: (open: boolean) => void
+  readonly chatId: string
+  readonly chatName: string
+  readonly currentMembers: StickChatMemberWithUser[]
+  readonly onMembersUpdated: (members: StickChatMemberWithUser[]) => void
 }
 
 /**

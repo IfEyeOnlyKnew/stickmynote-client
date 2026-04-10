@@ -7,10 +7,10 @@ import { MessageCircle, X } from "lucide-react"
 import type { ChatRequest } from "@/types/chat-request"
 
 interface ChatRequestToastProps {
-  request: ChatRequest
-  onView: (request: ChatRequest) => void
-  onDismiss: (requestId: string) => void
-  autoDismissMs?: number
+  readonly request: ChatRequest
+  readonly onView: (request: ChatRequest) => void
+  readonly onDismiss: (requestId: string) => void
+  readonly autoDismissMs?: number
 }
 
 export function ChatRequestToast({
@@ -163,9 +163,9 @@ export function ChatRequestToast({
 
 // Container component to manage multiple toasts
 interface ChatRequestToastsProps {
-  requests: ChatRequest[]
-  onView: (request: ChatRequest) => void
-  onDismiss: (requestId: string) => void
+  readonly requests: ChatRequest[]
+  readonly onView: (request: ChatRequest) => void
+  readonly onDismiss: (requestId: string) => void
 }
 
 export function ChatRequestToasts({

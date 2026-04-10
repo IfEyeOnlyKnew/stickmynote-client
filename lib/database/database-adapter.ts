@@ -441,11 +441,9 @@ function createQueryBuilder(table: string): QueryBuilder {
   let promise: Promise<QueryResult> | null = null
 
   function getPromise(): Promise<QueryResult> {
-    if (!promise) {
-      promise = new Promise<QueryResult>((resolve) => {
-        queueMicrotask(() => builder.execute(resolve))
-      })
-    }
+    promise ??= new Promise<QueryResult>((resolve) => {
+      queueMicrotask(() => builder.execute(resolve))
+    })
     return promise
   }
 

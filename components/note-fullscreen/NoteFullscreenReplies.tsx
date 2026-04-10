@@ -22,30 +22,30 @@ interface Tone {
 }
 
 interface NoteFullscreenRepliesProps {
-  noteId: string
-  replies: Reply[]
-  replyCount: number
-  replyContent: string
-  setReplyContent: (content: string) => void
-  isSubmittingReply: boolean
-  setIsSubmittingReply: (submitting: boolean) => void
-  isGeneratingSummary: boolean
-  setIsGeneratingSummary: (generating: boolean) => void
-  replySummary: string | null
-  setReplySummary: (summary: string) => void
-  selectedTone: string
-  setSelectedTone: (tone: string) => void
-  tones: Tone[]
-  onAddReply: (noteId: string, content: string, color?: string, parentReplyId?: string | null) => Promise<void>
-  onEditReply?: (noteId: string, replyId: string, content: string) => Promise<void>
-  onDeleteReply?: (noteId: string, replyId: string) => Promise<void>
-  onGenerateSummary?: (tone: string) => void
-  currentUserId?: string | null
+  readonly noteId: string
+  readonly replies: Reply[]
+  readonly replyCount: number
+  readonly replyContent: string
+  readonly setReplyContent: (content: string) => void
+  readonly isSubmittingReply: boolean
+  readonly setIsSubmittingReply: (submitting: boolean) => void
+  readonly isGeneratingSummary: boolean
+  readonly setIsGeneratingSummary: (generating: boolean) => void
+  readonly replySummary: string | null
+  readonly setReplySummary: (summary: string) => void
+  readonly selectedTone: string
+  readonly setSelectedTone: (tone: string) => void
+  readonly tones: Tone[]
+  readonly onAddReply: (noteId: string, content: string, color?: string, parentReplyId?: string | null) => Promise<void>
+  readonly onEditReply?: (noteId: string, replyId: string, content: string) => Promise<void>
+  readonly onDeleteReply?: (noteId: string, replyId: string) => Promise<void>
+  readonly onGenerateSummary?: (tone: string) => void
+  readonly currentUserId?: string | null
   // Real-time polling for chat-like experience
-  enablePolling?: boolean
-  onRepliesUpdated?: (replies: Reply[]) => void
+  readonly enablePolling?: boolean
+  readonly onRepliesUpdated?: (replies: Reply[]) => void
   // Allow editing/replying (defaults to true)
-  canEdit?: boolean
+  readonly canEdit?: boolean
 }
 
 export const NoteFullscreenReplies: React.FC<NoteFullscreenRepliesProps> = (props) => {

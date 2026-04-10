@@ -8,9 +8,9 @@ import { AskAIModal } from "@/components/ai/AskAIModal"
 import type { Note } from "@/types/note"
 
 interface NotePanelHeaderProps {
-  note: Note
-  onUpdateSharing: (noteId: string, isShared: boolean) => void
-  onDeleteNote: (noteId: string) => void
+  readonly note: Note
+  readonly onUpdateSharing: (noteId: string, isShared: boolean) => void
+  readonly onDeleteNote: (noteId: string) => void
 }
 
 export const NotePanelHeader: React.FC<NotePanelHeaderProps> = ({ note, onUpdateSharing, onDeleteNote }) => {

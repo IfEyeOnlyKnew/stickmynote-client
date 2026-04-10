@@ -25,13 +25,13 @@ import type { UserStatusType } from "@/types/user-status"
 import { getTimezoneAbbreviation } from "@/lib/constants/timezones"
 
 interface UserMenuProps {
-  hideSettings?: boolean
-  hideHowToSearch?: boolean
-  showAbout?: boolean
-  showClearAllNotes?: boolean
-  showDeleteAccount?: boolean
-  onClearAllNotes?: () => void
-  onDeleteAccount?: () => void
+  readonly hideSettings?: boolean
+  readonly hideHowToSearch?: boolean
+  readonly showAbout?: boolean
+  readonly showClearAllNotes?: boolean
+  readonly showDeleteAccount?: boolean
+  readonly onClearAllNotes?: () => void
+  readonly onDeleteAccount?: () => void
 }
 
 export function UserMenu({

@@ -6,7 +6,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { Badge } from "@/components/ui/badge"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
-import { Pencil, Trash2, MessageSquare, CheckSquare, AlertCircle, RefreshCw, ChevronDown, ChevronRight, CornerDownRight, Send, X, Check } from "lucide-react"
+import { Pencil, Trash2, MessageSquare, CheckSquare, AlertCircle, RefreshCw, ChevronDown, ChevronRight, CornerDownRight, Send, X } from "lucide-react"
 import { formatDistanceToNow } from "date-fns"
 import { DEPTH_COLORS } from "@/components/replies/reply-shared"
 import { ReplyEditForm } from "@/components/replies/ReplyEditForm"
@@ -41,18 +41,18 @@ interface CalStickInfo {
 }
 
 interface ReplyCardProps {
-  reply: Reply
-  depth?: number
-  currentUserId?: string
-  isPadOwner: boolean
-  isAdmin: boolean
-  parentAuthor?: string
-  onEdit: (replyId: string, content: string) => Promise<void>
-  onDelete: (replyId: string) => void
-  onReply: (reply: Reply) => void
-  onSubmitReply?: (content: string, parentReplyId: string) => Promise<void>
-  onSyncFromCalStick?: (replyId: string, calstickId: string) => Promise<void>
-  renderNestedReply: (reply: Reply, depth: number, parentAuthor?: string) => React.ReactNode
+  readonly reply: Reply
+  readonly depth?: number
+  readonly currentUserId?: string
+  readonly isPadOwner: boolean
+  readonly isAdmin: boolean
+  readonly parentAuthor?: string
+  readonly onEdit: (replyId: string, content: string) => Promise<void>
+  readonly onDelete: (replyId: string) => void
+  readonly onReply: (reply: Reply) => void
+  readonly onSubmitReply?: (content: string, parentReplyId: string) => Promise<void>
+  readonly onSyncFromCalStick?: (replyId: string, calstickId: string) => Promise<void>
+  readonly renderNestedReply: (reply: Reply, depth: number, parentAuthor?: string) => React.ReactNode
 }
 
 // Extracted to reduce cognitive complexity

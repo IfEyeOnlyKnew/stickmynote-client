@@ -44,58 +44,58 @@ interface Tone {
 
 interface UnifiedRepliesProps {
   // Core props
-  noteId: string
-  replies: Reply[]
-  replyCount: number
-  replyContent: string
-  setReplyContent: (content: string) => void
-  isSubmittingReply: boolean
+  readonly noteId: string
+  readonly replies: Reply[]
+  readonly replyCount: number
+  readonly replyContent: string
+  readonly setReplyContent: (content: string) => void
+  readonly isSubmittingReply: boolean
 
   // Context-specific props
-  context: "card" | "panel" | "fullscreen" | "stick"
-  isNewNote?: boolean
-  showReplyForm?: boolean
+  readonly context: "card" | "panel" | "fullscreen" | "stick"
+  readonly isNewNote?: boolean
+  readonly showReplyForm?: boolean
 
   // Feature flags
-  enableSummary?: boolean
-  enableExport?: boolean
-  enableFullscreenButton?: boolean
-  enableCollaboration?: boolean
+  readonly enableSummary?: boolean
+  readonly enableExport?: boolean
+  readonly enableFullscreenButton?: boolean
+  readonly enableCollaboration?: boolean
 
   // Summary props (when enableSummary is true)
-  isGeneratingSummary?: boolean
-  replySummary?: string | null
-  selectedTone?: string
-  setSelectedTone?: (tone: string) => void
-  tones?: Tone[]
+  readonly isGeneratingSummary?: boolean
+  readonly replySummary?: string | null
+  readonly selectedTone?: string
+  readonly setSelectedTone?: (tone: string) => void
+  readonly tones?: Tone[]
 
   // Export props (when enableExport is true)
-  isExporting?: boolean
-  onExportAll?: () => void
-  onGenerateSummaryDocx?: (tone: string) => void
+  readonly isExporting?: boolean
+  readonly onExportAll?: () => void
+  readonly onGenerateSummaryDocx?: (tone: string) => void
 
   // Event handlers
-  onOpenFullscreen?: (noteId: string) => void
-  onAddReplyClick?: (e: React.MouseEvent) => void
-  onCancelReply?: (e: React.MouseEvent) => void
-  onStickReply?: (e: React.MouseEvent) => void
-  onAddReply?: (noteId: string, content: string, color?: string, parentReplyId?: string | null) => Promise<void>
-  onGenerateSummary?: (tone: string) => void
+  readonly onOpenFullscreen?: (noteId: string) => void
+  readonly onAddReplyClick?: (e: React.MouseEvent) => void
+  readonly onCancelReply?: (e: React.MouseEvent) => void
+  readonly onStickReply?: (e: React.MouseEvent) => void
+  readonly onAddReply?: (noteId: string, content: string, color?: string, parentReplyId?: string | null) => Promise<void>
+  readonly onGenerateSummary?: (tone: string) => void
 
   // Additional props for different contexts
-  canEdit?: boolean
-  setIsSubmittingReply?: (submitting: boolean) => void
-  onDeleteReply?: (noteId: string, replyId: string) => Promise<void>
-  currentUserId?: string | null
-  onEditReply?: (noteId: string, replyId: string, content: string) => Promise<void>
+  readonly canEdit?: boolean
+  readonly setIsSubmittingReply?: (submitting: boolean) => void
+  readonly onDeleteReply?: (noteId: string, replyId: string) => Promise<void>
+  readonly currentUserId?: string | null
+  readonly onEditReply?: (noteId: string, replyId: string, content: string) => Promise<void>
 
   // Reply-to-reply support
-  enableReplyToReply?: boolean
+  readonly enableReplyToReply?: boolean
 
   // Real-time polling for replies (chat-like experience)
-  enablePolling?: boolean
-  pollingInterval?: number
-  onRepliesUpdated?: (replies: Reply[]) => void
+  readonly enablePolling?: boolean
+  readonly pollingInterval?: number
+  readonly onRepliesUpdated?: (replies: Reply[]) => void
 }
 
 export const UnifiedReplies: React.FC<UnifiedRepliesProps> = ({

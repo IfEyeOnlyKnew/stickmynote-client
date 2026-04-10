@@ -18,7 +18,7 @@ interface BreadcrumbItem {
 }
 
 interface BreadcrumbNavProps {
-  items: BreadcrumbItem[]
+  readonly items: BreadcrumbItem[]
 }
 
 interface AccessiblePad {

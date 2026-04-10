@@ -6,17 +6,17 @@ import { NoteTabs } from "@/components/note-tabs"
 import type { Note } from "@/types/note"
 
 interface NotePanelContentProps {
-  note: Note
-  resetKey: number
-  onTopicChange: (topic: string) => void
-  onContentChange: (content: string) => void
-  onDetailsChange: (details: string) => void
-  onStartEditing: () => void
-  onNoteInteraction?: (noteId: string) => void
-  onTabChange: (tabName: string) => void
-  isNewNote: boolean
-  isEditing: boolean
-  readOnly: boolean
+  readonly note: Note
+  readonly resetKey: number
+  readonly onTopicChange: (topic: string) => void
+  readonly onContentChange: (content: string) => void
+  readonly onDetailsChange: (details: string) => void
+  readonly onStartEditing: () => void
+  readonly onNoteInteraction?: (noteId: string) => void
+  readonly onTabChange: (tabName: string) => void
+  readonly isNewNote: boolean
+  readonly isEditing: boolean
+  readonly readOnly: boolean
 }
 
 export const NotePanelContent: React.FC<NotePanelContentProps> = ({
