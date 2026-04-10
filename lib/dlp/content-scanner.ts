@@ -1,4 +1,5 @@
 import "server-only"
+import { hasNestedQuantifier } from "@/lib/utils"
 
 /**
  * Built-in PII detection patterns for DLP content scanning.
@@ -95,9 +96,10 @@ export function scanContent(text: string, customPatterns?: string[]): ScanResult
 export function validateCustomPattern(patternStr: string): string | null {
   if (patternStr.length > 500) return "Pattern is too long (max 500 characters)"
 
-  // Nested quantifiers: (...+)+, (...*)*, (...+)*, (...*)+
-  // These are the classic ReDoS shape. Reject them outright.
-  if (/\([^)]*[+*][^)]*\)[+*]/.test(patternStr)) {
+  // Nested quantifiers are the classic ReDoS shape: (a+)+, (.*)*, etc.
+  // hasNestedQuantifier() is a linear scanner — no regex — so SonarQube
+  // S5852 can't flag the check itself.
+  if (hasNestedQuantifier(patternStr)) {
     return "Pattern contains nested quantifiers that could cause catastrophic backtracking"
   }
 

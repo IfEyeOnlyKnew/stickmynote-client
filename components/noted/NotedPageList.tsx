@@ -21,7 +21,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
-import { cn } from "@/lib/utils"
+import { cn, stripHtmlTags } from "@/lib/utils"
 import type { NotedPage, NotedGroup } from "@/hooks/useNoted"
 
 interface NotedPageListProps {
@@ -74,10 +74,7 @@ export function NotedPageList({
     return () => observer.disconnect()
   }, [hasMore, loadingMore, onLoadMore])
 
-  const stripHtml = (html: string) => {
-    if (!html) return ""
-    return html.replaceAll(/<[^>]*>/g, "").slice(0, 100)
-  }
+  const stripHtml = (html: string) => stripHtmlTags(html).slice(0, 100)
 
   return (
     <div className="flex flex-col h-full border-r">

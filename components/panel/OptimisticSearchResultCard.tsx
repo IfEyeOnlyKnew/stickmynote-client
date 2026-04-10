@@ -10,7 +10,7 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import type { Note } from "@/types/note"
 import { formatDistanceToNow } from "date-fns"
 import { useToast } from "@/hooks/use-toast"
-import { escapeRegExp } from "@/lib/utils"
+import { escapeRegExp, stripHtmlTags } from "@/lib/utils"
 
 interface OptimisticState {
   likes: number
@@ -232,7 +232,7 @@ export function OptimisticSearchResultCard({
   }
 
   const getExcerpt = (content: string) => {
-    const text = content.replaceAll(/<[^>]*>/g, "").trim()
+    const text = stripHtmlTags(content).trim()
     return text.length > 100 ? text.substring(0, 100) + "..." : text
   }
 

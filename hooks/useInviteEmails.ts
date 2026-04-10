@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect, useCallback } from "react"
+import { isValidEmail } from "@/lib/utils"
 
 interface User {
   id: string
@@ -129,7 +130,7 @@ export function useInviteEmails({
     const emails = manualEmails
       .split(/[,;\n]/)
       .map((e) => e.trim())
-      .filter((e) => e.length > 0 && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e))
+      .filter((e) => e.length > 0 && isValidEmail(e))
       .map((email) => ({ email }))
 
     if (emails.length === 0) {
@@ -164,7 +165,7 @@ export function useInviteEmails({
   }, [manualEmails, entityId, entityParam, loadSavedEmails])
 
   const addTypedEmail = useCallback(() => {
-    if (searchQuery && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(searchQuery)) {
+    if (searchQuery && isValidEmail(searchQuery)) {
       const isAlreadySelected =
         selectedEmails.includes(searchQuery) || selectedUsers.some((u) => u.email === searchQuery)
       if (!isAlreadySelected) {
@@ -201,7 +202,7 @@ export function useInviteEmails({
     selectedUsers.length +
     selectedEmails.length +
     (searchQuery &&
-    /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(searchQuery) &&
+    isValidEmail(searchQuery) &&
     !selectedEmails.includes(searchQuery) &&
     !selectedUsers.some((u) => u.email === searchQuery)
       ? 1

@@ -23,6 +23,7 @@ import {
 import { getCsrfToken } from "@/lib/client-csrf"
 import { useToast } from "@/hooks/use-toast"
 import type { DLPSettings } from "@/types/organization"
+import { hasNestedQuantifier } from "@/lib/utils"
 
 interface DLPTabProps {
   currentOrgId: string
@@ -132,8 +133,9 @@ export function DLPTab({ currentOrgId }: Readonly<DLPTabProps>) {
 
     // Reject nested quantifiers. These are the classic ReDoS shape — e.g.
     // `(a+)+` or `(.*)*` — and can cause the content scanner to hang on
-    // crafted input. This mirrors the server-side check in content-scanner.ts.
-    if (/\([^)]*[+*][^)]*\)[+*]/.test(value)) {
+    // crafted input. The check uses a linear scanner (no regex) so it can't
+    // itself become a ReDoS vector. Mirrors content-scanner.ts.
+    if (hasNestedQuantifier(value)) {
       toast({
         title: "Unsafe Pattern",
         description: "Nested quantifiers like (a+)+ can cause catastrophic backtracking. Please rewrite the pattern.",

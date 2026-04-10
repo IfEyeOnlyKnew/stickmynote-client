@@ -1,5 +1,6 @@
 import nodemailer from "nodemailer"
 import type { Transporter } from "nodemailer"
+import { stripHtmlTags } from "@/lib/utils"
 
 interface EmailOptions {
   to: string | string[]
@@ -67,7 +68,7 @@ class SMTPEmailService {
         to: Array.isArray(options.to) ? options.to.join(", ") : options.to,
         subject: options.subject,
         html: options.html,
-        text: options.text || options.html.replaceAll(/<[^>]*>/g, ""),
+        text: options.text || stripHtmlTags(options.html),
       })
 
       console.log(`[Email] Sent to ${options.to}: ${info.messageId}`)

@@ -20,6 +20,7 @@ import { UserPlus, Trash2, Shield, FileText, Mail, Clock, Search, Users, Loader2
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { CsvEmailUpload } from "@/components/csv-email-upload"
 import { ScrollArea } from "@/components/ui/scroll-area"
+import { isValidEmail } from "@/lib/utils"
 
 // LDAP search result type
 interface LDAPUser {
@@ -267,6 +268,7 @@ export function ManageMembersDialog({ open, onOpenChange, padId, padName }: Read
     } finally {
       setInvitingGroup(false)
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [padId, inviteRole])
 
   const fetchMembers = async () => {
@@ -451,7 +453,7 @@ export function ManageMembersDialog({ open, onOpenChange, padId, padName }: Read
     const emails = bulkEmails
       .split(/[,;\n]/)
       .map((e) => e.trim())
-      .filter((e) => e.length > 0 && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e))
+      .filter((e) => e.length > 0 && isValidEmail(e))
 
     if (emails.length === 0) {
       setFeedbackMessage({ type: "error", text: "No valid emails found. Please check the format." })

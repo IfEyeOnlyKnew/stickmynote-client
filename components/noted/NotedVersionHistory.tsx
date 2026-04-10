@@ -15,7 +15,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
-import { cn } from "@/lib/utils"
+import { cn, stripHtmlTags } from "@/lib/utils"
 import { useNotedVersions, type NotedPageVersion } from "@/hooks/useNotedVersions"
 import { SafeHtmlRenderer } from "@/components/safe-html-renderer"
 
@@ -27,7 +27,7 @@ interface NotedVersionHistoryProps {
 }
 
 function stripHtml(html: string): string {
-  return html.replaceAll(/<[^>]*>/g, "")
+  return stripHtmlTags(html)
 }
 
 type DiffLineType = "same" | "added" | "removed"

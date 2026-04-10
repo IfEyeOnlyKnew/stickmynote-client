@@ -13,6 +13,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { X, Users, Mail, FileText, Check, Shield } from "lucide-react"
 import { CsvEmailUpload } from "@/components/csv-email-upload"
 import { useInviteEmails } from "@/hooks/useInviteEmails"
+import { isValidEmail } from "@/lib/utils"
 
 type PadRole = "admin" | "editor" | "viewer"
 
@@ -130,7 +131,7 @@ export function PadInviteModal({ open, onOpenChange, padId, onInviteSubmit }: Re
     const userIds = selectedUsers.map((u) => u.id)
     const emails = [...selectedEmails]
 
-    if (searchQuery && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(searchQuery)) {
+    if (searchQuery && isValidEmail(searchQuery)) {
       const isAlreadySelected = emails.includes(searchQuery) || selectedUsers.some((u) => u.email === searchQuery)
       if (!isAlreadySelected) {
         emails.push(searchQuery)
@@ -235,7 +236,7 @@ export function PadInviteModal({ open, onOpenChange, padId, onInviteSubmit }: Re
                     placeholder="Search users or type email address..."
                     className="flex-1"
                   />
-                  {searchQuery && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(searchQuery) && (
+                  {searchQuery && isValidEmail(searchQuery) && (
                     <Button size="sm" onClick={addTypedEmail} className="px-4">
                       Add
                     </Button>

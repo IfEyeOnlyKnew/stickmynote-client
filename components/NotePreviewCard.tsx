@@ -12,6 +12,7 @@ import { NotedIcon } from "@/components/noted/NotedIcon"
 import type { Note } from "@/types/note"
 import { formatDistanceToNow } from "date-fns"
 import { COLORS } from "@/utils/noteUtils"
+import { stripHtmlTags } from "@/lib/utils"
 
 interface NotePreviewCardProps {
   readonly note: Note
@@ -44,7 +45,7 @@ export const NotePreviewCard: React.FC<NotePreviewCardProps> = ({
     if (note.title) return note.title
     if (note.content) {
       // Strip HTML and get first line
-      const stripped = note.content.replaceAll(/<[^>]*>/g, "").trim()
+      const stripped = stripHtmlTags(note.content).trim()
       const firstLine = stripped.split("\n")[0]
       return firstLine.length > 60 ? firstLine.substring(0, 60) + "..." : firstLine
     }
@@ -54,7 +55,7 @@ export const NotePreviewCard: React.FC<NotePreviewCardProps> = ({
   // Get content preview (strip HTML, truncate)
   const contentPreview = useMemo(() => {
     if (!note.content) return ""
-    const stripped = note.content.replaceAll(/<[^>]*>/g, "").trim()
+    const stripped = stripHtmlTags(note.content).trim()
     // Skip first line if it's the same as title
     const lines = stripped.split("\n").filter(Boolean)
     const previewLines = note.topic || note.title ? lines : lines.slice(1)

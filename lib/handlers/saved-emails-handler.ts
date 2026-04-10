@@ -1,5 +1,6 @@
 // Saved emails handler logic - extracted for v1/v2 deduplication
 import { db } from '@/lib/database/pg-client'
+import { isValidEmail } from '@/lib/utils'
 
 export interface SavedEmailsUser {
   id: string
@@ -60,13 +61,11 @@ export interface CreateSavedEmailsResult {
   savedEmails: any[]
 }
 
-const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
-
 export function validateAndParseEmails(emails: any[]): { email: string; name: string | null }[] {
   return emails
     .filter((emailData: any) => {
       const email = typeof emailData === 'string' ? emailData : emailData.email
-      return email && EMAIL_REGEX.test(email)
+      return email && isValidEmail(email)
     })
     .map((emailData: any) => {
       const email = typeof emailData === 'string' ? emailData : emailData.email
@@ -231,7 +230,7 @@ export async function parseCSVEmails(
       }
       return { email: trimmedLine.toLowerCase(), name: null }
     })
-    .filter((item) => item.email && EMAIL_REGEX.test(item.email))
+    .filter((item) => item.email && isValidEmail(item.email))
 
   if (emails.length === 0) {
     throw new Error('No valid email addresses found in CSV file. Please check the format.')

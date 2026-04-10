@@ -14,6 +14,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { X, Users, Mail, FileText, Check } from "lucide-react"
 import { CsvEmailUpload } from "@/components/csv-email-upload"
 import { useInviteEmails } from "@/hooks/useInviteEmails"
+import { isValidEmail } from "@/lib/utils"
 
 interface EnhancedInviteModalProps {
   open: boolean
@@ -72,7 +73,7 @@ export function EnhancedInviteModal({ open, onOpenChange, teamId, onInviteSubmit
     const emailList = manualEmails
       .split(/[,;\n]/)
       .map((e) => e.trim())
-      .filter((e) => e.length > 0 && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e))
+      .filter((e) => e.length > 0 && isValidEmail(e))
 
     if (emailList.length === 0) {
       alert("No valid emails found. Please check the format.")
@@ -110,7 +111,7 @@ export function EnhancedInviteModal({ open, onOpenChange, teamId, onInviteSubmit
     const emails = [...selectedEmails]
 
     // Add any manually typed emails that aren't in saved emails
-    if (searchQuery && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(searchQuery)) {
+    if (searchQuery && isValidEmail(searchQuery)) {
       const isAlreadySelected = emails.includes(searchQuery) || selectedUsers.some((u) => u.email === searchQuery)
       if (!isAlreadySelected) {
         emails.push(searchQuery)
@@ -240,7 +241,7 @@ export function EnhancedInviteModal({ open, onOpenChange, teamId, onInviteSubmit
                 )}
 
                 {/* Manual Email Entry */}
-                {searchQuery && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(searchQuery) && (
+                {searchQuery && isValidEmail(searchQuery) && (
                   <Card className="border-dashed">
                     <CardContent className="p-4">
                       <div className="flex items-center justify-between">

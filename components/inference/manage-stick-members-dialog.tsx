@@ -10,6 +10,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { UserPlus, X, Loader2, Mail, FileText, Info } from "lucide-react"
 import { CsvEmailUpload } from "@/components/csv-email-upload"
+import { isValidEmail } from "@/lib/utils"
 
 const ROLE_OPTIONS = [
   { value: "viewer", label: "Viewer", description: "Can only view and reply to sticks" },
@@ -165,7 +166,7 @@ export function ManageStickMembersDialog({
     const emails = bulkEmails
       .split(/[,;\n]/)
       .map((e) => e.trim())
-      .filter((e) => e.length > 0 && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e))
+      .filter((e) => e.length > 0 && isValidEmail(e))
 
     if (emails.length === 0) {
       setError("No valid emails found. Please check the format.")

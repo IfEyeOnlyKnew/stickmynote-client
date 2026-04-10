@@ -11,6 +11,7 @@ import { Building2, User, Loader2, Lock, Unlock } from "lucide-react"
 import { useRouter } from "next/navigation"
 import { PadTemplatePicker } from "@/components/inference/pad-template-picker"
 import type { PadTemplate } from "@/types/pad-templates"
+import { isValidEmail } from "@/lib/utils"
 
 type HubType = "individual" | "organization"
 type AccessMode = "all_sticks" | "individual_sticks"
@@ -35,8 +36,7 @@ function validateHubForm(data: HubFormData): string | null {
   if (!data.name.trim() || !data.email.trim()) {
     return "Name and email are required"
   }
-  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
-  if (!emailRegex.test(data.email)) {
+  if (!isValidEmail(data.email)) {
     return "Please enter a valid email address"
   }
   return null

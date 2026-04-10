@@ -22,7 +22,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
-import { cn } from "@/lib/utils"
+import { cn, stripHtmlTags } from "@/lib/utils"
 import { useNotedTemplates, type NotedTemplate } from "@/hooks/useNotedTemplates"
 import { NotedTemplateEditor } from "./NotedTemplateEditor"
 import { SafeHtmlRenderer } from "@/components/safe-html-renderer"
@@ -122,10 +122,7 @@ export function NotedTemplateGallery({
     setEditorOpen(true)
   }, [])
 
-  const stripHtml = (html: string) => {
-    if (!html) return ""
-    return html.replaceAll(/<[^>]*>/g, "").slice(0, 150)
-  }
+  const stripHtml = (html: string) => stripHtmlTags(html).slice(0, 150)
 
   return (
     <>

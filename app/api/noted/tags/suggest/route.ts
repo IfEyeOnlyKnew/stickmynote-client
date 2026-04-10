@@ -2,6 +2,7 @@ import { type NextRequest, NextResponse } from "next/server"
 import { requireAuthAndOrg, safeRateLimit } from "@/lib/api/route-helpers"
 import { createRateLimitResponse } from "@/lib/auth/cached-auth"
 import { db as pgClient } from "@/lib/database/pg-client"
+import { stripHtmlTags } from "@/lib/utils"
 
 // POST /api/noted/tags/suggest - AI-powered tag suggestions
 export async function POST(request: NextRequest) {
@@ -21,7 +22,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Strip HTML from content for analysis
-    const plainContent = (content || "").replaceAll(/<[^>]*>/g, "").slice(0, 2000)
+    const plainContent = stripHtmlTags(content || "", 5000).slice(0, 2000)
     const textForAnalysis = `Title: ${title || "Untitled"}\n\nContent: ${plainContent}`
 
     // Get existing tags for context

@@ -425,9 +425,25 @@ CITATIONS: [1], [2] - [why relevant]`
         maxTokens: 400,
       })
 
-      // Parse response - using [\s\S] instead of 's' flag for dotall behavior
-      const answerMatch = /ANSWER:\s*([\s\S]+?)(?=CITATIONS:|$)/.exec(text)
-      const citationsMatch = /CITATIONS:\s*([\s\S]+)/.exec(text)
+      // Bound the text before running regex on it. The AI provider already
+      // caps output at ~400 tokens (~1600 chars), but a defensive hard cap
+      // makes the regex work explicitly O(n) with small n.
+      const boundedText = text.length > 4000 ? text.slice(0, 4000) : text
+
+      // Parse response — split on the literal "CITATIONS:" marker instead of
+      // using a regex with lookahead + lazy quantifier (SonarQube S5852).
+      // Linear by construction: indexOf + substring are both O(n).
+      const citationsMarker = "CITATIONS:"
+      const markerIdx = boundedText.indexOf(citationsMarker)
+      const beforeCitations = markerIdx >= 0 ? boundedText.substring(0, markerIdx) : boundedText
+      const afterCitations = markerIdx >= 0 ? boundedText.substring(markerIdx + citationsMarker.length) : ""
+
+      const answerPrefix = "ANSWER:"
+      const answerIdx = beforeCitations.indexOf(answerPrefix)
+      const answerMatch = answerIdx >= 0
+        ? { 1: beforeCitations.substring(answerIdx + answerPrefix.length) }
+        : null
+      const citationsMatch = markerIdx >= 0 ? { 1: afterCitations } : null
 
       const answer = answerMatch?.[1]?.trim() || text.trim()
       const citations: Array<{ topic: string; relevance: string }> = []

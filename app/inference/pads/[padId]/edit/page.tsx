@@ -17,6 +17,7 @@ import { Switch } from "@/components/ui/switch"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { CsvEmailUpload } from "@/components/csv-email-upload"
 import { AccountsManager } from "@/components/inference/accounts-manager"
+import { isValidEmail } from "@/lib/utils"
 import { AdminManager } from "@/components/inference/admin-manager"
 import {
   Settings,
@@ -232,7 +233,7 @@ export default function EditPadPage() {
     const emails = bulkEmails
       .split(/[,;\n]/)
       .map((e) => e.trim())
-      .filter((e) => e.length > 0 && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e))
+      .filter((e) => e.length > 0 && isValidEmail(e))
 
     if (emails.length === 0) {
       alert("No valid emails found. Please check the format.")

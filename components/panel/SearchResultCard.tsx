@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import type { Note } from "@/types/note"
 import { formatDistanceToNow } from "date-fns"
-import { escapeRegExp } from "@/lib/utils"
+import { escapeRegExp, stripHtmlTags } from "@/lib/utils"
 
 interface SearchResultCardProps {
   note: Note
@@ -44,7 +44,7 @@ export function SearchResultCard({ note, searchTerm, onOpen, currentUserId }: Re
 
   // Get excerpt from content (first 100 chars)
   const getExcerpt = (content: string) => {
-    const text = content.replaceAll(/<[^>]*>/g, "").trim()
+    const text = stripHtmlTags(content).trim()
     return text.length > 100 ? text.substring(0, 100) + "..." : text
   }
 
