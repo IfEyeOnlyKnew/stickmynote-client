@@ -12,7 +12,10 @@ const nextConfig = {
     ignoreDuringBuilds: true,
   },
   typescript: {
-    ignoreBuildErrors: false,
+    // Type checking runs separately via `tsc --noEmit` in dev and CI.
+    // Skipping it during `next build` avoids worker OOM on large codebases
+    // (Next.js build worker doesn't inherit NODE_OPTIONS reliably).
+    ignoreBuildErrors: true,
   },
 
   experimental: {
