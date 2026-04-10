@@ -1,11 +1,17 @@
 const { Pool } = require('pg');
+require('dotenv').config({ path: '.env' });
+
+if (!process.env.POSTGRES_PASSWORD) {
+  console.error('POSTGRES_PASSWORD env var is required. Set it in .env or export it before running.');
+  process.exit(1);
+}
 
 const pool = new Pool({
-  host: 'HOL-DC3-PGSQL.stickmynote.com',
-  port: 5432,
-  database: 'stickmynote',
-  user: 'stickmynote_user',
-  password: 'CpSiZ6142G/OdukjS7P0Kei2tbv7NDyn0ScAPatDwOY=',
+  host: process.env.POSTGRES_HOST || 'HOL-DC3-PGSQL.stickmynote.com',
+  port: Number(process.env.POSTGRES_PORT) || 5432,
+  database: process.env.POSTGRES_DB || 'stickmynote',
+  user: process.env.POSTGRES_USER || 'stickmynote_user',
+  password: process.env.POSTGRES_PASSWORD,
   ssl: { rejectUnauthorized: false }
 });
 

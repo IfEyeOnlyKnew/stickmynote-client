@@ -17,6 +17,7 @@ import {
 } from "@/components/ui/alert-dialog"
 import { cn } from "@/lib/utils"
 import { useNotedVersions, type NotedPageVersion } from "@/hooks/useNotedVersions"
+import { SafeHtmlRenderer } from "@/components/safe-html-renderer"
 
 interface NotedVersionHistoryProps {
   pageId: string
@@ -219,9 +220,9 @@ export function NotedVersionHistory({
                     ))}
                   </div>
                 ) : (
-                  <div
-                    className="prose prose-sm dark:prose-invert max-w-none"
-                    dangerouslySetInnerHTML={{ __html: versionContent }}
+                  <SafeHtmlRenderer
+                    content={versionContent}
+                    className="prose-sm dark:prose-invert"
                   />
                 )}
               </ScrollArea>

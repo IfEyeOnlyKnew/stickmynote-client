@@ -86,9 +86,8 @@ export function applySecurityHeaders(response: Response): Response {
 }
 
 export function generateNonce(): string {
-  if (typeof crypto !== "undefined" && crypto.getRandomValues) {
-    return Buffer.from(crypto.getRandomValues(new Uint8Array(16))).toString("base64")
-  }
-  // Fallback for environments without crypto.getRandomValues
-  return Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15)
+  // CSP nonces must be cryptographically random. crypto.getRandomValues is
+  // available on all supported Node.js versions and all browsers since 2011,
+  // so there is no need for a Math.random fallback (which would be insecure).
+  return Buffer.from(crypto.getRandomValues(new Uint8Array(16))).toString("base64")
 }

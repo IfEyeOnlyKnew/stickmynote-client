@@ -25,6 +25,7 @@ import {
 import { cn } from "@/lib/utils"
 import { useNotedTemplates, type NotedTemplate } from "@/hooks/useNotedTemplates"
 import { NotedTemplateEditor } from "./NotedTemplateEditor"
+import { SafeHtmlRenderer } from "@/components/safe-html-renderer"
 
 const CATEGORY_TABS = [
   { value: "", label: "All" },
@@ -284,9 +285,9 @@ export function NotedTemplateGallery({
                   )}
                 </div>
                 <ScrollArea className="flex-1 p-3">
-                  <div
-                    className="prose prose-sm dark:prose-invert max-w-none"
-                    dangerouslySetInnerHTML={{ __html: previewTemplate.content }}
+                  <SafeHtmlRenderer
+                    content={previewTemplate.content}
+                    className="prose-sm dark:prose-invert"
                   />
                 </ScrollArea>
                 <div className="px-3 py-2 border-t">

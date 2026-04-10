@@ -45,6 +45,7 @@ export class SearchCache {
       }
       return null
     } catch (error) {
+      console.debug("[SearchCache] get failed, falling back to uncached:", error)
       return null
     }
   }
@@ -61,7 +62,7 @@ export class SearchCache {
 
       await redis.setex(key, this.CACHE_TTL, cachedResult)
     } catch (error) {
-      // Cache set error - fail silently
+      console.debug("[SearchCache] set failed, cache write skipped:", error)
     }
   }
 
@@ -74,7 +75,7 @@ export class SearchCache {
         await redis.del(...keys)
       }
     } catch (error) {
-      // Cache invalidation error - fail silently
+      console.debug("[SearchCache] invalidatePattern failed, stale entries may remain:", error)
     }
   }
 }
