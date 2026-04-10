@@ -6,6 +6,21 @@ interface RouteContext {
   params: Promise<{ orgId: string }>
 }
 
+// Per RFC 1035/1123: total length ≤ 253, each label 1–63 chars,
+// labels match [a-z0-9] with optional internal hyphens, no leading/trailing hyphen.
+// The single-label regex is linear (no nested quantifiers) — safe from backtracking.
+const DOMAIN_LABEL_REGEX = /^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$/
+
+function isValidDomain(domain: string): boolean {
+  if (domain.length === 0 || domain.length > 253) return false
+  const labels = domain.split(".")
+  if (labels.length < 2) return false
+  for (const label of labels) {
+    if (!DOMAIN_LABEL_REGEX.test(label)) return false
+  }
+  return true
+}
+
 // GET - List all domains for an organization
 export async function GET(request: NextRequest, context: RouteContext) {
   try {
@@ -129,9 +144,12 @@ export async function POST(request: NextRequest, context: RouteContext) {
     // Normalize domain (lowercase, trim)
     const normalizedDomain = domain.toLowerCase().trim()
 
-    // Validate domain format
-    const domainRegex = /^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$/
-    if (!domainRegex.test(normalizedDomain)) {
+    // Validate domain format via a two-step check that's immune to ReDoS:
+    //   1. Enforce RFC 1035 length bounds before regex matching
+    //   2. Validate each label independently with a simple linear regex
+    // The previous single-regex approach had nested optional groups, which
+    // SonarQube S5852 flags as vulnerable to catastrophic backtracking.
+    if (!isValidDomain(normalizedDomain)) {
       return NextResponse.json({ error: "Invalid domain format" }, { status: 400 })
     }
 

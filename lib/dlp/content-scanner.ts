@@ -52,6 +52,18 @@ const BUILT_IN_PATTERNS: BuiltInPattern[] = [
   },
 ]
 
+// Hard caps to bound the work a DLP scan can perform. These prevent admin-
+// configured (or smuggled-through-admin) regexes from turning into ReDoS
+// denial-of-service vectors when applied to hostile content.
+//
+// Node.js has no native regex timeout, so we defend by limiting the surface:
+// - TEXT_SCAN_LIMIT_CHARS caps the slice of content each pattern sees.
+// - CUSTOM_PATTERN_LIMIT caps how many admin patterns run per invocation.
+// - rejectUnsafePattern() refuses patterns with shapes that SonarQube S5852
+//   flags as vulnerable to catastrophic backtracking.
+const TEXT_SCAN_LIMIT_CHARS = 100_000
+const CUSTOM_PATTERN_LIMIT = 50
+
 /**
  * Scan text content for sensitive data patterns.
  *
@@ -64,12 +76,39 @@ export function scanContent(text: string, customPatterns?: string[]): ScanResult
     return { hasSensitiveData: false, matches: [] }
   }
 
+  // Truncate extremely long input so no pattern walks hundreds of MB.
+  const boundedText = text.length > TEXT_SCAN_LIMIT_CHARS ? text.slice(0, TEXT_SCAN_LIMIT_CHARS) : text
+
   const matches: PatternMatch[] = [
-    ...scanBuiltInPatterns(text),
-    ...scanCustomPatterns(text, customPatterns),
+    ...scanBuiltInPatterns(boundedText),
+    ...scanCustomPatterns(boundedText, customPatterns),
   ]
 
   return { hasSensitiveData: matches.length > 0, matches }
+}
+
+/**
+ * Validate that a regex string does not contain backtracking-prone shapes.
+ * Returns null if the pattern is acceptable, or an error message otherwise.
+ * Exposed so the admin UI can reject bad patterns at save time.
+ */
+export function validateCustomPattern(patternStr: string): string | null {
+  if (patternStr.length > 500) return "Pattern is too long (max 500 characters)"
+
+  // Nested quantifiers: (...+)+, (...*)*, (...+)*, (...*)+
+  // These are the classic ReDoS shape. Reject them outright.
+  if (/\([^)]*[+*][^)]*\)[+*]/.test(patternStr)) {
+    return "Pattern contains nested quantifiers that could cause catastrophic backtracking"
+  }
+
+  // Ensure it compiles
+  try {
+    new RegExp(patternStr)
+  } catch {
+    return "Invalid regular expression syntax"
+  }
+
+  return null
 }
 
 function scanBuiltInPatterns(text: string): PatternMatch[] {
@@ -88,7 +127,13 @@ function scanCustomPatterns(text: string, customPatterns?: string[]): PatternMat
   if (!customPatterns?.length) return []
 
   const matches: PatternMatch[] = []
-  for (const patternStr of customPatterns) {
+  // Cap how many custom patterns we run per scan. An admin can still have
+  // more than CUSTOM_PATTERN_LIMIT configured; the scan just stops processing
+  // once the limit is reached rather than blocking the server.
+  const bounded = customPatterns.slice(0, CUSTOM_PATTERN_LIMIT)
+  for (const patternStr of bounded) {
+    // Reject obviously-backtracking patterns before compiling them.
+    if (validateCustomPattern(patternStr) !== null) continue
     try {
       const regex = new RegExp(patternStr, "gi")
       const found = text.match(regex)

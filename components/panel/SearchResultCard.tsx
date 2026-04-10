@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import type { Note } from "@/types/note"
 import { formatDistanceToNow } from "date-fns"
+import { escapeRegExp } from "@/lib/utils"
 
 interface SearchResultCardProps {
   note: Note
@@ -23,7 +24,9 @@ export function SearchResultCard({ note, searchTerm, onOpen, currentUserId }: Re
   const highlightText = (text: string, term?: string) => {
     if (!term || !text) return text
 
-    const parts = text.split(new RegExp(`(${term})`, "gi"))
+    // Escape the user-supplied term so regex metacharacters are treated literally.
+    // Without this, a term like "(.+)+" becomes a ReDoS-vulnerable pattern.
+    const parts = text.split(new RegExp(`(${escapeRegExp(term)})`, "gi"))
     return (
       <>
         {parts.map((part, i) =>

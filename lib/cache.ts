@@ -8,6 +8,17 @@ interface CacheItem<T> {
   ttl: number
 }
 
+// Convert a glob pattern (supporting `*` as the only wildcard) to an anchored
+// regex. Escapes every other metacharacter literally so arbitrary input cannot
+// produce a catastrophic-backtracking pattern. The result is linear by
+// construction because `.*` followed by literals cannot backtrack onto itself.
+function globToSafeRegex(pattern: string): RegExp {
+  const escaped = pattern.replaceAll(/[.*+?^${}()|[\]\\]/g, (ch) =>
+    ch === "*" ? ".*" : `\\${ch}`,
+  )
+  return new RegExp(`^${escaped}$`)
+}
+
 class Cache {
   private readonly cache = new Map<string, CacheItem<any>>()
   private readonly maxSize = 1000
@@ -116,11 +127,12 @@ class Cache {
   }
 
   /**
-   * Invalidate cache entries matching a pattern
+   * Invalidate cache entries matching a glob pattern. Only `*` is treated as
+   * a wildcard; all other regex metacharacters are escaped literally.
    */
   invalidatePattern(pattern: string): number {
     let deletedCount = 0
-    const regex = new RegExp(pattern.replaceAll("*", ".*"))
+    const regex = globToSafeRegex(pattern)
 
     for (const key of this.cache.keys()) {
       if (regex.test(key)) {
@@ -185,10 +197,10 @@ class Cache {
   }
 
   /**
-   * Get all keys matching a pattern
+   * Get all keys matching a glob pattern (same semantics as invalidatePattern).
    */
   getKeysByPattern(pattern: string): string[] {
-    const regex = new RegExp(pattern.replaceAll("*", ".*"))
+    const regex = globToSafeRegex(pattern)
     return Array.from(this.cache.keys()).filter((key) => regex.test(key))
   }
 
@@ -221,9 +233,7 @@ class Cache {
     }
 
     const elapsed = Date.now() - item.timestamp
-    const remaining = item.ttl - elapsed
-
-    return remaining > 0 ? remaining : 0
+    return Math.max(0, item.ttl - elapsed)
   }
 
   /**

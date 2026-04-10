@@ -124,6 +124,24 @@ export function DLPTab({ currentOrgId }: Readonly<DLPTabProps>) {
     const value = newCustomPattern.trim()
     if (!value) return
 
+    // Length cap — keeps the regex simple enough to compile and scan safely
+    if (value.length > 500) {
+      toast({ title: "Pattern Too Long", description: "Maximum 500 characters", variant: "destructive" })
+      return
+    }
+
+    // Reject nested quantifiers. These are the classic ReDoS shape — e.g.
+    // `(a+)+` or `(.*)*` — and can cause the content scanner to hang on
+    // crafted input. This mirrors the server-side check in content-scanner.ts.
+    if (/\([^)]*[+*][^)]*\)[+*]/.test(value)) {
+      toast({
+        title: "Unsafe Pattern",
+        description: "Nested quantifiers like (a+)+ can cause catastrophic backtracking. Please rewrite the pattern.",
+        variant: "destructive",
+      })
+      return
+    }
+
     // Validate regex
     try {
       new RegExp(value)

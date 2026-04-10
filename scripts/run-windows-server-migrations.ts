@@ -2,6 +2,7 @@ import { Client } from 'pg';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as dotenv from 'dotenv';
+import { splitSqlStatements } from './split-sql';
 
 // Load environment variables
 dotenv.config({ path: path.join(__dirname, '..', '.env') });
@@ -40,8 +41,10 @@ async function runMigration(filePath: string): Promise<{ success: boolean; skipp
     // If full file fails, try statement by statement
     console.log(`   ⚙️  Running statement by statement...`);
     
-    // Split SQL into statements (handle semicolons inside strings)
-    const statements = sql.split(/;[\s]*(?=(?:[^']*'[^']*')*[^']*$)/)
+    // Split SQL into statements using a linear state machine that honors
+    // single-quoted strings. Replaces a regex with nested quantifiers that
+    // was vulnerable to catastrophic backtracking (SonarQube S5852).
+    const statements = splitSqlStatements(sql)
       .map(s => s.trim())
       .filter(s => s.length > 0 && !s.startsWith('--'));
     

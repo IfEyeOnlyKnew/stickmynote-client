@@ -10,6 +10,7 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import type { Note } from "@/types/note"
 import { formatDistanceToNow } from "date-fns"
 import { useToast } from "@/hooks/use-toast"
+import { escapeRegExp } from "@/lib/utils"
 
 interface OptimisticState {
   likes: number
@@ -212,7 +213,9 @@ export function OptimisticSearchResultCard({
   const highlightText = (text: string, term?: string) => {
     if (!term || !text) return text
 
-    const parts = text.split(new RegExp(`(${term})`, "gi"))
+    // Escape user-supplied term — treats regex metacharacters as literals to
+    // prevent ReDoS and the correctness bug of "(" breaking the highlight.
+    const parts = text.split(new RegExp(`(${escapeRegExp(term)})`, "gi"))
     return (
       <>
         {parts.map((part, i) =>
