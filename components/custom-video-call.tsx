@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState, useCallback } from "react"
+import { useEffect, useRef, useState, useCallback } from "react"
 import Image from "next/image"
 import {
   LiveKitRoom,
@@ -203,7 +203,7 @@ function VideoCallContent({ roomName, onLeave, userName, isMinimized }: Readonly
   const [backgroundImage, setBackgroundImage] = useState<string>(
     "https://images.unsplash.com/photo-1497366216548-37526070297c?w=800&q=80",
   )
-  const [, setBgProcessor] = useState<BackgroundProcessorWrapper | null>(null)
+  const bgProcessorRef = useRef<BackgroundProcessorWrapper | null>(null)
 
   // Reaction data channel handler extracted to reduce nesting depth
   const handleReactionData = useCallback((msg: { payload: BufferSource }) => {
@@ -285,7 +285,7 @@ function VideoCallContent({ roomName, onLeave, userName, isMinimized }: Readonly
   }, [room, onLeave])
 
   const applyVideoEffect = useCallback(
-    async (effect: "none" | "blur" | "image", imageUrl?: string) => {
+    async (effect: VideoEffect, imageUrl?: string) => {
       const camPub = localParticipant.getTrackPublication(Track.Source.Camera)
       const camTrack = camPub?.track
       if (!camTrack) return
@@ -294,10 +294,10 @@ function VideoCallContent({ roomName, onLeave, userName, isMinimized }: Readonly
         const processor = createVideoProcessor(effect, imageUrl || backgroundImage)
         if (processor) {
           await camTrack.setProcessor(processor)
-          setBgProcessor(processor)
+          bgProcessorRef.current = processor
         } else {
           await camTrack.stopProcessor()
-          setBgProcessor(null)
+          bgProcessorRef.current = null
         }
 
         setVideoEffect(effect)

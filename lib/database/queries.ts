@@ -199,7 +199,9 @@ export async function getStickTabs(stickId: string): Promise<PersonalStickTab[]>
   )
 }
 
-export async function createStickTab(tab: Omit<PersonalStickTab, "id" | "created_at" | "updated_at">): Promise<PersonalStickTab | null> {
+type CreateStickTabInput = Omit<PersonalStickTab, "id" | "created_at" | "updated_at">
+
+export async function createStickTab(tab: CreateStickTabInput): Promise<PersonalStickTab | null> {
   return queryOne<PersonalStickTab>(
     `INSERT INTO personal_sticks_tabs (stick_id, title, content, position)
      VALUES ($1, $2, $3, $4)
