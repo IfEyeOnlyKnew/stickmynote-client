@@ -1,8 +1,7 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { createServiceDatabaseClient, type DatabaseClient } from "@/lib/database/database-adapter"
-import { getCachedAuthUser, createRateLimitResponse, createUnauthorizedResponse } from "@/lib/auth/cached-auth"
-import { getOrgContext } from "@/lib/auth/get-org-context"
+import { type DatabaseClient } from "@/lib/database/database-adapter"
 import { validateCSRFMiddleware } from "@/lib/csrf"
+import { requireAuthOrgDb } from "@/lib/api/route-helpers"
 import { publishToUser } from "@/lib/ws/publish-event"
 import type { ChatRequest } from "@/types/chat-request"
 
@@ -13,19 +12,6 @@ import type { ChatRequest } from "@/types/chat-request"
  * GET - Fetch pending requests for current user (as recipient or requester)
  * POST - Create a new chat request
  */
-
-// ============================================================================
-// Types
-// ============================================================================
-
-interface OrgContext {
-  orgId: string
-  organizationId?: string
-}
-
-interface RateLimitedResult {
-  rateLimited: true
-}
 
 // ============================================================================
 // Constants
@@ -61,51 +47,6 @@ const Errors = {
   createFailed: () => NextResponse.json({ error: "Failed to create chat request" }, { status: 500 }),
   internal: () => NextResponse.json({ error: "Internal server error" }, { status: 500 }),
 } as const
-
-// ============================================================================
-// Auth Helpers
-// ============================================================================
-
-function isRateLimited(result: OrgContext | RateLimitedResult | null): result is RateLimitedResult {
-  return result !== null && "rateLimited" in result
-}
-
-async function safeGetOrgContext(userId: string): Promise<OrgContext | RateLimitedResult | null> {
-  try {
-    return await getOrgContext(userId)
-  } catch (error) {
-    if (error instanceof Error && error.message === "RATE_LIMITED") {
-      return { rateLimited: true }
-    }
-    throw error
-  }
-}
-
-async function getAuthenticatedContext(request: NextRequest) {
-  const { user, error: authError } = await getCachedAuthUser()
-
-  if (authError === "rate_limited") {
-    return { error: createRateLimitResponse() }
-  }
-
-  if (!user) {
-    return { error: createUnauthorizedResponse() }
-  }
-
-  const orgContextResult = await safeGetOrgContext(user.id)
-
-  if (isRateLimited(orgContextResult)) {
-    return { error: createRateLimitResponse() }
-  }
-
-  if (!orgContextResult) {
-    return { error: Errors.noOrgContext() }
-  }
-
-  const db = await createServiceDatabaseClient()
-
-  return { user, orgContext: orgContextResult, db }
-}
 
 // ============================================================================
 // Helpers
@@ -164,8 +105,8 @@ async function enrichRequestWithUsers(
 
 export async function GET(request: NextRequest) {
   try {
-    const ctx = await getAuthenticatedContext(request)
-    if ("error" in ctx) return ctx.error
+    const ctx = await requireAuthOrgDb()
+    if ("response" in ctx) return ctx.response
 
     const { user, db } = ctx
 
@@ -226,8 +167,8 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    const ctx = await getAuthenticatedContext(request)
-    if ("error" in ctx) return ctx.error
+    const ctx = await requireAuthOrgDb()
+    if ("response" in ctx) return ctx.response
 
     const { user, orgContext, db } = ctx
 

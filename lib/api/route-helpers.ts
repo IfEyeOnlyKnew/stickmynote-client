@@ -1,6 +1,7 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { getCachedAuthUser, createRateLimitResponse, createUnauthorizedResponse } from "@/lib/auth/cached-auth"
 import { getOrgContext } from "@/lib/auth/get-org-context"
+import { createServiceDatabaseClient } from "@/lib/database/database-adapter"
 import { applyRateLimit } from "@/lib/rate-limiter-enhanced"
 
 /**
@@ -32,6 +33,32 @@ export async function requireAuthAndOrg() {
   if (!orgContext) return { response: NextResponse.json({ error: "No organization context" }, { status: 403 }) }
 
   return { user, orgContext }
+}
+
+/**
+ * Same as requireAuthAndOrg but also creates a service database client.
+ * Returns { user, orgContext, db } on success, or { response } on failure.
+ * Handles RATE_LIMITED errors thrown from getOrgContext.
+ */
+export async function requireAuthOrgDb() {
+  const { user, error: authError } = await getCachedAuthUser()
+  if (authError === "rate_limited") return { response: createRateLimitResponse() }
+  if (!user) return { response: createUnauthorizedResponse() }
+
+  let orgContext
+  try {
+    orgContext = await getOrgContext()
+  } catch (error) {
+    if (error instanceof Error && error.message === "RATE_LIMITED") {
+      return { response: createRateLimitResponse() }
+    }
+    throw error
+  }
+
+  if (!orgContext) return { response: NextResponse.json({ error: "No organization context" }, { status: 403 }) }
+
+  const db = await createServiceDatabaseClient()
+  return { user, orgContext, db }
 }
 
 /**

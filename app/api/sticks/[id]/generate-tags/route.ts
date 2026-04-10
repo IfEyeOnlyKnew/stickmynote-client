@@ -4,66 +4,10 @@ import { getCachedAuthUser, createRateLimitResponse, createUnauthorizedResponse 
 import { getOrgContext } from "@/lib/auth/get-org-context"
 import {
   type Hyperlink,
+  fetchHyperlinks,
   formatHyperlinks,
-  deduplicateByUrl,
   validateGenerateTagsInput,
 } from "@/lib/handlers/stick-generate-tags-handler"
-
-async function fetchSearXNGResults(query: string): Promise<Hyperlink[]> {
-  const searxngUrl = process.env.SEARXNG_URL || "https://searx.be"
-
-  try {
-    console.log(`[Generate Links] Fetching from SearXNG: ${searxngUrl}/search?q=${encodeURIComponent(query)}`)
-
-    const response = await fetch(
-      `${searxngUrl}/search?q=${encodeURIComponent(query)}&format=json&categories=general`,
-      {
-        headers: {
-          Accept: "application/json",
-        },
-      },
-    )
-
-    if (!response.ok) {
-      console.warn(`[Generate Links] SearXNG returned status ${response.status}`)
-      return []
-    }
-
-    const data = await response.json()
-    const hyperlinks: Hyperlink[] = []
-
-    if (data.results && Array.isArray(data.results)) {
-      for (const result of data.results) {
-        if (result.url && result.title) {
-          hyperlinks.push({
-            url: result.url,
-            title: result.title.substring(0, 100) + (result.title.length > 100 ? "..." : ""),
-          })
-        }
-      }
-    }
-
-    console.log(`[Generate Links] Found ${hyperlinks.length} results for query: ${query}`)
-    return hyperlinks.slice(0, 5)
-  } catch (fetchError) {
-    console.error("[Generate Links] SearXNG fetch error:", fetchError)
-    return []
-  }
-}
-
-async function fetchHyperlinks(searchQueries: string[]): Promise<Hyperlink[]> {
-  if (searchQueries.length === 0) return []
-
-  try {
-    const searchPromises = searchQueries.slice(0, 3).map((query) => fetchSearXNGResults(query))
-    const searchResults = await Promise.all(searchPromises)
-
-    return deduplicateByUrl(searchResults.flat()).slice(0, 8)
-  } catch (error) {
-    console.error("[Generate Links] Error fetching hyperlinks:", error)
-    return []
-  }
-}
 
 function generateSearchQueries(topic: string, content: string): string[] {
   // Create search queries directly from topic and content without AI

@@ -329,39 +329,13 @@ export function MobileStickCard({
                       </h5>
                       <div className="space-y-2">
                         {categoryReplies.map((reply) => (
-                          <div
+                          <ReplyCard
                             key={reply.id}
-                            className="p-2 rounded border-l-2 bg-gray-50"
-                            style={{ borderLeftColor: reply.color }}
-                          >
-                            <p className="text-xs mb-1">{reply.content}</p>
-                            <div className="flex items-center justify-between gap-2">
-                              <div className="flex items-center gap-2 text-xs text-gray-500 flex-1 min-w-0">
-                                <span className="truncate">{reply.users?.full_name || reply.users?.email || "Unknown"}</span>
-                                <span>•</span>
-                                <span className="flex-shrink-0">{formatDistanceToNow(new Date(reply.created_at), { addSuffix: true })}</span>
-                              </div>
-                              {reply.calstick_id ? (
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  onClick={() => onNavigateToCalstick?.(reply.calstick_id!)}
-                                  className="text-green-600 hover:text-green-700 hover:bg-green-50 h-6 px-2 flex-shrink-0"
-                                >
-                                  <ExternalLink className="h-3 w-3" />
-                                </Button>
-                              ) : (
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  onClick={() => onPromoteReply?.(stick.id, stick.topic, stick.content || '', reply.id, reply.content)}
-                                  className="text-purple-600 hover:text-purple-700 hover:bg-purple-50 h-6 px-2 flex-shrink-0"
-                                >
-                                  <ArrowRight className="h-3 w-3" />
-                                </Button>
-                              )}
-                            </div>
-                          </div>
+                            reply={reply}
+                            timeLabel={formatDistanceToNow(new Date(reply.created_at), { addSuffix: true })}
+                            onNavigateToCalstick={onNavigateToCalstick}
+                            onPromote={() => onPromoteReply?.(stick.id, stick.topic, stick.content || '', reply.id, reply.content)}
+                          />
                         ))}
                       </div>
                     </div>
@@ -404,38 +378,12 @@ export function MobileStickCard({
                                   {milestone.label}
                                 </Badge>
                               )}
-                              <div
-                                className="p-2 rounded border-l-2 bg-gray-50"
-                                style={{ borderLeftColor: reply.color }}
-                              >
-                                <p className="text-xs mb-1">{reply.content}</p>
-                                <div className="flex items-center justify-between gap-2">
-                                  <div className="flex items-center gap-2 text-xs text-gray-500 flex-1 min-w-0">
-                                    <span className="truncate">{reply.users?.full_name || reply.users?.email || "Unknown"}</span>
-                                    <span>•</span>
-                                    <span className="flex-shrink-0">{replyDate.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}</span>
-                                  </div>
-                                  {reply.calstick_id ? (
-                                    <Button
-                                      variant="ghost"
-                                      size="sm"
-                                      onClick={() => onNavigateToCalstick?.(reply.calstick_id!)}
-                                      className="text-green-600 hover:text-green-700 hover:bg-green-50 h-6 px-2 flex-shrink-0"
-                                    >
-                                      <ExternalLink className="h-3 w-3" />
-                                    </Button>
-                                  ) : (
-                                    <Button
-                                      variant="ghost"
-                                      size="sm"
-                                      onClick={() => onPromoteReply?.(stick.id, stick.topic, stick.content || '', reply.id, reply.content)}
-                                      className="text-purple-600 hover:text-purple-700 hover:bg-purple-50 h-6 px-2 flex-shrink-0"
-                                    >
-                                      <ArrowRight className="h-3 w-3" />
-                                    </Button>
-                                  )}
-                                </div>
-                              </div>
+                              <ReplyCard
+                                reply={reply}
+                                timeLabel={replyDate.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}
+                                onNavigateToCalstick={onNavigateToCalstick}
+                                onPromote={() => onPromoteReply?.(stick.id, stick.topic, stick.content || '', reply.id, reply.content)}
+                              />
                             </div>
                           </div>
                         </div>
@@ -464,5 +412,52 @@ export function MobileStickCard({
         autoSubmit
       />
     </>
+  )
+}
+
+function ReplyCard({
+  reply,
+  timeLabel,
+  onNavigateToCalstick,
+  onPromote,
+}: Readonly<{
+  reply: Reply
+  timeLabel: string
+  onNavigateToCalstick?: (calstickId: string) => void
+  onPromote: () => void
+}>) {
+  return (
+    <div
+      className="p-2 rounded border-l-2 bg-gray-50"
+      style={{ borderLeftColor: reply.color }}
+    >
+      <p className="text-xs mb-1">{reply.content}</p>
+      <div className="flex items-center justify-between gap-2">
+        <div className="flex items-center gap-2 text-xs text-gray-500 flex-1 min-w-0">
+          <span className="truncate">{reply.users?.full_name || reply.users?.email || "Unknown"}</span>
+          <span>•</span>
+          <span className="flex-shrink-0">{timeLabel}</span>
+        </div>
+        {reply.calstick_id ? (
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => onNavigateToCalstick?.(reply.calstick_id!)}
+            className="text-green-600 hover:text-green-700 hover:bg-green-50 h-6 px-2 flex-shrink-0"
+          >
+            <ExternalLink className="h-3 w-3" />
+          </Button>
+        ) : (
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={onPromote}
+            className="text-purple-600 hover:text-purple-700 hover:bg-purple-50 h-6 px-2 flex-shrink-0"
+          >
+            <ArrowRight className="h-3 w-3" />
+          </Button>
+        )}
+      </div>
+    </div>
   )
 }

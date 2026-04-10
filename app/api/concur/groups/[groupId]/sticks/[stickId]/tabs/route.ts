@@ -3,144 +3,18 @@ import { createServiceDatabaseClient } from "@/lib/database/database-adapter"
 import { validateUUID } from "@/lib/input-validation-enhanced"
 import { getOrgContext } from "@/lib/auth/get-org-context"
 import { getCachedAuthUser, createRateLimitResponse, createUnauthorizedResponse } from "@/lib/auth/cached-auth"
+import {
+  type DbTabType,
+  type VideoInfo,
+  type ImageInfo,
+  type ExportLink,
+  getTabName,
+  getTabOrder,
+  normalizeTabData,
+  createTabItem,
+} from "@/lib/handlers/stick-tabs-handler"
 
 export const dynamic = "force-dynamic"
-
-// ============================================================================
-// Types
-// ============================================================================
-
-type DbTabType = "main" | "details" | "images" | "videos" | "tags" | "links"
-
-interface VideoInfo {
-  id: string
-  url: string
-  title?: string
-  thumbnail?: string
-  duration?: string | number
-  platform?: "youtube" | "vimeo" | "rumble"
-  embed_id?: string
-  embed_url?: string
-  added_at?: string
-}
-
-interface ImageInfo {
-  id: string
-  url: string
-  title?: string
-  alt?: string
-  caption?: string
-  size?: number
-  type?: string
-  width?: number
-  height?: number
-}
-
-interface ExportLink {
-  url: string
-  filename: string
-  created_at: string
-  type: string
-}
-
-// ============================================================================
-// Helpers
-// ============================================================================
-
-function getTabName(tabType: string): string {
-  const tabNames: Record<string, string> = {
-    videos: "Videos",
-    images: "Images",
-    tags: "Tags",
-    links: "Links",
-  }
-  return tabNames[tabType] || "Details"
-}
-
-function getTabOrder(tabType: string): number {
-  const tabOrders: Record<string, number> = {
-    videos: 1,
-    images: 2,
-    tags: 3,
-    links: 4,
-  }
-  return tabOrders[tabType] ?? 5
-}
-
-function normalizeTabData(input: any): {
-  videos?: VideoInfo[]
-  images?: ImageInfo[]
-  content?: string
-  metadata?: Record<string, string | number | boolean>
-  tags?: string[]
-  links?: string[]
-  exports?: ExportLink[]
-  [k: string]: any
-} {
-  let obj: any = input
-  try {
-    if (obj && typeof obj === "string") {
-      obj = JSON.parse(obj)
-    }
-  } catch {
-    obj = {}
-  }
-  if (!obj || typeof obj !== "object") obj = {}
-  if (obj.videos && !Array.isArray(obj.videos)) obj.videos = []
-  if (obj.images && !Array.isArray(obj.images)) obj.images = []
-  if (obj.tags && !Array.isArray(obj.tags)) obj.tags = []
-  if (obj.links && !Array.isArray(obj.links)) obj.links = []
-  if (obj.exports && !Array.isArray(obj.exports)) obj.exports = []
-  return obj
-}
-
-function createTabItem(
-  tabType: string,
-  url: string | undefined,
-  title: string | undefined,
-  type: string | undefined,
-  thumbnail: string | undefined,
-  metadata: Record<string, any> | undefined,
-): { key: string; item: any } | null {
-  const now = Date.now()
-  const isoNow = new Date().toISOString()
-
-  if (tabType === "videos" && url) {
-    return {
-      key: "videos",
-      item: {
-        id: `video_${now}`,
-        url,
-        title: title || `Video ${now}`,
-        thumbnail,
-        added_at: isoNow,
-        ...metadata,
-      } as VideoInfo,
-    }
-  }
-
-  if (tabType === "images" && url) {
-    return {
-      key: "images",
-      item: {
-        id: `image_${now}`,
-        url,
-        title: title || `Image ${now}`,
-        ...metadata,
-      } as ImageInfo,
-    }
-  }
-
-  if (tabType === "tags" && type) {
-    return { key: "tags", item: type }
-  }
-
-  if (tabType === "links" && url) {
-    return { key: "links", item: url }
-  }
-
-  return null
-}
 
 async function getAuthAndMembership(groupId: string, stickId: string) {
   const { user, error: authError } = await getCachedAuthUser()

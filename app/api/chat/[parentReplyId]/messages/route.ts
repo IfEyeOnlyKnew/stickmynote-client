@@ -1,8 +1,8 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { createServiceDatabaseClient, type DatabaseClient } from "@/lib/database/database-adapter"
-import { getCachedAuthUser, createRateLimitResponse, createUnauthorizedResponse } from "@/lib/auth/cached-auth"
-import { getOrgContext } from "@/lib/auth/get-org-context"
+import { type DatabaseClient } from "@/lib/database/database-adapter"
+import { createRateLimitResponse } from "@/lib/auth/cached-auth"
 import { validateCSRFMiddleware } from "@/lib/csrf"
+import { requireAuthOrgDb } from "@/lib/api/route-helpers"
 
 /**
  * CHAT MESSAGES API
@@ -14,20 +14,6 @@ import { validateCSRFMiddleware } from "@/lib/csrf"
 // ============================================================================
 // Types
 // ============================================================================
-
-interface AuthUser {
-  id: string
-  email?: string
-}
-
-interface OrgContext {
-  orgId: string
-  organizationId?: string
-}
-
-interface RateLimitedResult {
-  rateLimited: true
-}
 
 interface ChatMessage {
   id: string
@@ -45,12 +31,6 @@ interface UserInfo {
   full_name?: string
   avatar_url?: string
   username?: string
-}
-
-interface AuthenticatedContext {
-  user: AuthUser
-  orgContext: OrgContext
-  db: DatabaseClient
 }
 
 // ============================================================================
@@ -85,52 +65,6 @@ const Errors = {
 // ============================================================================
 // Auth Helpers
 // ============================================================================
-
-function isRateLimited(result: OrgContext | RateLimitedResult | null): result is RateLimitedResult {
-  return result !== null && "rateLimited" in result
-}
-
-async function safeGetOrgContext(userId: string): Promise<OrgContext | RateLimitedResult | null> {
-  try {
-    return await getOrgContext(userId)
-  } catch (error) {
-    if (error instanceof Error && error.message === "RATE_LIMITED") {
-      return { rateLimited: true }
-    }
-    throw error
-  }
-}
-
-async function getAuthenticatedContext(): Promise<
-  | { success: true; context: AuthenticatedContext }
-  | { success: false; response: NextResponse }
-> {
-  const { user, error: authError } = await getCachedAuthUser()
-
-  if (authError === "rate_limited") {
-    return { success: false, response: createRateLimitResponse() }
-  }
-
-  if (!user) {
-    return { success: false, response: createUnauthorizedResponse() }
-  }
-
-  const orgContextResult = await safeGetOrgContext(user.id)
-  if (isRateLimited(orgContextResult)) {
-    return { success: false, response: createRateLimitResponse() }
-  }
-
-  if (!orgContextResult) {
-    return { success: false, response: Errors.noOrgContext() }
-  }
-
-  const db = await createServiceDatabaseClient()
-
-  return {
-    success: true,
-    context: { user, orgContext: orgContextResult, db },
-  }
-}
 
 function handleRateLimitError(error: unknown): NextResponse | null {
   if (error instanceof Error && error.message === "RATE_LIMITED") {
@@ -215,13 +149,9 @@ export async function GET(
 ) {
   try {
     const { parentReplyId } = await params
-    const authResult = await getAuthenticatedContext()
-
-    if (!authResult.success) {
-      return authResult.response
-    }
-
-    const { db } = authResult.context
+    const ctx = await requireAuthOrgDb()
+    if ("response" in ctx) return ctx.response
+    const { db } = ctx
 
     // Verify parent reply exists
     const parentExists = await verifyParentReplyExists(db, parentReplyId)
@@ -275,13 +205,9 @@ export async function POST(
 
   try {
     const { parentReplyId } = await params
-    const authResult = await getAuthenticatedContext()
-
-    if (!authResult.success) {
-      return authResult.response
-    }
-
-    const { user, orgContext, db } = authResult.context
+    const ctx = await requireAuthOrgDb()
+    if ("response" in ctx) return ctx.response
+    const { user, orgContext, db } = ctx
     const body = await request.json()
     const { content } = body
 

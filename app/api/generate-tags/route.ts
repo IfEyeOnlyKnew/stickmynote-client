@@ -2,81 +2,11 @@ import { NextResponse } from "next/server"
 import { getCachedAuthUser, createRateLimitResponse, createUnauthorizedResponse } from "@/lib/auth/cached-auth"
 import { getOrgContext } from "@/lib/auth/get-org-context"
 import { db } from "@/lib/database/pg-client"
-
-type Hyperlink = { url: string; title: string }
-
-async function fetchSearXNGResults(query: string): Promise<Hyperlink[]> {
-  const searxngUrl = process.env.SEARXNG_URL || "https://searx.be"
-
-  try {
-    console.log(`[Generate Links] Fetching from SearXNG: ${searxngUrl}/search?q=${encodeURIComponent(query)}`)
-
-    const response = await fetch(
-      `${searxngUrl}/search?q=${encodeURIComponent(query)}&format=json&categories=general`,
-      {
-        headers: {
-          Accept: "application/json",
-        },
-      },
-    )
-
-    if (!response.ok) {
-      console.warn(`[Generate Links] SearXNG returned status ${response.status}`)
-      return []
-    }
-
-    const data = await response.json()
-    const hyperlinks: Hyperlink[] = []
-
-    if (data.results && Array.isArray(data.results)) {
-      for (const result of data.results) {
-        if (result.url && result.title) {
-          hyperlinks.push({
-            url: result.url,
-            title: result.title.substring(0, 100) + (result.title.length > 100 ? "..." : ""),
-          })
-        }
-      }
-    }
-
-    console.log(`[Generate Links] Found ${hyperlinks.length} results for query: ${query}`)
-    return hyperlinks.slice(0, 5)
-  } catch (fetchError) {
-    console.error("[Generate Links] SearXNG fetch error:", fetchError)
-    return []
-  }
-}
-
-async function fetchHyperlinks(searchQueries: string[]): Promise<Hyperlink[]> {
-  if (searchQueries.length === 0) return []
-
-  try {
-    const searchPromises = searchQueries.slice(0, 3).map((query) => fetchSearXNGResults(query))
-    const searchResults = await Promise.all(searchPromises)
-
-    // Deduplicate by URL
-    const seen = new Set<string>()
-    const uniqueResults: Hyperlink[] = []
-    for (const result of searchResults.flat()) {
-      if (!seen.has(result.url)) {
-        seen.add(result.url)
-        uniqueResults.push(result)
-      }
-    }
-
-    return uniqueResults.slice(0, 8)
-  } catch (error) {
-    console.error("[Generate Links] Error fetching hyperlinks:", error)
-    return []
-  }
-}
-
-function formatHyperlinks(hyperlinks: Hyperlink[]): Hyperlink[] {
-  return hyperlinks.map((link) => ({
-    url: link.url.startsWith("http") ? link.url : `https://${link.url}`,
-    title: link.title,
-  }))
-}
+import {
+  type Hyperlink,
+  fetchHyperlinks,
+  formatHyperlinks,
+} from "@/lib/handlers/stick-generate-tags-handler"
 
 function generateSearchQueries(topic: string): string[] {
   // Create search queries directly from topic without AI
