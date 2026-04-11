@@ -198,6 +198,79 @@ async function saveExportLink(
   }
 }
 
+// Fetch a stick's replies and enrich each reply with its author's username/email.
+// Returns [] if the stick has no replies or the reply table query fails.
+async function fetchRepliesWithUsers(
+  db: DatabaseClient,
+  stickId: string
+): Promise<Reply[]> {
+  const { data: replies } = await db
+    .from("paks_pad_stick_replies")
+    .select("*")
+    .eq("stick_id", stickId)
+    .order("created_at", { ascending: true });
+
+  if (!replies || replies.length === 0) return [];
+
+  const replyUserIds = [
+    ...new Set(replies.map((r: any) => r.user_id).filter(Boolean)),
+  ] as string[];
+
+  let replyUserMap: Record<string, { username?: string; email?: string }> = {};
+  if (replyUserIds.length > 0) {
+    const { data: users } = await db
+      .from("users")
+      .select("id, username, email")
+      .in("id", replyUserIds);
+    if (users) {
+      replyUserMap = Object.fromEntries(
+        users.map((u: any) => [u.id, { username: u.username, email: u.email }])
+      );
+    }
+  }
+
+  return replies.map((reply: any) => ({
+    ...reply,
+    user: replyUserMap[reply.user_id] || null,
+  })) as Reply[];
+}
+
+// Fetch stick tabs and split them into video/image lists suitable for both
+// the prompt builder and the DOCX media section.
+async function fetchMediaLinks(
+  db: DatabaseClient,
+  stickId: string
+): Promise<{ videoLinks: MediaLink[]; imageLinks: MediaLink[] }> {
+  const { data: stickTabs } = await db
+    .from("paks_pad_stick_tabs")
+    .select("*")
+    .eq("stick_id", stickId)
+    .order("tab_order", { ascending: true });
+
+  const videoTabs = stickTabs?.filter((tab) => tab.tab_type === "video") || [];
+  const imageTabs = stickTabs?.filter((tab) => tab.tab_type === "images") || [];
+
+  return {
+    videoLinks: formatVideoLinks(videoTabs),
+    imageLinks: formatImageLinks(imageTabs),
+  };
+}
+
+// Write a DOCX buffer to public/exports and return its public URL.
+// Accepts either a Node Buffer (what docx.Packer.toBuffer returns) or an
+// ArrayBuffer — both get written through Buffer.from().
+async function saveExportToDisk(
+  buffer: Buffer | ArrayBuffer,
+  filename: string
+): Promise<string> {
+  const exportsDir = path.join(process.cwd(), "public", "exports");
+  await mkdir(exportsDir, { recursive: true });
+  const filePath = path.join(exportsDir, filename);
+  await writeFile(filePath, Buffer.isBuffer(buffer) ? buffer : Buffer.from(buffer));
+  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+  return `${baseUrl}/exports/${filename}`;
+}
+
 type PadInfo = { name?: string; multi_pak_id?: string; owner_id?: string; multi_paks?: { owner_id?: string } }
 
 async function fetchPadData(db: any, padId: string | null): Promise<PadInfo | null> {
@@ -223,411 +296,406 @@ async function fetchPadData(db: any, padId: string | null): Promise<PadInfo | nu
   return padsData
 }
 
+// Build the sections[0].children array for a DOCX export. Split into
+// named sub-section builders so this file's POST handler doesn't carry
+// 200 lines of inline `new DocxParagraph({...})` calls.
+
+interface DocxModules {
+  Document: any
+  Paragraph: any
+  TextRun: any
+  HeadingLevel: any
+}
+
+function buildDocumentHeaderSection(
+  docx: DocxModules,
+  tone: string,
+  summary: string
+): any[] {
+  const { Paragraph, TextRun, HeadingLevel } = docx
+  const summaryParagraphs = splitSummaryIntoParagraphs(summary)
+
+  return [
+    new Paragraph({
+      text: "MULTI-PAK STICK EXPORT",
+      heading: HeadingLevel?.TITLE,
+      spacing: { after: 400 },
+    }),
+    new Paragraph({
+      children: [
+        new TextRun({
+          text: `Generated on ${new Date().toLocaleDateString()} at ${new Date().toLocaleTimeString()} | Tone: ${
+            tone.charAt(0).toUpperCase() + tone.slice(1)
+          }`,
+          italics: true,
+          size: 20,
+        }),
+      ],
+      spacing: { after: 600 },
+    }),
+    new Paragraph({
+      text: "EXECUTIVE SUMMARY",
+      heading: HeadingLevel?.HEADING_1,
+      spacing: { before: 400, after: 200 },
+    }),
+    ...summaryParagraphs.map(
+      (paragraphText: string) =>
+        new Paragraph({
+          children: [new TextRun({ text: paragraphText, size: 24 })],
+          spacing: { after: 300 },
+        })
+    ),
+  ]
+}
+
+function buildStickInfoSection(docx: DocxModules, stickData: StickData): any[] {
+  const { Paragraph, TextRun, HeadingLevel } = docx
+  return [
+    new Paragraph({
+      text: "STICK INFORMATION",
+      heading: HeadingLevel?.HEADING_1,
+      spacing: { before: 400, after: 200 },
+    }),
+    new Paragraph({
+      children: [
+        new TextRun({ text: "Topic: ", bold: true, size: 24 }),
+        new TextRun({ text: stickData.topic || "Untitled", size: 24 }),
+      ],
+      spacing: { after: 200 },
+    }),
+    new Paragraph({
+      children: [
+        new TextRun({ text: "Pad: ", bold: true, size: 24 }),
+        new TextRun({ text: stickData.pads?.name || "Unknown Pad", size: 24 }),
+      ],
+      spacing: { after: 200 },
+    }),
+    new Paragraph({
+      children: [
+        new TextRun({ text: "Created: ", bold: true, size: 24 }),
+        new TextRun({
+          text: new Date(stickData.created_at).toLocaleDateString(),
+          size: 24,
+        }),
+      ],
+      spacing: { after: 200 },
+    }),
+    new Paragraph({
+      text: "MAIN CONTENT",
+      heading: HeadingLevel?.HEADING_1,
+      spacing: { before: 400, after: 200 },
+    }),
+    new Paragraph({
+      children: [
+        new TextRun({
+          text: stickData.content || "No content provided.",
+          size: 24,
+        }),
+      ],
+      spacing: { after: 400 },
+    }),
+  ]
+}
+
+function buildMediaSection(
+  docx: DocxModules,
+  videoLinks: MediaLink[],
+  imageLinks: MediaLink[]
+): any[] {
+  if (videoLinks.length === 0 && imageLinks.length === 0) return []
+  const { Paragraph, TextRun, HeadingLevel } = docx
+
+  const videoBlock =
+    videoLinks.length > 0
+      ? [
+          new Paragraph({
+            children: [new TextRun({ text: "Videos:", bold: true, size: 24 })],
+            spacing: { after: 200 },
+          }),
+          ...videoLinks.map(
+            (video: MediaLink) =>
+              new Paragraph({
+                children: [
+                  new TextRun({
+                    text: `• ${video.title || "Untitled"}: ${video.embed_url || video.url}`,
+                    size: 24,
+                  }),
+                ],
+                spacing: { after: 200 },
+              })
+          ),
+        ]
+      : []
+
+  const imageBlock =
+    imageLinks.length > 0
+      ? [
+          new Paragraph({
+            children: [new TextRun({ text: "Images:", bold: true, size: 24 })],
+            spacing: { after: 200 },
+          }),
+          ...imageLinks.map(
+            (image: MediaLink) =>
+              new Paragraph({
+                children: [
+                  new TextRun({
+                    text: `• ${image.caption || "Untitled"}: ${image.url}`,
+                    size: 24,
+                  }),
+                ],
+                spacing: { after: 200 },
+              })
+          ),
+        ]
+      : []
+
+  return [
+    new Paragraph({
+      text: "MEDIA CONTENT",
+      heading: HeadingLevel?.HEADING_1,
+      spacing: { before: 400, after: 200 },
+    }),
+    ...videoBlock,
+    ...imageBlock,
+  ]
+}
+
+function buildRepliesSection(docx: DocxModules, replies: Reply[]): any[] {
+  const { Paragraph, TextRun, HeadingLevel } = docx
+
+  const header = new Paragraph({
+    text: `DISCUSSION AND REPLIES (${replies.length})`,
+    heading: HeadingLevel?.HEADING_1,
+    spacing: { before: 400, after: 200 },
+  })
+
+  if (replies.length === 0) {
+    return [
+      header,
+      new Paragraph({
+        children: [
+          new TextRun({
+            text: "No replies or discussion available.",
+            italics: true,
+            size: 24,
+          }),
+        ],
+        spacing: { after: 300 },
+      }),
+    ]
+  }
+
+  const replyParagraphs = replies.flatMap((reply: Reply) => [
+    new Paragraph({
+      children: [
+        new TextRun({
+          text: `${reply.user?.username || reply.user?.email || "Anonymous User"}`,
+          bold: true,
+          size: 26,
+        }),
+        new TextRun({
+          text: ` (${new Date(reply.created_at).toLocaleDateString()})`,
+          italics: true,
+          size: 22,
+        }),
+      ],
+      spacing: { after: 100 },
+    }),
+    new Paragraph({
+      children: [new TextRun({ text: reply.content, size: 24 })],
+      spacing: { after: 400 },
+    }),
+  ])
+
+  return [header, ...replyParagraphs]
+}
+
+function buildFooterSection(docx: DocxModules): any[] {
+  const { Paragraph, TextRun, HeadingLevel } = docx
+  return [
+    new Paragraph({
+      text: "END OF DOCUMENT",
+      heading: HeadingLevel?.HEADING_2,
+      spacing: { before: 600, after: 200 },
+    }),
+    new Paragraph({
+      children: [
+        new TextRun({
+          text:
+            "This document contains a comprehensive export of the Multi-pak Stick including all content, media, and discussion threads. Generated automatically by Stick My Note application.",
+          italics: true,
+          size: 20,
+        }),
+      ],
+      spacing: { after: 200 },
+    }),
+  ]
+}
+
+interface BuildExportDocArgs {
+  docx: DocxModules
+  tone: string
+  summary: string
+  stickData: StickData
+  videoLinks: MediaLink[]
+  imageLinks: MediaLink[]
+  replies: Reply[]
+}
+
+function buildExportDocument(args: BuildExportDocArgs): any {
+  const { docx, tone, summary, stickData, videoLinks, imageLinks, replies } = args
+  const { Document } = docx
+  return new Document({
+    sections: [
+      {
+        children: [
+          ...buildDocumentHeaderSection(docx, tone, summary),
+          ...buildStickInfoSection(docx, stickData),
+          ...buildMediaSection(docx, videoLinks, imageLinks),
+          ...buildRepliesSection(docx, replies),
+          ...buildFooterSection(docx),
+        ],
+      },
+    ],
+  })
+}
+
+// POST guard helpers — split out so the main handler reads as a linear
+// pipeline instead of an 80-line wall of validation branches.
+
+type AuthSuccess = { user: { id: string; email?: string }; orgContext: { orgId: string } }
+type AuthFailure = { response: NextResponse }
+
+async function authenticate(): Promise<AuthSuccess | AuthFailure> {
+  const authResult = await getCachedAuthUser()
+  if (authResult.rateLimited) {
+    return {
+      response: NextResponse.json(
+        { error: "Rate limit exceeded. Please try again in a moment." },
+        { status: 429, headers: { "Retry-After": "30" } }
+      ),
+    }
+  }
+  if (!authResult.user) {
+    return { response: NextResponse.json({ error: "Unauthorized" }, { status: 401 }) }
+  }
+  const orgContext = await getOrgContext()
+  if (!orgContext) {
+    return {
+      response: NextResponse.json(
+        { error: "Organization context required" },
+        { status: 403 }
+      ),
+    }
+  }
+  return { user: authResult.user, orgContext }
+}
+
+async function loadStickWithAccess(
+  db: DatabaseClient,
+  stickId: string,
+  userId: string
+): Promise<{ stick: StickData } | { response: NextResponse }> {
+  const { data: stickData, error: stickError } = await db
+    .from("paks_pad_sticks")
+    .select("*")
+    .eq("id", stickId)
+    .maybeSingle()
+
+  if (stickError || !stickData) {
+    return {
+      response: NextResponse.json(
+        { error: "Stick not found or access denied" },
+        { status: 404 }
+      ),
+    }
+  }
+
+  const padsData = await fetchPadData(db, stickData.pad_id)
+  const stickDataWithPads = { ...stickData, pads: padsData } as StickData
+
+  const hasAccess = await checkUserAccess(db, stickDataWithPads, userId)
+  if (!hasAccess) {
+    return {
+      response: NextResponse.json({ error: "Access denied" }, { status: 403 }),
+    }
+  }
+
+  return { stick: stickDataWithPads }
+}
+
 export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const docx = await initializeDocxModules();
-
   try {
-    const { id: stickId } = await params;
-    const { tone = "formal" } = await request.json();
+    const { id: stickId } = await params
+    const { tone = "formal" } = await request.json()
 
-    // Check if AI service is configured
     if (!isAIAvailable()) {
-      return NextResponse.json(
-        { error: "AI service not configured" },
-        { status: 500 }
-      );
+      return NextResponse.json({ error: "AI service not configured" }, { status: 500 })
     }
 
-    const db = await createDatabaseClient();
-
-    const authResult = await getCachedAuthUser();
-    if (authResult.rateLimited) {
-      return NextResponse.json(
-        { error: "Rate limit exceeded. Please try again in a moment." },
-        { status: 429, headers: { "Retry-After": "30" } }
-      );
-    }
-    if (!authResult.user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-    const user = authResult.user;
-
-    // Get org context
-    const orgContext = await getOrgContext();
-    if (!orgContext) {
-      return NextResponse.json(
-        { error: "Organization context required" },
-        { status: 403 }
-      );
+    const docx = await initializeDocxModules()
+    if (!docx) {
+      return NextResponse.json({ error: "DOCX generation not available" }, { status: 500 })
     }
 
-    // Fetch stick data
-    const { data: stickData, error: stickError } = await db
-      .from("paks_pad_sticks")
-      .select("*")
-      .eq("id", stickId)
-      .maybeSingle();
+    const auth = await authenticate()
+    if ("response" in auth) return auth.response
+    const { user, orgContext } = auth
 
-    if (stickError || !stickData) {
-      return NextResponse.json(
-        { error: "Stick not found or access denied" },
-        { status: 404 }
-      );
-    }
+    const db = await createDatabaseClient()
 
-    // Fetch pad and multi-pak info separately
-    const padsData = await fetchPadData(db, stickData.pad_id);
-    const stickDataWithPads = { ...stickData, pads: padsData };
-
-    const hasAccess = await checkUserAccess(
-      db,
-      stickDataWithPads as StickData,
-      user.id
-    );
-
-    if (!hasAccess) {
-      return NextResponse.json({ error: "Access denied" }, { status: 403 });
-    }
+    const stickAccess = await loadStickWithAccess(db, stickId, user.id)
+    if ("response" in stickAccess) return stickAccess.response
+    const stickDataWithPads = stickAccess.stick
 
     // Use the stick's org_id for saving export link, not user's current context
-    const stickOrgId = stickData.org_id || orgContext.orgId;
+    const stickOrgId = (stickDataWithPads as any).org_id || orgContext.orgId
 
-    // Fetch stick replies
-    const { data: replies } = await db
-      .from("paks_pad_stick_replies")
-      .select("*")
-      .eq("stick_id", stickId)
-      .order("created_at", { ascending: true });
+    // Gather everything the DOCX and prompt builders need
+    const [repliesWithUsers, { videoLinks, imageLinks }] = await Promise.all([
+      fetchRepliesWithUsers(db, stickId),
+      fetchMediaLinks(db, stickId),
+    ])
 
-    // Fetch user data for replies
-    const replyUserIds = [...new Set((replies || []).map((r: any) => r.user_id).filter(Boolean))] as string[];
-    let replyUserMap: Record<string, { username?: string; email?: string }> = {};
-    if (replyUserIds.length > 0) {
-      const { data: users } = await db
-        .from("users")
-        .select("id, username, email")
-        .in("id", replyUserIds);
-      if (users) {
-        replyUserMap = Object.fromEntries(users.map((u: any) => [u.id, { username: u.username, email: u.email }]));
-      }
-    }
-    const repliesWithUsers = (replies || []).map((reply: any) => ({
-      ...reply,
-      user: replyUserMap[reply.user_id] || null,
-    }));
+    // Generate AI summary
+    const prompt = buildPrompt(tone, stickDataWithPads, videoLinks, imageLinks, repliesWithUsers)
+    const { text: comprehensiveSummary } = await aiProviderGenerateText({
+      prompt,
+      maxTokens: 2000,
+    })
 
-    // Fetch stick tabs
-    const { data: stickTabs } = await db
-      .from("paks_pad_stick_tabs")
-      .select("*")
-      .eq("stick_id", stickId)
-      .order("tab_order", { ascending: true });
-
-    // Process tabs content
-    const videoTabs =
-      stickTabs?.filter((tab) => tab.tab_type === "video") || [];
-    const imageTabs =
-      stickTabs?.filter((tab) => tab.tab_type === "images") || [];
-    const videoLinks = formatVideoLinks(videoTabs);
-    const imageLinks = formatImageLinks(imageTabs);
-
-    // Build prompt and generate AI summary
-    const prompt = buildPrompt(
+    // Build and save the DOCX
+    const doc = buildExportDocument({
+      docx,
       tone,
-      stickDataWithPads as StickData,
+      summary: comprehensiveSummary,
+      stickData: stickDataWithPads,
       videoLinks,
       imageLinks,
-      repliesWithUsers as Reply[] | null
-    );
+      replies: repliesWithUsers,
+    })
+    const buffer = await docx.Packer.toBuffer(doc)
+    const filename = generateExportFilename(stickDataWithPads.topic)
+    const fileUrl = await saveExportToDisk(buffer, filename)
 
-    // Generate comprehensive summary using AI
-    const { text: comprehensiveSummary } = await aiProviderGenerateText({
-      prompt: prompt,
-      maxTokens: 2000,
-    });
-
-    // Check if docx module is available
-    if (!docx) {
-      return NextResponse.json(
-        { error: "DOCX generation not available" },
-        { status: 500 }
-      );
-    }
-
-    const { Document: DocxDocument, Paragraph: DocxParagraph, TextRun: DocxTextRun, Packer: DocxPacker, HeadingLevel } = docx;
-
-    // Create DOCX document
-    const summaryParagraphs = splitSummaryIntoParagraphs(comprehensiveSummary);
-
-    const doc = new DocxDocument({
-      sections: [
-        {
-          children: [
-            // Title
-            new DocxParagraph({
-              text: "MULTI-PAK STICK EXPORT",
-              heading: HeadingLevel?.TITLE,
-              spacing: { after: 400 },
-            }),
-
-            // Document metadata
-            new DocxParagraph({
-              children: [
-                new DocxTextRun({
-                  text: `Generated on ${new Date().toLocaleDateString()} at ${new Date().toLocaleTimeString()} | Tone: ${
-                    tone.charAt(0).toUpperCase() + tone.slice(1)
-                  }`,
-                  italics: true,
-                  size: 20,
-                }),
-              ],
-              spacing: { after: 600 },
-            }),
-
-            // Executive Summary
-            new DocxParagraph({
-              text: "EXECUTIVE SUMMARY",
-              heading: HeadingLevel?.HEADING_1,
-              spacing: { before: 400, after: 200 },
-            }),
-            ...summaryParagraphs.map(
-              (paragraphText: string) =>
-                new DocxParagraph({
-                  children: [
-                    new DocxTextRun({
-                      text: paragraphText,
-                      size: 24,
-                    }),
-                  ],
-                  spacing: { after: 300 },
-                })
-            ),
-
-            // Stick Information
-            new DocxParagraph({
-              text: "STICK INFORMATION",
-              heading: HeadingLevel?.HEADING_1,
-              spacing: { before: 400, after: 200 },
-            }),
-            new DocxParagraph({
-              children: [
-                new DocxTextRun({ text: "Topic: ", bold: true, size: 24 }),
-                new DocxTextRun({
-                  text: stickDataWithPads.topic || "Untitled",
-                  size: 24,
-                }),
-              ],
-              spacing: { after: 200 },
-            }),
-            new DocxParagraph({
-              children: [
-                new DocxTextRun({ text: "Pad: ", bold: true, size: 24 }),
-                new DocxTextRun({
-                  text: stickDataWithPads.pads?.name || "Unknown Pad",
-                  size: 24,
-                }),
-              ],
-              spacing: { after: 200 },
-            }),
-            new DocxParagraph({
-              children: [
-                new DocxTextRun({ text: "Created: ", bold: true, size: 24 }),
-                new DocxTextRun({
-                  text: new Date(stickDataWithPads.created_at).toLocaleDateString(),
-                  size: 24,
-                }),
-              ],
-              spacing: { after: 200 },
-            }),
-
-            // Main Content
-            new DocxParagraph({
-              text: "MAIN CONTENT",
-              heading: HeadingLevel?.HEADING_1,
-              spacing: { before: 400, after: 200 },
-            }),
-            new DocxParagraph({
-              children: [
-                new DocxTextRun({
-                  text: stickDataWithPads.content || "No content provided.",
-                  size: 24,
-                }),
-              ],
-              spacing: { after: 400 },
-            }),
-
-            // Media Content
-            ...(videoLinks.length > 0 || imageLinks.length > 0
-              ? [
-                  new DocxParagraph({
-                    text: "MEDIA CONTENT",
-                    heading: HeadingLevel?.HEADING_1,
-                    spacing: { before: 400, after: 200 },
-                  }),
-                  ...(videoLinks.length > 0
-                    ? [
-                        new DocxParagraph({
-                          children: [
-                            new DocxTextRun({
-                              text: "Videos:",
-                              bold: true,
-                              size: 24,
-                            }),
-                          ],
-                          spacing: { after: 200 },
-                        }),
-                        ...videoLinks.map(
-                          (video: any) =>
-                            new DocxParagraph({
-                              children: [
-                                new DocxTextRun({
-                                  text: `• ${video.title || "Untitled"}: ${
-                                    video.embed_url || video.url
-                                  }`,
-                                  size: 24,
-                                }),
-                              ],
-                              spacing: { after: 200 },
-                            })
-                        ),
-                      ]
-                    : []),
-                  ...(imageLinks.length > 0
-                    ? [
-                        new DocxParagraph({
-                          children: [
-                            new DocxTextRun({
-                              text: "Images:",
-                              bold: true,
-                              size: 24,
-                            }),
-                          ],
-                          spacing: { after: 200 },
-                        }),
-                        ...imageLinks.map(
-                          (image: any) =>
-                            new DocxParagraph({
-                              children: [
-                                new DocxTextRun({
-                                  text: `• ${image.caption || "Untitled"}: ${
-                                    image.url
-                                  }`,
-                                  size: 24,
-                                }),
-                              ],
-                              spacing: { after: 200 },
-                            })
-                        ),
-                      ]
-                    : []),
-                ]
-              : []),
-
-            // Discussion and Replies
-            new DocxParagraph({
-              text: `DISCUSSION AND REPLIES (${repliesWithUsers?.length || 0})`,
-              heading: HeadingLevel?.HEADING_1,
-              spacing: { before: 400, after: 200 },
-            }),
-            ...(repliesWithUsers && repliesWithUsers.length > 0
-              ? repliesWithUsers.flatMap((reply: any) => [
-                  new DocxParagraph({
-                    children: [
-                      new DocxTextRun({
-                        text: `${
-                          reply.user?.username ||
-                          reply.user?.email ||
-                          "Anonymous User"
-                        }`,
-                        bold: true,
-                        size: 26,
-                      }),
-                      new DocxTextRun({
-                        text: ` (${new Date(
-                          reply.created_at
-                        ).toLocaleDateString()})`,
-                        italics: true,
-                        size: 22,
-                      }),
-                    ],
-                    spacing: { after: 100 },
-                  }),
-                  new DocxParagraph({
-                    children: [
-                      new DocxTextRun({
-                        text: reply.content,
-                        size: 24,
-                      }),
-                    ],
-                    spacing: { after: 400 },
-                  }),
-                ])
-              : [
-                  new DocxParagraph({
-                    children: [
-                      new DocxTextRun({
-                        text: "No replies or discussion available.",
-                        italics: true,
-                        size: 24,
-                      }),
-                    ],
-                    spacing: { after: 300 },
-                  }),
-                ]),
-
-            // Document Footer
-            new DocxParagraph({
-              text: "END OF DOCUMENT",
-              heading: HeadingLevel?.HEADING_2,
-              spacing: { before: 600, after: 200 },
-            }),
-            new DocxParagraph({
-              children: [
-                new DocxTextRun({
-                  text: "This document contains a comprehensive export of the Multi-pak Stick including all content, media, and discussion threads. Generated automatically by Stick My Note application.",
-                  italics: true,
-                  size: 20,
-                }),
-              ],
-              spacing: { after: 200 },
-            }),
-          ],
-        },
-      ],
-    });
-
-    const buffer = await DocxPacker.toBuffer(doc);
-
-    const filename = generateExportFilename(stickDataWithPads.topic);
-
-    // Save to local public/exports directory
-    const exportsDir = path.join(process.cwd(), "public", "exports");
-    await mkdir(exportsDir, { recursive: true });
-    const filePath = path.join(exportsDir, filename);
-    await writeFile(filePath, Buffer.from(buffer));
-
-    // Generate URL for local file
-    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
-    const fileUrl = `${baseUrl}/exports/${filename}`;
-
-    const exportLink = buildExportLink(fileUrl, filename);
-
-    await saveExportLink(db, stickId, user.id, stickOrgId, exportLink);
+    // Record the export in the stick's Details tab
+    const exportLink = buildExportLink(fileUrl, filename)
+    await saveExportLink(db, stickId, user.id, stickOrgId, exportLink)
 
     return NextResponse.json({
       success: true,
       exportUrl: fileUrl,
-      filename: filename,
+      filename,
       message: "Complete stick export generated successfully",
-    });
+    })
   } catch (error) {
-    console.error("Export stick error:", error);
+    console.error("Export stick error:", error)
     return NextResponse.json(
       { error: `Failed to export stick: ${(error as Error).message}` },
       { status: 500 }
-    );
+    )
   }
 }

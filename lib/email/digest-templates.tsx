@@ -130,40 +130,70 @@ export function generateDigestEmailHtml(data: DigestEmailData): string {
   `
 }
 
+// Build the plain-text counter lines for one pad (new sticks, replies,
+// etc.). Returns an array of already-indented strings, or [] if the pad
+// has zero of every category.
+function formatPadCounters(pad: PadDigestSummary): string[] {
+  const lines: string[] = []
+  if (pad.newSticks > 0) lines.push(`  • ${pad.newSticks} new stick(s)`)
+  if (pad.replies > 0) lines.push(`  • ${pad.replies} reply/replies`)
+  if (pad.statusChanges > 0) lines.push(`  • ${pad.statusChanges} status change(s)`)
+  if (pad.unresolvedBlockers > 0) lines.push(`  • ${pad.unresolvedBlockers} blocker(s)`)
+  if (pad.mentions > 0) lines.push(`  • ${pad.mentions} mention(s)`)
+  return lines
+}
+
+// Format the first 5 notification items for one pad, plus an optional
+// "+N more" line. Returns an array of strings; empty if there are no
+// notifications.
+function formatPadNotifications(notifications: DigestNotification[]): string[] {
+  const lines = notifications.slice(0, 5).map((n) => `  - ${n.title}: ${n.message}`)
+  if (notifications.length > 5) {
+    lines.push(`  + ${notifications.length - 5} more updates`)
+  }
+  return lines
+}
+
+// Render the full plain-text block for a single pad: header, counters,
+// notification excerpts, and a trailing blank line.
+function renderPadBlock(pad: PadDigestSummary): string {
+  const parts: string[] = [`--- ${pad.padName} ---`]
+  parts.push(...formatPadCounters(pad))
+  parts.push("") // blank line between counters and notifications
+  parts.push(...formatPadNotifications(pad.notifications))
+  parts.push("") // trailing blank line between pads
+  return parts.join("\n")
+}
+
 export function generateDigestPlainText(data: DigestEmailData): string {
   const { userName, frequency, periodStart, periodEnd, totalNotifications, padSummaries, siteUrl } = data
 
   const periodLabel = frequency === "daily" ? "Daily" : "Weekly"
   const greeting = userName ? `Hi ${userName.split(" ")[0]},` : "Hi there,"
+  const periodPhrase = frequency === "daily" ? "today" : "this week"
 
-  let text = `${periodLabel} Digest - Stick My Note\n`
-  text += `${formatDate(periodStart)} - ${formatDate(periodEnd)}\n\n`
-  text += `${greeting}\n\n`
-  text += `Here's what happened across your pads ${frequency === "daily" ? "today" : "this week"}:\n\n`
-  text += `Total updates: ${totalNotifications}\n\n`
+  const header = [
+    `${periodLabel} Digest - Stick My Note`,
+    `${formatDate(periodStart)} - ${formatDate(periodEnd)}`,
+    "",
+    greeting,
+    "",
+    `Here's what happened across your pads ${periodPhrase}:`,
+    "",
+    `Total updates: ${totalNotifications}`,
+    "",
+  ].join("\n")
 
-  for (const pad of padSummaries) {
-    text += `--- ${pad.padName} ---\n`
-    if (pad.newSticks > 0) text += `  • ${pad.newSticks} new stick(s)\n`
-    if (pad.replies > 0) text += `  • ${pad.replies} reply/replies\n`
-    if (pad.statusChanges > 0) text += `  • ${pad.statusChanges} status change(s)\n`
-    if (pad.unresolvedBlockers > 0) text += `  • ${pad.unresolvedBlockers} blocker(s)\n`
-    if (pad.mentions > 0) text += `  • ${pad.mentions} mention(s)\n`
-    text += `\n`
+  const padBlocks = padSummaries.map(renderPadBlock).join("")
 
-    for (const n of pad.notifications.slice(0, 5)) {
-      text += `  - ${n.title}: ${n.message}\n`
-    }
-    if (pad.notifications.length > 5) {
-      text += `  + ${pad.notifications.length - 5} more updates\n`
-    }
-    text += `\n`
-  }
+  const footer = [
+    `View all activity: ${siteUrl}/social`,
+    "",
+    `Manage preferences: ${siteUrl}/settings/notifications`,
+    "",
+  ].join("\n")
 
-  text += `View all activity: ${siteUrl}/social\n\n`
-  text += `Manage preferences: ${siteUrl}/settings/notifications\n`
-
-  return text
+  return header + padBlocks + footer
 }
 
 function escapeHtml(str: string): string {
