@@ -85,7 +85,7 @@ export function isValidEmail(email: string | null | undefined): boolean {
 }
 
 // --- hasNestedQuantifier: scanner with small helpers so each step stays
-// simple enough to keep cognitive complexity under SonarQube's S3776 limit.
+// simple enough to keep cognitive complexity under SonarCloud's S3776 limit.
 
 // Returns the index of the closing `]` of a character class that starts at
 // pattern[i] (which must be `[`). Backslash-escaped characters inside the
@@ -105,52 +105,57 @@ function isRepetitionQuantifier(ch: string | undefined): boolean {
   return ch === "+" || ch === "*" || ch === "{"
 }
 
+// Per-character dispatch for hasNestedQuantifier. Returns either:
+//   { found: true }                      — nested repetition detected, stop
+//   { found: false, nextIndex: number }  — continue scanning from nextIndex
+// Splitting the main loop's branching into this helper keeps the loop body
+// to a single switch-like expression, satisfying S3776 cognitive complexity.
+function scanQuantifierStep(
+  pattern: string,
+  i: number,
+  stack: boolean[],
+): { found: true } | { found: false; nextIndex: number } {
+  const ch = pattern[i]
+
+  if (ch === "\\") return { found: false, nextIndex: i + 2 }
+
+  if (ch === "[") return { found: false, nextIndex: skipCharClass(pattern, i) + 1 }
+
+  if (ch === "(") {
+    stack.push(false)
+    return { found: false, nextIndex: i + 1 }
+  }
+
+  if (ch === ")") {
+    const hadInner = stack.pop() ?? false
+    if (hadInner && isRepetitionQuantifier(pattern[i + 1])) return { found: true }
+    return { found: false, nextIndex: i + 1 }
+  }
+
+  if (isRepetitionQuantifier(ch) && stack.length > 0) {
+    stack[stack.length - 1] = true
+  }
+  return { found: false, nextIndex: i + 1 }
+}
+
 // Scan a regex pattern string for nested-quantifier shapes like (a+)+,
 // (.*)* etc. — the classic catastrophic-backtracking signature. Returns
 // true if the pattern looks unsafe. Used to validate admin-configured
 // DLP patterns before compiling/running them.
 //
-// Implemented as a character-by-character scan (no regex) so SonarQube
+// Implemented as a character-by-character scan (no regex) so SonarCloud
 // can't flag *this* function itself under S5852.
 export function hasNestedQuantifier(pattern: string): boolean {
-  // innerQuantifierStack[d] === true means some quantifier has been seen
-  // inside the currently-open group at depth d. A closing `)` followed by
-  // `+`/`*`/`{` on a group where that flag is true is nested repetition.
-  const innerQuantifierStack: boolean[] = []
-
+  // stack[d] === true means some quantifier has been seen inside the
+  // currently-open group at depth d. A closing `)` followed by `+`/`*`/`{`
+  // on a group where that flag is true is nested repetition.
+  const stack: boolean[] = []
   let i = 0
   while (i < pattern.length) {
-    const ch = pattern[i]
-
-    if (ch === "\\") {
-      i += 2 // skip escaped character
-      continue
-    }
-
-    if (ch === "[") {
-      i = skipCharClass(pattern, i) + 1
-      continue
-    }
-
-    if (ch === "(") {
-      innerQuantifierStack.push(false)
-      i++
-      continue
-    }
-
-    if (ch === ")") {
-      const hadInner = innerQuantifierStack.pop() ?? false
-      if (hadInner && isRepetitionQuantifier(pattern[i + 1])) return true
-      i++
-      continue
-    }
-
-    if (isRepetitionQuantifier(ch) && innerQuantifierStack.length > 0) {
-      innerQuantifierStack[innerQuantifierStack.length - 1] = true
-    }
-    i++
+    const step = scanQuantifierStep(pattern, i, stack)
+    if (step.found) return true
+    i = step.nextIndex
   }
-
   return false
 }
 
