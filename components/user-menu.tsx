@@ -197,9 +197,9 @@ export function UserMenu({
           <span>Dashboard</span>
         </DropdownMenuItem>
         <DropdownMenuSeparator />
-        <DropdownMenuItem onClick={() => router.push("/personal")}>
+        <DropdownMenuItem onClick={() => router.push("/concur")}>
           <StickyNote className="mr-2 h-4 w-4" />
-          <span>Personal Hub</span>
+          <span>Concur Hub</span>
         </DropdownMenuItem>
         <DropdownMenuItem onClick={() => router.push("/paks")}>
           <FolderKanban className="mr-2 h-4 w-4" />
