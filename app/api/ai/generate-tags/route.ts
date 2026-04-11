@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server"
 import { getCachedAuthUser, createRateLimitResponse, createUnauthorizedResponse } from "@/lib/auth/cached-auth"
 import {
-  type Hyperlink,
   fetchSearXNGResults,
   formatHyperlinks,
   deduplicateByUrl,

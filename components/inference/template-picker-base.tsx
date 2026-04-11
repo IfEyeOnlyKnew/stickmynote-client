@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, type ReactNode } from "react"
+import { useState, useEffect, useRef, type ReactNode } from "react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import {
@@ -59,19 +59,24 @@ export function TemplatePickerBase<T extends TemplateBase>(props: Readonly<Templ
   const [selectedCategory, setSelectedCategory] = useState<string>("all")
   const [searchQuery, setSearchQuery] = useState("")
   const [open, setOpen] = useState(false)
-  const [, setLoading] = useState(false)
+  // Loading flag is never read by the UI — the Dialog handles its own visual
+  // pending state. Kept as a ref so we could add a spinner later without
+  // triggering a re-render, and so S6754 doesn't flag a throwaway setter.
+  const loadingRef = useRef(false)
 
   /* eslint-disable react-hooks/exhaustive-deps */
   useEffect(() => {
     if (!open) return
-    setLoading(true)
+    loadingRef.current = true
     fetchTemplates()
       .then((data) => {
         setTemplates(data.templates || [])
         setCategories(data.categories || {})
       })
       .catch((err) => console.error("Error fetching templates:", err))
-      .finally(() => setLoading(false))
+      .finally(() => {
+        loadingRef.current = false
+      })
   }, [open])
   /* eslint-enable react-hooks/exhaustive-deps */
 

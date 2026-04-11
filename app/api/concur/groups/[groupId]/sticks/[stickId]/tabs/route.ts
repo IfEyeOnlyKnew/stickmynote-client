@@ -5,9 +5,6 @@ import { getOrgContext } from "@/lib/auth/get-org-context"
 import { getCachedAuthUser, createRateLimitResponse, createUnauthorizedResponse } from "@/lib/auth/cached-auth"
 import {
   type DbTabType,
-  type VideoInfo,
-  type ImageInfo,
-  type ExportLink,
   getTabName,
   getTabOrder,
   normalizeTabData,

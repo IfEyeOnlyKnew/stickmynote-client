@@ -9,7 +9,7 @@ export function cn(...inputs: ClassValue[]) {
 // inside a RegExp constructor. Prevents ReDoS and broken patterns when the
 // input contains characters like ( ) [ ] . * + ? | \ etc.
 export function escapeRegExp(input: string): string {
-  return input.replaceAll(/[.*+?^${}()|[\]\\]/g, "\\$&")
+  return input.replaceAll(/[.*+?^${}()|[\]\\]/g, String.raw`\$&`)
 }
 
 // Strip HTML tags from a string using a single linear pass. Replaces the
@@ -25,8 +25,7 @@ export function stripHtmlTags(html: string | null | undefined, maxLen = 10_000):
   const bounded = html.length > maxLen ? html.slice(0, maxLen) : html
   const out: string[] = []
   let inTag = false
-  for (let i = 0; i < bounded.length; i++) {
-    const ch = bounded[i]
+  for (const ch of bounded) {
     if (ch === "<") {
       inTag = true
     } else if (ch === ">") {
@@ -37,6 +36,18 @@ export function stripHtmlTags(html: string | null | undefined, maxLen = 10_000):
   }
   return out.join("")
 }
+
+// Codepoints SonarCloud wants us to treat as whitespace for email validation.
+// Kept as a frozen set so the hot path uses Set#has (O(1)) instead of a
+// chain of === comparisons.
+const EMAIL_DISALLOWED_WHITESPACE = new Set<number>([
+  32, // space
+  9,  // tab
+  10, // LF
+  13, // CR
+  11, // VT
+  12, // FF
+])
 
 // Validate an email address using linear string operations only. Replaces
 // `/^[^\s@]+@[^\s@]+\.[^\s@]+$/` which SonarQube S5852 flags for having
@@ -51,27 +62,47 @@ export function isValidEmail(email: string | null | undefined): boolean {
   const e = email.trim()
   if (e.length === 0 || e.length > 254) return false
 
-  // No whitespace anywhere (single O(n) scan)
-  for (let i = 0; i < e.length; i++) {
-    const c = e.charCodeAt(i)
-    // space, tab, LF, CR, VT, FF
-    if (c === 32 || c === 9 || c === 10 || c === 13 || c === 11 || c === 12) return false
+  // No whitespace anywhere (single O(n) scan). for-of iterates code points,
+  // so `ch.codePointAt(0)` is correct even for astral characters.
+  for (const ch of e) {
+    const c = ch.codePointAt(0) ?? 0
+    if (EMAIL_DISALLOWED_WHITESPACE.has(c)) return false
   }
 
   const at = e.indexOf("@")
   if (at < 1) return false
-  if (e.indexOf("@", at + 1) !== -1) return false // more than one @
+  if (e.substring(at + 1).includes("@")) return false // more than one @
 
   const local = e.substring(0, at)
   const domain = e.substring(at + 1)
   if (local.length === 0 || domain.length === 0) return false
   if (domain.length > 253) return false
 
-  const dot = domain.indexOf(".")
-  if (dot < 1) return false
+  if (!domain.includes(".")) return false
   if (domain.startsWith(".") || domain.endsWith(".")) return false
 
   return true
+}
+
+// --- hasNestedQuantifier: scanner with small helpers so each step stays
+// simple enough to keep cognitive complexity under SonarQube's S3776 limit.
+
+// Returns the index of the closing `]` of a character class that starts at
+// pattern[i] (which must be `[`). Backslash-escaped characters inside the
+// class are skipped. If no `]` is found, returns pattern.length.
+function skipCharClass(pattern: string, start: number): number {
+  let i = start + 1
+  while (i < pattern.length && pattern[i] !== "]") {
+    if (pattern[i] === "\\") i++
+    i++
+  }
+  return i
+}
+
+// True if the character at index i is a top-level repetition quantifier
+// (`+`, `*`, or the start of a `{n,m}` quantifier).
+function isRepetitionQuantifier(ch: string | undefined): boolean {
+  return ch === "+" || ch === "*" || ch === "{"
 }
 
 // Scan a regex pattern string for nested-quantifier shapes like (a+)+,
@@ -82,51 +113,42 @@ export function isValidEmail(email: string | null | undefined): boolean {
 // Implemented as a character-by-character scan (no regex) so SonarQube
 // can't flag *this* function itself under S5852.
 export function hasNestedQuantifier(pattern: string): boolean {
-  let depth = 0
-  // Track whether any `+`/`*`/`{n,}` quantifier appeared since the current
-  // group's opening paren. If yes, a closing `)` followed by `+`/`*`/`{n,}`
-  // means we have nested repetition.
+  // innerQuantifierStack[d] === true means some quantifier has been seen
+  // inside the currently-open group at depth d. A closing `)` followed by
+  // `+`/`*`/`{` on a group where that flag is true is nested repetition.
   const innerQuantifierStack: boolean[] = []
 
-  for (let i = 0; i < pattern.length; i++) {
+  let i = 0
+  while (i < pattern.length) {
     const ch = pattern[i]
 
     if (ch === "\\") {
-      i++ // skip escaped character
+      i += 2 // skip escaped character
       continue
     }
 
     if (ch === "[") {
-      // skip character class
-      i++
-      while (i < pattern.length && pattern[i] !== "]") {
-        if (pattern[i] === "\\") i++
-        i++
-      }
+      i = skipCharClass(pattern, i) + 1
       continue
     }
 
     if (ch === "(") {
-      depth++
       innerQuantifierStack.push(false)
+      i++
       continue
     }
 
     if (ch === ")") {
       const hadInner = innerQuantifierStack.pop() ?? false
-      depth = Math.max(0, depth - 1)
-      const next = pattern[i + 1]
-      if (hadInner && (next === "+" || next === "*" || next === "{")) {
-        return true
-      }
+      if (hadInner && isRepetitionQuantifier(pattern[i + 1])) return true
+      i++
       continue
     }
 
-    if (ch === "+" || ch === "*" || ch === "{") {
-      if (depth > 0) {
-        innerQuantifierStack[innerQuantifierStack.length - 1] = true
-      }
+    if (isRepetitionQuantifier(ch) && innerQuantifierStack.length > 0) {
+      innerQuantifierStack[innerQuantifierStack.length - 1] = true
     }
+    i++
   }
 
   return false
