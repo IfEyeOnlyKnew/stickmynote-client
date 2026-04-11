@@ -58,12 +58,21 @@ Respond with ONLY a JSON array of tag names, e.g. ["tag1", "tag2", "tag3"]. Keep
       if (!ollamaRes.ok) throw new Error("Ollama request failed")
 
       const ollamaData = await ollamaRes.json()
-      const responseText = ollamaData.response || ""
+      const rawResponse = ollamaData.response || ""
+      // Bound the response before parsing. num_predict: 100 already caps
+      // Ollama's output server-side, but a defensive hard cap here makes
+      // the subsequent linear scan obviously O(n) with small n and avoids
+      // SonarCloud S5852 false positives on regex-based JSON array extraction.
+      const responseText: string = rawResponse.length > 2000 ? rawResponse.slice(0, 2000) : rawResponse
 
-      // Parse JSON array from response
-      const match = responseText.match(/\[[\s\S]*?\]/)
-      if (match) {
-        const suggestedTags: string[] = JSON.parse(match[0])
+      // Extract the first [...] JSON array via linear indexOf scans.
+      // Replaces /\[[\s\S]*?\]/ which SonarCloud S5852 flags for unbounded
+      // repetition. Both operations are O(n), no backtracking possible.
+      const openIdx = responseText.indexOf("[")
+      const closeIdx = openIdx >= 0 ? responseText.indexOf("]", openIdx + 1) : -1
+      if (openIdx >= 0 && closeIdx > openIdx) {
+        const jsonSlice = responseText.substring(openIdx, closeIdx + 1)
+        const suggestedTags: string[] = JSON.parse(jsonSlice)
         const cleanTags = suggestedTags
           .filter((t): t is string => typeof t === "string" && t.trim().length > 0)
           .map((t) => t.trim().toLowerCase())
