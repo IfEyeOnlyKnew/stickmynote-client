@@ -271,6 +271,7 @@ export function PMHubTab() {
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
                   {MONTHS.map((m, i) => (
+                    // eslint-disable-next-line react/no-array-index-key -- MONTHS is a fixed-length constant in calendar order
                     <SelectItem key={i + 1} value={String(i + 1)}>{m}</SelectItem>
                   ))}
                 </SelectContent>

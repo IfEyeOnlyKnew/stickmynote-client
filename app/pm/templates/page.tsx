@@ -210,6 +210,7 @@ export default function TemplatesPage() {
       {loading && (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {[1, 2, 3, 4, 5, 6].map((i) => (
+            // eslint-disable-next-line react/no-array-index-key -- fungible loading skeletons
             <Card key={i} className="animate-pulse">
               <CardContent className="pt-4"><div className="h-20 bg-muted rounded" /></CardContent>
             </Card>

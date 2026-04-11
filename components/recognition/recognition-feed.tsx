@@ -137,6 +137,7 @@ export function RecognitionFeed({ filterValueId }: Readonly<RecognitionFeedProps
     return (
       <div className="space-y-4">
         {[1, 2, 3].map(i => (
+          // eslint-disable-next-line react/no-array-index-key -- fungible loading skeletons
           <Card key={i} className="animate-pulse">
             <CardContent className="p-6">
               <div className="flex gap-3">

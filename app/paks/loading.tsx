@@ -11,6 +11,7 @@ export default function PaksLoading() {
 
       <div className="grid md:grid-cols-2 gap-6">
         {[1, 2].map((i) => (
+          // eslint-disable-next-line react/no-array-index-key -- fungible loading skeletons
           <Card key={i}>
             <CardHeader className="text-center">
               <Skeleton className="w-12 h-12 rounded-lg mx-auto mb-4" />

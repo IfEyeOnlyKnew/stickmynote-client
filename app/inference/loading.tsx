@@ -30,6 +30,7 @@ export default function InferenceLoading() {
         {/* Content skeleton */}
         <div className="space-y-8">
           {[1, 2].map((i) => (
+            // eslint-disable-next-line react/no-array-index-key -- fungible loading skeletons
             <div key={i} className="space-y-4">
               <div className="flex items-center justify-between">
                 <Skeleton className="h-8 w-48" />

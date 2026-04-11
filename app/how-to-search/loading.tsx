@@ -82,6 +82,7 @@ export default function HowToSearchLoading() {
             </CardHeader>
             <CardContent className="space-y-4">
               {Array.from({ length: 5 }).map((_, index) => (
+                // eslint-disable-next-line react/no-array-index-key -- fungible loading skeletons, no reorder/identity
                 <div key={`tip-skeleton-${index}`} className="flex items-start gap-3">
                   <Skeleton className="w-6 h-6 rounded-full flex-shrink-0 mt-0.5" />
                   <div className="space-y-2 flex-1">
@@ -147,6 +148,7 @@ export default function HowToSearchLoading() {
                 <div className="space-y-4">
                   <Skeleton className="h-6 w-32" />
                   {Array.from({ length: 4 }).map((_, index) => (
+                    // eslint-disable-next-line react/no-array-index-key -- fungible loading skeletons
                     <div key={`left-ref-${index}`} className="flex items-center gap-3">
                       <Skeleton className="w-4 h-4 rounded" />
                       <Skeleton className="h-4 w-full" />
@@ -158,6 +160,7 @@ export default function HowToSearchLoading() {
                 <div className="space-y-4">
                   <Skeleton className="h-6 w-36" />
                   {Array.from({ length: 4 }).map((_, index) => (
+                    // eslint-disable-next-line react/no-array-index-key -- fungible loading skeletons
                     <div key={`right-ref-${index}`} className="flex items-center gap-3">
                       <Skeleton className="w-4 h-4 rounded" />
                       <Skeleton className="h-4 w-full" />

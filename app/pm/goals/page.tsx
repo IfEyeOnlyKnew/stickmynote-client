@@ -293,6 +293,7 @@ export default function GoalsPage() {
       {loading && (
         <div className="space-y-4">
           {[1, 2, 3].map((i) => (
+            // eslint-disable-next-line react/no-array-index-key -- fungible loading skeletons
             <Card key={i} className="animate-pulse">
               <CardContent className="pt-4"><div className="h-6 bg-muted rounded w-48" /></CardContent>
             </Card>

@@ -156,6 +156,7 @@ export default function MyInferenceSticksPage() {
         {loadingSticks && (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {[0, 1, 2, 3, 4, 5, 6, 7, 8].map((n) => (
+              // eslint-disable-next-line react/no-array-index-key -- fungible loading skeletons
               <StickCardSkeleton key={`skeleton-${n}`} />
             ))}
           </div>

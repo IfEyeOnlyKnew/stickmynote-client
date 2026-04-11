@@ -52,6 +52,7 @@ export function BadgeDisplay({ userId, compact = false, maxDisplay }: Readonly<B
     return (
       <div className="flex gap-2">
         {[1, 2, 3].map(i => (
+          // eslint-disable-next-line react/no-array-index-key -- fungible loading skeletons
           <div key={i} className="h-10 w-10 rounded-full bg-gray-200 animate-pulse" />
         ))}
       </div>

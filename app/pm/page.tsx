@@ -169,6 +169,7 @@ export default function PMDashboard() {
       {loading && (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {[0, 1, 2, 3, 4, 5].map((n) => (
+            // eslint-disable-next-line react/no-array-index-key -- fungible loading skeletons
             <Card key={`skeleton-${n}`} className="animate-pulse">
               <CardHeader className="pb-2"><div className="h-4 bg-muted rounded w-32" /></CardHeader>
               <CardContent><div className="h-8 bg-muted rounded w-20 mt-2" /></CardContent>

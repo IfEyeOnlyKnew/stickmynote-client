@@ -36,6 +36,7 @@ export function RecognitionStats() {
     return (
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         {[1, 2, 3, 4].map(i => (
+          // eslint-disable-next-line react/no-array-index-key -- fungible loading skeletons
           <Card key={i} className="animate-pulse">
             <CardContent className="p-4">
               <div className="h-8 w-8 bg-gray-200 rounded-lg mb-2" />

@@ -95,6 +95,7 @@ export function CardGridSkeleton({
   return (
     <div className={`grid ${gridCols} gap-6`}>
       {Array.from({ length: count }).map((_, i) => (
+        // eslint-disable-next-line react/no-array-index-key -- fungible loading skeletons
         <Card key={`skeleton-${i}`}>
           <CardHeader>
             <Skeleton className="h-6 w-3/4" />

@@ -124,6 +124,7 @@ export function TableSkeleton({ rows = 5 }: Readonly<{ rows?: number }>) {
   return (
     <div className="space-y-3">
       {Array.from({ length: rows }).map((_, i) => (
+        // eslint-disable-next-line react/no-array-index-key -- fungible loading skeletons
         <div key={`row-skeleton-${i}`} className="flex items-center gap-4">
           <Skeleton className="h-12 w-12" />
           <Skeleton className="h-12 flex-1" />

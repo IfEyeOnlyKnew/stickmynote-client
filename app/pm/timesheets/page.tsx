@@ -276,6 +276,7 @@ export default function TimesheetsPage() {
           ))}
           {/* Empty cells for offset */}
           {Array.from({ length: getDay(start) }, (_, n) => n).map((n) => (
+            // eslint-disable-next-line react/no-array-index-key -- static empty-cell offsets in a month calendar grid
             <div key={`offset-${n}`} />
           ))}
           {entriesByDay.map(({ day, total }) => {
@@ -327,6 +328,7 @@ export default function TimesheetsPage() {
       {loading ? (
         <div className="space-y-3">
           {[1, 2, 3].map((i) => (
+            // eslint-disable-next-line react/no-array-index-key -- fungible loading skeletons
             <Card key={i} className="animate-pulse">
               <CardContent className="pt-4"><div className="h-12 bg-muted rounded" /></CardContent>
             </Card>

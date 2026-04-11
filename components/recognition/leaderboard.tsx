@@ -67,6 +67,7 @@ export function Leaderboard({ compact = false, maxEntries }: Readonly<Leaderboar
     return (
       <div className="space-y-3">
         {[1, 2, 3, 4, 5].map(i => (
+          // eslint-disable-next-line react/no-array-index-key -- fungible loading skeletons
           <div key={i} className="flex items-center gap-3 p-3 animate-pulse">
             <div className="h-5 w-5 bg-gray-200 rounded" />
             <div className="h-10 w-10 bg-gray-200 rounded-full" />

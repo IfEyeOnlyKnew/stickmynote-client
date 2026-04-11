@@ -297,6 +297,7 @@ export function SearchStatsDialog({ open, onOpenChange, userId }: Readonly<Searc
           <div className="space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
               {[1, 2, 3, 4].map((i) => (
+                // eslint-disable-next-line react/no-array-index-key -- fungible loading skeletons
                 <LoadingSkeletonItem key={i} i={i} />
               ))}
             </div>

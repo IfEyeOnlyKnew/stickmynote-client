@@ -140,6 +140,7 @@ export default function InvoicesPage() {
       {loading && (
         <div className="space-y-3">
           {[1, 2, 3].map((i) => (
+            // eslint-disable-next-line react/no-array-index-key -- fungible loading skeletons
             <Card key={i} className="animate-pulse">
               <CardContent className="pt-4"><div className="h-16 bg-muted rounded" /></CardContent>
             </Card>

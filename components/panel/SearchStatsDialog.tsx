@@ -66,6 +66,7 @@ export function SearchStatsDialog({ open, onOpenChange, userId }: Readonly<Searc
           <div className="space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               {[1, 2, 3].map((i) => (
+                // eslint-disable-next-line react/no-array-index-key -- fungible loading skeletons
                 <Card key={i}>
                   <CardHeader>
                     <Skeleton className="h-4 w-24" />
