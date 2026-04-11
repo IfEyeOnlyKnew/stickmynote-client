@@ -382,28 +382,6 @@ async function saveExportLinkToDetailsTab(
   }
 }
 
-async function tryCleanupDocx(blobUrl: string, filename: string): Promise<string | null> {
-  try {
-    const cleanupResponse = await fetch(
-      `${process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000"}/api/cleanup-docx`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ blobUrl, filename }),
-      }
-    )
-
-    if (cleanupResponse.ok) {
-      const cleanupResult = await cleanupResponse.json()
-      return cleanupResult.cleanedUrl
-    }
-  } catch (cleanupError) {
-    console.error("[summarize-replies] Cleanup error:", cleanupError)
-    // Fall back to original document if cleanup fails
-  }
-  return null
-}
-
 // ============================================================================
 // Route Handler
 // ============================================================================
@@ -497,13 +475,10 @@ export async function POST(request: NextRequest) {
     const { url: docxUrl, filename } = await generateDocxDocument(summary, replies, tone, noteId)
     console.log("[summarize-replies] DOCX generated:", filename, "URL:", docxUrl)
 
-    const cleanedUrl = await tryCleanupDocx(docxUrl, filename)
-    const finalUrl = cleanedUrl || docxUrl
-
     // Save export link to the note's Details tab
     if (authResult.user?.id) {
       const exportLink: ExportLink = {
-        url: finalUrl,
+        url: docxUrl,
         filename,
         created_at: new Date().toISOString(),
         type: `reply-summary-${tone}`,
@@ -512,7 +487,7 @@ export async function POST(request: NextRequest) {
     }
 
     return NextResponse.json({
-      summary, replyCount: replies.length, tone, docxUrl: finalUrl, filename,
+      summary, replyCount: replies.length, tone, docxUrl, filename,
     })
   } catch (error) {
     console.error(`${LOG_PREFIX} POST error:`, error)

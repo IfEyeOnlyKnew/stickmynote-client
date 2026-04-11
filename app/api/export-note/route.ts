@@ -202,26 +202,6 @@ ${repliesSection}
 Please provide a well-structured, comprehensive summary that captures all aspects of this note. Use clear paragraph breaks to separate different topics and themes. Format it as a professional document that could serve as a complete record of this note's content and discussion.`
 }
 
-async function tryCleanupDocx(blobUrl: string, filename: string): Promise<string> {
-  try {
-    const cleanupResponse = await fetch(
-      `${process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000"}/api/cleanup-docx`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ blobUrl, filename }),
-      },
-    )
-    if (cleanupResponse.ok) {
-      const cleanupResult = await cleanupResponse.json()
-      return cleanupResult.cleanedUrl
-    }
-  } catch (cleanupError) {
-    console.warn("DOCX cleanup error, using original document:", cleanupError)
-  }
-  return blobUrl
-}
-
 async function fetchRepliesWithUsers(db: DatabaseClient, noteId: string) {
   const { data: repliesData } = await db
     .from("personal_sticks_replies")
@@ -459,13 +439,8 @@ export async function POST(request: NextRequest) {
     const filename = `note-export-${noteId}-${Date.now()}.docx`
     const blob = await put(filename, Buffer.from(await docxBlob.arrayBuffer()), { folder: "documents" })
 
-    const finalUrl = await tryCleanupDocx(blob.url, filename)
-    const message = finalUrl === blob.url
-      ? "Complete note export generated successfully"
-      : "Complete note export generated and cleaned successfully"
-
     await saveExportLink(db, noteId, user.id, {
-      url: finalUrl,
+      url: blob.url,
       filename,
       created_at: new Date().toISOString(),
       type: "complete_export",
@@ -473,9 +448,9 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      exportUrl: finalUrl,
+      exportUrl: blob.url,
       filename,
-      message,
+      message: "Complete note export generated successfully",
     })
   } catch (error) {
     console.error("Export note error:", error)

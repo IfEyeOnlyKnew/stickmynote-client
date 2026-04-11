@@ -237,26 +237,6 @@ async function enrichMessagesWithUsers(
   return messagesData.map((m) => ({ ...m, user: userMap.get(m.user_id) ?? undefined }))
 }
 
-async function tryCleanupDocx(blobUrl: string, filename: string): Promise<string> {
-  try {
-    const cleanupResponse = await fetch(
-      `${process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000"}/api/cleanup-docx`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ blobUrl, filename }),
-      }
-    )
-    if (cleanupResponse.ok) {
-      const cleanupResult = await cleanupResponse.json()
-      return cleanupResult.cleanedUrl
-    }
-  } catch (cleanupError) {
-    console.warn("[ChatExport] DOCX cleanup error, using original:", cleanupError)
-  }
-  return blobUrl
-}
-
 // ============================================================================
 // Handler
 // ============================================================================
@@ -473,11 +453,9 @@ export async function POST(
     const filename = `chat-export-${parentReplyId.slice(0, 8)}-${Date.now()}.docx`
     const blob = await put(filename, Buffer.from(await docxBlob.arrayBuffer()), { folder: "documents" })
 
-    const finalUrl = await tryCleanupDocx(blob.url, filename)
-
     // Save export link to Details tab
     await saveExportLink(db, noteId, user.id, {
-      url: finalUrl,
+      url: blob.url,
       filename,
       created_at: new Date().toISOString(),
       type: "chat_export",
@@ -485,7 +463,7 @@ export async function POST(
 
     return NextResponse.json({
       success: true,
-      exportUrl: finalUrl,
+      exportUrl: blob.url,
       filename,
       message: "Chat exported successfully with AI summary",
     })
