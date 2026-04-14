@@ -126,7 +126,9 @@ function renderItem(item: HostedArticleSectionItem, idx: number, accent: string)
                 allowFullScreen
               />
             ) : (
-              <video src={item.url} controls className="w-full h-full" />
+              <video src={item.url} controls className="w-full h-full">
+                <track kind="captions" />
+              </video>
             )}
           </div>
           {item.caption && <figcaption className="text-sm text-gray-500 text-center mt-2">{item.caption}</figcaption>}
