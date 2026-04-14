@@ -4,6 +4,7 @@ import { getOrgContext } from "@/lib/auth/get-org-context"
 import { getCachedAuthUser, createRateLimitResponse, createUnauthorizedResponse } from "@/lib/auth/cached-auth"
 import { publishToOrg } from "@/lib/ws/publish-event"
 import { isConcurAdmin } from "@/lib/concur/concur-auth"
+import { ensureUserProvisioned } from "@/lib/auth/ldap-auth"
 
 // ============================================================================
 // Types
@@ -190,22 +191,25 @@ export async function POST(request: Request) {
       return Errors.missingFields()
     }
 
-    // Lookup owner users by email
+    // Lookup owner users by email — auto-provision from LDAP if needed
+    const owner1Provisioned = await ensureUserProvisioned(owner1Email, orgContext.orgId)
+    if (!owner1Provisioned) return Errors.ownerNotFound(owner1Email)
+    const owner2Provisioned = await ensureUserProvisioned(owner2Email, orgContext.orgId)
+    if (!owner2Provisioned) return Errors.ownerNotFound(owner2Email)
+
     const { data: owner1 } = await serviceDb
       .from("users")
       .select("id, email, full_name")
-      .eq("email", owner1Email.trim().toLowerCase())
+      .eq("id", owner1Provisioned.id)
       .maybeSingle()
-
-    if (!owner1) return Errors.ownerNotFound(owner1Email)
 
     const { data: owner2 } = await serviceDb
       .from("users")
       .select("id, email, full_name")
-      .eq("email", owner2Email.trim().toLowerCase())
+      .eq("id", owner2Provisioned.id)
       .maybeSingle()
 
-    if (!owner2) return Errors.ownerNotFound(owner2Email)
+    if (!owner1 || !owner2) return Errors.ownerNotFound(owner1 ? owner2Email : owner1Email)
 
     // Create group
     const { data: group, error: groupError } = await db

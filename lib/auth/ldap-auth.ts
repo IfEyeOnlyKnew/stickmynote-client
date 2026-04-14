@@ -470,6 +470,89 @@ export async function authenticateWithAD(email: string, password: string): Promi
   }
 }
 
+/**
+ * Find an LDAP user by email — matches sAMAccountName (local part), mail, or userPrincipalName.
+ * More robust than the login-style sAMAccountName-only search when the email local part
+ * doesn't match the user's sAMAccountName.
+ */
+async function findLDAPUserByEmail(client: any, config: LDAPConfig, email: string): Promise<LDAPUser | null> {
+  const escape = (s: string) => s.replaceAll(/[\\*()]/g, (c) => `\\${c}`)
+  const localPart = extractUsername(email)
+  const filter = `(&(objectClass=user)(objectCategory=person)(|(sAMAccountName=${escape(localPart)})(mail=${escape(email)})(userPrincipalName=${escape(email)})))`
+
+  return new Promise((resolve, reject) => {
+    client.search(
+      config.userBaseDN,
+      { filter, scope: "sub" as const, attributes: [...LDAP_SEARCH_ATTRIBUTES], sizeLimit: 1 },
+      (err: Error | null, res: any) => {
+        if (err) return reject(err)
+        let found: LDAPUser | null = null
+        res.on("searchEntry", (entry: LDAPSearchEntry) => {
+          if (!found) {
+            try {
+              found = parseSearchEntry(entry)
+            } catch (e) {
+              console.warn("[LDAP] findLDAPUserByEmail parse error:", e)
+            }
+          }
+        })
+        res.on("error", (e: Error) => {
+          if (e.message?.includes("Size Limit Exceeded")) resolve(found)
+          else reject(e)
+        })
+        res.on("end", () => resolve(found))
+      },
+    )
+  })
+}
+
+/**
+ * Ensure a user by email is provisioned in the local DB (via LDAP lookup if needed),
+ * and optionally ensure they belong to the given organization.
+ * Returns the user, or null if no matching LDAP/DB user exists.
+ */
+export async function ensureUserProvisioned(
+  email: string,
+  orgId?: string,
+): Promise<{ id: string; email: string; full_name: string | null } | null> {
+  const normalized = email.trim().toLowerCase()
+  if (!normalized) return null
+
+  let userRow = (
+    await db.query<{ id: string; email: string; full_name: string | null }>(
+      `SELECT id, email, full_name FROM users WHERE LOWER(email) = $1 LIMIT 1`,
+      [normalized],
+    )
+  ).rows[0]
+
+  if (!userRow) {
+    const config = getLDAPConfig()
+    const client = await createLDAPClient(config.url)
+    let ldapUser: LDAPUser | null = null
+    try {
+      await bindLDAP(client, config.bindDN, config.bindPassword)
+      ldapUser = await findLDAPUserByEmail(client, config, normalized)
+    } catch (err) {
+      console.error("[LDAP] ensureUserProvisioned lookup error:", err)
+    } finally {
+      safeUnbind(client)
+    }
+    if (!ldapUser) return null
+
+    const provisioned = await provisionUser(ldapUser)
+    userRow = { id: provisioned.id, email: provisioned.email, full_name: provisioned.full_name }
+  }
+
+  if (orgId) {
+    const orgRow = (
+      await db.query<{ name: string }>(`SELECT name FROM organizations WHERE id = $1`, [orgId])
+    ).rows[0]
+    await ensureOrganizationMembership(orgId, userRow.id, orgRow?.name || "organization")
+  }
+
+  return userRow
+}
+
 export async function testLDAPConnection(): Promise<{ success: boolean; message: string }> {
   const config = getLDAPConfig()
   const client = await createLDAPClient(config.url)

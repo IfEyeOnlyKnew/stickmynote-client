@@ -9,13 +9,17 @@ import { NoteFullscreenHeader } from "./note-fullscreen/NoteFullscreenHeader"
 import { NoteFullscreenContent } from "./note-fullscreen/NoteFullscreenContent"
 import { NoteFullscreenReplies } from "./note-fullscreen/NoteFullscreenReplies"
 import { SummarizeLinksButton } from "./ui/summarize-links-button"
-import { Trash2, Share2, Lock, MessagesSquare, Video, Sparkles } from "lucide-react"
+import { Trash2, Share2, Lock, MessagesSquare, Video, Sparkles, Globe } from "lucide-react"
+import { useToast } from "@/hooks/use-toast"
 import { CreateChatModal } from "@/components/stick-chats/CreateChatModal"
 import { AskAIModal } from "@/components/ai/AskAIModal"
 
 export const UnifiedNoteFullscreen: React.FC = () => {
   const [chatModalOpen, setChatModalOpen] = useState(false)
   const [askAIOpen, setAskAIOpen] = useState(false)
+  const [isPublishing, setIsPublishing] = useState(false)
+  const [publishedSlug, setPublishedSlug] = useState<string | null>(null)
+  const { toast } = useToast()
   const context = useNoteContext()
   const {
     note,
@@ -83,6 +87,20 @@ export const UnifiedNoteFullscreen: React.FC = () => {
   useEffect(() => {
     onEditStateChange?.(note.id, isEditing)
   }, [isEditing, note.id, onEditStateChange])
+
+  useEffect(() => {
+    if (isNewNote || !note.id) return
+    let cancelled = false
+    fetch(`/api/sticks/${note.id}/hosted-page`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => {
+        if (!cancelled && data?.exists) setPublishedSlug(data.slug)
+      })
+      .catch(() => {})
+    return () => {
+      cancelled = true
+    }
+  }, [note.id, isNewNote])
 
   // Check if a link summary report has been generated
   // The report is stored in the details field and contains "LINK SUMMARY REPORT" marker
@@ -223,6 +241,60 @@ export const UnifiedNoteFullscreen: React.FC = () => {
                 onClick={() => onSummarizeLinks(note.id)}
                 isSummarizing={summarizingLinks === note.id}
               />
+            )}
+
+            <Button
+              variant="outline"
+              size="sm"
+              className="text-xs h-6"
+              disabled={isPublishing}
+              onClick={async () => {
+                setIsPublishing(true)
+                toast({
+                  title: "Publishing page...",
+                  description: "Ollama is writing the article. This can take 15-30 seconds.",
+                })
+                try {
+                  const res = await fetch(`/api/sticks/${note.id}/hosted-page`, { method: "POST" })
+                  const data = await res.json()
+                  if (!res.ok) {
+                    toast({ title: data.error || "Failed to publish page", variant: "destructive" })
+                    return
+                  }
+                  await navigator.clipboard.writeText(data.url).catch(() => {})
+                  setPublishedSlug(data.slug)
+                  toast({ title: "Page published", description: `Opened in new tab. URL copied.` })
+                  window.open(data.url, "_blank", "noopener")
+                } catch {
+                  toast({ title: "Failed to publish page", variant: "destructive" })
+                } finally {
+                  setIsPublishing(false)
+                }
+              }}
+            >
+              {isPublishing ? (
+                <>
+                  <div className="h-3 w-3 mr-1 animate-spin rounded-full border-2 border-gray-300 border-t-gray-600" />
+                  Publishing...
+                </>
+              ) : (
+                <>
+                  <Globe className="h-3 w-3 mr-1" />
+                  {publishedSlug ? "Republish as Page" : "Publish as Page"}
+                </>
+              )}
+            </Button>
+
+            {publishedSlug && !isPublishing && (
+              <Button
+                variant="outline"
+                size="sm"
+                className="text-xs h-6"
+                onClick={() => window.open(`/hosted/${publishedSlug}`, "_blank", "noopener")}
+              >
+                <Globe className="h-3 w-3 mr-1" />
+                View Published Page
+              </Button>
             )}
           </div>
         )}

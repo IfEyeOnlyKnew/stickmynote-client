@@ -2,6 +2,7 @@ import { type NextRequest, NextResponse } from "next/server"
 import { createServiceDatabaseClient } from "@/lib/database/database-adapter"
 import { getCachedAuthUser, createRateLimitResponse, createUnauthorizedResponse } from "@/lib/auth/cached-auth"
 import { padChatCache } from "@/lib/cache/pad-chat-cache"
+import { ensureUserProvisioned } from "@/lib/auth/ldap-auth"
 
 export const dynamic = "force-dynamic"
 
@@ -231,7 +232,11 @@ export async function POST(
       return NextResponse.json({ error: "Email is required" }, { status: 400 })
     }
 
-    const user = await getUserByEmail(db, email)
+    const provisioned = await ensureUserProvisioned(email)
+    if (!provisioned) {
+      return NextResponse.json({ error: "User not found with that email" }, { status: 404 })
+    }
+    const user = await getUserByEmail(db, provisioned.email)
     if (!user) {
       return NextResponse.json({ error: "User not found with that email" }, { status: 404 })
     }

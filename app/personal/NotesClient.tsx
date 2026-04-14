@@ -34,6 +34,10 @@ import { Input } from "@/components/ui/input"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { SimpleNoteGrid } from "@/components/SimpleNoteGrid"
+import { DateGroupedNoteGrid } from "@/components/DateGroupedNoteGrid"
+import { Calendar } from "lucide-react"
+import { Switch } from "@/components/ui/switch"
+import { Label } from "@/components/ui/label"
 import { UserMenu } from "@/components/user-menu"
 import { BreadcrumbNav } from "@/components/breadcrumb-nav"
 
@@ -124,6 +128,19 @@ export function NotesClient({ initialNotes, userId, stats }: Readonly<NotesClien
   // UI state
   const [searchTerm, setSearchTerm] = useState("")
   const [searchFilter, setSearchFilter] = useState("all")
+  const [groupByDate, setGroupByDate] = useState(false)
+
+  useEffect(() => {
+    if (typeof window === "undefined") return
+    setGroupByDate(window.localStorage.getItem("personal.groupByDate") === "true")
+  }, [])
+
+  const handleToggleGroupByDate = useCallback((value: boolean) => {
+    setGroupByDate(value)
+    if (typeof window !== "undefined") {
+      window.localStorage.setItem("personal.groupByDate", value ? "true" : "false")
+    }
+  }, [])
   const [selectedColor] = useState<(typeof COLORS)[number]>(COLORS[0])
   const [isClient, setIsClient] = useState(false)
   const [summarizingLinks, setSummarizingLinks] = useState<string | null>(null)
@@ -559,6 +576,18 @@ export function NotesClient({ initialNotes, userId, stats }: Readonly<NotesClien
                 </Button>
               )}
 
+              <div className="flex items-center gap-1.5 flex-shrink-0">
+                <Calendar className="h-4 w-4 text-gray-500" />
+                <Switch
+                  id="personal-group-by-date"
+                  checked={groupByDate}
+                  onCheckedChange={handleToggleGroupByDate}
+                />
+                <Label htmlFor="personal-group-by-date" className="text-xs text-gray-600 hidden md:inline cursor-pointer">
+                  By date
+                </Label>
+              </div>
+
               <Select value={searchFilter} onValueChange={setSearchFilter}>
                 <SelectTrigger className="w-20 md:w-32 lg:w-36 flex-shrink-0">
                   <SelectValue />
@@ -644,15 +673,27 @@ export function NotesClient({ initialNotes, userId, stats }: Readonly<NotesClien
               </p>
             </div>
           ) : (
-            <SimpleNoteGrid
-              notes={filteredNotes}
-              onNoteClick={handleNoteClick}
-              onUpdateColor={handleUpdateNoteColor}
-              onLoadMore={loadMoreNotes}
-              hasMore={hasMore}
-              isLoadingMore={loadingMore}
-              loadingNoteId={loadingNoteId}
-            />
+            groupByDate ? (
+              <DateGroupedNoteGrid
+                notes={filteredNotes}
+                onNoteClick={handleNoteClick}
+                onUpdateColor={handleUpdateNoteColor}
+                onLoadMore={loadMoreNotes}
+                hasMore={hasMore}
+                isLoadingMore={loadingMore}
+                loadingNoteId={loadingNoteId}
+              />
+            ) : (
+              <SimpleNoteGrid
+                notes={filteredNotes}
+                onNoteClick={handleNoteClick}
+                onUpdateColor={handleUpdateNoteColor}
+                onLoadMore={loadMoreNotes}
+                hasMore={hasMore}
+                isLoadingMore={loadingMore}
+                loadingNoteId={loadingNoteId}
+              />
+            )
           )}
         </div>
       </div>

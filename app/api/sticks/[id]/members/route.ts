@@ -2,6 +2,7 @@ import { getCachedAuthUser, createRateLimitResponse, createUnauthorizedResponse 
 import { createDatabaseClient } from "@/lib/database/database-adapter"
 import { type NextRequest, NextResponse } from "next/server"
 import { buildInviteLink, sendInvitationEmail } from "@/lib/handlers/stick-members-handler"
+import { ensureUserProvisioned } from "@/lib/auth/ldap-auth"
 
 export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -37,11 +38,16 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
 
     const { data: pad } = await db.from("paks_pads").select("id, title").eq("id", stick.pad_id).maybeSingle()
 
-    // Find the user by email
+    // Find (or auto-provision from LDAP) the user by email
+    const provisioned = await ensureUserProvisioned(email)
+    if (!provisioned) {
+      return NextResponse.json({ error: "User not found" }, { status: 404 })
+    }
+
     const { data: invitedUser } = await db
       .from("users")
       .select("id, email, username")
-      .eq("email", email)
+      .eq("id", provisioned.id)
       .maybeSingle()
 
     if (!invitedUser) {

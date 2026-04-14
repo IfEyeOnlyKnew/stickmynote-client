@@ -2,6 +2,7 @@ import { createDatabaseClient, createServiceDatabaseClient } from "@/lib/databas
 import { NextResponse } from "next/server"
 import { getOrgContext } from "@/lib/auth/get-org-context"
 import { getCachedAuthUser, createRateLimitResponse, createUnauthorizedResponse } from "@/lib/auth/cached-auth"
+import { ensureUserProvisioned } from "@/lib/auth/ldap-auth"
 
 // ============================================================================
 // Constants & Errors
@@ -132,24 +133,19 @@ export async function POST(request: Request, { params }: { params: Promise<{ gro
     const { email, role } = await request.json()
     if (!email?.trim()) return Errors.emailRequired()
 
-    // Lookup user
+    // Lookup user — auto-provision from LDAP and add to org if needed
+    const provisioned = await ensureUserProvisioned(email, orgContext.orgId)
+    if (!provisioned) return Errors.userNotFound(email)
+
     const { data: targetUser } = await serviceDb
       .from("users")
       .select("id, full_name, email, avatar_url")
-      .eq("email", email.trim().toLowerCase())
+      .eq("id", provisioned.id)
       .maybeSingle()
 
-    if (!targetUser) return Errors.userNotFound(email)
-
-    // Check they're in the org
-    const { data: orgMembership } = await db
-      .from("organization_members")
-      .select("id")
-      .eq("org_id", orgContext.orgId)
-      .eq("user_id", targetUser.id)
-      .maybeSingle()
-
-    if (!orgMembership) return Errors.userNotFound(email)
+    if (!targetUser) {
+      return Errors.userNotFound(email)
+    }
 
     // Check if already a member
     const existing = await checkGroupMembership(db, groupId, targetUser.id, orgContext.orgId)

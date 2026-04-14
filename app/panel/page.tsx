@@ -3,7 +3,10 @@
 import { useState, useEffect, useCallback, useRef } from "react"
 import Image from "next/image"
 import { useRouter } from "next/navigation"
-import { Loader2, BarChart3, Sparkles, TrendingUp, ChevronDown } from "lucide-react"
+import { Loader2, BarChart3, Sparkles, TrendingUp, ChevronDown, Calendar } from "lucide-react"
+import { Switch } from "@/components/ui/switch"
+import { Label } from "@/components/ui/label"
+import { groupByDate } from "@/lib/date-grouping"
 
 import { useUser } from "@/contexts/user-context"
 import { useToast } from "@/hooks/use-toast"
@@ -59,6 +62,19 @@ export default function CommunityPanelPage() {
   const [totalResults, setTotalResults] = useState(0)
   const [pendingCount] = useState(0)
   const [showStats, setShowStats] = useState(false)
+  const [groupByDateOn, setGroupByDateOn] = useState(false)
+
+  useEffect(() => {
+    if (typeof window === "undefined") return
+    setGroupByDateOn(window.localStorage.getItem("panel.groupByDate") === "true")
+  }, [])
+
+  const handleToggleGroupByDate = useCallback((value: boolean) => {
+    setGroupByDateOn(value)
+    if (typeof window !== "undefined") {
+      window.localStorage.setItem("panel.groupByDate", value ? "true" : "false")
+    }
+  }, [])
   const [fullscreenHook, setFullscreenHook] = useState<{
     isFullscreen: boolean
     fullscreenItem: string | null
@@ -596,6 +612,57 @@ export default function CommunityPanelPage() {
     </div>
   )
 
+  // Helper: Render a flat or date-grouped grid of community notes
+  const renderNotesGrid = (notesSearchTerm?: string) => {
+    if (!groupByDateOn) {
+      return (
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6 pb-8">
+          {communityNotes.map((note, index) => (
+            <OptimisticSearchResultCard
+              key={note.id}
+              note={note}
+              searchTerm={notesSearchTerm}
+              onOpen={(noteId) => handleNoteClick(noteId, index)}
+              currentUserId={user?.id}
+            />
+          ))}
+        </div>
+      )
+    }
+
+    const groups = groupByDate(communityNotes, (n) => n.updated_at || n.created_at)
+    const indexById = new Map(communityNotes.map((n, i) => [n.id, i]))
+
+    return (
+      <div className="space-y-6 pb-8">
+        {groups.map((group) => (
+          <section key={group.dateKey}>
+            <div className="sticky top-[73px] z-30 py-2 bg-white/90 backdrop-blur-sm border-b mb-4">
+              <h2 className="text-sm font-semibold text-gray-600 flex items-center gap-2">
+                <Calendar className="h-4 w-4" />
+                {group.label}
+                <span className="text-xs font-normal text-gray-500">
+                  ({group.items.length} stick{group.items.length === 1 ? "" : "s"})
+                </span>
+              </h2>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+              {group.items.map((note) => (
+                <OptimisticSearchResultCard
+                  key={note.id}
+                  note={note}
+                  searchTerm={notesSearchTerm}
+                  onOpen={(noteId) => handleNoteClick(noteId, indexById.get(note.id) ?? 0)}
+                  currentUserId={user?.id}
+                />
+              ))}
+            </div>
+          </section>
+        ))}
+      </div>
+    )
+  }
+
   // Helper: Render recent shared sticks (no search term)
   const renderRecentSticks = () => (
     <div className="container mx-auto px-4">
@@ -605,16 +672,7 @@ export default function CommunityPanelPage() {
         </h2>
         <p className="text-gray-600 mt-2">Explore the latest from the community</p>
       </div>
-      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6 pb-8">
-        {communityNotes.map((note, index) => (
-          <OptimisticSearchResultCard
-            key={note.id}
-            note={note}
-            onOpen={(noteId) => handleNoteClick(noteId, index)}
-            currentUserId={user?.id}
-          />
-        ))}
-      </div>
+      {renderNotesGrid()}
       {hasMore && renderLoadMoreButton("Shared Sticks")}
     </div>
   )
@@ -622,17 +680,7 @@ export default function CommunityPanelPage() {
   // Helper: Render search results
   const renderSearchResults = () => (
     <div className="container mx-auto px-4">
-      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6 pb-8">
-        {communityNotes.map((note, index) => (
-          <OptimisticSearchResultCard
-            key={note.id}
-            note={note}
-            searchTerm={searchTerm}
-            onOpen={(noteId) => handleNoteClick(noteId, index)}
-            currentUserId={user?.id}
-          />
-        ))}
-      </div>
+      {renderNotesGrid(searchTerm)}
       {hasMore && renderLoadMoreButton("Results")}
     </div>
   )
@@ -709,7 +757,18 @@ export default function CommunityPanelPage() {
               </div>
             </div>
 
-            <div className="flex items-center gap-2 sm:ml-auto">
+            <div className="flex items-center gap-3 sm:ml-auto">
+              <div className="flex items-center gap-1.5">
+                <Calendar className="h-4 w-4 text-gray-500" />
+                <Switch
+                  id="panel-group-by-date"
+                  checked={groupByDateOn}
+                  onCheckedChange={handleToggleGroupByDate}
+                />
+                <Label htmlFor="panel-group-by-date" className="text-xs text-gray-600 hidden md:inline cursor-pointer">
+                  By date
+                </Label>
+              </div>
               <UserMenu showAbout={true} />
             </div>
           </div>
