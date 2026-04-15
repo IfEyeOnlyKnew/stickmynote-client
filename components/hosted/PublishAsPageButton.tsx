@@ -5,23 +5,29 @@ import { Button } from "@/components/ui/button"
 import { Globe } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 
+type Kind = "personal" | "pad" | "concur"
+
 interface PublishAsPageButtonProps {
   readonly stickId: string
-  readonly kind: "personal" | "pad" | "concur"
-  readonly canPublish: boolean
+  /** Optional hint — server will also detect the kind by looking up the stick. */
+  readonly kind?: Kind
+  /** Optional parent-controlled override. When unset, authorization is fetched from the server. */
+  readonly canPublish?: boolean
   readonly size?: "sm" | "default"
   readonly className?: string
 }
 
 export function PublishAsPageButton({
   stickId,
-  kind,
-  canPublish,
+  kind: kindHint,
+  canPublish: canPublishOverride,
   size = "sm",
   className,
 }: PublishAsPageButtonProps) {
   const [isPublishing, setIsPublishing] = useState(false)
   const [publishedSlug, setPublishedSlug] = useState<string | null>(null)
+  const [serverCanPublish, setServerCanPublish] = useState<boolean>(false)
+  const [serverKind, setServerKind] = useState<Kind | null>(null)
   const { toast } = useToast()
 
   useEffect(() => {
@@ -30,13 +36,19 @@ export function PublishAsPageButton({
     fetch(`/api/sticks/${stickId}/hosted-page`)
       .then((r) => (r.ok ? r.json() : null))
       .then((data) => {
-        if (!cancelled && data?.exists) setPublishedSlug(data.slug)
+        if (cancelled || !data) return
+        if (data.exists) setPublishedSlug(data.slug)
+        if (typeof data.canPublish === "boolean") setServerCanPublish(data.canPublish)
+        if (data.kind) setServerKind(data.kind)
       })
       .catch(() => {})
     return () => {
       cancelled = true
     }
   }, [stickId])
+
+  const canPublish = canPublishOverride ?? serverCanPublish
+  const effectiveKind = kindHint ?? serverKind ?? "personal"
 
   const handlePublish = async () => {
     setIsPublishing(true)
@@ -45,7 +57,7 @@ export function PublishAsPageButton({
       description: "Ollama is writing the article. This can take 15-30 seconds.",
     })
     try {
-      const res = await fetch(`/api/sticks/${stickId}/hosted-page?kind=${kind}`, { method: "POST" })
+      const res = await fetch(`/api/sticks/${stickId}/hosted-page?kind=${effectiveKind}`, { method: "POST" })
       const data = await res.json()
       if (!res.ok) {
         toast({ title: data.error || "Failed to publish page", variant: "destructive" })
@@ -61,6 +73,8 @@ export function PublishAsPageButton({
       setIsPublishing(false)
     }
   }
+
+  if (!canPublish && !publishedSlug) return null
 
   return (
     <div className="flex items-center gap-2">

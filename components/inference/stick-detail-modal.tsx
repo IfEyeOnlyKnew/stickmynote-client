@@ -862,11 +862,7 @@ export function StickDetailModal({ open, onOpenChange, stickId, onUpdate }: Read
                           <div className="flex items-center justify-between">
                             <CardTitle className="text-lg sm:text-xl md:text-2xl">Stick Content</CardTitle>
                             <div className="flex items-center gap-2">
-                              <PublishAsPageButton
-                                stickId={stick.id}
-                                kind="pad"
-                                canPublish={isOwner || isPadOwner || isAdmin}
-                              />
+                              <PublishAsPageButton stickId={stick.id} kind="pad" />
                               <FollowButton
                                 entityType="social_stick"
                                 entityId={stick.id}

@@ -457,6 +457,30 @@ export async function getLatestHostedPageForStick(
   return row ? { slug: row.slug, createdAt: row.created_at } : null
 }
 
+/**
+ * Check if a user can publish a hosted page for this stick.
+ * Looks up the stick in each kind's table and applies the kind-specific rule.
+ */
+export async function canUserPublishStick(
+  stickId: string,
+  userId: string,
+): Promise<{ canPublish: boolean; kind: StickKind | null }> {
+  for (const kind of ["personal", "pad", "concur"] as StickKind[]) {
+    const cfg = KIND[kind]
+    const extraCols = kind === "pad" ? ", pad_id" : kind === "concur" ? ", group_id" : ""
+    const result = await db.query<StickRow>(
+      `SELECT id, user_id, topic, content, color, created_at, updated_at, org_id${extraCols}
+       FROM ${cfg.stickTable} WHERE id = $1 LIMIT 1`,
+      [stickId],
+    )
+    const stick = result.rows[0]
+    if (!stick) continue
+    const allowed = await canPublish(kind, stick, userId)
+    return { canPublish: allowed, kind }
+  }
+  return { canPublish: false, kind: null }
+}
+
 export async function getHostedPageBySlug(slug: string): Promise<HostedArticleData | null> {
   const result = await db.query<{ article_data: HostedArticleData }>(
     `SELECT article_data FROM stick_hosted_pages WHERE slug = $1 LIMIT 1`,

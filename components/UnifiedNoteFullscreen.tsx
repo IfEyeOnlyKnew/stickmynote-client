@@ -227,12 +227,12 @@ export const UnifiedNoteFullscreen: React.FC = () => {
               />
             )}
 
-            <PublishAsPageButton
-              stickId={note.id}
-              kind="personal"
-              canPublish={note.user_id === currentUserId}
-              className="text-xs h-6"
-            />
+          </div>
+        )}
+
+        {!isNewNote && (
+          <div className="flex items-center gap-2 mt-2 mb-4">
+            <PublishAsPageButton stickId={note.id} kind="personal" className="text-xs h-6" />
           </div>
         )}
       </>
@@ -241,6 +241,8 @@ export const UnifiedNoteFullscreen: React.FC = () => {
     note.tags,
     note.hyperlinks,
     note.id,
+    note.user_id,
+    currentUserId,
     note.topic,
     note.title,
     isNewNote,

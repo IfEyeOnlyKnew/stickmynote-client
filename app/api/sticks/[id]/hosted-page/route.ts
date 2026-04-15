@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { getCachedAuthUser, createRateLimitResponse, createUnauthorizedResponse } from "@/lib/auth/cached-auth"
-import { generateHostedPage, getLatestHostedPageForStick, type StickKind } from "@/lib/handlers/hosted-page-handler"
+import { generateHostedPage, getLatestHostedPageForStick, canUserPublishStick, type StickKind } from "@/lib/handlers/hosted-page-handler"
 
 const VALID_KINDS: StickKind[] = ["personal", "pad", "concur"]
 
@@ -16,9 +16,17 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     if (authResult.rateLimited) return createRateLimitResponse()
     if (!authResult.user) return createUnauthorizedResponse()
 
-    const latest = await getLatestHostedPageForStick(stickId)
-    if (!latest) return NextResponse.json({ exists: false })
-    return NextResponse.json({ exists: true, slug: latest.slug, createdAt: latest.createdAt })
+    const [latest, permission] = await Promise.all([
+      getLatestHostedPageForStick(stickId),
+      canUserPublishStick(stickId, authResult.user.id),
+    ])
+    return NextResponse.json({
+      exists: !!latest,
+      slug: latest?.slug,
+      createdAt: latest?.createdAt,
+      canPublish: permission.canPublish,
+      kind: permission.kind,
+    })
   } catch (error) {
     console.error("[HostedPage] GET error:", error)
     return NextResponse.json({ error: "Failed to check hosted page" }, { status: 500 })
