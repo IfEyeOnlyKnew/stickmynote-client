@@ -97,16 +97,36 @@ async function canPublish(kind: StickKind, stick: StickRow, userId: string): Pro
   if (stick.user_id === userId) return true
 
   if (kind === "pad" && stick.pad_id) {
-    const padOwner = await db.query<{ owner_id: string }>(
+    // paks_pads and social_pads both own sticks in paks_pad_sticks
+    const paksOwner = await db.query<{ owner_id: string }>(
       `SELECT owner_id FROM paks_pads WHERE id = $1 LIMIT 1`,
       [stick.pad_id],
     )
-    if (padOwner.rows[0]?.owner_id === userId) return true
-    const memberRole = await db.query<{ role: string }>(
+    if (paksOwner.rows[0]?.owner_id === userId) return true
+
+    const socialOwner = await db.query<{ owner_id: string }>(
+      `SELECT owner_id FROM social_pads WHERE id = $1 LIMIT 1`,
+      [stick.pad_id],
+    )
+    if (socialOwner.rows[0]?.owner_id === userId) return true
+
+    // stick-level admin on paks pads
+    const stickAdmin = await db.query<{ role: string }>(
       `SELECT role FROM paks_pad_stick_members WHERE stick_id = $1 AND user_id = $2 LIMIT 1`,
       [stick.id, userId],
     )
-    return memberRole.rows[0]?.role === "admin"
+    if (stickAdmin.rows[0]?.role === "admin") return true
+
+    // pad-level admin on social pads
+    const socialMember = await db.query<{ role: string; admin_level: string | null }>(
+      `SELECT role, admin_level FROM social_pad_members
+       WHERE social_pad_id = $1 AND user_id = $2 LIMIT 1`,
+      [stick.pad_id, userId],
+    )
+    const sm = socialMember.rows[0]
+    if (sm && (sm.role === "admin" || sm.admin_level)) return true
+
+    return false
   }
 
   if (kind === "concur" && stick.group_id) {

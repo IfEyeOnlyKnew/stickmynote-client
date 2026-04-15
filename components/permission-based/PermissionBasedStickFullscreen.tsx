@@ -20,6 +20,7 @@ import { X, Trash2, Zap, MessagesSquare, Video } from "lucide-react"
 import { GenericStickTabs } from "@/components/GenericStickTabs"
 import { ThreadedReplies } from "@/components/replies/ThreadedReplies"
 import { CreateChatModal } from "@/components/stick-chats/CreateChatModal"
+import { PublishAsPageButton } from "@/components/hosted/PublishAsPageButton"
 import type { Stick } from "@/types/pad"
 import type { StickTabsConfig } from "@/types/stick-tabs-config"
 import { getStickTabs, saveStickTab, deleteStickTabItem } from "@/lib/stick-tabs"
@@ -641,6 +642,7 @@ export function PermissionBasedStickFullscreen({
               )}
             </div>
             <div className="flex items-center gap-1">
+              <PublishAsPageButton stickId={stick.id} kind="pad" />
               {permissions.canAdmin && (
                 <AlertDialog>
                   <AlertDialogTrigger asChild>
