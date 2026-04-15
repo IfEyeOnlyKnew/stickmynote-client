@@ -30,6 +30,7 @@ import {
   deleteConcurStickTabItem,
 } from "@/lib/concur-stick-tabs"
 import type { StickTabsConfig } from "@/types/stick-tabs-config"
+import { PublishAsPageButton } from "@/components/hosted/PublishAsPageButton"
 
 // ============================================================================
 // Types
@@ -329,6 +330,15 @@ export function ConcurStickDetailModal({
         )}
 
         <div className="flex-1 min-h-0 overflow-y-auto px-6">
+          {/* Publish as Page */}
+          <div className="flex justify-end mb-2 pt-2">
+            <PublishAsPageButton
+              stickId={stick.id}
+              kind="concur"
+              canPublish={isOwner || stick.user_id === user?.id}
+            />
+          </div>
+
           {/* Stick Tabs (Main, Videos, Images, Details) */}
           <div className="mb-4">
             <GenericStickTabs

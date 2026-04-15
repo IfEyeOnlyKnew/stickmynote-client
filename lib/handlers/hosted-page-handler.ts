@@ -8,6 +8,44 @@ import type {
   HostedArticleReply,
 } from "@/components/hosted/HostedArticle"
 
+export type StickKind = "personal" | "pad" | "concur"
+
+interface KindConfig {
+  stickTable: string
+  tabsTable: string
+  tabsFk: string
+  repliesTable: string
+  repliesFk: string
+  hasParentReplyId: boolean
+}
+
+const KIND: Record<StickKind, KindConfig> = {
+  personal: {
+    stickTable: "personal_sticks",
+    tabsTable: "personal_sticks_tabs",
+    tabsFk: "personal_stick_id",
+    repliesTable: "personal_sticks_replies",
+    repliesFk: "personal_stick_id",
+    hasParentReplyId: true,
+  },
+  pad: {
+    stickTable: "paks_pad_sticks",
+    tabsTable: "paks_pad_stick_tabs",
+    tabsFk: "stick_id",
+    repliesTable: "paks_pad_stick_replies",
+    repliesFk: "stick_id",
+    hasParentReplyId: false,
+  },
+  concur: {
+    stickTable: "concur_sticks",
+    tabsTable: "concur_stick_tabs",
+    tabsFk: "stick_id",
+    repliesTable: "concur_stick_replies",
+    repliesFk: "stick_id",
+    hasParentReplyId: true,
+  },
+}
+
 function randomSlug(topic: string): string {
   const slugBase = (topic || "stick")
     .toLowerCase()
@@ -27,6 +65,8 @@ interface StickRow {
   created_at: string
   updated_at: string | null
   org_id: string | null
+  pad_id?: string | null
+  group_id?: string | null
 }
 
 interface TabRow {
@@ -49,10 +89,44 @@ interface ReplyRow {
   email: string | null
 }
 
+// ============================================================================
+// Authorization — owner or admin can publish
+// ============================================================================
+
+async function canPublish(kind: StickKind, stick: StickRow, userId: string): Promise<boolean> {
+  if (stick.user_id === userId) return true
+
+  if (kind === "pad" && stick.pad_id) {
+    const padOwner = await db.query<{ owner_id: string }>(
+      `SELECT owner_id FROM paks_pads WHERE id = $1 LIMIT 1`,
+      [stick.pad_id],
+    )
+    if (padOwner.rows[0]?.owner_id === userId) return true
+    const memberRole = await db.query<{ role: string }>(
+      `SELECT role FROM paks_pad_stick_members WHERE stick_id = $1 AND user_id = $2 LIMIT 1`,
+      [stick.id, userId],
+    )
+    return memberRole.rows[0]?.role === "admin"
+  }
+
+  if (kind === "concur" && stick.group_id) {
+    const groupRole = await db.query<{ role: string }>(
+      `SELECT role FROM concur_group_members WHERE group_id = $1 AND user_id = $2 LIMIT 1`,
+      [stick.group_id, userId],
+    )
+    return groupRole.rows[0]?.role === "owner"
+  }
+
+  return false
+}
+
+// ============================================================================
+// Tab → article items
+// ============================================================================
+
 function tabItemsFromRow(tab: TabRow): HostedArticleSectionItem[] {
   const items: HostedArticleSectionItem[] = []
 
-  // Hyperlinks stored in `tags` JSONB (common pattern for Tags tab)
   if (tab.tags) {
     const links = Array.isArray(tab.tags) ? tab.tags : []
     for (const link of links) {
@@ -67,7 +141,6 @@ function tabItemsFromRow(tab: TabRow): HostedArticleSectionItem[] {
     }
   }
 
-  // tab_data can be array of items
   if (Array.isArray(tab.tab_data)) {
     for (const d of tab.tab_data) {
       if (d?.url && /(mp4|webm|youtube|youtu\.be|vimeo)/i.test(String(d.url))) {
@@ -80,13 +153,16 @@ function tabItemsFromRow(tab: TabRow): HostedArticleSectionItem[] {
     }
   }
 
-  // tab_content as prose fallback
   if (tab.tab_content && items.length === 0) {
     items.push({ type: "prose", html: tab.tab_content })
   }
 
   return items
 }
+
+// ============================================================================
+// Reply tree
+// ============================================================================
 
 function buildReplyTree(rows: ReplyRow[]): HostedArticleReply[] {
   const byId = new Map<string, HostedArticleReply>()
@@ -111,6 +187,10 @@ function buildReplyTree(rows: ReplyRow[]): HostedArticleReply[] {
   }
   return roots
 }
+
+// ============================================================================
+// Ollama narrative
+// ============================================================================
 
 async function askOllamaForNarrative(stick: StickRow, sections: HostedArticleSection[]): Promise<{
   deck: string
@@ -151,23 +231,15 @@ Keep tone warm, clear, journalistic. Lead-ins and closings should flow naturally
   }
 
   try {
-    const { text } = await generateText({
-      prompt,
-      maxTokens: 800,
-      temperature: 0.6,
-    })
+    const { text } = await generateText({ prompt, maxTokens: 800, temperature: 0.6 })
     const match = /\{[\s\S]*\}/.exec(text)
     if (!match) return fallback
     const parsed = JSON.parse(match[0])
     return {
       deck: String(parsed.deck || fallback.deck),
       lead: String(parsed.lead || fallback.lead),
-      sectionLeadIns: Array.isArray(parsed.sectionLeadIns)
-        ? parsed.sectionLeadIns.map(String)
-        : fallback.sectionLeadIns,
-      sectionClosings: Array.isArray(parsed.sectionClosings)
-        ? parsed.sectionClosings.map(String)
-        : fallback.sectionClosings,
+      sectionLeadIns: Array.isArray(parsed.sectionLeadIns) ? parsed.sectionLeadIns.map(String) : fallback.sectionLeadIns,
+      sectionClosings: Array.isArray(parsed.sectionClosings) ? parsed.sectionClosings.map(String) : fallback.sectionClosings,
       discussionHeading: String(parsed.discussionHeading || fallback.discussionHeading),
     }
   } catch (err) {
@@ -176,38 +248,122 @@ Keep tone warm, clear, journalistic. Lead-ins and closings should flow naturally
   }
 }
 
+// ============================================================================
+// Extra sections: Noted, chats, video
+// ============================================================================
+
+async function buildExtraSections(
+  kind: StickKind,
+  stick: StickRow,
+  origin: string,
+): Promise<HostedArticleSection[]> {
+  const extras: HostedArticleSection[] = []
+
+  // Noted pages — personal via personal_stick_id, pad/concur via stick_id
+  const notedCol = kind === "personal" ? "personal_stick_id" : "stick_id"
+  const notedResult = await db.query<{ title: string; content: string }>(
+    `SELECT title, content FROM noted_pages WHERE ${notedCol} = $1 LIMIT 1`,
+    [stick.id],
+  )
+  const noted = notedResult.rows[0]
+  if (noted && (noted.content || noted.title)) {
+    extras.push({
+      tabName: noted.title?.trim() || "Noted",
+      items: [{ type: "prose", html: noted.content || "" }],
+    })
+  }
+
+  // Chat rooms linked to this stick
+  if (kind === "personal" || kind === "pad") {
+    const chatType = kind === "personal" ? "personal" : "social"
+    const chatResult = await db.query<{ id: string; name: string | null; is_group: boolean }>(
+      `SELECT id, name, is_group FROM stick_chats
+       WHERE stick_id = $1 AND stick_type = $2
+       ORDER BY created_at ASC`,
+      [stick.id, chatType],
+    )
+    if (chatResult.rows.length > 0) {
+      extras.push({
+        tabName: "Chat Rooms",
+        items: chatResult.rows.map((c) => ({
+          type: "link" as const,
+          title: c.name || (c.is_group ? "Group chat" : "Direct chat"),
+          description: c.is_group ? "Group chat room" : "One-on-one chat",
+          url: `${origin}/chat/${c.id}`,
+        })),
+      })
+    }
+  }
+
+  // Video rooms for pad sticks (pad_id exists)
+  if (kind === "pad" && stick.pad_id) {
+    const videoResult = await db.query<{ id: string; name: string | null }>(
+      `SELECT id, name FROM video_rooms
+       WHERE pad_id = $1 AND livekit_room_name IS NOT NULL
+       ORDER BY created_at ASC`,
+      [stick.pad_id],
+    )
+    if (videoResult.rows.length > 0) {
+      extras.push({
+        tabName: "Video Rooms",
+        items: videoResult.rows.map((v) => ({
+          type: "link" as const,
+          title: v.name || "Video room",
+          description: "Join the LiveKit video session",
+          url: `${origin}/video/join/${v.id}`,
+        })),
+      })
+    }
+  }
+
+  return extras
+}
+
+// ============================================================================
+// Main entry — generate or update a hosted page
+// ============================================================================
+
 export interface GenerateHostedPageResult {
   slug: string
   articleData: HostedArticleData
 }
 
-export async function generateHostedPageForPersonalStick(
+export async function generateHostedPage(
+  kind: StickKind,
   stickId: string,
   userId: string,
   origin: string,
 ): Promise<GenerateHostedPageResult | { error: string; status: number }> {
+  const cfg = KIND[kind]
+
+  const extraCols = kind === "pad" ? ", pad_id" : kind === "concur" ? ", group_id" : ""
   const stickResult = await db.query<StickRow>(
-    `SELECT id, user_id, topic, content, color, created_at, updated_at, org_id
-     FROM personal_sticks WHERE id = $1 LIMIT 1`,
+    `SELECT id, user_id, topic, content, color, created_at, updated_at, org_id${extraCols}
+     FROM ${cfg.stickTable} WHERE id = $1 LIMIT 1`,
     [stickId],
   )
   const stick = stickResult.rows[0]
   if (!stick) return { error: "Stick not found", status: 404 }
-  if (stick.user_id !== userId) return { error: "Not authorized", status: 403 }
+
+  const allowed = await canPublish(kind, stick, userId)
+  if (!allowed) return { error: "Only owners or admins can publish", status: 403 }
 
   const tabsResult = await db.query<TabRow>(
-    `SELECT id, tab_name, tab_type, tab_content, tab_data, tags, tab_order
-     FROM personal_sticks_tabs
-     WHERE personal_stick_id = $1
+    `SELECT id, tab_name, tab_type, tab_content, tab_data,
+            ${kind === "personal" ? "tags" : "NULL::jsonb AS tags"},
+            tab_order
+     FROM ${cfg.tabsTable}
+     WHERE ${cfg.tabsFk} = $1
      ORDER BY tab_order ASC, created_at ASC`,
     [stickId],
   )
 
+  const parentCol = cfg.hasParentReplyId ? "r.parent_reply_id" : "NULL::uuid AS parent_reply_id"
   const repliesResult = await db.query<ReplyRow>(
-    `SELECT r.id, r.content, r.created_at, r.user_id, r.parent_reply_id, u.full_name, u.email
-     FROM personal_sticks_replies r
+    `SELECT r.id, r.content, r.created_at, r.user_id, ${parentCol}, u.full_name, u.email
+     FROM ${cfg.repliesTable} r
      LEFT JOIN users u ON u.id = r.user_id
-     WHERE r.personal_stick_id = $1
+     WHERE r.${cfg.repliesFk} = $1
      ORDER BY r.created_at ASC`,
     [stickId],
   )
@@ -223,61 +379,8 @@ export async function generateHostedPageForPersonalStick(
     items: tabItemsFromRow(tab),
   }))
 
-  // Attach the Noted page (if any) as its own section
-  const notedResult = await db.query<{ title: string; content: string; updated_at: string }>(
-    `SELECT title, content, updated_at FROM noted_pages WHERE personal_stick_id = $1 LIMIT 1`,
-    [stickId],
-  )
-  const noted = notedResult.rows[0]
-  if (noted && (noted.content || noted.title)) {
-    sectionsSkeleton.push({
-      tabName: noted.title?.trim() || "Noted",
-      items: [{ type: "prose", html: noted.content || "" }],
-    })
-  }
-
-  // Attach any chat rooms linked to this stick
-  const chatResult = await db.query<{ id: string; name: string | null; is_group: boolean }>(
-    `SELECT id, name, is_group FROM stick_chats
-     WHERE stick_id = $1 AND stick_type = 'personal'
-     ORDER BY created_at ASC`,
-    [stickId],
-  )
-  if (chatResult.rows.length > 0) {
-    sectionsSkeleton.push({
-      tabName: "Chat Rooms",
-      items: chatResult.rows.map((c) => ({
-        type: "link" as const,
-        title: c.name || (c.is_group ? "Group chat" : "Direct chat"),
-        description: c.is_group ? "Group chat room" : "One-on-one chat",
-        url: `${origin}/chat/${c.id}`,
-      })),
-    })
-  }
-
-  // Attach any video rooms created for this stick (via pad association, if any)
-  const videoResult = await db.query<{ id: string; name: string | null; livekit_room_name: string | null }>(
-    `SELECT vr.id, vr.name, vr.livekit_room_name
-     FROM video_rooms vr
-     WHERE vr.livekit_room_name IS NOT NULL
-       AND EXISTS (
-         SELECT 1 FROM personal_sticks ps
-         WHERE ps.id = $1 AND vr.pad_id IS NOT NULL
-       )
-     ORDER BY vr.created_at ASC`,
-    [stickId],
-  )
-  if (videoResult.rows.length > 0) {
-    sectionsSkeleton.push({
-      tabName: "Video Rooms",
-      items: videoResult.rows.map((v) => ({
-        type: "link" as const,
-        title: v.name || "Video room",
-        description: "Join the LiveKit video session",
-        url: `${origin}/video/join/${v.id}`,
-      })),
-    })
-  }
+  const extras = await buildExtraSections(kind, stick, origin)
+  sectionsSkeleton.push(...extras)
 
   const narrative = await askOllamaForNarrative(stick, sectionsSkeleton)
 
@@ -303,17 +406,12 @@ export async function generateHostedPageForPersonalStick(
     body: stick.content || undefined,
     sections,
     discussion: replyTree.length > 0 ? { heading: narrative.discussionHeading, replies: replyTree } : undefined,
-    footer: {
-      stickId: stick.id,
-      permalink: "",
-      publishedAt: new Date().toISOString(),
-    },
+    footer: { stickId: stick.id, permalink: "", publishedAt: new Date().toISOString() },
   }
 
-  // Reuse existing slug if this stick was already published
   const existing = await db.query<{ slug: string }>(
-    `SELECT slug FROM stick_hosted_pages WHERE stick_id = $1 AND stick_kind = 'personal' LIMIT 1`,
-    [stickId],
+    `SELECT slug FROM stick_hosted_pages WHERE stick_id = $1 AND stick_kind = $2 LIMIT 1`,
+    [stickId, kind],
   )
   const slug = existing.rows[0]?.slug || randomSlug(stick.topic || "")
   articleData.footer.permalink = `${origin}/hosted/${slug}`
@@ -322,18 +420,27 @@ export async function generateHostedPageForPersonalStick(
     await db.query(
       `UPDATE stick_hosted_pages
        SET article_data = $1::jsonb, generated_by = $2, updated_at = NOW()
-       WHERE stick_id = $3 AND stick_kind = 'personal'`,
-      [JSON.stringify(articleData), userId, stickId],
+       WHERE stick_id = $3 AND stick_kind = $4`,
+      [JSON.stringify(articleData), userId, stickId, kind],
     )
   } else {
     await db.query(
       `INSERT INTO stick_hosted_pages (stick_id, stick_kind, slug, generated_by, article_data)
-       VALUES ($1, 'personal', $2, $3, $4::jsonb)`,
-      [stickId, slug, userId, JSON.stringify(articleData)],
+       VALUES ($1, $2, $3, $4, $5::jsonb)`,
+      [stickId, kind, slug, userId, JSON.stringify(articleData)],
     )
   }
 
   return { slug, articleData }
+}
+
+// Backwards-compatible shim for the personal endpoint
+export async function generateHostedPageForPersonalStick(
+  stickId: string,
+  userId: string,
+  origin: string,
+) {
+  return generateHostedPage("personal", stickId, userId, origin)
 }
 
 export async function getLatestHostedPageForStick(

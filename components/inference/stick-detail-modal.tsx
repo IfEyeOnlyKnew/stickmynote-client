@@ -25,6 +25,7 @@ import { toast } from "sonner"
 import { WORKFLOW_STATUSES, WORKFLOW_ORDER, type WorkflowStatus } from "@/types/inference-workflow"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
+import { PublishAsPageButton } from "@/components/hosted/PublishAsPageButton"
 
 interface Reply {
   id: string
@@ -860,12 +861,19 @@ export function StickDetailModal({ open, onOpenChange, stickId, onUpdate }: Read
                         <div className="space-y-3 mb-4">
                           <div className="flex items-center justify-between">
                             <CardTitle className="text-lg sm:text-xl md:text-2xl">Stick Content</CardTitle>
-                            <FollowButton
-                              entityType="social_stick"
-                              entityId={stick.id}
-                              entityName={stick.topic}
-                              variant="icon"
-                            />
+                            <div className="flex items-center gap-2">
+                              <PublishAsPageButton
+                                stickId={stick.id}
+                                kind="pad"
+                                canPublish={isOwner || isPadOwner || isAdmin}
+                              />
+                              <FollowButton
+                                entityType="social_stick"
+                                entityId={stick.id}
+                                entityName={stick.topic}
+                                variant="icon"
+                              />
+                            </div>
                           </div>
                           <div className="flex gap-2 flex-wrap">
                             <Button
