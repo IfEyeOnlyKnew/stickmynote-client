@@ -147,6 +147,7 @@ async function canPublish(kind: StickKind, stick: StickRow, userId: string): Pro
 function tabItemsFromRow(tab: TabRow): HostedArticleSectionItem[] {
   const items: HostedArticleSectionItem[] = []
 
+  // Hyperlinks live in the `tags` JSONB on personal tabs
   if (tab.tags) {
     const links = Array.isArray(tab.tags) ? tab.tags : []
     for (const link of links) {
@@ -161,18 +162,51 @@ function tabItemsFromRow(tab: TabRow): HostedArticleSectionItem[] {
     }
   }
 
+  // Videos tab: tab_data = { videos: [{id, url, embed_url, title, platform, ...}, ...] }
+  const videosList = tab.tab_data?.videos
+  if (Array.isArray(videosList)) {
+    for (const v of videosList) {
+      if (!v?.url && !v?.embed_url) continue
+      items.push({
+        type: "video",
+        url: v.url,
+        embedUrl: v.embed_url,
+        platform: v.platform,
+        title: v.title,
+        caption: v.description || v.title,
+      })
+    }
+  }
+
+  // Images tab: tab_data = { images: [{id, url, alt, caption, ...}, ...] }
+  const imagesList = tab.tab_data?.images
+  if (Array.isArray(imagesList)) {
+    for (const img of imagesList) {
+      if (!img?.url) continue
+      items.push({
+        type: "image",
+        url: img.url,
+        alt: img.alt,
+        caption: img.caption,
+      })
+    }
+  }
+
+  // Fallback: tab_data as a bare array of {url, ...}
   if (Array.isArray(tab.tab_data)) {
     for (const d of tab.tab_data) {
-      if (d?.url && /(mp4|webm|youtube|youtu\.be|vimeo)/i.test(String(d.url))) {
+      if (!d?.url) continue
+      if (/(mp4|webm|youtube|youtu\.be|vimeo)/i.test(String(d.url))) {
         items.push({ type: "video", url: d.url, caption: d.caption || d.title })
-      } else if (d?.url && /(jpg|jpeg|png|gif|webp|svg)/i.test(String(d.url))) {
+      } else if (/(jpg|jpeg|png|gif|webp|svg)/i.test(String(d.url))) {
         items.push({ type: "image", url: d.url, caption: d.caption || d.title })
-      } else if (d?.url) {
+      } else {
         items.push({ type: "link", title: d.title, url: d.url, description: d.description })
       }
     }
   }
 
+  // Details / rich-text tab with HTML body
   if (tab.tab_content && items.length === 0) {
     items.push({ type: "prose", html: tab.tab_content })
   }

@@ -1,4 +1,19 @@
+import { Libre_Bodoni, Public_Sans } from "next/font/google"
 import { HostedArticle, type HostedArticleData } from "@/components/hosted/HostedArticle"
+
+const libreBodoni = Libre_Bodoni({
+  subsets: ["latin"],
+  weight: ["400", "500", "600", "700"],
+  variable: "--font-hosted-serif",
+  display: "swap",
+})
+
+const publicSans = Public_Sans({
+  subsets: ["latin"],
+  weight: ["300", "400", "500", "600", "700"],
+  variable: "--font-hosted-sans",
+  display: "swap",
+})
 
 const fixture: HostedArticleData = {
   masthead: {
@@ -128,5 +143,19 @@ const fixture: HostedArticleData = {
 }
 
 export default function HostedPreviewPage() {
-  return <HostedArticle data={fixture} />
+  return (
+    <div className={`${libreBodoni.variable} ${publicSans.variable}`}>
+      <style
+        dangerouslySetInnerHTML={{
+          __html: `
+            .hosted-article .font-serif { font-family: var(--font-hosted-serif), ui-serif, Georgia, serif; }
+            .hosted-article .font-sans  { font-family: var(--font-hosted-sans), ui-sans-serif, system-ui, sans-serif; }
+          `,
+        }}
+      />
+      <div className="hosted-article">
+        <HostedArticle data={fixture} />
+      </div>
+    </div>
+  )
 }
