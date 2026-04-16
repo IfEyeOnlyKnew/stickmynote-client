@@ -15,6 +15,7 @@
         "Gantt",
         "gapi",
         "ical",
+        "livekit",
         "mypads",
         "mysticks",
         "Neue",
@@ -29,7 +30,12 @@
         "stickmynote",
         "storymap",
         "timesheets",
-        "unarchiving"
+        "unarchiving",
+        "wordmark",
+        "youtu",
+        "zadd",
+        "zcard",
+        "zremrangebyscore"
     ],
     "jest.enable": false,
     "webhint.enabledHints": {

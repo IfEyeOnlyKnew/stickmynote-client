@@ -89,25 +89,6 @@ export class EnhancedRateLimiter {
     const windowStart = now - config.windowMs
 
     try {
-    } catch (error) {
-      console.warn("Rate limiting error (fail-open):", error)
-      // Fail open - allow request if rate limiting fails
-      const now = Date.now()
-      const config = RATE_LIMIT_CONFIGS[action] || RATE_LIMIT_CONFIGS.api_general
-      return {
-        success: true,
-        limit: config.maxRequests,
-        remaining: Math.max(0, config.maxRequests - 1),
-        resetTime: now + config.windowMs,
-        headers: this.getRateLimitHeaders(
-          config.maxRequests,
-          Math.max(0, config.maxRequests - 1),
-          now + config.windowMs,
-        ),
-      }
-    }
-
-    try {
       if (this.redis) {
         return await this.checkRedisRateLimit(key, config, now, windowStart)
       } else {

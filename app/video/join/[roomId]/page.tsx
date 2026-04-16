@@ -12,7 +12,8 @@ export default function VideoJoinPage() {
   const roomId = params.roomId as string
 
   const [livekitRoomName, setLivekitRoomName] = useState<string | null>(null)
-  const [, setRoomDisplayName] = useState<string>("Video Room")
+  const [roomDisplayName, setRoomDisplayName] = useState<string>("Video Room")
+  void roomDisplayName
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
 

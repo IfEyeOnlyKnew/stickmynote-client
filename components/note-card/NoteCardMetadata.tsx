@@ -11,7 +11,7 @@ interface NoteCardMetadataProps {
   readonly isNewNote: boolean
   readonly hideGenerateTags: boolean
   readonly generatingTags: string | null | undefined
-  readonly summarizingLinks?: string | null | undefined
+  readonly summarizingLinks?: string | null
   readonly topic?: string
   readonly title?: string
   readonly content?: string

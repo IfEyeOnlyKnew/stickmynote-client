@@ -77,7 +77,7 @@ export async function GET(request: NextRequest) {
       userId: user.id,
       userName: user.full_name || user.email,
       email: user.email,
-      capacityHoursPerDay: user.capacity_hours_per_day || 8.0,
+      capacityHoursPerDay: user.capacity_hours_per_day || 8,
       hourlyRateCents: user.hourly_rate_cents || 0,
       tasks: tasks
         .filter((task) => task.calstick_assignee_id === user.id)

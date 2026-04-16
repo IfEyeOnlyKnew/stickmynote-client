@@ -31,11 +31,14 @@ export const useCommunityInteractions = (updateNote: (noteId: string, updates: P
     })
   }, [])
 
-  const handleComment = useCallback((noteId: string) => {
-    // TODO: Implement comment functionality
+  // Demo community panel (control-panel/) has no comment backend of its own.
+  // Real discussions live on sticks/pads/concur via their own reply APIs.
+  // This handler shows a toast instead of silently no-oping so the card click
+  // still gives feedback.
+  const handleComment = useCallback((_noteId: string) => {
     toast({
-      title: "Comments coming soon!",
-      description: "Comment functionality will be available soon.",
+      title: "Comments are on individual sticks",
+      description: "Open a stick to leave a reply or join its discussion.",
     })
   }, [])
 

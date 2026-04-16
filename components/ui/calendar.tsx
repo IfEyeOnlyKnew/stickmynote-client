@@ -9,6 +9,11 @@ import { buttonVariants } from "@/components/ui/button"
 
 export type CalendarProps = React.ComponentProps<typeof DayPicker>
 
+function CalendarChevron({ orientation }: { orientation?: "up" | "down" | "left" | "right" }) {
+  if (orientation === "left") return <ChevronLeft className="h-4 w-4" />
+  return <ChevronRight className="h-4 w-4" />
+}
+
 function Calendar({ className, classNames, showOutsideDays = true, ...props }: CalendarProps) {
   return (
     <DayPicker
@@ -42,14 +47,7 @@ function Calendar({ className, classNames, showOutsideDays = true, ...props }: C
         day_hidden: "invisible",
         ...classNames,
       }}
-      components={{
-        Chevron: ({ orientation }) => {
-          if (orientation === "left") {
-            return <ChevronLeft className="h-4 w-4" />
-          }
-          return <ChevronRight className="h-4 w-4" />
-        },
-      }}
+      components={{ Chevron: CalendarChevron }}
       {...props}
     />
   )

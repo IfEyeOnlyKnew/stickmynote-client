@@ -144,69 +144,62 @@ async function canPublish(kind: StickKind, stick: StickRow, userId: string): Pro
 // Tab → article items
 // ============================================================================
 
+function extractLinkItems(tags: unknown): HostedArticleSectionItem[] {
+  if (!Array.isArray(tags)) return []
+  return tags
+    .filter((link) => link?.url)
+    .map((link) => ({
+      type: "link" as const,
+      title: link.title || link.url,
+      description: link.summary || link.description,
+      url: link.url,
+    }))
+}
+
+function extractVideoItems(videos: unknown): HostedArticleSectionItem[] {
+  if (!Array.isArray(videos)) return []
+  return videos
+    .filter((v) => v?.url || v?.embed_url)
+    .map((v) => ({
+      type: "video" as const,
+      url: v.url,
+      embedUrl: v.embed_url,
+      platform: v.platform,
+      title: v.title,
+      caption: v.description || v.title,
+    }))
+}
+
+function extractImageItems(images: unknown): HostedArticleSectionItem[] {
+  if (!Array.isArray(images)) return []
+  return images
+    .filter((img) => img?.url)
+    .map((img) => ({ type: "image" as const, url: img.url, alt: img.alt, caption: img.caption }))
+}
+
+const VIDEO_URL_RE = /(mp4|webm|youtube|youtu\.be|vimeo)/i
+const IMAGE_URL_RE = /(jpg|jpeg|png|gif|webp|svg)/i
+
+function classifyBareItem(d: { url: string; title?: string; description?: string; caption?: string }): HostedArticleSectionItem {
+  if (VIDEO_URL_RE.test(d.url)) return { type: "video", url: d.url, caption: d.caption || d.title }
+  if (IMAGE_URL_RE.test(d.url)) return { type: "image", url: d.url, caption: d.caption || d.title }
+  return { type: "link", title: d.title, url: d.url, description: d.description }
+}
+
+function extractBareArrayItems(tabData: unknown): HostedArticleSectionItem[] {
+  if (!Array.isArray(tabData)) return []
+  return tabData.filter((d) => d?.url).map(classifyBareItem)
+}
+
 function tabItemsFromRow(tab: TabRow): HostedArticleSectionItem[] {
-  const items: HostedArticleSectionItem[] = []
+  const items: HostedArticleSectionItem[] = [
+    ...extractLinkItems(tab.tags),
+    ...extractVideoItems(tab.tab_data?.videos),
+    ...extractImageItems(tab.tab_data?.images),
+    ...extractBareArrayItems(tab.tab_data),
+  ]
 
-  // Hyperlinks live in the `tags` JSONB on personal tabs
-  if (tab.tags) {
-    const links = Array.isArray(tab.tags) ? tab.tags : []
-    for (const link of links) {
-      if (link?.url) {
-        items.push({
-          type: "link",
-          title: link.title || link.url,
-          description: link.summary || link.description,
-          url: link.url,
-        })
-      }
-    }
-  }
-
-  // Videos tab: tab_data = { videos: [{id, url, embed_url, title, platform, ...}, ...] }
-  const videosList = tab.tab_data?.videos
-  if (Array.isArray(videosList)) {
-    for (const v of videosList) {
-      if (!v?.url && !v?.embed_url) continue
-      items.push({
-        type: "video",
-        url: v.url,
-        embedUrl: v.embed_url,
-        platform: v.platform,
-        title: v.title,
-        caption: v.description || v.title,
-      })
-    }
-  }
-
-  // Images tab: tab_data = { images: [{id, url, alt, caption, ...}, ...] }
-  const imagesList = tab.tab_data?.images
-  if (Array.isArray(imagesList)) {
-    for (const img of imagesList) {
-      if (!img?.url) continue
-      items.push({
-        type: "image",
-        url: img.url,
-        alt: img.alt,
-        caption: img.caption,
-      })
-    }
-  }
-
-  // Fallback: tab_data as a bare array of {url, ...}
-  if (Array.isArray(tab.tab_data)) {
-    for (const d of tab.tab_data) {
-      if (!d?.url) continue
-      if (/(mp4|webm|youtube|youtu\.be|vimeo)/i.test(String(d.url))) {
-        items.push({ type: "video", url: d.url, caption: d.caption || d.title })
-      } else if (/(jpg|jpeg|png|gif|webp|svg)/i.test(String(d.url))) {
-        items.push({ type: "image", url: d.url, caption: d.caption || d.title })
-      } else {
-        items.push({ type: "link", title: d.title, url: d.url, description: d.description })
-      }
-    }
-  }
-
-  // Details / rich-text tab with HTML body
+  // Details / rich-text tab with HTML body — only if nothing else was extracted
   if (tab.tab_content && items.length === 0) {
     items.push({ type: "prose", html: tab.tab_content })
   }
@@ -572,7 +565,7 @@ export async function canUserPublishStick(
 ): Promise<{ canPublish: boolean; kind: StickKind | null }> {
   for (const kind of ["personal", "pad", "concur"] as StickKind[]) {
     const cfg = KIND[kind]
-    const extraCols = kind === "pad" ? ", pad_id" : kind === "concur" ? ", group_id" : ""
+    const extraCols = extraPadColumnForKind(kind)
     const result = await db.query<StickRow>(
       `SELECT id, user_id, topic, content, color, created_at, updated_at, org_id${extraCols}
        FROM ${cfg.stickTable} WHERE id = $1 LIMIT 1`,

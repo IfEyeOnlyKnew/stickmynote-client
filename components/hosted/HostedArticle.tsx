@@ -1,6 +1,6 @@
 import React from "react"
 import { format } from "date-fns"
-import { Link2, FileDown, MessageSquare, Video as VideoIcon, CalendarDays } from "lucide-react"
+import { Link2, FileDown, MessageSquare, CalendarDays } from "lucide-react"
 
 export interface HostedArticleReply {
   id: string

@@ -20,7 +20,8 @@ interface CustomField {
 
 export function CustomFieldsSettings() {
   const [fields, setFields] = useState<CustomField[]>([])
-  const [, setLoading] = useState(true)
+  const [loading, setLoading] = useState(true)
+  void loading
   const [isOpen, setIsOpen] = useState(false)
   const [newField, setNewField] = useState<Partial<CustomField>>({
     type: "text",

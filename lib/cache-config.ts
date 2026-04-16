@@ -1,6 +1,5 @@
 // Cache configuration and utilities for Next.js data caching
-import { unstable_cache } from "next/cache"
-import { revalidateTag } from "next/cache"
+import { unstable_cache, revalidateTag } from "next/cache"
 
 /**
  * Cache tags for different data types

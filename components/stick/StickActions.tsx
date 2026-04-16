@@ -57,7 +57,7 @@ export function StickActions({
         <Button
           size="sm"
           onClick={onStickEdit}
-          disabled={!hasChanges || isSaving || !contentTrimmed}
+          disabled={isSaving || !contentTrimmed}
           className="text-xs"
         >
           {isSaving ? (
