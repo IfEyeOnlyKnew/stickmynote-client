@@ -287,8 +287,12 @@ async function getOrCreateDefaultOrganization(userId: string, userEmail: string)
 
 async function provisionUser(ldapUser: LDAPUser): Promise<ProvisionedUser> {
   const email = ldapUser.mail || ldapUser.userPrincipalName
-  const fullName = ldapUser.displayName || `${ldapUser.givenName} ${ldapUser.sn}`.trim()
-  
+  const fullName =
+    ldapUser.displayName ||
+    `${ldapUser.givenName} ${ldapUser.sn}`.trim() ||
+    email.split("@")[0]
+  const username = ldapUser.sAMAccountName || email.split("@")[0]
+
   // Check if this will be the first user
   const firstUser = await isFirstUser()
 
@@ -302,16 +306,17 @@ async function provisionUser(ldapUser: LDAPUser): Promise<ProvisionedUser> {
   )
 
   if (existingUser.rows.length > 0) {
-    // Update existing user
+    // Update existing user — fill in missing username/full_name without overwriting a manually edited value
     const result = await db.query(
       `UPDATE users
-       SET full_name = $1,
-           distinguished_name = $2,
+       SET full_name = COALESCE(NULLIF(full_name, ''), $1),
+           username = COALESCE(NULLIF(username, ''), $2),
+           distinguished_name = $3,
            email_verified = true,
            updated_at = NOW()
-       WHERE id = $3
+       WHERE id = $4
        RETURNING id, email, full_name, distinguished_name`,
-      [fullName, ldapUser.dn, existingUser.rows[0].id]
+      [fullName, username, ldapUser.dn, existingUser.rows[0].id]
     )
     console.log(`[LDAP] Updated existing user: ${email}`)
     return result.rows[0]
@@ -319,10 +324,10 @@ async function provisionUser(ldapUser: LDAPUser): Promise<ProvisionedUser> {
 
   // Create new user
   const result = await db.query(
-    `INSERT INTO users (email, full_name, distinguished_name, email_verified, hub_mode, created_at, updated_at)
-     VALUES ($1, $2, $3, true, 'full_access', NOW(), NOW())
+    `INSERT INTO users (email, username, full_name, distinguished_name, email_verified, hub_mode, created_at, updated_at)
+     VALUES ($1, $2, $3, $4, true, 'full_access', NOW(), NOW())
      RETURNING id, email, full_name, distinguished_name`,
-    [email, fullName, ldapUser.dn]
+    [email, username, fullName, ldapUser.dn]
   )
   console.log(`[LDAP] Created new user: ${email}`)
   
