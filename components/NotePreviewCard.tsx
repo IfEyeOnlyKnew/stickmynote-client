@@ -167,6 +167,7 @@ export const NotePreviewCard: React.FC<NotePreviewCardProps> = ({
                 stickTopic={note.topic || note.title}
                 stickContent={note.content}
                 stickColor={note.color}
+                isPersonal={true}
                 className="h-6 w-6 p-0"
               />
             </span>

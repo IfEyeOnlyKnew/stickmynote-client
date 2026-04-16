@@ -240,6 +240,7 @@ export function MySticksClient({ initialSticks }: MySticksClientProps) {
                             stickTopic={stick.topic}
                             stickContent={stick.content}
                             stickColor={stick.color}
+                            isPersonal={!stick.pad_id}
                             className="h-7 w-7 p-0"
                           />
                         </span>

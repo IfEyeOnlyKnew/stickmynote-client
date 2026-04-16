@@ -11,6 +11,7 @@ interface StickMapButtonProps {
   readonly stickTopic?: string | null
   readonly stickContent?: string | null
   readonly stickColor?: string | null
+  readonly isPersonal?: boolean
   readonly size?: "sm" | "default"
   readonly className?: string
   readonly label?: string
@@ -22,6 +23,7 @@ export function StickMapButton({
   stickTopic,
   stickContent,
   stickColor,
+  isPersonal = false,
   size = "sm",
   className = "h-8 px-2",
   label = "Stick Map",
@@ -41,7 +43,8 @@ export function StickMapButton({
 
       if (nodeId === "noted") {
         try {
-          const res = await fetch(`/api/noted/pages/by-stick/${stickId}`)
+          const query = isPersonal ? "?personal=true" : ""
+          const res = await fetch(`/api/noted/pages/by-stick/${stickId}${query}`)
           const json = await res.json()
           if (json.exists && json.data?.id) {
             router.push(`/noted?page=${json.data.id}`)
