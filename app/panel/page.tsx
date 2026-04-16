@@ -612,26 +612,35 @@ export default function CommunityPanelPage() {
     </div>
   )
 
-  // Helper: Render a flat or date-grouped grid of community notes
-  const renderNotesGrid = (notesSearchTerm?: string) => {
-    if (!groupByDateOn) {
-      return (
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6 pb-8">
-          {communityNotes.map((note, index) => (
-            <OptimisticSearchResultCard
-              key={note.id}
-              note={note}
-              searchTerm={notesSearchTerm}
-              onOpen={(noteId) => handleNoteClick(noteId, index)}
-              currentUserId={user?.id}
-            />
-          ))}
-        </div>
-      )
-    }
+  // Helper: open-handler factory keeps the map callback shallow enough for nesting rules
+  const makeNoteOpener = (index: number) => (noteId: string) => handleNoteClick(noteId, index)
 
+  const renderFlatGrid = (notesSearchTerm?: string) => (
+    <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6 pb-8">
+      {communityNotes.map((note, index) => (
+        <OptimisticSearchResultCard
+          key={note.id}
+          note={note}
+          searchTerm={notesSearchTerm}
+          onOpen={makeNoteOpener(index)}
+          currentUserId={user?.id}
+        />
+      ))}
+    </div>
+  )
+
+  const renderGroupedGrid = (notesSearchTerm: string | undefined, indexById: Map<string, number>) => {
     const groups = groupByDate(communityNotes, (n) => n.updated_at || n.created_at)
-    const indexById = new Map(communityNotes.map((n, i) => [n.id, i]))
+    const renderSectionCards = (group: { items: typeof communityNotes }) =>
+      group.items.map((note) => (
+        <OptimisticSearchResultCard
+          key={note.id}
+          note={note}
+          searchTerm={notesSearchTerm}
+          onOpen={makeNoteOpener(indexById.get(note.id) ?? 0)}
+          currentUserId={user?.id}
+        />
+      ))
 
     return (
       <div className="space-y-6 pb-8">
@@ -647,20 +656,18 @@ export default function CommunityPanelPage() {
               </h2>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-              {group.items.map((note) => (
-                <OptimisticSearchResultCard
-                  key={note.id}
-                  note={note}
-                  searchTerm={notesSearchTerm}
-                  onOpen={(noteId) => handleNoteClick(noteId, indexById.get(note.id) ?? 0)}
-                  currentUserId={user?.id}
-                />
-              ))}
+              {renderSectionCards(group)}
             </div>
           </section>
         ))}
       </div>
     )
+  }
+
+  const renderNotesGrid = (notesSearchTerm?: string) => {
+    if (!groupByDateOn) return renderFlatGrid(notesSearchTerm)
+    const indexById = new Map(communityNotes.map((n, i) => [n.id, i]))
+    return renderGroupedGrid(notesSearchTerm, indexById)
   }
 
   // Helper: Render recent shared sticks (no search term)

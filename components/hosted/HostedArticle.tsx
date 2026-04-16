@@ -92,7 +92,7 @@ function resolveVideoEmbed(item: HostedArticleSectionItem): { kind: "iframe"; sr
 // Masthead
 // ============================================================================
 
-function Masthead({ wordmark, tagline }: { wordmark: string; tagline: string }) {
+function Masthead({ wordmark, tagline }: Readonly<{ wordmark: string; tagline: string }>) {
   return (
     <div className="border-b border-zinc-200 bg-white/95 backdrop-blur supports-[backdrop-filter]:bg-white/80 sticky top-0 z-40 print:static print:border-b print:bg-white">
       <div className="mx-auto max-w-[960px] px-4 md:px-8 py-3 flex items-center justify-between">
@@ -110,7 +110,7 @@ function Masthead({ wordmark, tagline }: { wordmark: string; tagline: string }) 
 // Hero
 // ============================================================================
 
-function Hero({ hero }: { hero: HostedArticleData["hero"] }) {
+function Hero({ hero }: Readonly<{ hero: HostedArticleData["hero"] }>) {
   return (
     <header className="relative">
       <div
@@ -151,7 +151,7 @@ function Hero({ hero }: { hero: HostedArticleData["hero"] }) {
 // Prose + Lead
 // ============================================================================
 
-function LeadAndBody({ lead, body }: { lead?: string; body?: string }) {
+function LeadAndBody({ lead, body }: Readonly<{ lead?: string; body?: string }>) {
   if (!lead && !body) return null
   return (
     <section className="mx-auto max-w-[720px] px-4 md:px-8 pb-8">
@@ -173,7 +173,7 @@ function LeadAndBody({ lead, body }: { lead?: string; body?: string }) {
 // Item renderers
 // ============================================================================
 
-function ImageFigure({ item }: { item: HostedArticleSectionItem }) {
+function ImageFigure({ item }: Readonly<{ item: HostedArticleSectionItem }>) {
   if (!item.url) return null
   return (
     <figure className="my-10 md:-mx-20">
@@ -192,7 +192,7 @@ function ImageFigure({ item }: { item: HostedArticleSectionItem }) {
   )
 }
 
-function VideoFigure({ item }: { item: HostedArticleSectionItem }) {
+function VideoFigure({ item }: Readonly<{ item: HostedArticleSectionItem }>) {
   const resolved = resolveVideoEmbed(item)
   if (!resolved) return null
   return (
@@ -222,7 +222,7 @@ function VideoFigure({ item }: { item: HostedArticleSectionItem }) {
   )
 }
 
-function LinkCard({ item, accent }: { item: HostedArticleSectionItem; accent: string }) {
+function LinkCard({ item, accent }: Readonly<{ item: HostedArticleSectionItem; accent: string }>) {
   if (!item.url) return null
   return (
     <a
@@ -254,7 +254,7 @@ function LinkCard({ item, accent }: { item: HostedArticleSectionItem; accent: st
   )
 }
 
-function FileCard({ item }: { item: HostedArticleSectionItem }) {
+function FileCard({ item }: Readonly<{ item: HostedArticleSectionItem }>) {
   if (!item.url) return null
   return (
     <a
@@ -272,7 +272,7 @@ function FileCard({ item }: { item: HostedArticleSectionItem }) {
   )
 }
 
-function EventCard({ item, accent }: { item: HostedArticleSectionItem; accent: string }) {
+function EventCard({ item, accent }: Readonly<{ item: HostedArticleSectionItem; accent: string }>) {
   return (
     <div
       className="my-5 p-5 border border-zinc-200 bg-white relative"
@@ -299,7 +299,7 @@ function EventCard({ item, accent }: { item: HostedArticleSectionItem; accent: s
   )
 }
 
-function ProseBlock({ item }: { item: HostedArticleSectionItem }) {
+function ProseBlock({ item }: Readonly<{ item: HostedArticleSectionItem }>) {
   if (item.html) {
     return (
       <div
@@ -314,7 +314,7 @@ function ProseBlock({ item }: { item: HostedArticleSectionItem }) {
   return null
 }
 
-function SectionItem({ item, accent }: { item: HostedArticleSectionItem; accent: string }) {
+function SectionItem({ item, accent }: Readonly<{ item: HostedArticleSectionItem; accent: string }>) {
   switch (item.type) {
     case "image":
       return <ImageFigure item={item} />
@@ -336,7 +336,7 @@ function SectionItem({ item, accent }: { item: HostedArticleSectionItem; accent:
 // Section
 // ============================================================================
 
-function Section({ section, accent }: { section: HostedArticleSection; accent: string }) {
+function Section({ section, accent }: Readonly<{ section: HostedArticleSection; accent: string }>) {
   return (
     <section className="mx-auto max-w-[720px] px-4 md:px-8 py-10 md:py-14">
       <div className="mb-8">
@@ -357,8 +357,12 @@ function Section({ section, accent }: { section: HostedArticleSection; accent: s
       )}
 
       <div>
-        {section.items.map((item, i) => (
-          <SectionItem key={i} item={item} accent={accent} />
+        {section.items.map((item) => (
+          <SectionItem
+            key={`${item.type}-${item.url || item.title || item.caption || item.html?.slice(0, 40) || item.description?.slice(0, 40)}`}
+            item={item}
+            accent={accent}
+          />
         ))}
       </div>
 
@@ -373,7 +377,7 @@ function Section({ section, accent }: { section: HostedArticleSection; accent: s
 // Discussion
 // ============================================================================
 
-function ReplyNode({ reply, depth = 0, accent }: { reply: HostedArticleReply; depth?: number; accent: string }) {
+function ReplyNode({ reply, depth = 0, accent }: Readonly<{ reply: HostedArticleReply; depth?: number; accent: string }>) {
   return (
     <div
       className={
@@ -395,7 +399,7 @@ function ReplyNode({ reply, depth = 0, accent }: { reply: HostedArticleReply; de
   )
 }
 
-function Discussion({ discussion, accent }: { discussion: NonNullable<HostedArticleData["discussion"]>; accent: string }) {
+function Discussion({ discussion, accent }: Readonly<{ discussion: NonNullable<HostedArticleData["discussion"]>; accent: string }>) {
   if (!discussion.replies.length) return null
   return (
     <section className="mx-auto max-w-[720px] px-4 md:px-8 py-10 md:py-14 border-t border-zinc-200">
@@ -418,7 +422,7 @@ function Discussion({ discussion, accent }: { discussion: NonNullable<HostedArti
 // Footer
 // ============================================================================
 
-function Footer({ footer, wordmark }: { footer: HostedArticleData["footer"]; wordmark: string }) {
+function Footer({ footer, wordmark }: Readonly<{ footer: HostedArticleData["footer"]; wordmark: string }>) {
   return (
     <footer className="mt-12 border-t border-zinc-200 bg-zinc-50 print:bg-white">
       <div className="mx-auto max-w-[720px] px-4 md:px-8 py-10 text-center">
@@ -435,7 +439,7 @@ function Footer({ footer, wordmark }: { footer: HostedArticleData["footer"]; wor
 // Main component
 // ============================================================================
 
-export function HostedArticle({ data }: { data: HostedArticleData }) {
+export function HostedArticle({ data }: Readonly<{ data: HostedArticleData }>) {
   const accent = data.hero.accentColor || "#18181B"
   return (
     <article className="min-h-screen bg-[#FAFAFA] text-zinc-900 antialiased print:bg-white">
@@ -443,8 +447,8 @@ export function HostedArticle({ data }: { data: HostedArticleData }) {
       <Hero hero={data.hero} />
       <LeadAndBody lead={data.lead} body={data.body} />
 
-      {data.sections.map((s, i) => (
-        <Section key={i} section={s} accent={accent} />
+      {data.sections.map((s) => (
+        <Section key={s.tabName} section={s} accent={accent} />
       ))}
 
       {data.discussion && <Discussion discussion={data.discussion} accent={accent} />}

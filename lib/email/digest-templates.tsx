@@ -134,13 +134,16 @@ export function generateDigestEmailHtml(data: DigestEmailData): string {
 // etc.). Returns an array of already-indented strings, or [] if the pad
 // has zero of every category.
 function formatPadCounters(pad: PadDigestSummary): string[] {
-  const lines: string[] = []
-  if (pad.newSticks > 0) lines.push(`  • ${pad.newSticks} new stick(s)`)
-  if (pad.replies > 0) lines.push(`  • ${pad.replies} reply/replies`)
-  if (pad.statusChanges > 0) lines.push(`  • ${pad.statusChanges} status change(s)`)
-  if (pad.unresolvedBlockers > 0) lines.push(`  • ${pad.unresolvedBlockers} blocker(s)`)
-  if (pad.mentions > 0) lines.push(`  • ${pad.mentions} mention(s)`)
-  return lines
+  const counters: ReadonlyArray<{ count: number; label: string }> = [
+    { count: pad.newSticks, label: "new stick(s)" },
+    { count: pad.replies, label: "reply/replies" },
+    { count: pad.statusChanges, label: "status change(s)" },
+    { count: pad.unresolvedBlockers, label: "blocker(s)" },
+    { count: pad.mentions, label: "mention(s)" },
+  ]
+  return counters
+    .filter((c) => c.count > 0)
+    .map((c) => `  • ${c.count} ${c.label}`)
 }
 
 // Format the first 5 notification items for one pad, plus an optional
@@ -157,11 +160,13 @@ function formatPadNotifications(notifications: DigestNotification[]): string[] {
 // Render the full plain-text block for a single pad: header, counters,
 // notification excerpts, and a trailing blank line.
 function renderPadBlock(pad: PadDigestSummary): string {
-  const parts: string[] = [`--- ${pad.padName} ---`]
-  parts.push(...formatPadCounters(pad))
-  parts.push("") // blank line between counters and notifications
-  parts.push(...formatPadNotifications(pad.notifications))
-  parts.push("") // trailing blank line between pads
+  const parts: string[] = [
+    `--- ${pad.padName} ---`,
+    ...formatPadCounters(pad),
+    "", // blank line between counters and notifications
+    ...formatPadNotifications(pad.notifications),
+    "", // trailing blank line between pads
+  ]
   return parts.join("\n")
 }
 

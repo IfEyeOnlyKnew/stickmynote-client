@@ -27,7 +27,7 @@
 
 import { useState, useEffect, useMemo, useCallback, useRef } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
-import { Loader2, Plus, Search, Undo2, X, BarChart3, ChevronLeft, FolderPlus, Check, FolderOpen } from "lucide-react"
+import { Loader2, Plus, Search, Undo2, X, BarChart3, ChevronLeft, FolderPlus, Check, FolderOpen, Calendar } from "lucide-react"
 import type { Note } from "@/types/note"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -35,7 +35,6 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { SimpleNoteGrid } from "@/components/SimpleNoteGrid"
 import { DateGroupedNoteGrid } from "@/components/DateGroupedNoteGrid"
-import { Calendar } from "lucide-react"
 import { Switch } from "@/components/ui/switch"
 import { Label } from "@/components/ui/label"
 import { UserMenu } from "@/components/user-menu"
@@ -660,31 +659,25 @@ export function NotesClient({ initialNotes, userId, stats }: Readonly<NotesClien
             </div>
           )}
 
-          {filteredNotes.length === 0 && !loading ? (
-            <div className="flex flex-col items-center justify-center py-16 text-gray-500">
-              <div className="text-6xl mb-4">📝</div>
-              <h3 className="text-lg font-medium mb-2">No notes found</h3>
-              <p className="text-sm">
-                {(() => {
-                  if (groupsHook.selectedGroupId) return "No sticks in this group yet. Open a stick and add it to this group."
-                  if (searchTerm) return "Try adjusting your search or filter"
-                  return "Create your first note to get started!"
-                })()}
-              </p>
-            </div>
-          ) : (
-            groupByDate ? (
-              <DateGroupedNoteGrid
-                notes={filteredNotes}
-                onNoteClick={handleNoteClick}
-                onUpdateColor={handleUpdateNoteColor}
-                onLoadMore={loadMoreNotes}
-                hasMore={hasMore}
-                isLoadingMore={loadingMore}
-                loadingNoteId={loadingNoteId}
-              />
-            ) : (
-              <SimpleNoteGrid
+          {(() => {
+            if (filteredNotes.length === 0 && !loading) {
+              return (
+                <div className="flex flex-col items-center justify-center py-16 text-gray-500">
+                  <div className="text-6xl mb-4">📝</div>
+                  <h3 className="text-lg font-medium mb-2">No notes found</h3>
+                  <p className="text-sm">
+                    {(() => {
+                      if (groupsHook.selectedGroupId) return "No sticks in this group yet. Open a stick and add it to this group."
+                      if (searchTerm) return "Try adjusting your search or filter"
+                      return "Create your first note to get started!"
+                    })()}
+                  </p>
+                </div>
+              )
+            }
+            const GridComponent = groupByDate ? DateGroupedNoteGrid : SimpleNoteGrid
+            return (
+              <GridComponent
                 notes={filteredNotes}
                 onNoteClick={handleNoteClick}
                 onUpdateColor={handleUpdateNoteColor}
@@ -694,7 +687,7 @@ export function NotesClient({ initialNotes, userId, stats }: Readonly<NotesClien
                 loadingNoteId={loadingNoteId}
               />
             )
-          )}
+          })()}
         </div>
       </div>
 

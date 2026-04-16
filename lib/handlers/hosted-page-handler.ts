@@ -382,38 +382,39 @@ export interface GenerateHostedPageResult {
   articleData: HostedArticleData
 }
 
-export async function generateHostedPage(
-  kind: StickKind,
-  stickId: string,
-  userId: string,
-  origin: string,
-): Promise<GenerateHostedPageResult | { error: string; status: number }> {
-  const cfg = KIND[kind]
+function extraPadColumnForKind(kind: StickKind): string {
+  if (kind === "pad") return ", pad_id"
+  if (kind === "concur") return ", group_id"
+  return ""
+}
 
-  const extraCols = kind === "pad" ? ", pad_id" : kind === "concur" ? ", group_id" : ""
-  const stickResult = await db.query<StickRow>(
-    `SELECT id, user_id, topic, content, color, created_at, updated_at, org_id${extraCols}
+async function loadStick(kind: StickKind, stickId: string): Promise<StickRow | null> {
+  const cfg = KIND[kind]
+  const result = await db.query<StickRow>(
+    `SELECT id, user_id, topic, content, color, created_at, updated_at, org_id${extraPadColumnForKind(kind)}
      FROM ${cfg.stickTable} WHERE id = $1 LIMIT 1`,
     [stickId],
   )
-  const stick = stickResult.rows[0]
-  if (!stick) return { error: "Stick not found", status: 404 }
+  return result.rows[0] || null
+}
 
-  const allowed = await canPublish(kind, stick, userId)
-  if (!allowed) return { error: "Only owners or admins can publish", status: 403 }
-
-  const tabsResult = await db.query<TabRow>(
-    `SELECT id, tab_name, tab_type, tab_content, tab_data,
-            ${kind === "personal" ? "tags" : "NULL::jsonb AS tags"},
-            tab_order
+async function loadTabs(kind: StickKind, stickId: string): Promise<TabRow[]> {
+  const cfg = KIND[kind]
+  const tagsCol = kind === "personal" ? "tags" : "NULL::jsonb AS tags"
+  const result = await db.query<TabRow>(
+    `SELECT id, tab_name, tab_type, tab_content, tab_data, ${tagsCol}, tab_order
      FROM ${cfg.tabsTable}
      WHERE ${cfg.tabsFk} = $1
      ORDER BY tab_order ASC, created_at ASC`,
     [stickId],
   )
+  return result.rows
+}
 
+async function loadReplies(kind: StickKind, stickId: string): Promise<ReplyRow[]> {
+  const cfg = KIND[kind]
   const parentCol = cfg.hasParentReplyId ? "r.parent_reply_id" : "NULL::uuid AS parent_reply_id"
-  const repliesResult = await db.query<ReplyRow>(
+  const result = await db.query<ReplyRow>(
     `SELECT r.id, r.content, r.created_at, r.user_id, ${parentCol}, u.full_name, u.email
      FROM ${cfg.repliesTable} r
      LEFT JOIN users u ON u.id = r.user_id
@@ -421,37 +422,37 @@ export async function generateHostedPage(
      ORDER BY r.created_at ASC`,
     [stickId],
   )
+  return result.rows
+}
 
-  const authorResult = await db.query<{ full_name: string | null; email: string }>(
+async function loadAuthor(userId: string): Promise<{ full_name: string | null; email: string } | undefined> {
+  const result = await db.query<{ full_name: string | null; email: string }>(
     `SELECT full_name, email FROM users WHERE id = $1 LIMIT 1`,
-    [stick.user_id],
+    [userId],
   )
-  const author = authorResult.rows[0]
+  return result.rows[0]
+}
 
-  const sectionsSkeleton: HostedArticleSection[] = tabsResult.rows.map((tab) => ({
-    tabName: tab.tab_name || "Untitled Section",
-    items: tabItemsFromRow(tab),
-  }))
+type Narrative = Awaited<ReturnType<typeof askOllamaForNarrative>>
 
-  const extras = await buildExtraSections(kind, stick, origin)
-  sectionsSkeleton.push(...extras)
+function buildArticleData(
+  stick: StickRow,
+  sections: HostedArticleSection[],
+  replyTree: HostedArticleReply[],
+  author: { full_name: string | null; email: string } | undefined,
+  narrative: Narrative,
+): HostedArticleData {
+  const authorName = author?.full_name || author?.email || "Unknown author"
+  const discussion = replyTree.length > 0
+    ? { heading: narrative.discussionHeading, replies: replyTree }
+    : undefined
 
-  const narrative = await askOllamaForNarrative(stick, sectionsSkeleton)
-
-  const sections: HostedArticleSection[] = sectionsSkeleton.map((s, i) => ({
-    ...s,
-    leadIn: narrative.sectionLeadIns[i] || undefined,
-    closing: narrative.sectionClosings[i] || undefined,
-  }))
-
-  const replyTree = buildReplyTree(repliesResult.rows)
-
-  const articleData: HostedArticleData = {
+  return {
     masthead: { wordmark: "Stick My Note", tagline: "Hosted from a Stick" },
     hero: {
       topic: stick.topic || "Untitled",
       deck: narrative.deck,
-      authorName: author?.full_name || author?.email || "Unknown author",
+      authorName,
       createdAt: stick.created_at,
       updatedAt: stick.updated_at || undefined,
       accentColor: stick.color || "#6366f1",
@@ -459,15 +460,24 @@ export async function generateHostedPage(
     lead: narrative.lead,
     body: stick.content || undefined,
     sections,
-    discussion: replyTree.length > 0 ? { heading: narrative.discussionHeading, replies: replyTree } : undefined,
+    discussion,
     footer: { stickId: stick.id, permalink: "", publishedAt: new Date().toISOString() },
   }
+}
 
+async function persistArticle(
+  stickId: string,
+  kind: StickKind,
+  userId: string,
+  articleData: HostedArticleData,
+  origin: string,
+  fallbackSlugSource: string,
+): Promise<string> {
   const existing = await db.query<{ slug: string }>(
     `SELECT slug FROM stick_hosted_pages WHERE stick_id = $1 AND stick_kind = $2 LIMIT 1`,
     [stickId, kind],
   )
-  const slug = existing.rows[0]?.slug || randomSlug(stick.topic || "")
+  const slug = existing.rows[0]?.slug || randomSlug(fallbackSlugSource)
   articleData.footer.permalink = `${origin}/hosted/${slug}`
 
   if (existing.rows[0]) {
@@ -485,6 +495,47 @@ export async function generateHostedPage(
     )
   }
 
+  return slug
+}
+
+export async function generateHostedPage(
+  kind: StickKind,
+  stickId: string,
+  userId: string,
+  origin: string,
+): Promise<GenerateHostedPageResult | { error: string; status: number }> {
+  const stick = await loadStick(kind, stickId)
+  if (!stick) return { error: "Stick not found", status: 404 }
+
+  const allowed = await canPublish(kind, stick, userId)
+  if (!allowed) return { error: "Only owners or admins can publish", status: 403 }
+
+  const [tabs, replyRows, author, extras] = await Promise.all([
+    loadTabs(kind, stickId),
+    loadReplies(kind, stickId),
+    loadAuthor(stick.user_id),
+    buildExtraSections(kind, stick, origin),
+  ])
+
+  const sectionsSkeleton: HostedArticleSection[] = [
+    ...tabs.map((tab) => ({
+      tabName: tab.tab_name || "Untitled Section",
+      items: tabItemsFromRow(tab),
+    })),
+    ...extras,
+  ]
+
+  const narrative = await askOllamaForNarrative(stick, sectionsSkeleton)
+  const sections: HostedArticleSection[] = sectionsSkeleton.map((s, i) => ({
+    ...s,
+    leadIn: narrative.sectionLeadIns[i] || undefined,
+    closing: narrative.sectionClosings[i] || undefined,
+  }))
+
+  const replyTree = buildReplyTree(replyRows)
+  const articleData = buildArticleData(stick, sections, replyTree, author, narrative)
+
+  const slug = await persistArticle(stickId, kind, userId, articleData, origin, stick.topic || "")
   return { slug, articleData }
 }
 
