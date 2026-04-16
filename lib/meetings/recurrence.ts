@@ -65,41 +65,56 @@ export function expandRecurrence(
   return expandSimpleRecurrence(type, meeting, opts)
 }
 
+function computeOccurrence(weekStart: Date, dayOfWeek: number, startDate: Date): Date {
+  const occDate = new Date(weekStart)
+  occDate.setDate(occDate.getDate() + dayOfWeek)
+  occDate.setHours(startDate.getHours(), startDate.getMinutes(), startDate.getSeconds())
+  return occDate
+}
+
+type OccurrenceAction = "skip" | "stop" | "include" | "count-only"
+
+function classifyOccurrence(
+  occDate: Date,
+  count: number,
+  haveOccurrences: boolean,
+  opts: ExpansionOptions,
+): OccurrenceAction {
+  const { startDate, maxCount, recurrenceEnd, rangeStart, rangeEnd } = opts
+  if (occDate < startDate) return "skip"
+  if (recurrenceEnd && occDate > recurrenceEnd) return "stop"
+  if (count >= maxCount) return "stop"
+  if (occDate > rangeEnd && haveOccurrences) return "stop"
+  if (occDate >= rangeStart && occDate <= rangeEnd) return "include"
+  return "count-only"
+}
+
 function expandWeeklyWithDays(
   daysOfWeek: number[],
   opts: ExpansionOptions,
 ): OccurrenceDate[] {
-  const { startDate, interval, duration, maxCount, recurrenceEnd, rangeStart, rangeEnd } = opts
+  const { startDate, interval, duration, maxCount, recurrenceEnd, rangeEnd } = opts
   const occurrences: OccurrenceDate[] = []
   let count = 0
   const days = daysOfWeek.toSorted((a, b) => a - b)
   const weekStart = new Date(startDate)
   weekStart.setDate(weekStart.getDate() - weekStart.getDay()) // Go to Sunday
+  const hardStop = recurrenceEnd || rangeEnd
 
   while (count < maxCount) {
     for (const dayOfWeek of days) {
-      const occDate = new Date(weekStart)
-      occDate.setDate(occDate.getDate() + dayOfWeek)
-      occDate.setHours(startDate.getHours(), startDate.getMinutes(), startDate.getSeconds())
+      const occDate = computeOccurrence(weekStart, dayOfWeek, startDate)
+      const action = classifyOccurrence(occDate, count, occurrences.length > 0, opts)
 
-      if (occDate < startDate) continue
-      if (recurrenceEnd && occDate > recurrenceEnd) return occurrences
-      if (count >= maxCount) return occurrences
-
-      if (occDate >= rangeStart && occDate <= rangeEnd) {
+      if (action === "skip") continue
+      if (action === "stop") return occurrences
+      if (action === "include") {
         occurrences.push(createOccurrence(occDate, duration))
       }
-
-      // If we're past the range, stop early
-      if (occDate > rangeEnd && occurrences.length > 0) return occurrences
-
       count++
     }
-    // Advance by interval weeks
     weekStart.setDate(weekStart.getDate() + 7 * interval)
-
-    // Safety: if we've gone way past the range, stop
-    if (weekStart > rangeEnd && weekStart > (recurrenceEnd || rangeEnd)) break
+    if (weekStart > rangeEnd && weekStart > hardStop) break
   }
   return occurrences
 }
