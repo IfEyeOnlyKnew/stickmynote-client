@@ -14,6 +14,7 @@ import { PermissionBasedStickFullscreen } from "@/components/permission-based/Pe
 import { CreateChatModal } from "@/components/stick-chats/CreateChatModal"
 import { Button } from "@/components/ui/button"
 import { NotedIcon } from "@/components/noted/NotedIcon"
+import { StickMapButton } from "@/components/stick-map/StickMapButton"
 import type { Stick } from "@/types/pad"
 import {
   CommunicationPaletteProvider,
@@ -231,6 +232,15 @@ export function MySticksClient({ initialSticks }: MySticksClientProps) {
                             stickContent={stick.content}
                             isPersonal={!stick.pad_id}
                             size="sm"
+                          />
+                        </span>
+                        <span onClick={(e) => e.stopPropagation()} onKeyDown={(e) => e.stopPropagation()} role="none">
+                          <StickMapButton
+                            stickId={stick.id}
+                            stickTopic={stick.topic}
+                            stickContent={stick.content}
+                            stickColor={stick.color}
+                            className="h-7 w-7 p-0"
                           />
                         </span>
                         <Button

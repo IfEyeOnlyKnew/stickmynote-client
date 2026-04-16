@@ -69,6 +69,7 @@ import {
   CommunicationModals,
 } from "@/components/communication"
 import { MobileStickCard } from "@/components/inference/mobile-stick-card"
+import { StickMapButton } from "@/components/stick-map/StickMapButton"
 
 async function fetchWithRetry(
   url: string,
@@ -379,6 +380,12 @@ const StickTableRow = React.memo(function StickTableRow({
             <Button variant="ghost" size="sm" onClick={handleOpenClick} title="View and edit stick">
               <Eye className="h-4 w-4" />
             </Button>
+            <StickMapButton
+              stickId={stick.id}
+              stickTopic={stick.topic}
+              stickContent={stick.content}
+              stickColor={stick.color}
+            />
             <Button variant="ghost" size="sm" onClick={handleChatClick} title="New chat">
               <MessagesSquare className="h-4 w-4 text-purple-500 hover:text-purple-600" />
             </Button>

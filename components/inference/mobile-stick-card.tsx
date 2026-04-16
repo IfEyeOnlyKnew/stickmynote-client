@@ -24,6 +24,7 @@ import {
 import { formatDistanceToNow } from "date-fns"
 import { WorkflowStatusBadge } from "./workflow-status-badge"
 import { CreateChatModal } from "@/components/stick-chats/CreateChatModal"
+import { StickMapButton } from "@/components/stick-map/StickMapButton"
 import type { WorkflowStatus } from "@/types/inference-workflow"
 
 interface Reply {
@@ -226,6 +227,13 @@ export function MobileStickCard({
               <Eye className="h-4 w-4 mr-1" />
               View
             </Button>
+            <StickMapButton
+              stickId={stick.id}
+              stickTopic={stick.topic}
+              stickContent={stick.content}
+              stickColor={stick.color}
+              className="flex-1 text-xs"
+            />
             <Button
               variant="ghost"
               size="sm"

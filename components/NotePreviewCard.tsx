@@ -9,6 +9,7 @@ import { Badge } from "@/components/ui/badge"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { MessageCircle, Expand, Clock, Share2, Palette } from "lucide-react"
 import { NotedIcon } from "@/components/noted/NotedIcon"
+import { StickMapButton } from "@/components/stick-map/StickMapButton"
 import type { Note } from "@/types/note"
 import { formatDistanceToNow } from "date-fns"
 import { COLORS } from "@/utils/noteUtils"
@@ -160,6 +161,15 @@ export const NotePreviewCard: React.FC<NotePreviewCardProps> = ({
                 className="h-6 w-6 p-0"
               />
             </button>
+            <span onClick={(e) => e.stopPropagation()} onKeyDown={(e) => e.stopPropagation()} role="none">
+              <StickMapButton
+                stickId={note.id}
+                stickTopic={note.topic || note.title}
+                stickContent={note.content}
+                stickColor={note.color}
+                className="h-6 w-6 p-0"
+              />
+            </span>
             <Expand className="w-4 h-4 opacity-50 text-gray-500" />
           </div>
         </div>
