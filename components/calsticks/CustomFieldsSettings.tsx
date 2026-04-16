@@ -20,8 +20,6 @@ interface CustomField {
 
 export function CustomFieldsSettings() {
   const [fields, setFields] = useState<CustomField[]>([])
-  const [loading, setLoading] = useState(true)
-  void loading
   const [isOpen, setIsOpen] = useState(false)
   const [newField, setNewField] = useState<Partial<CustomField>>({
     type: "text",
@@ -37,7 +35,6 @@ export function CustomFieldsSettings() {
 
   const fetchFields = async () => {
     try {
-      setLoading(true)
       const response = await fetch("/api/calsticks/custom-fields")
       if (response.ok) {
         const data = await response.json()
@@ -45,8 +42,6 @@ export function CustomFieldsSettings() {
       }
     } catch (error) {
       console.error("Failed to fetch fields:", error)
-    } finally {
-      setLoading(false)
     }
   }
 

@@ -35,8 +35,6 @@ export function OptimisticSearchResultCard({
 
   const [isHovered, setIsHovered] = useState(false)
   const [viewCount, setViewCount] = useState<number>(0)
-  const [isLoadingCounts, setIsLoadingCounts] = useState(true)
-  void isLoadingCounts
   const fetchedRef = useRef(false)
   const pendingActionRef = useRef(false)
 
@@ -90,8 +88,6 @@ export function OptimisticSearchResultCard({
         }
       } catch {
         // Non-critical — counts and bookmark state fall back to defaults
-      } finally {
-        setIsLoadingCounts(false)
       }
     }
     fetchCounts()
@@ -136,7 +132,7 @@ export function OptimisticSearchResultCard({
           variant: "destructive",
         })
       }
-    } catch (error) {
+    } catch {
       setOptimisticState((prev) => ({
         ...prev,
         isLiked: !newIsLiked,
@@ -184,7 +180,7 @@ export function OptimisticSearchResultCard({
           variant: "destructive",
         })
       }
-    } catch (error) {
+    } catch {
       setOptimisticState((prev) => ({ ...prev, isBookmarked: !newIsBookmarked }))
     } finally {
       setTimeout(() => {

@@ -32,8 +32,6 @@ interface PermissionPresetsManagerProps {
 export function PermissionPresetsManager({ onApplyPreset }: Readonly<PermissionPresetsManagerProps>) {
   const [presets, setPresets] = useState<PermissionPreset[]>([])
   const [dialogOpen, setDialogOpen] = useState(false)
-  const [editingPreset, setEditingPreset] = useState<PermissionPreset | null>(null)
-  void editingPreset
   const [presetName, setPresetName] = useState("")
   const [presetDescription, setPresetDescription] = useState("")
 
@@ -73,7 +71,6 @@ export function PermissionPresetsManager({ onApplyPreset }: Readonly<PermissionP
   const resetForm = () => {
     setPresetName("")
     setPresetDescription("")
-    setEditingPreset(null)
   }
 
   return (
