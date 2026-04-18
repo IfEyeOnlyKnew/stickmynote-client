@@ -250,30 +250,26 @@ export default function DashboardPage() {
                 </Popover>
               </CardTitle>
               <CardDescription className="text-base">
-                Collaborate with teams through shared Pads, Sticks, and reusable templates with enterprise-grade engagement features
+                Turn ideas into decisions with structured Stick templates for Problem Solving, Decision Making, and Feature Requests
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="space-y-3">
                 <div className="flex items-center text-sm text-gray-600">
                   <div className="w-2 h-2 bg-purple-500 rounded-full mr-2"></div>
-                  Organizational Pads for team collaboration
+                  Problem Solving sticks to investigate and resolve issues
                 </div>
                 <div className="flex items-center text-sm text-gray-600">
                   <div className="w-2 h-2 bg-purple-500 rounded-full mr-2"></div>
-                  Reusable Stick templates for common posts and workflows
+                  Decision Making sticks to weigh options and reach consensus
                 </div>
                 <div className="flex items-center text-sm text-gray-600">
                   <div className="w-2 h-2 bg-purple-500 rounded-full mr-2"></div>
-                  Personalized feeds and trending content
+                  Feature Request sticks to capture and prioritize ideas
                 </div>
                 <div className="flex items-center text-sm text-gray-600">
                   <div className="w-2 h-2 bg-purple-500 rounded-full mr-2"></div>
-                  Knowledge sharing and Q&A
-                </div>
-                <div className="flex items-center text-sm text-gray-600">
-                  <div className="w-2 h-2 bg-purple-500 rounded-full mr-2"></div>
-                  Role-based permissions (Owner/Admin/Edit)
+                  Categorized replies that move each discussion toward a conclusion
                 </div>
               </div>
               <Button
