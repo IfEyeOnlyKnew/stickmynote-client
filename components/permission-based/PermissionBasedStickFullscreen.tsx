@@ -20,6 +20,7 @@ import { X, Trash2, Zap, MessagesSquare, Video } from "lucide-react"
 import { GenericStickTabs } from "@/components/GenericStickTabs"
 import { ThreadedReplies } from "@/components/replies/ThreadedReplies"
 import { CreateChatModal } from "@/components/stick-chats/CreateChatModal"
+import { NotedIcon } from "@/components/noted/NotedIcon"
 import { PublishAsPageButton } from "@/components/hosted/PublishAsPageButton"
 import type { Stick } from "@/types/pad"
 import type { StickTabsConfig } from "@/types/stick-tabs-config"
@@ -620,6 +621,14 @@ export function PermissionBasedStickFullscreen({
                     <Zap className="h-3 w-3 text-yellow-600" />
                     <span className="hidden sm:inline">QuickStick</span>
                   </Label>
+                  <NotedIcon
+                    stickId={stick.id}
+                    stickTopic={editedStick.topic}
+                    stickContent={editedStick.content}
+                    isPersonal={stickType === "personal"}
+                    className="h-6 w-6 sm:h-7 sm:w-7 p-0 flex-shrink-0"
+                    openInNewTab
+                  />
                   <Button
                     variant="ghost"
                     size="sm"
@@ -634,7 +643,7 @@ export function PermissionBasedStickFullscreen({
                     size="sm"
                     className="h-6 w-6 sm:h-7 sm:w-7 p-0 flex-shrink-0"
                     title="Start video call"
-                    onClick={() => window.open("/video", "_blank")}
+                    onClick={() => window.open("/video", "_blank", "noopener,noreferrer")}
                   >
                     <Video className="h-4 w-4 text-rose-600" />
                   </Button>
@@ -747,6 +756,7 @@ export function PermissionBasedStickFullscreen({
         autoSubmit
         stickId={stick.id}
         stickType="pad"
+        openInNewTab
       />
     </dialog>
   )

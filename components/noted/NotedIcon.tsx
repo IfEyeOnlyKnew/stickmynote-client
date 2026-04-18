@@ -14,6 +14,7 @@ interface NotedIconProps {
   isPersonal?: boolean
   size?: "sm" | "md"
   className?: string
+  openInNewTab?: boolean
 }
 
 export function NotedIcon({
@@ -23,6 +24,7 @@ export function NotedIcon({
   isPersonal = false,
   size = "sm",
   className,
+  openInNewTab = false,
 }: Readonly<NotedIconProps>) {
   const router = useRouter()
   const { csrfToken } = useCSRF()
@@ -31,6 +33,15 @@ export function NotedIcon({
   const handleClick = useCallback(async (e: React.MouseEvent) => {
     e.stopPropagation()
     if (loading) return
+
+    // Synchronously open a blank tab during the click so popup blockers
+    // don't interfere. We'll set its location once we know the page id.
+    const newTab = openInNewTab ? window.open("about:blank", "_blank") : null
+    const navigate = (url: string) => {
+      if (newTab) newTab.location.href = url
+      else router.push(url)
+    }
+
     setLoading(true)
 
     try {
@@ -42,8 +53,7 @@ export function NotedIcon({
       const checkJson = await checkRes.json()
 
       if (checkJson.exists && checkJson.data?.id) {
-        // Navigate to existing page
-        router.push(`/noted?page=${checkJson.data.id}`)
+        navigate(`/noted?page=${checkJson.data.id}`)
         return
       }
 
@@ -66,13 +76,14 @@ export function NotedIcon({
 
       if (!createRes.ok) throw new Error("Failed to create Noted page")
       const createJson = await createRes.json()
-      router.push(`/noted?page=${createJson.data.id}`)
+      navigate(`/noted?page=${createJson.data.id}`)
     } catch (err) {
       console.error("Noted icon error:", err)
+      if (newTab) newTab.close()
     } finally {
       setLoading(false)
     }
-  }, [stickId, stickTopic, stickContent, isPersonal, csrfToken, loading, router])
+  }, [stickId, stickTopic, stickContent, isPersonal, csrfToken, loading, router, openInNewTab])
 
   return (
     <TooltipProvider>

@@ -27,6 +27,8 @@ interface CreateChatModalProps {
   readonly stickId?: string
   /** Type of stick being linked */
   readonly stickType?: "personal" | "social" | "pad"
+  /** If true, open the created chat in a new tab instead of the current one */
+  readonly openInNewTab?: boolean
 }
 
 /**
@@ -39,6 +41,7 @@ export const CreateChatModal: React.FC<CreateChatModalProps> = ({
   autoSubmit = false,
   stickId,
   stickType,
+  openInNewTab = false,
 }) => {
   const router = useRouter()
   const { csrfToken } = useCSRF()
@@ -93,7 +96,11 @@ export const CreateChatModal: React.FC<CreateChatModalProps> = ({
       if (response.ok) {
         const data = await response.json()
         onOpenChange(false)
-        router.push(`/chats/${data.chat.id}`)
+        if (openInNewTab) {
+          window.open(`/chats/${data.chat.id}`, "_blank", "noopener,noreferrer")
+        } else {
+          router.push(`/chats/${data.chat.id}`)
+        }
       } else {
         const errorData = await response.json()
         setError(errorData.error || "Failed to create chat")
