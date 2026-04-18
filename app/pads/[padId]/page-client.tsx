@@ -636,7 +636,14 @@ export function PadPageClient({ pad, sticks, userRole }: Readonly<PadPageClientP
               </Button>
             )}
             {canInviteUsers && (
-              <Button variant="outline" size="icon" className="h-8 w-8" onClick={handleOpenSettingsDialog}>
+              <Button
+                variant="outline"
+                size="icon"
+                className="h-8 w-8"
+                onClick={handleOpenSettingsDialog}
+                title="Settings"
+                aria-label="Settings"
+              >
                 <Settings className="h-4 w-4" />
               </Button>
             )}
@@ -715,6 +722,7 @@ export function PadPageClient({ pad, sticks, userRole }: Readonly<PadPageClientP
           padId={pad.id}
           padName={pad.name}
           userRole={userRole}
+          onPadUpdated={() => router.refresh()}
         />
 
         {selectedStick && isFullscreenOpen && (

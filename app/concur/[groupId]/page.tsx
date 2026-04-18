@@ -71,7 +71,7 @@ export default function ConcurGroupPage() {
 
   const fetchGroup = useCallback(async () => {
     try {
-      const res = await fetch(`/api/concur/groups/${groupId}`)
+      const res = await fetch(`/api/concur/groups/${groupId}`, { cache: "no-store" })
       if (!res.ok) throw new Error("Failed to fetch")
       const data = await res.json()
       setGroup(data.group)

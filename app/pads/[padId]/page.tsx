@@ -166,7 +166,17 @@ async function fetchSticksWithRetry(db: DatabaseClient, padId: string): Promise<
   return []
 }
 
-async function getPadWithSticks(padId: string): Promise<PadPageData> {
+async function hasStickMembership(db: DatabaseClient, stickId: string, userId: string): Promise<boolean> {
+  const { data } = await db
+    .from("paks_pad_stick_members")
+    .select("stick_id")
+    .eq("stick_id", stickId)
+    .eq("user_id", userId)
+    .maybeSingle()
+  return !!data
+}
+
+async function getPadWithSticks(padId: string, stickParam: string | null): Promise<PadPageData> {
   const session = await getSession()
 
   if (!session) {
@@ -195,6 +205,13 @@ async function getPadWithSticks(padId: string): Promise<PadPageData> {
 
   // Verify access
   if (!userRole && !isPadOwner && !membership) {
+    // User has no pad-level access. If they were linked here to view a specific
+    // stick (e.g. from Noted's "Go to Stick") and they have stick-level access,
+    // send them to /mysticks where they can open that stick without exposing
+    // the rest of the pad's contents.
+    if (stickParam && (await hasStickMembership(db, stickParam, user.id))) {
+      redirect(`/mysticks?stick=${encodeURIComponent(stickParam)}`)
+    }
     redirect("/mypads")
   }
 
@@ -204,8 +221,19 @@ async function getPadWithSticks(padId: string): Promise<PadPageData> {
   return { pad, sticks, user, userRole }
 }
 
-export default async function PadPage({ params }: Readonly<{ params: { padId: string } }>) {
-  const { pad, sticks, userRole } = await getPadWithSticks(params.padId)
+interface PadPageSearchParams {
+  stick?: string
+}
+
+export default async function PadPage({
+  params,
+  searchParams,
+}: Readonly<{
+  params: { padId: string }
+  searchParams?: PadPageSearchParams
+}>) {
+  const stickParam = typeof searchParams?.stick === "string" ? searchParams.stick : null
+  const { pad, sticks, userRole } = await getPadWithSticks(params.padId, stickParam)
 
   return <PadPageClient pad={pad} sticks={sticks} userRole={userRole} />
 }

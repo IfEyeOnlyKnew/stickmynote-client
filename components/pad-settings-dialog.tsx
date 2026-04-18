@@ -11,7 +11,9 @@ import {
 } from "@/components/ui/dialog"
 import { Badge } from "@/components/ui/badge"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
-import { Trash2, Shield, Crown } from 'lucide-react'
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import { Loader2, Trash2, Shield, Crown } from 'lucide-react'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 
 interface PadMember {
@@ -28,14 +30,23 @@ interface PadSettingsDialogProps {
   padId: string
   padName: string
   userRole: string | null
+  onPadUpdated?: () => void
 }
 
-export function PadSettingsDialog({ open, onOpenChange, padId, padName, userRole }: Readonly<PadSettingsDialogProps>) {
+export function PadSettingsDialog({ open, onOpenChange, padId, padName, userRole, onPadUpdated }: Readonly<PadSettingsDialogProps>) {
   const [members, setMembers] = useState<PadMember[]>([])
   const [loading, setLoading] = useState(false)
   const [feedbackMessage, setFeedbackMessage] = useState<{ type: "success" | "error"; text: string } | null>(null)
+  const [nameInput, setNameInput] = useState(padName)
+  const [savingName, setSavingName] = useState(false)
 
   const canManageMembers = ["admin", "owner"].includes(userRole || "")
+  const canEditPad = canManageMembers
+  const nameChanged = nameInput.trim() !== padName.trim()
+
+  useEffect(() => {
+    if (open) setNameInput(padName)
+  }, [open, padName])
 
   /* eslint-disable react-hooks/exhaustive-deps */
   useEffect(() => {
@@ -84,6 +95,37 @@ export function PadSettingsDialog({ open, onOpenChange, padId, padName, userRole
     } catch (error) {
       console.error("Error updating role:", error)
       setFeedbackMessage({ type: "error", text: "Failed to update role" })
+    }
+  }
+
+  const handleSaveName = async () => {
+    if (!canEditPad) return
+    const trimmed = nameInput.trim()
+    if (!trimmed) {
+      setFeedbackMessage({ type: "error", text: "Pad name cannot be empty" })
+      return
+    }
+    if (trimmed === padName.trim()) return
+
+    setSavingName(true)
+    try {
+      const response = await fetch(`/api/pads/${padId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: trimmed }),
+      })
+      if (response.ok) {
+        setFeedbackMessage({ type: "success", text: "Pad name updated" })
+        onPadUpdated?.()
+      } else {
+        const data = await response.json().catch(() => ({}))
+        setFeedbackMessage({ type: "error", text: data.error || "Failed to update pad name" })
+      }
+    } catch (error) {
+      console.error("Error updating pad name:", error)
+      setFeedbackMessage({ type: "error", text: "Failed to update pad name" })
+    } finally {
+      setSavingName(false)
     }
   }
 
@@ -168,6 +210,31 @@ export function PadSettingsDialog({ open, onOpenChange, padId, padName, userRole
             {feedbackMessage.text}
           </div>
         )}
+
+        <div className="space-y-2 pb-4 border-b">
+          <Label htmlFor="pad-name-input" className="text-sm font-medium">
+            Pad Name
+          </Label>
+          <div className="flex gap-2">
+            <Input
+              id="pad-name-input"
+              value={nameInput}
+              onChange={(e) => setNameInput(e.target.value)}
+              maxLength={200}
+              disabled={!canEditPad || savingName}
+              placeholder="Pad name"
+            />
+            {canEditPad && (
+              <Button onClick={handleSaveName} disabled={!nameChanged || savingName || !nameInput.trim()}>
+                {savingName && <Loader2 className="h-4 w-4 animate-spin mr-1" />}
+                Save
+              </Button>
+            )}
+          </div>
+          {!canEditPad && (
+            <p className="text-xs text-muted-foreground">Only pad admins and owners can rename this pad.</p>
+          )}
+        </div>
 
         <div className="space-y-4">
           <div className="flex items-center justify-between">

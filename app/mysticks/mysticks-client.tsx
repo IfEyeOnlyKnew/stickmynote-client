@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useMemo, useEffect } from "react"
-import { useRouter } from "next/navigation"
+import { useRouter, useSearchParams } from "next/navigation"
 import type { StickWithRole } from "@/lib/data/sticks-data"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -27,6 +27,8 @@ interface MySticksClientProps {
 
 export function MySticksClient({ initialSticks }: MySticksClientProps) {
   const router = useRouter()
+  const searchParams = useSearchParams()
+  const stickIdParam = searchParams.get("stick")
   const [sticks, setSticks] = useState<StickWithRole[]>(initialSticks)
   const [searchQuery, setSearchQuery] = useState("")
   const [activeTab, setActiveTab] = useState("all")
@@ -39,6 +41,16 @@ export function MySticksClient({ initialSticks }: MySticksClientProps) {
   useEffect(() => {
     setMounted(true)
   }, [])
+
+  // Auto-open a stick from ?stick= URL param (e.g. linked from Noted "Go to Stick")
+  useEffect(() => {
+    if (!stickIdParam || isFullscreenOpen) return
+    const target = sticks.find((s) => s.id === stickIdParam)
+    if (target) {
+      setSelectedStick(target)
+      setIsFullscreenOpen(true)
+    }
+  }, [stickIdParam, sticks]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const filteredSticks = useMemo(() => {
     return sticks.filter((stick) => {
@@ -90,6 +102,10 @@ export function MySticksClient({ initialSticks }: MySticksClientProps) {
   const handleCloseFullscreen = () => {
     setIsFullscreenOpen(false)
     setSelectedStick(null)
+    // Clear the ?stick= param so the effect doesn't reopen the fullscreen
+    if (stickIdParam) {
+      router.replace("/mysticks")
+    }
   }
 
   const handleChatClick = (e: React.MouseEvent, stickTopic: string) => {
