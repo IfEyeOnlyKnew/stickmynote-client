@@ -250,14 +250,18 @@ export default function DashboardPage() {
                 </Popover>
               </CardTitle>
               <CardDescription className="text-base">
-                Collaborate with teams through Social Pads and Sticks with enterprise-grade social features
+                Collaborate with teams through shared Pads, Sticks, and reusable templates with enterprise-grade engagement features
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="space-y-3">
                 <div className="flex items-center text-sm text-gray-600">
                   <div className="w-2 h-2 bg-purple-500 rounded-full mr-2"></div>
-                  Social Pads for team collaboration
+                  Organizational Pads for team collaboration
+                </div>
+                <div className="flex items-center text-sm text-gray-600">
+                  <div className="w-2 h-2 bg-purple-500 rounded-full mr-2"></div>
+                  Reusable Stick templates for common posts and workflows
                 </div>
                 <div className="flex items-center text-sm text-gray-600">
                   <div className="w-2 h-2 bg-purple-500 rounded-full mr-2"></div>
