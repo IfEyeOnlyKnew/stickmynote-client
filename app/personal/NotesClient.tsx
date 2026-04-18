@@ -124,6 +124,17 @@ export function NotesClient({ initialNotes, userId, stats }: Readonly<NotesClien
     onUpdateNoteColor: handleUpdateNoteColor,
   })
 
+  // Close handler that also closes the tab when the user arrived from Noted's
+  // "Go to Stick" (new tab). window.close() only works for tabs opened by
+  // script; the internal close runs either way so the fallback path leaves the
+  // UI in a usable state.
+  const handleCloseFullscreen = useCallback(() => {
+    fullscreenHook.closeFullscreen()
+    if (searchParams.get("from") === "noted") {
+      window.close()
+    }
+  }, [fullscreenHook, searchParams])
+
   // UI state
   const [searchTerm, setSearchTerm] = useState("")
   const [searchFilter, setSearchFilter] = useState("all")
@@ -806,7 +817,7 @@ export function NotesClient({ initialNotes, userId, stats }: Readonly<NotesClien
 
       {/* Fullscreen Note Modal: edit a single note in depth */}
       {fullscreenHook.fullscreenNoteId && (
-        <Dialog open={true} onOpenChange={() => fullscreenHook.closeFullscreen()}>
+        <Dialog open={true} onOpenChange={handleCloseFullscreen}>
           <DialogContent className="max-w-[95vw] xl:max-w-[1600px] w-full h-[calc(100dvh-2rem)] max-h-[calc(100dvh-2rem)] p-4 overflow-y-auto">
             <DialogHeader className="sr-only">
               <DialogTitle>Note Details</DialogTitle>
@@ -871,7 +882,7 @@ export function NotesClient({ initialNotes, userId, stats }: Readonly<NotesClien
                 note={allNotes.find((n) => n.id === fullscreenHook.fullscreenNoteId)!}
                 mode="fullscreen"
                 currentUserId={userId}
-                onClose={fullscreenHook.closeFullscreen}
+                onClose={handleCloseFullscreen}
                 onUpdateSharing={(noteId: string, isShared: boolean) =>
                   handleUpdateNoteSharing?.(noteId, isShared)
                 }

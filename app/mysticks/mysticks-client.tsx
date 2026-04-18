@@ -102,6 +102,12 @@ export function MySticksClient({ initialSticks }: MySticksClientProps) {
   const handleCloseFullscreen = () => {
     setIsFullscreenOpen(false)
     setSelectedStick(null)
+    // If the user arrived here from Noted's "Go to Stick" (new tab), close the
+    // tab on X. window.close() only works for script-opened tabs, so fall back
+    // to clearing the URL param when it's blocked.
+    if (searchParams.get("from") === "noted") {
+      window.close()
+    }
     // Clear the ?stick= param so the effect doesn't reopen the fullscreen
     if (stickIdParam) {
       router.replace("/mysticks")

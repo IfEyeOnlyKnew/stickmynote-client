@@ -285,12 +285,14 @@ export function NotedPageEditor({ page, groups, saving, onSave, onCancel, onGrou
     editor.chain().focus().insertContent(content).run()
   }, [editor])
 
-  // Build the source stick URL — link to the specific stick
+  // Build the source stick URL — link to the specific stick.
+  // from=noted signals that this tab was opened from Noted; the target page
+  // should close the tab (rather than the fullscreen modal) on X click.
   let sourceStickUrl: string | null = null
   if (page.is_personal && page.personal_stick_id) {
-    sourceStickUrl = `/personal?stick=${page.personal_stick_id}`
+    sourceStickUrl = `/personal?stick=${page.personal_stick_id}&from=noted`
   } else if (!page.is_personal && page.stick_id && page.pad_id) {
-    sourceStickUrl = `/pads/${page.pad_id}?stick=${page.stick_id}`
+    sourceStickUrl = `/pads/${page.pad_id}?stick=${page.stick_id}&from=noted`
   }
 
   if (!editor) return null

@@ -561,8 +561,22 @@ export function PadPageClient({ pad, sticks, userRole }: Readonly<PadPageClientP
 
     setIsFullscreenOpen(false)
     setSelectedStick(null)
+
+    // If the user arrived here via Noted's "Go to Stick" (new tab), close the tab
+    // on X rather than leaving them stuck on a pad they might not otherwise have
+    // visited. window.close() only works for tabs opened by script, so fall back
+    // to clearing the URL param when it's blocked.
+    if (searchParams.get("from") === "noted") {
+      window.close()
+    }
+
+    // Clear ?stick= so the auto-open effect doesn't reopen the fullscreen after
+    // router.refresh() swaps in a new localSticks reference.
+    if (stickParam) {
+      router.replace(`/pads/${pad.id}`)
+    }
     router.refresh()
-  }, [selectedStick, refreshStickTaskCounts, router])
+  }, [selectedStick, refreshStickTaskCounts, router, searchParams, stickParam, pad.id])
 
   const handleUpdateStick = useCallback(async (updatedStick: Stick) => {
     setSelectedStick(updatedStick)
