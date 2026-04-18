@@ -368,8 +368,8 @@ function userMatchesOrgPatterns(userDN: string, patterns: string[]): boolean {
 }
 
 async function ensureOrganizationMembership(orgId: string, userId: string, orgName: string): Promise<void> {
-  const membershipResult = await db.query(
-    `SELECT id FROM organization_members
+  const membershipResult = await db.query<{ id: string; status: string | null }>(
+    `SELECT id, status FROM organization_members
      WHERE org_id = $1 AND user_id = $2
      LIMIT 1`,
     [orgId, userId]
@@ -382,13 +382,24 @@ async function ensureOrganizationMembership(orgId: string, userId: string, orgNa
       [orgId, userId]
     )
     console.log(`[LDAP] Added user to organization: ${orgName}`)
-  } else {
+    return
+  }
+
+  // Already a member — only bump status if it isn't already 'active'.
+  // Note: we intentionally do NOT write updated_at here. organization_members
+  // does not have an updated_at column in the Windows Server schema, and
+  // writing one throws, aborting the caller (e.g. adding a Concur member).
+  if (membershipResult.rows[0]?.status === "active") return
+
+  try {
     await db.query(
       `UPDATE organization_members
-       SET status = 'active', updated_at = NOW()
+       SET status = 'active'
        WHERE org_id = $1 AND user_id = $2`,
       [orgId, userId]
     )
+  } catch (err) {
+    console.error("[LDAP] ensureOrganizationMembership status refresh failed:", err)
   }
 }
 

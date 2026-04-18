@@ -220,11 +220,17 @@ async function ensureOrgMembership(orgId: string, userId: string, role: string):
     )
     console.log(`[SSO] Added user to organization`)
   } else if (existing.rows[0].status !== "active") {
-    await db.query(
-      `UPDATE organization_members SET status = 'active', updated_at = NOW()
-       WHERE org_id = $1 AND user_id = $2`,
-      [orgId, userId],
-    )
-    console.log(`[SSO] Reactivated user organization membership`)
+    // Omit updated_at — the Windows Server schema for organization_members
+    // does not have that column, and writing it throws.
+    try {
+      await db.query(
+        `UPDATE organization_members SET status = 'active'
+         WHERE org_id = $1 AND user_id = $2`,
+        [orgId, userId],
+      )
+      console.log(`[SSO] Reactivated user organization membership`)
+    } catch (err) {
+      console.error("[SSO] Failed to reactivate org membership:", err)
+    }
   }
 }
