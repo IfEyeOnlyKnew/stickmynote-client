@@ -30,6 +30,7 @@ export function PanelSidebar() {
   const [mobileOpen, setMobileOpen] = useState(false)
   const [isConcurAdmin, setIsConcurAdmin] = useState(false)
   const [isConcurMember, setIsConcurMember] = useState(false)
+  const [isConcurOwner, setIsConcurOwner] = useState(false)
 
   useEffect(() => {
     const stored = localStorage.getItem(STORAGE_KEY)
@@ -48,8 +49,10 @@ export function PanelSidebar() {
         const res = await fetch("/api/concur/groups")
         if (res.ok) {
           const data = await res.json()
+          const groups = data.groups || []
           setIsConcurAdmin(data.isConcurAdmin || false)
-          setIsConcurMember((data.groups?.length || 0) > 0)
+          setIsConcurMember(groups.length > 0)
+          setIsConcurOwner(groups.some((g: { user_role?: string }) => g.user_role === "owner"))
         }
       } catch {
         // Silent fail
@@ -70,7 +73,7 @@ export function PanelSidebar() {
     { href: "/panel", label: "Comm Sticks", icon: Globe, exact: true },
   ]
 
-  if (isConcurAdmin) {
+  if (isConcurAdmin || isConcurOwner) {
     navItems.push({ href: "/concur", label: "Concur Admin", icon: ShieldCheck, exact: true })
   }
 

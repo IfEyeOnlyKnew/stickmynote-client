@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from "react"
 import { BreadcrumbNav } from "@/components/breadcrumb-nav"
 import { UserMenu } from "@/components/user-menu"
+import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import {
@@ -11,9 +12,11 @@ import {
   Pin,
   Calendar,
   Eye,
+  Plus,
 } from "lucide-react"
 import { format, isToday, isYesterday, formatDistanceToNow } from "date-fns"
 import { ConcurStickDetailModal } from "@/components/concur/concur-stick-detail-modal"
+import { RequestConcurGroupDialog } from "@/components/concur/request-concur-group-dialog"
 
 // ============================================================================
 // Types
@@ -102,6 +105,7 @@ export default function ConcurSticksPage() {
   const [nextCursor, setNextCursor] = useState<string | null>(null)
   const [hasMore, setHasMore] = useState(false)
   const [selectedStick, setSelectedStick] = useState<FeedStick | null>(null)
+  const [showRequestDialog, setShowRequestDialog] = useState(false)
   const observerRef = useRef<IntersectionObserver | null>(null)
   const sentinelRef = useRef<HTMLDivElement | null>(null)
 
@@ -196,7 +200,16 @@ export default function ConcurSticksPage() {
                 Latest posts from your groups
               </p>
             </div>
-            <UserMenu />
+            <div className="flex items-center gap-3">
+              <Button
+                onClick={() => setShowRequestDialog(true)}
+                className="bg-indigo-600 hover:bg-indigo-700"
+              >
+                <Plus className="h-4 w-4 mr-1" />
+                Request Group
+              </Button>
+              <UserMenu />
+            </div>
           </div>
         </div>
       </div>
@@ -259,6 +272,13 @@ export default function ConcurSticksPage() {
           </>
         )}
       </div>
+
+      {showRequestDialog && (
+        <RequestConcurGroupDialog
+          onClose={() => setShowRequestDialog(false)}
+          onSubmitted={() => setShowRequestDialog(false)}
+        />
+      )}
 
       {/* Stick Detail Modal */}
       {selectedStick && (

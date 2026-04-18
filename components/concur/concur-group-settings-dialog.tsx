@@ -10,6 +10,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Loader2, Upload, X, Image as ImageIcon } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
@@ -40,6 +41,7 @@ export function ConcurGroupSettingsDialog({
   onUpdated,
 }: Readonly<ConcurGroupSettingsDialogProps>) {
   const { toast } = useToast()
+  const [name, setName] = useState(groupName)
   const [logoUrl, setLogoUrl] = useState(currentLogoUrl || "")
   const [headerImageUrl, setHeaderImageUrl] = useState(currentHeaderImageUrl || "")
   const [uploadingLogo, setUploadingLogo] = useState(false)
@@ -92,12 +94,19 @@ export function ConcurGroupSettingsDialog({
   }
 
   const handleSave = async () => {
+    const trimmedName = name.trim()
+    if (!trimmedName) {
+      toast({ title: "Group name is required", variant: "destructive" })
+      return
+    }
+
     setSaving(true)
     try {
       const res = await fetch(`/api/concur/groups/${groupId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
+          name: trimmedName,
           logo_url: logoUrl || null,
           header_image_url: headerImageUrl || null,
         }),
@@ -135,6 +144,20 @@ export function ConcurGroupSettingsDialog({
         </DialogHeader>
 
         <div className="space-y-6 py-2">
+          {/* Group Name */}
+          <div className="space-y-2">
+            <Label htmlFor="group-name-input" className="text-sm font-medium">
+              Group Name
+            </Label>
+            <Input
+              id="group-name-input"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              maxLength={100}
+              placeholder="e.g. Engineering Team"
+            />
+          </div>
+
           {/* Logo Upload */}
           <div className="space-y-3">
             <Label className="text-sm font-medium">
@@ -280,7 +303,7 @@ export function ConcurGroupSettingsDialog({
           </Button>
           <Button
             onClick={handleSave}
-            disabled={saving || uploadingLogo || uploadingHeader}
+            disabled={saving || uploadingLogo || uploadingHeader || !name.trim()}
             className="bg-indigo-600 hover:bg-indigo-700"
           >
             {saving ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : null}
