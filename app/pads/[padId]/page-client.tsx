@@ -5,8 +5,9 @@ import { useState, useEffect, useCallback } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { Users, Plus, UserPlus, BarChart3, CheckCircle2, Circle, Settings, Sparkles, Network } from "lucide-react"
+import { Users, Plus, UserPlus, BarChart3, CheckCircle2, Circle, Settings, Sparkles, Network, MessagesSquare, Video } from "lucide-react"
 import { NotedIcon } from "@/components/noted/NotedIcon"
+import { CreateChatModal } from "@/components/stick-chats/CreateChatModal"
 import { CreateStickModal } from "@/components/create-stick-modal"
 import { BreadcrumbNav } from "@/components/breadcrumb-nav"
 import { PermissionBasedStickFullscreen } from "@/components/permission-based/PermissionBasedStickFullscreen"
@@ -194,9 +195,11 @@ interface StickCardProps {
   onOpenGantt: (e: React.MouseEvent, stick: Stick) => void
   onOpenMap: (e: React.MouseEvent, stick: Stick) => void
   onColorChange: (stickId: string, color: string) => void
+  onOpenChat: (e: React.MouseEvent, stick: Stick) => void
+  onOpenVideo: (e: React.MouseEvent) => void
 }
 
-function StickCard({ stick, counts, canEdit, onClick, onOpenGantt, onOpenMap, onColorChange }: Readonly<StickCardProps>) {
+function StickCard({ stick, counts, canEdit, onClick, onOpenGantt, onOpenMap, onColorChange, onOpenChat, onOpenVideo }: Readonly<StickCardProps>) {
   const hasTasks = counts && counts.total > 0
 
   const handleClick = useCallback(() => {
@@ -210,6 +213,14 @@ function StickCard({ stick, counts, canEdit, onClick, onOpenGantt, onOpenMap, on
   const handleMapClick = useCallback((e: React.MouseEvent) => {
     onOpenMap(e, stick)
   }, [onOpenMap, stick])
+
+  const handleChatClick = useCallback((e: React.MouseEvent) => {
+    onOpenChat(e, stick)
+  }, [onOpenChat, stick])
+
+  const handleVideoClick = useCallback((e: React.MouseEvent) => {
+    onOpenVideo(e)
+  }, [onOpenVideo])
 
   const handleColorChange = useCallback((color: string) => {
     onColorChange(stick.id, color)
@@ -258,8 +269,27 @@ function StickCard({ stick, counts, canEdit, onClick, onOpenGantt, onOpenMap, on
                 stickId={stick.id}
                 stickTopic={stick.topic}
                 stickContent={stick.content}
+                openInNewTab
               />
             </div>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={handleChatClick}
+              className="h-8 px-2"
+              title="New chat"
+            >
+              <MessagesSquare className="h-4 w-4 text-purple-500 hover:text-purple-600" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={handleVideoClick}
+              className="h-8 px-2"
+              title="Start video call"
+            >
+              <Video className="h-4 w-4 text-blue-500 hover:text-blue-600" />
+            </Button>
             <Button
               variant="ghost"
               size="sm"
@@ -307,6 +337,9 @@ export function PadPageClient({ pad, sticks, userRole }: Readonly<PadPageClientP
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false)
   const [showInviteModal, setShowInviteModal] = useState(false)
   const [showSettingsDialog, setShowSettingsDialog] = useState(false)
+  const [chatModalOpen, setChatModalOpen] = useState(false)
+  const [chatStickId, setChatStickId] = useState<string | null>(null)
+  const [chatStickTopic, setChatStickTopic] = useState("")
 
   // Stick states
   const [localSticks, setLocalSticks] = useState<Stick[]>(sticks)
@@ -441,6 +474,18 @@ export function PadPageClient({ pad, sticks, userRole }: Readonly<PadPageClientP
       stickContent: stick.content || "",
       stickColor: stick.color || "",
     })
+  }, [])
+
+  const handleOpenChat = useCallback((e: React.MouseEvent, stick: Stick) => {
+    e.stopPropagation()
+    setChatStickId(stick.id)
+    setChatStickTopic(stick.topic || "Untitled Stick")
+    setChatModalOpen(true)
+  }, [])
+
+  const handleOpenVideo = useCallback((e: React.MouseEvent) => {
+    e.stopPropagation()
+    window.open("/video", "_blank", "noopener,noreferrer")
   }, [])
 
   const handleCloseMap = useCallback((open: boolean) => {
@@ -683,6 +728,8 @@ export function PadPageClient({ pad, sticks, userRole }: Readonly<PadPageClientP
                   onOpenGantt={handleOpenGantt}
                   onOpenMap={handleOpenMap}
                   onColorChange={handleStickColorChange}
+                  onOpenChat={handleOpenChat}
+                  onOpenVideo={handleOpenVideo}
                 />
               ))}
             </div>
@@ -735,6 +782,16 @@ export function PadPageClient({ pad, sticks, userRole }: Readonly<PadPageClientP
             stickType="alliance"
           />
         )}
+
+        <CreateChatModal
+          open={chatModalOpen}
+          onOpenChange={setChatModalOpen}
+          defaultName={chatStickTopic}
+          autoSubmit
+          openInNewTab
+          stickId={chatStickId || undefined}
+          stickType="pad"
+        />
       </div>
 
       {/* Communication Palette Modals */}

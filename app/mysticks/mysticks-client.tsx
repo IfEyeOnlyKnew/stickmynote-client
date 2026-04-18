@@ -116,7 +116,7 @@ export function MySticksClient({ initialSticks }: MySticksClientProps) {
 
   const handleVideoClick = (e: React.MouseEvent) => {
     e.stopPropagation()
-    router.push("/video")
+    window.open("/video", "_blank", "noopener,noreferrer")
   }
 
   const handleUpdateStick = (updatedStick: Stick) => {
@@ -248,6 +248,7 @@ export function MySticksClient({ initialSticks }: MySticksClientProps) {
                             stickContent={stick.content}
                             isPersonal={!stick.pad_id}
                             size="sm"
+                            openInNewTab
                           />
                         </span>
                         <span onClick={(e) => e.stopPropagation()} onKeyDown={(e) => e.stopPropagation()} role="none">
@@ -326,6 +327,7 @@ export function MySticksClient({ initialSticks }: MySticksClientProps) {
         onOpenChange={setChatModalOpen}
         defaultName={chatStickTopic}
         autoSubmit
+        openInNewTab
       />
 
       {/* Communication Palette Modals */}
