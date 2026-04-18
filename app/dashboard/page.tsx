@@ -5,7 +5,7 @@ import { useState, useEffect } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { StickyNote, Users, FileText, ArrowRight, Share2, MessagesSquare, Video, CalendarCheck, Download, BookOpen, Info, Sparkles } from "lucide-react"
+import { StickyNote, Users, FileText, ArrowRight, Share2, MessagesSquare, Video, CalendarCheck, Download, BookOpen, Info, Sparkles, Briefcase } from "lucide-react"
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover"
 import { UserMenu } from "@/components/user-menu"
 import { useUser } from "@/contexts/user-context"
@@ -506,6 +506,47 @@ export default function DashboardPage() {
                 size="lg"
               >
                 Go to Recognition Hub
+                <ArrowRight className="h-5 w-5 ml-2" />
+              </Button>
+            </CardContent>
+          </Card>
+
+          {/* PM Hub Section */}
+          <Card className="hover:shadow-xl transition-all duration-300 hover:scale-105 border-2 hover:border-emerald-300">
+            <CardHeader className="text-center pb-4">
+              <div className="mx-auto w-16 h-16 bg-emerald-100 rounded-full flex items-center justify-center mb-4">
+                <Briefcase className="h-8 w-8 text-emerald-600" />
+              </div>
+              <CardTitle className="text-2xl text-gray-900">PM Hub</CardTitle>
+              <CardDescription className="text-base">
+                Project management with portfolio, timesheets, goals, budget, and invoices
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-3">
+                <div className="flex items-center text-sm text-gray-600">
+                  <div className="w-2 h-2 bg-emerald-500 rounded-full mr-2"></div>
+                  Portfolio and resource planning
+                </div>
+                <div className="flex items-center text-sm text-gray-600">
+                  <div className="w-2 h-2 bg-emerald-500 rounded-full mr-2"></div>
+                  Timesheets and invoicing
+                </div>
+                <div className="flex items-center text-sm text-gray-600">
+                  <div className="w-2 h-2 bg-emerald-500 rounded-full mr-2"></div>
+                  Goals and budget tracking
+                </div>
+                <div className="flex items-center text-sm text-gray-600">
+                  <div className="w-2 h-2 bg-emerald-500 rounded-full mr-2"></div>
+                  Reusable project templates and forms
+                </div>
+              </div>
+              <Button
+                onClick={() => window.open("/pm", "_blank", "noopener,noreferrer")}
+                className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-semibold py-3 text-lg"
+                size="lg"
+              >
+                Go to PM Hub
                 <ArrowRight className="h-5 w-5 ml-2" />
               </Button>
             </CardContent>

@@ -83,7 +83,7 @@ export async function PATCH(request: NextRequest, context: { params: Promise<{ p
   try {
     const auth = await requireAuthAndOrg()
     if ("response" in auth) return auth.response
-    const { user, orgContext } = auth
+    const { user } = auth
 
     const db = await createServiceDatabaseClient()
 
@@ -107,41 +107,38 @@ export async function PATCH(request: NextRequest, context: { params: Promise<{ p
       return NextResponse.json({ error: "Pad name is too long" }, { status: 400 })
     }
 
+    // Fetch by id only — mirrors lib/data/pads-data.ts and app/pads/[padId]/page.tsx
+    // which authorize by pad ownership/membership rather than org_id. Standalone
+    // pads (multi_pak_id NULL) and legacy pads without org_id both need to work.
     const { data: pad, error: fetchError } = await db
       .from("paks_pads")
-      .select("id, owner_id, multi_pak_id, org_id")
+      .select("id, owner_id")
       .eq("id", padId)
-      .eq("org_id", orgContext.orgId)
       .maybeSingle()
 
     if (fetchError) {
-      console.error("Error fetching Pad:", fetchError)
+      console.error("PATCH /api/pads/[padId] fetch error:", fetchError)
       return NextResponse.json({ error: "Failed to fetch Pad" }, { status: 500 })
     }
     if (!pad) return NextResponse.json({ error: "Pad not found" }, { status: 404 })
 
-    const isPadOwner = pad.owner_id === user.id
+    // Pad owner can always rename
+    let canEdit = pad.owner_id === user.id
 
-    const { data: multiPak } = await db
-      .from("multi_paks")
-      .select("owner_id")
-      .eq("id", pad.multi_pak_id)
-      .eq("org_id", orgContext.orgId)
-      .maybeSingle()
+    // Pad admin members can rename
+    if (!canEdit) {
+      const { data: membership } = await db
+        .from("paks_pad_members")
+        .select("role")
+        .eq("pad_id", padId)
+        .eq("user_id", user.id)
+        .eq("accepted", true)
+        .maybeSingle()
 
-    const isMultiPakOwner = multiPak?.owner_id === user.id
+      canEdit = membership?.role === "admin"
+    }
 
-    const { data: membership } = await db
-      .from("multi_pak_members")
-      .select("role")
-      .eq("multi_pak_id", pad.multi_pak_id)
-      .eq("user_id", user.id)
-      .eq("accepted", true)
-      .maybeSingle()
-
-    const isMultiPakAdmin = membership?.role === "admin"
-
-    if (!isPadOwner && !isMultiPakOwner && !isMultiPakAdmin) {
+    if (!canEdit) {
       return NextResponse.json({ error: "Permission denied" }, { status: 403 })
     }
 
@@ -149,12 +146,11 @@ export async function PATCH(request: NextRequest, context: { params: Promise<{ p
       .from("paks_pads")
       .update({ name })
       .eq("id", padId)
-      .eq("org_id", orgContext.orgId)
       .select()
       .single()
 
     if (updateError) {
-      console.error("Error updating Pad:", updateError)
+      console.error("PATCH /api/pads/[padId] update error:", updateError)
       return NextResponse.json({ error: "Failed to update Pad" }, { status: 500 })
     }
 

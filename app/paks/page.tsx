@@ -4,7 +4,7 @@ import { useState } from "react"
 import { useRouter } from "next/navigation"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { FileText, Search, Calendar, StickyNote, Zap } from "lucide-react"
+import { FileText, Search, Calendar, StickyNote, Zap, Briefcase } from "lucide-react"
 import { BrowseAllPadsModal } from "@/components/browse-all-pads-modal"
 import { UserMenu } from "@/components/user-menu"
 import { BreadcrumbNav } from "@/components/breadcrumb-nav"
@@ -114,11 +114,34 @@ export default function PaksPage() {
             <CardDescription>Task management with calendar dates</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            <Button onClick={() => router.push("/calsticks")} className="w-full bg-purple-600 hover:bg-purple-700">
+            <Button
+              onClick={() => window.open("/calsticks", "_blank", "noopener,noreferrer")}
+              className="w-full bg-purple-600 hover:bg-purple-700"
+            >
               <Calendar className="h-4 w-4 mr-2" />
               Go to CalSticks
             </Button>
             <div className="text-sm text-gray-500 text-center">View and manage task deadlines</div>
+          </CardContent>
+        </Card>
+
+        <Card className="hover:shadow-lg transition-shadow border-orange-200">
+          <CardHeader className="text-center">
+            <div className="mx-auto w-12 h-12 bg-orange-100 rounded-lg flex items-center justify-center mb-4">
+              <Briefcase className="h-6 w-6 text-orange-600" />
+            </div>
+            <CardTitle className="text-xl">PM Hub</CardTitle>
+            <CardDescription>Project management, timesheets, goals, and budget</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <Button
+              onClick={() => window.open("/pm", "_blank", "noopener,noreferrer")}
+              className="w-full bg-orange-600 hover:bg-orange-700"
+            >
+              <Briefcase className="h-4 w-4 mr-2" />
+              Go to PM Hub
+            </Button>
+            <div className="text-sm text-gray-500 text-center">Portfolio, resources, and project tools</div>
           </CardContent>
         </Card>
       </div>
