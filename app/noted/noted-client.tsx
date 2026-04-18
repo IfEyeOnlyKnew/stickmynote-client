@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useCallback, useState } from "react"
+import { useEffect, useCallback, useRef, useState } from "react"
 import { useSearchParams } from "next/navigation"
 import { BookOpen, Loader2, Scissors, PanelLeftClose, PanelLeftOpen, ArrowLeft, FolderOpen } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -24,6 +24,8 @@ interface NotedClientProps {
 export function NotedClient({ userId }: Readonly<NotedClientProps>) {
   const searchParams = useSearchParams()
   const pageIdParam = searchParams.get("page")
+  const stickIdParam = searchParams.get("stick")
+  const personalStickParam = searchParams.get("personal") === "true"
 
   const {
     pages,
@@ -61,6 +63,24 @@ export function NotedClient({ userId }: Readonly<NotedClientProps>) {
   // Desktop: toggle the page list (search) column
   const [showPageList, setShowPageList] = useState(true)
 
+  // Resolve ?stick=<id>&personal=<bool> by finding or creating a Noted page for that stick,
+  // then swapping the URL to ?page=<id> so refreshes/back/forward work as expected.
+  const stickHandledRef = useRef(false)
+  useEffect(() => {
+    if (!stickIdParam || loading || stickHandledRef.current) return
+    stickHandledRef.current = true
+    ;(async () => {
+      const page = await createPage({
+        [personalStickParam ? "personal_stick_id" : "stick_id"]: stickIdParam,
+        is_personal: personalStickParam,
+      })
+      if (page) {
+        await selectPage(page)
+        window.history.replaceState({}, "", `/noted?page=${page.id}`)
+      }
+    })()
+  }, [stickIdParam, personalStickParam, loading, createPage, selectPage])
+
   // Auto-select page from URL param
   useEffect(() => {
     if (pageIdParam && pages.length > 0 && !selectedPage) {
@@ -71,10 +91,10 @@ export function NotedClient({ userId }: Readonly<NotedClientProps>) {
 
   // Auto-select first page if none selected
   useEffect(() => {
-    if (!selectedPage && pages.length > 0 && !pageIdParam) {
+    if (!selectedPage && pages.length > 0 && !pageIdParam && !stickIdParam) {
       selectPage(pages[0])
     }
-  }, [pages, selectedPage, pageIdParam, selectPage])
+  }, [pages, selectedPage, pageIdParam, stickIdParam, selectPage])
 
   // Cache pages for offline access when they load
   useEffect(() => {

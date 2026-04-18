@@ -25,7 +25,9 @@ async function createNotedPageFromStick(
 
   const result = await pgClient.query(
     `INSERT INTO noted_pages (stick_id, user_id, org_id, title, content, group_id, is_personal, source_content) VALUES ($1, $2, $3, $4, $5, $6, false, $7) RETURNING *`,
-    [stickId, userId, orgId, title || stick.topic || "Untitled", content || stick.content || "", groupId || null, sourceContent || stick.content || ""],
+    // Store '' (not 'Untitled') when the stick has no topic yet, so display_title
+    // can fall back dynamically to stick.topic once it's generated.
+    [stickId, userId, orgId, title || stick.topic || "", content || stick.content || "", groupId || null, sourceContent || stick.content || ""],
   )
   return NextResponse.json({ data: result.rows[0] }, { status: 201 })
 }
@@ -43,7 +45,7 @@ async function createNotedPageFromPersonalStick(
 
   const result = await pgClient.query(
     `INSERT INTO noted_pages (personal_stick_id, user_id, org_id, title, content, group_id, is_personal, source_content) VALUES ($1, $2, $3, $4, $5, $6, true, $7) RETURNING *`,
-    [personalStickId, userId, orgId, title || pStick.topic || "Untitled", content || pStick.content || "", groupId || null, sourceContent || pStick.content || ""],
+    [personalStickId, userId, orgId, title || pStick.topic || "", content || pStick.content || "", groupId || null, sourceContent || pStick.content || ""],
   )
   return NextResponse.json({ data: result.rows[0] }, { status: 201 })
 }
@@ -64,7 +66,7 @@ export async function GET(request: NextRequest) {
     // shared pad pages only for pad members
     let query = `
       SELECT np.*,
-        COALESCE(np.title, s.topic, ps.topic, 'Untitled') as display_title,
+        COALESCE(NULLIF(np.title, ''), s.topic, ps.topic, 'Untitled') as display_title,
         s.pad_id as pad_id
       FROM noted_pages np
       LEFT JOIN paks_pad_sticks s ON s.id = np.stick_id

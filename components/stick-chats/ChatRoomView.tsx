@@ -22,6 +22,7 @@ import { formatDistanceToNow } from "date-fns"
 import { useCSRF } from "@/hooks/useCSRF"
 import { useWebSocket } from "@/hooks/useWebSocket"
 import { useUserPresence } from "@/hooks/usePresence"
+import { NotedIcon } from "@/components/noted/NotedIcon"
 import type {
   StickChatWithDetails,
   StickChatMessageWithUser,
@@ -265,6 +266,16 @@ export const ChatRoomView: React.FC<ChatRoomViewProps> = ({
             )}
 
             {/* Action buttons */}
+            {chat.stick_id && (
+              <NotedIcon
+                stickId={chat.stick_id}
+                stickTopic={chat.stick_topic}
+                isPersonal={chat.stick_type === "personal"}
+                openInNewTab
+                className="h-9"
+              />
+            )}
+
             <Button
               variant="outline"
               size="sm"
