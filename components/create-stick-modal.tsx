@@ -20,10 +20,16 @@ interface CreateStickModalProps {
   onClose: () => void
   padId: string
   context?: "paks" | "inference"
+  // When creating a sub-stick: the parent's id travels in the POST body so the
+  // server wires up the FK; the parent's color is inherited so the family
+  // reads as one palette. Both props must be set for sub-stick mode.
+  parentStickId?: string
+  parentColor?: string
 }
 
-export function CreateStickModal({ isOpen, onClose, padId, context = "paks" }: Readonly<CreateStickModalProps>) {
+export function CreateStickModal({ isOpen, onClose, padId, context = "paks", parentStickId, parentColor }: Readonly<CreateStickModalProps>) {
   const { form, updateForm, resetForm, createStick, isLoading, isValid } = useCreateStick(padId, context)
+  const isSubStick = Boolean(parentStickId)
 
   const { lastSaved, isSaving, deleteDraft } = useAutoSaveDraft({
     padId,
@@ -36,9 +42,12 @@ export function CreateStickModal({ isOpen, onClose, padId, context = "paks" }: R
     e.preventDefault()
     if (!isValid) return
 
-    const stickData = {
+    const stickData: any = {
       ...form,
-      color: "#fbbf24", // Default yellow color for sticks
+      color: parentColor || "#fbbf24", // Inherit parent color in sub-stick mode
+    }
+    if (parentStickId) {
+      stickData.parent_stick_id = parentStickId
     }
 
     const success = await createStick(stickData)
@@ -72,8 +81,12 @@ export function CreateStickModal({ isOpen, onClose, padId, context = "paks" }: R
         <DialogHeader>
           <div className="flex items-center justify-between">
             <div>
-              <DialogTitle>Create New Stick</DialogTitle>
-              <DialogDescription>Add a new stick to your pad with a topic and content</DialogDescription>
+              <DialogTitle>{isSubStick ? "Create Sub Stick" : "Create New Stick"}</DialogTitle>
+              <DialogDescription>
+                {isSubStick
+                  ? "Sub sticks belong to their parent and inherit its color."
+                  : "Add a new stick to your pad with a topic and content"}
+              </DialogDescription>
             </div>
             <div className="flex gap-2">
               <TemplatePicker onTemplateSelect={handleTemplateSelect} />

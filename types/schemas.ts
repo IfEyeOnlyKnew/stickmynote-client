@@ -236,6 +236,7 @@ export const noteSchema = z.object({
   z_index: z.number().int().optional(),
   hyperlinks: z.array(z.object({ url: z.string().url(), title: z.string().optional() })).optional(),
   is_pinned: z.boolean().optional(),
+  parent_stick_id: uuidSchema.nullable().optional(),
 })
 
 export type Note = z.infer<typeof noteSchema>
@@ -338,6 +339,7 @@ export const stickSchema = z.object({
   position_x: z.number().int().optional(),
   position_y: z.number().int().optional(),
   is_shared: z.boolean().optional(),
+  parent_stick_id: uuidSchema.nullable().optional(),
 })
 
 export type Stick = z.infer<typeof stickSchema>
@@ -352,6 +354,7 @@ export const createStickSchema = z.object({
   position_x: z.number().int().optional(),
   position_y: z.number().int().optional(),
   is_shared: z.boolean().optional().default(false),
+  parent_stick_id: uuidSchema.nullable().optional(),
 })
 
 export type CreateStickData = z.infer<typeof createStickSchema>

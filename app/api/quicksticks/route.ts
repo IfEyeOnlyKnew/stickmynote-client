@@ -50,11 +50,14 @@ export async function GET(request: NextRequest) {
       })
     }
 
+    // Top-level quicksticks only. Sub-sticks of quickstick parents are
+    // fetched separately below so they render inline alongside their parent.
     let query = db
       .from("paks_pad_sticks")
       .select("*", { count: "exact" })
       .eq("is_quickstick", true)
       .eq("org_id", orgContext.orgId)
+      .is("parent_stick_id", null)
       .order("updated_at", { ascending: false })
 
     // Apply search filter if provided
@@ -101,8 +104,25 @@ export async function GET(request: NextRequest) {
         return false
       })
 
+    // Fetch sub-sticks of the accessible quickstick parents. Sub-sticks show
+    // regardless of their own is_quickstick flag — they belong to the family.
+    const parentIds = accessibleSticks.map((s: any) => s.id)
+    let subSticks: any[] = []
+    if (parentIds.length > 0) {
+      const { data: subs } = await db
+        .from("paks_pad_sticks")
+        .select("*")
+        .in("parent_stick_id", parentIds)
+        .order("created_at", { ascending: false })
+      subSticks = (subs || []).map((s: any) => ({
+        ...s,
+        pads: padMap[s.pad_id] || null,
+      }))
+    }
+
     const responseData = {
       sticks: accessibleSticks || [],
+      subSticks,
       hasMore: (sticks?.length || 0) === limit,
       total: count || 0,
       offset,

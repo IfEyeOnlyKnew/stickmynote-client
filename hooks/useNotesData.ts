@@ -14,6 +14,7 @@ interface PersonalStick {
   position_x?: number
   position_y?: number
   is_shared?: boolean
+  parent_stick_id?: string | null
   created_at?: string
   updated_at?: string
 }
@@ -48,6 +49,7 @@ interface UseNotesDataReturn {
     color: string,
     windowSize: { width: number; height: number },
     highestZIndex: number,
+    parentStickId?: string | null,
   ) => Promise<Note>
   handleUpdateNote: (noteId: string, updates: Partial<Note>) => Promise<void>
   handleDeleteNote: (noteId: string, onSuccess: () => void) => Promise<void>
@@ -162,6 +164,7 @@ function transformNote(
     created_at: note.created_at || new Date().toISOString(),
     updated_at: note.updated_at || new Date().toISOString(),
     user_id: note.user_id,
+    parent_stick_id: note.parent_stick_id ?? null,
     replies: noteReplies.map((reply) => ({
       id: reply.id,
       content: reply.content || "",
@@ -219,13 +222,7 @@ export function useNotesData(userId: string | null, shouldLoad = true): UseNotes
         const limit = 20
 
         // Fetch notes via API
-        const { notes: rawNotes, total, tabs, replies } = await fetchNotes(userId!, limit, currentOffset)
-
-        // Debug: Log tabs data to understand structure
-        console.log('[useNotesData] Tabs received from API:', tabs)
-        if (tabs && tabs.length > 0) {
-          console.log('[useNotesData] First tab structure:', JSON.stringify(tabs[0], null, 2))
-        }
+        const { notes: rawNotes, total, tabs, replies, subSticks } = await fetchNotes(userId!, limit, currentOffset)
 
         if (!rawNotes || rawNotes.length === 0) {
           if (isLoadMore) {
@@ -237,12 +234,18 @@ export function useNotesData(userId: string | null, shouldLoad = true): UseNotes
           return
         }
 
-        // Build lookup maps and transform notes
+        // Build lookup maps and transform notes + sub-sticks
         const hyperlinksByNoteId = buildHyperlinksMap(tabs || [])
         const repliesByNoteId = buildRepliesMap(replies || [])
-        const notesWithReplies = rawNotes.map((note: PersonalStick) =>
+        const parentsTransformed = rawNotes.map((note: PersonalStick) =>
           transformNote(note, hyperlinksByNoteId, repliesByNoteId)
         )
+        const subsTransformed = (subSticks || []).map((note: PersonalStick) =>
+          transformNote(note, hyperlinksByNoteId, repliesByNoteId)
+        )
+        // Flatten: parents + their sub-sticks live in one array. The grid
+        // groups them at render time using parent_stick_id.
+        const notesWithReplies = [...parentsTransformed, ...subsTransformed]
 
         // Update state based on load type
         if (isLoadMore) {
@@ -268,7 +271,12 @@ export function useNotesData(userId: string | null, shouldLoad = true): UseNotes
   )
 
   const handleCreateNote = useCallback(
-    async (color: string, windowSize: { width: number; height: number }, highestZIndex: number): Promise<Note> => {
+    async (
+      color: string,
+      windowSize: { width: number; height: number },
+      highestZIndex: number,
+      parentStickId?: string | null,
+    ): Promise<Note> => {
       if (!userId) {
         throw new Error("User not authenticated")
       }
@@ -288,6 +296,7 @@ export function useNotesData(userId: string | null, shouldLoad = true): UseNotes
           position_x,
           position_y,
           is_shared: false,
+          parent_stick_id: parentStickId ?? null,
         })
 
         if (!note) {
@@ -310,6 +319,7 @@ export function useNotesData(userId: string | null, shouldLoad = true): UseNotes
           created_at: note.created_at,
           updated_at: note.updated_at,
           user_id: note.user_id,
+          parent_stick_id: note.parent_stick_id ?? null,
           replies: [],
           z_index: newZIndex,
         }

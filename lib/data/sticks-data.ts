@@ -12,6 +12,7 @@ export interface StickWithRole {
   userRole: "owner" | "admin" | "edit" | "view"
   pad_name?: string
   owner_id: string
+  parent_stick_id?: string | null
 }
 
 export async function fetchUserSticks(userId: string): Promise<StickWithRole[]> {
@@ -22,7 +23,7 @@ export async function fetchUserSticks(userId: string): Promise<StickWithRole[]> 
   // Fetch owned sticks
   const { data: ownedSticks, error: ownedError } = await db
     .from("paks_pad_sticks")
-    .select("id, topic, content, color, user_id, pad_id, created_at, updated_at")
+    .select("id, topic, content, color, user_id, pad_id, created_at, updated_at, parent_stick_id")
     .eq("user_id", userId)
     .order("updated_at", { ascending: false })
 
@@ -39,8 +40,14 @@ export async function fetchUserSticks(userId: string): Promise<StickWithRole[]> 
     .select("role, stick_id")
     .eq("user_id", userId)
 
+  // Log each failing query individually. The original code only bailed when
+  // ALL THREE failed, which meant a column-missing error (e.g. a missed
+  // migration) silently produced an empty list. Surface every failure.
+  if (ownedError) console.error("[fetchUserSticks] ownedSticks query failed:", ownedError)
+  if (padMemberError) console.error("[fetchUserSticks] padMemberships query failed:", padMemberError)
+  if (stickMemberError) console.error("[fetchUserSticks] stickMemberships query failed:", stickMemberError)
+
   if (ownedError && padMemberError && stickMemberError) {
-    console.error("Failed to fetch sticks:", { ownedError, padMemberError, stickMemberError })
     return []
   }
 
@@ -50,7 +57,7 @@ export async function fetchUserSticks(userId: string): Promise<StickWithRole[]> 
   if (stickMembershipStickIds.length > 0) {
     const { data } = await db
       .from("paks_pad_sticks")
-      .select("id, topic, content, color, user_id, pad_id, created_at, updated_at")
+      .select("id, topic, content, color, user_id, pad_id, created_at, updated_at, parent_stick_id")
       .in("id", stickMembershipStickIds)
     stickMembershipSticks = data || []
   }
@@ -62,7 +69,7 @@ export async function fetchUserSticks(userId: string): Promise<StickWithRole[]> 
   if (memberPadIds.length > 0) {
     const { data: memberSticksData, error: memberSticksError } = await db
       .from("paks_pad_sticks")
-      .select("id, topic, content, color, user_id, pad_id, created_at, updated_at")
+      .select("id, topic, content, color, user_id, pad_id, created_at, updated_at, parent_stick_id")
       .in("pad_id", memberPadIds)
       .order("updated_at", { ascending: false })
 
@@ -104,6 +111,7 @@ export async function fetchUserSticks(userId: string): Promise<StickWithRole[]> 
     userRole: "owner" as const,
     pad_name: stick.pad_id ? padNameMap.get(stick.pad_id) : undefined,
     owner_id: stick.user_id,
+    parent_stick_id: stick.parent_stick_id ?? null,
   }))
 
   // Process member sticks from pads
@@ -121,6 +129,7 @@ export async function fetchUserSticks(userId: string): Promise<StickWithRole[]> 
       userRole: (padMembership?.role || "view") as "admin" | "edit" | "view",
       pad_name: stick.pad_id ? padNameMap.get(stick.pad_id) : undefined,
       owner_id: stick.user_id,
+      parent_stick_id: stick.parent_stick_id ?? null,
     }
   })
 
@@ -146,12 +155,42 @@ export async function fetchUserSticks(userId: string): Promise<StickWithRole[]> 
         userRole: sm.role as "admin" | "edit" | "view",
         pad_name: stick.pad_id ? padNameMap.get(stick.pad_id) : undefined,
         owner_id: stick.user_id,
+        parent_stick_id: stick.parent_stick_id ?? null,
       }
     })
 
-  // Combine and deduplicate
+  // Combine and deduplicate parents
   const allSticks = [...processedOwnedSticks, ...processedMemberSticks, ...processedDirectSticks]
   const uniqueSticks = allSticks.filter((stick, index, self) => index === self.findIndex((s) => s.id === stick.id))
 
-  return uniqueSticks
+  // Fetch sub-sticks of every accessible parent. Sub-sticks inherit the
+  // parent's role for UI purposes — if you can see and edit the parent, you
+  // can see and edit its children. The client hides them by default and
+  // surfaces them in "Show Sub Sticks" mode.
+  const parentIds = uniqueSticks.filter((s) => !s.parent_stick_id).map((s) => s.id)
+  if (parentIds.length === 0) return uniqueSticks
+
+  const { data: subSticksData } = await db
+    .from("paks_pad_sticks")
+    .select("id, topic, content, color, user_id, pad_id, created_at, updated_at, parent_stick_id")
+    .in("parent_stick_id", parentIds)
+
+  const roleByParentId = new Map(uniqueSticks.map((s) => [s.id, s.userRole]))
+  const processedSubs: StickWithRole[] = (subSticksData || []).map((stick: any) => ({
+    id: stick.id,
+    topic: stick.topic,
+    content: stick.content,
+    color: stick.color,
+    user_id: stick.user_id,
+    pad_id: stick.pad_id,
+    created_at: stick.created_at,
+    updated_at: stick.updated_at,
+    userRole: roleByParentId.get(stick.parent_stick_id) ?? ("view" as const),
+    pad_name: stick.pad_id ? padNameMap.get(stick.pad_id) : undefined,
+    owner_id: stick.user_id,
+    parent_stick_id: stick.parent_stick_id,
+  }))
+
+  // Return parents + their sub-sticks in one array; the client groups them.
+  return [...uniqueSticks, ...processedSubs.filter((s) => !uniqueSticks.some((u) => u.id === s.id))]
 }

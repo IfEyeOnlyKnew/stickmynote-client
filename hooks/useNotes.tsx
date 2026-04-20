@@ -24,7 +24,11 @@ interface UseNotesReturn {
   generatingTags: string | null
   highestZIndex: number
   setHighestZIndex: React.Dispatch<React.SetStateAction<number>>
-  handleCreateNote: (color: string, windowSize: { width: number; height: number }) => Promise<Note>
+  handleCreateNote: (
+    color: string,
+    windowSize: { width: number; height: number },
+    parentStickId?: string | null,
+  ) => Promise<Note>
   loadMoreNotes: () => Promise<void>
   handleNoteContentChange: (noteId: string, content: string) => void
   handleNoteTopicChange: (noteId: string, topic: string) => void
@@ -102,13 +106,19 @@ export function useNotes(userId: string | null, shouldLoad = true): UseNotesRetu
 
   /* eslint-disable react-hooks/exhaustive-deps */
   const handleCreateNote = useCallback(
-    async (color: string, windowSize: { width: number; height: number }): Promise<Note> => {
+    async (
+      color: string,
+      windowSize: { width: number; height: number },
+      parentStickId?: string | null,
+    ): Promise<Note> => {
       try {
-        const newNote = await data.handleCreateNote(color, windowSize, state.highestZIndex)
+        const newNote = await data.handleCreateNote(color, windowSize, state.highestZIndex, parentStickId)
         state.setHighestZIndex(state.highestZIndex + 1)
         toast({
-          title: "Stick Created",
-          description: "Your new Stick has been created successfully.",
+          title: parentStickId ? "Sub Stick Created" : "Stick Created",
+          description: parentStickId
+            ? "Your new Sub Stick has been created successfully."
+            : "Your new Stick has been created successfully.",
         })
         return newNote
       } catch (err) {

@@ -13,6 +13,10 @@ interface SimpleNoteGridProps {
   readonly hasMore?: boolean
   readonly isLoadingMore?: boolean
   readonly loadingNoteId?: string | null
+  readonly subStickCountsByParent?: Map<string, number>
+  readonly isShowingSubSticks?: boolean
+  readonly onCreateSubStick?: (parentNote: Note) => void
+  readonly onToggleShowSubSticks?: () => void
 }
 
 export const SimpleNoteGrid: React.FC<SimpleNoteGridProps> = ({
@@ -23,6 +27,10 @@ export const SimpleNoteGrid: React.FC<SimpleNoteGridProps> = ({
   hasMore = false,
   isLoadingMore = false,
   loadingNoteId = null,
+  subStickCountsByParent,
+  isShowingSubSticks = false,
+  onCreateSubStick,
+  onToggleShowSubSticks,
 }) => {
   const loadMoreRef = useRef<HTMLDivElement>(null)
   const observerRef = useRef<IntersectionObserver | null>(null)
@@ -70,15 +78,24 @@ export const SimpleNoteGrid: React.FC<SimpleNoteGridProps> = ({
     <div className="w-full">
       {/* Responsive grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 md:gap-6">
-        {notes.map((note) => (
-          <NotePreviewCard
-            key={note.id}
-            note={note}
-            onClick={() => handleNoteClick(note.id)}
-            onUpdateColor={onUpdateColor}
-            isLoading={loadingNoteId === note.id}
-          />
-        ))}
+        {notes.map((note) => {
+          const isSubStick = Boolean(note.parent_stick_id)
+          const hasSubSticks = !isSubStick && (subStickCountsByParent?.get(note.id) ?? 0) > 0
+          return (
+            <NotePreviewCard
+              key={note.id}
+              note={note}
+              onClick={() => handleNoteClick(note.id)}
+              onUpdateColor={onUpdateColor}
+              isLoading={loadingNoteId === note.id}
+              isSubStick={isSubStick}
+              hasSubSticks={hasSubSticks}
+              isShowingSubSticks={isShowingSubSticks}
+              onCreateSubStick={onCreateSubStick && !isSubStick ? () => onCreateSubStick(note) : undefined}
+              onToggleShowSubSticks={onToggleShowSubSticks}
+            />
+          )
+        })}
       </div>
 
       {/* Load more trigger / loading indicator */}

@@ -7,7 +7,7 @@ import React, { useMemo, useState } from "react"
 import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
-import { MessageCircle, Expand, Clock, Share2, Palette } from "lucide-react"
+import { MessageCircle, Expand, Clock, Share2, Palette, GitBranch, Plus, Eye, EyeOff } from "lucide-react"
 import { NotedIcon } from "@/components/noted/NotedIcon"
 import { StickMapButton } from "@/components/stick-map/StickMapButton"
 import type { Note } from "@/types/note"
@@ -20,6 +20,12 @@ interface NotePreviewCardProps {
   readonly onClick: () => void
   readonly onUpdateColor?: (noteId: string, color: string) => void
   readonly isLoading?: boolean
+  // Sub-stick affordances. A card without these props behaves exactly as before.
+  readonly isSubStick?: boolean
+  readonly hasSubSticks?: boolean
+  readonly isShowingSubSticks?: boolean
+  readonly onCreateSubStick?: () => void
+  readonly onToggleShowSubSticks?: () => void
 }
 
 export const NotePreviewCard: React.FC<NotePreviewCardProps> = ({
@@ -27,8 +33,14 @@ export const NotePreviewCard: React.FC<NotePreviewCardProps> = ({
   onClick,
   onUpdateColor,
   isLoading = false,
+  isSubStick = false,
+  hasSubSticks = false,
+  isShowingSubSticks = false,
+  onCreateSubStick,
+  onToggleShowSubSticks,
 }) => {
   const [colorPickerOpen, setColorPickerOpen] = useState(false)
+  const [subMenuOpen, setSubMenuOpen] = useState(false)
 
   // Format the timestamp
   const timeAgo = useMemo(() => {
@@ -90,6 +102,46 @@ export const NotePreviewCard: React.FC<NotePreviewCardProps> = ({
     e.stopPropagation() // Prevent card click
   }
 
+  // Sub-stick connector: keep the 3px border on three sides, thicken the
+  // left edge to 8px in the card's own color. Since sub-sticks are created
+  // with the parent's color, this reads as a continuation of the parent.
+  const cardStyle: React.CSSProperties = isSubStick
+    ? {
+        borderTopWidth: "3px",
+        borderRightWidth: "3px",
+        borderBottomWidth: "3px",
+        borderLeftWidth: "8px",
+        borderColor: borderColor,
+        borderStyle: "solid",
+      }
+    : {
+        borderWidth: "3px",
+        borderColor: borderColor,
+        borderStyle: "solid",
+      }
+
+  const handleCreateSubStickClick = (e: React.MouseEvent) => {
+    e.stopPropagation()
+    setSubMenuOpen(false)
+    onCreateSubStick?.()
+  }
+
+  const handleToggleShowClick = (e: React.MouseEvent) => {
+    e.stopPropagation()
+    setSubMenuOpen(false)
+    onToggleShowSubSticks?.()
+  }
+
+  const handleSubStickIconClick = (e: React.MouseEvent) => {
+    e.stopPropagation()
+    // If the stick has no children yet, go straight to create.
+    if (!hasSubSticks) {
+      onCreateSubStick?.()
+      return
+    }
+    setSubMenuOpen((open) => !open)
+  }
+
   return (
     <Card
       className={`
@@ -98,11 +150,7 @@ export const NotePreviewCard: React.FC<NotePreviewCardProps> = ({
         overflow-hidden bg-white
         ${isLoading ? "opacity-50 pointer-events-none" : ""}
       `}
-      style={{
-        borderWidth: "3px",
-        borderColor: borderColor,
-        borderStyle: "solid"
-      }}
+      style={cardStyle}
       onClick={onClick}
     >
       <CardContent className="p-4">
@@ -171,6 +219,65 @@ export const NotePreviewCard: React.FC<NotePreviewCardProps> = ({
                 className="h-6 w-6 p-0"
               />
             </span>
+            {/* Sub-stick affordance. Hidden on sub-stick cards since nesting
+                is capped at one level. Hidden on inference surfaces because
+                those render a different card component entirely. */}
+            {!isSubStick && onCreateSubStick && (
+              <Popover open={subMenuOpen} onOpenChange={setSubMenuOpen}>
+                <PopoverTrigger asChild>
+                  <button
+                    type="button"
+                    onClick={handleSubStickIconClick}
+                    className="relative p-1 rounded hover:bg-gray-100 transition-colors"
+                    title={hasSubSticks ? "Sub Sticks" : "Create Sub Stick"}
+                  >
+                    <GitBranch className="w-4 h-4 text-gray-400 hover:text-gray-600" />
+                    {hasSubSticks && (
+                      <span
+                        className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full"
+                        style={{ backgroundColor: borderColor === "#e5e7eb" ? "#9ca3af" : borderColor }}
+                        aria-hidden="true"
+                      />
+                    )}
+                  </button>
+                </PopoverTrigger>
+                {hasSubSticks && (
+                  <PopoverContent
+                    className="w-48 p-1"
+                    align="end"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    {onToggleShowSubSticks && (
+                      <button
+                        type="button"
+                        onClick={handleToggleShowClick}
+                        className="w-full flex items-center gap-2 px-2 py-1.5 text-sm rounded hover:bg-gray-100 text-left"
+                      >
+                        {isShowingSubSticks ? (
+                          <>
+                            <EyeOff className="w-4 h-4" />
+                            Hide Sub Sticks
+                          </>
+                        ) : (
+                          <>
+                            <Eye className="w-4 h-4" />
+                            Show Sub Sticks
+                          </>
+                        )}
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      onClick={handleCreateSubStickClick}
+                      className="w-full flex items-center gap-2 px-2 py-1.5 text-sm rounded hover:bg-gray-100 text-left"
+                    >
+                      <Plus className="w-4 h-4" />
+                      Create Sub Stick
+                    </button>
+                  </PopoverContent>
+                )}
+              </Popover>
+            )}
             <Expand className="w-4 h-4 opacity-50 text-gray-500" />
           </div>
         </div>

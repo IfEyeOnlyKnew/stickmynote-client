@@ -56,6 +56,7 @@ interface EnrichedNote {
 
 interface SearchResult {
   notes: EnrichedNote[]
+  subSticks?: EnrichedNote[]
   totalCount: number
   page: number
   hasMore: boolean
@@ -342,11 +343,15 @@ export async function POST(request: Request) {
       })
     }
 
-    // Build base query
+    // Build base query. Top-level sticks only — sub-sticks of shared parents
+    // are fetched separately below so they can render alongside their parent
+    // even when the sub-stick itself is not is_shared. Sub-sticks never
+    // surface on their own (they inherit the parent's share visibility).
     let notesQuery = db
       .from("personal_sticks")
       .select(NOTES_SELECT_QUERY, { count: "exact" })
       .eq("is_shared", true)
+      .is("parent_stick_id", null)
 
     // Apply full-text search
     if (query?.trim()) {
@@ -382,24 +387,51 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Search failed", details: notesError.message }, { status: 500 })
     }
 
-    // Get note IDs for fetching related data
-    const noteIds = (notes || []).map((n: any) => n.id)
+    // Parent IDs for fetching related data + sub-sticks
+    const parentIds = (notes || []).map((n: any) => n.id)
 
-    // Fetch user data, replies, and tags in parallel
+    // Fetch sub-sticks of the shared parents. They show regardless of their
+    // own is_shared flag — the parent's sharing implicitly shares the family.
+    let subSticksRaw: any[] = []
+    if (parentIds.length > 0) {
+      try {
+        const { data: subs } = await db
+          .from("personal_sticks")
+          .select(NOTES_SELECT_QUERY)
+          .in("parent_stick_id", parentIds)
+          .order("created_at", { ascending: false })
+        subSticksRaw = subs || []
+      } catch (err) {
+        console.warn("Failed to fetch sub-sticks for panel:", err)
+      }
+    }
+
+    const subStickIds = subSticksRaw.map((s: any) => s.id)
+    const allIds = [...parentIds, ...subStickIds]
+
+    // Fetch user data, replies, and tags for parents + sub-sticks together
+    const combinedNotesForUsers = [...(notes || []), ...subSticksRaw]
     const [usersMap, repliesResult, tagsMap] = await Promise.all([
-      fetchUsersForNotes(db, notes || []),
-      fetchRepliesForNotes(db, noteIds),
-      fetchTagsForNotes(db, noteIds),
+      fetchUsersForNotes(db, combinedNotesForUsers),
+      fetchRepliesForNotes(db, allIds),
+      fetchTagsForNotes(db, allIds),
     ])
 
     let filteredNotes = notes || []
 
-    // Apply tag filter
+    // Apply tag filter (parents only — sub-sticks travel with matching parents)
     if (tags?.length) {
       filteredNotes = filterNotesByTags(filteredNotes, tags, tagsMap)
     }
+    const keptParentIds = new Set(filteredNotes.map((n: any) => n.id))
 
     const enrichedNotes = enrichNotes(filteredNotes, usersMap, repliesResult, tagsMap)
+    const enrichedSubSticks = enrichNotes(
+      subSticksRaw.filter((s: any) => keptParentIds.has(s.parent_stick_id)),
+      usersMap,
+      repliesResult,
+      tagsMap,
+    )
     const totalCount = count || 0
     const hasMore = totalCount > offset + enrichedNotes.length
 
@@ -410,6 +442,7 @@ export async function POST(request: Request) {
 
     return NextResponse.json({
       notes: enrichedNotes,
+      subSticks: enrichedSubSticks,
       totalCount,
       page,
       hasMore,

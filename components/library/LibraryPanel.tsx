@@ -1,10 +1,11 @@
 "use client"
 
-import { useState, useEffect, useCallback, useRef } from "react"
+import { useState, useEffect, useCallback, useMemo, useRef } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import {
   Upload,
   File,
@@ -84,6 +85,28 @@ function getExtension(filename: string): string {
   return filename.split(".").pop()?.toUpperCase() || "FILE"
 }
 
+type TypeFilter = "all" | "docs" | "images" | "videos" | "other"
+type SortBy = "newest" | "oldest" | "name-asc" | "size-desc"
+
+function getTypeBucket(mimeType: string): Exclude<TypeFilter, "all"> {
+  if (mimeType.startsWith("image/")) return "images"
+  if (mimeType.startsWith("video/")) return "videos"
+  if (
+    mimeType.includes("pdf") ||
+    mimeType.includes("word") ||
+    mimeType.includes("document") ||
+    mimeType.includes("spreadsheet") ||
+    mimeType.includes("excel") ||
+    mimeType.includes("presentation") ||
+    mimeType.includes("powerpoint") ||
+    mimeType.includes("csv") ||
+    mimeType.startsWith("text/")
+  ) {
+    return "docs"
+  }
+  return "other"
+}
+
 export function LibraryPanel({ stickId, stickType, readOnly, className, onFileCountChange }: Readonly<LibraryPanelProps>) {
   const [files, setFiles] = useState<LibraryFile[]>([])
   const [permissions, setPermissions] = useState<string[]>([])
@@ -91,6 +114,8 @@ export function LibraryPanel({ stickId, stickType, readOnly, className, onFileCo
   const [loading, setLoading] = useState(true)
   const [uploading, setUploading] = useState(false)
   const [searchQuery, setSearchQuery] = useState("")
+  const [typeFilter, setTypeFilter] = useState<TypeFilter>("all")
+  const [sortBy, setSortBy] = useState<SortBy>("newest")
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   const canUpload = !readOnly && permissions.includes("upload")
@@ -185,13 +210,40 @@ export function LibraryPanel({ stickId, stickType, readOnly, className, onFileCo
     a.remove()
   }
 
-  const filteredFiles = searchQuery
-    ? files.filter(
-        (f) =>
-          f.original_filename.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          f.description?.toLowerCase().includes(searchQuery.toLowerCase()),
+  const typeCounts = useMemo(() => {
+    const counts = { docs: 0, images: 0, videos: 0, other: 0 }
+    for (const f of files) counts[getTypeBucket(f.mime_type)]++
+    return counts
+  }, [files])
+
+  const filteredFiles = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase()
+    const matches = files.filter((f) => {
+      if (typeFilter !== "all" && getTypeBucket(f.mime_type) !== typeFilter) return false
+      if (!q) return true
+      return (
+        f.original_filename.toLowerCase().includes(q) ||
+        f.description?.toLowerCase().includes(q)
       )
-    : files
+    })
+
+    const sorted = [...matches]
+    switch (sortBy) {
+      case "newest":
+        sorted.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+        break
+      case "oldest":
+        sorted.sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime())
+        break
+      case "name-asc":
+        sorted.sort((a, b) => a.original_filename.localeCompare(b.original_filename, undefined, { sensitivity: "base" }))
+        break
+      case "size-desc":
+        sorted.sort((a, b) => b.file_size - a.file_size)
+        break
+    }
+    return sorted
+  }, [files, searchQuery, typeFilter, sortBy])
 
   return (
     <div className={className}>
@@ -240,26 +292,71 @@ export function LibraryPanel({ stickId, stickType, readOnly, className, onFileCo
         )}
       </div>
 
-      {/* Search */}
+      {/* Controls: search + type filter chips + sort */}
       {files.length > 3 && (
-        <div className="relative mb-3">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
-          <Input
-            placeholder="Search files..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-9 h-8 text-sm"
-          />
-          {searchQuery && (
-            <button
-              type="button"
-              onClick={() => setSearchQuery("")}
-              className="absolute right-3 top-1/2 -translate-y-1/2"
-              title="Clear search"
-            >
-              <X className="h-4 w-4 text-gray-400 hover:text-gray-600" />
-            </button>
-          )}
+        <div className="mb-3 space-y-2">
+          <div className="flex items-center gap-2 flex-wrap">
+            <div className="relative flex-1 min-w-[180px]">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+              <Input
+                placeholder="Search files..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-9 h-8 text-sm"
+              />
+              {searchQuery && (
+                <button
+                  type="button"
+                  onClick={() => setSearchQuery("")}
+                  className="absolute right-3 top-1/2 -translate-y-1/2"
+                  title="Clear search"
+                >
+                  <X className="h-4 w-4 text-gray-400 hover:text-gray-600" />
+                </button>
+              )}
+            </div>
+            <Select value={sortBy} onValueChange={(v) => setSortBy(v as SortBy)}>
+              <SelectTrigger className="h-8 text-xs w-[140px]">
+                <SelectValue placeholder="Sort" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="newest">Newest</SelectItem>
+                <SelectItem value="oldest">Oldest</SelectItem>
+                <SelectItem value="name-asc">Name A–Z</SelectItem>
+                <SelectItem value="size-desc">Size (largest)</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="flex items-center gap-1.5 flex-wrap">
+            {([
+              { value: "all", label: "All", count: files.length },
+              { value: "docs", label: "Docs", count: typeCounts.docs },
+              { value: "images", label: "Images", count: typeCounts.images },
+              { value: "videos", label: "Videos", count: typeCounts.videos },
+              { value: "other", label: "Other", count: typeCounts.other },
+            ] as Array<{ value: TypeFilter; label: string; count: number }>).map((chip) => {
+              const active = typeFilter === chip.value
+              const disabled = chip.value !== "all" && chip.count === 0
+              return (
+                <button
+                  key={chip.value}
+                  type="button"
+                  disabled={disabled}
+                  onClick={() => setTypeFilter(chip.value)}
+                  className={
+                    "inline-flex items-center gap-1 px-2.5 h-7 rounded-full text-xs border transition-colors " +
+                    (active
+                      ? "bg-blue-600 text-white border-blue-600"
+                      : "bg-white text-gray-700 border-gray-300 hover:bg-gray-50") +
+                    (disabled ? " opacity-40 cursor-not-allowed hover:bg-white" : "")
+                  }
+                >
+                  {chip.label}
+                  <span className={active ? "text-white/80" : "text-gray-400"}>({chip.count})</span>
+                </button>
+              )
+            })}
+          </div>
         </div>
       )}
 
@@ -274,8 +371,8 @@ export function LibraryPanel({ stickId, stickType, readOnly, className, onFileCo
       {!loading && filteredFiles.length === 0 && (
         <div className="text-center py-8 text-gray-500">
           <FolderOpen className="h-10 w-10 mx-auto mb-2 text-gray-300" />
-          {searchQuery ? (
-            <p className="text-sm">No files match your search</p>
+          {searchQuery || typeFilter !== "all" ? (
+            <p className="text-sm">No files match your filters</p>
           ) : (
             <>
               <p className="text-sm font-medium mb-1">No files yet</p>

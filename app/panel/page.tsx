@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useCallback, useRef } from "react"
+import { useState, useEffect, useCallback, useRef, Fragment } from "react"
 import Image from "next/image"
 import { useRouter } from "next/navigation"
 import { Loader2, BarChart3, Sparkles, TrendingUp, ChevronDown, Calendar } from "lucide-react"
@@ -46,6 +46,9 @@ export default function CommunityPanelPage() {
   }, [csrfToken])
 
   const [communityNotes, setCommunityNotes] = useState<Note[]>([])
+  // Sub-sticks of shared parents. Always rendered inline with their parent;
+  // /panel intentionally has no "Show Sub Sticks" toggle and no creation.
+  const [subSticks, setSubSticks] = useState<Note[]>([])
   const [loading, setLoading] = useState(true)
   const [hasMore, setHasMore] = useState(false)
   const [searchTerm, setSearchTerm] = useState("")
@@ -267,18 +270,25 @@ export default function CommunityPanelPage() {
   }, [])
 
   // Helper: Update notes from search response
-  const updateNotesFromResponse = useCallback((data: { notes?: Note[]; totalCount?: number; hasMore?: boolean }, pageToFetch: number) => {
+  const updateNotesFromResponse = useCallback((data: { notes?: Note[]; subSticks?: Note[]; totalCount?: number; hasMore?: boolean }, pageToFetch: number) => {
     const newNotes = data.notes || []
+    const newSubSticks = data.subSticks || []
     const totalCount = data.totalCount || 0
     const moreAvailable = data.hasMore || false
 
     if (pageToFetch === 1) {
       setCommunityNotes(newNotes)
+      setSubSticks(newSubSticks)
     } else {
       setCommunityNotes((prev) => {
         const existingIds = new Set(prev.map((n) => n.id))
         const uniqueNewNotes = newNotes.filter((n: Note) => !existingIds.has(n.id))
         return [...prev, ...uniqueNewNotes]
+      })
+      setSubSticks((prev) => {
+        const existingIds = new Set(prev.map((n) => n.id))
+        const uniqueNew = newSubSticks.filter((n: Note) => !existingIds.has(n.id))
+        return [...prev, ...uniqueNew]
       })
     }
 
@@ -615,9 +625,20 @@ export default function CommunityPanelPage() {
   // Helper: open-handler factory keeps the map callback shallow enough for nesting rules
   const makeNoteOpener = (index: number) => (noteId: string) => handleNoteClick(noteId, index)
 
-  const renderFlatGrid = (notesSearchTerm?: string) => (
-    <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6 pb-8">
-      {communityNotes.map((note, index) => (
+  // Parent-id → sub-sticks lookup. Sub-sticks render in sequence directly
+  // after their parent; their position never drifts from the family.
+  const subSticksByParent = new Map<string, Note[]>()
+  for (const s of subSticks) {
+    if (!s.parent_stick_id) continue
+    const arr = subSticksByParent.get(s.parent_stick_id) ?? []
+    arr.push(s)
+    subSticksByParent.set(s.parent_stick_id, arr)
+  }
+
+  const renderParentWithSubs = (note: Note, index: number, notesSearchTerm?: string) => {
+    const subs = subSticksByParent.get(note.id) ?? []
+    return (
+      <>
         <OptimisticSearchResultCard
           key={note.id}
           note={note}
@@ -625,6 +646,24 @@ export default function CommunityPanelPage() {
           onOpen={makeNoteOpener(index)}
           currentUserId={user?.id}
         />
+        {subs.map((sub) => (
+          <OptimisticSearchResultCard
+            key={sub.id}
+            note={sub}
+            searchTerm={notesSearchTerm}
+            onOpen={makeNoteOpener(index)}
+            currentUserId={user?.id}
+            isSubStick
+          />
+        ))}
+      </>
+    )
+  }
+
+  const renderFlatGrid = (notesSearchTerm?: string) => (
+    <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6 pb-8">
+      {communityNotes.map((note, index) => (
+        <Fragment key={note.id}>{renderParentWithSubs(note, index, notesSearchTerm)}</Fragment>
       ))}
     </div>
   )
@@ -633,13 +672,9 @@ export default function CommunityPanelPage() {
     const groups = groupByDate(communityNotes, (n) => n.updated_at || n.created_at)
     const renderSectionCards = (group: { items: typeof communityNotes }) =>
       group.items.map((note) => (
-        <OptimisticSearchResultCard
-          key={note.id}
-          note={note}
-          searchTerm={notesSearchTerm}
-          onOpen={makeNoteOpener(indexById.get(note.id) ?? 0)}
-          currentUserId={user?.id}
-        />
+        <Fragment key={note.id}>
+          {renderParentWithSubs(note, indexById.get(note.id) ?? 0, notesSearchTerm)}
+        </Fragment>
       ))
 
     return (

@@ -23,6 +23,10 @@ interface OptimisticSearchResultCardProps {
   searchTerm?: string
   onOpen: (noteId: string) => void
   currentUserId?: string
+  // When true, render with a thickened left edge in the note's own color to
+  // signal membership in a shared family. /panel is view-only, so there is
+  // no "+ Sub Stick" affordance here — visual-only.
+  isSubStick?: boolean
 }
 
 export function OptimisticSearchResultCard({
@@ -30,6 +34,7 @@ export function OptimisticSearchResultCard({
   searchTerm,
   onOpen,
   currentUserId,
+  isSubStick = false,
 }: Readonly<OptimisticSearchResultCardProps>) {
   const { toast } = useToast()
 
@@ -250,9 +255,17 @@ export function OptimisticSearchResultCard({
 
   const formattedDate = note.created_at ? formatDistanceToNow(new Date(note.created_at), { addSuffix: true }) : ""
 
+  const subStickStyle: React.CSSProperties | undefined = isSubStick
+    ? {
+        borderLeftWidth: "8px",
+        borderLeftColor: note.color || "#6366f1",
+      }
+    : undefined
+
   return (
     <Card
       className="relative group hover:shadow-2xl transition-all duration-300 cursor-pointer overflow-hidden bg-white border-2 border-gray-300 hover:border-gray-400"
+      style={subStickStyle}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
       onClick={handleOpen}

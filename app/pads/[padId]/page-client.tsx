@@ -1,12 +1,13 @@
 "use client"
 
 import type React from "react"
-import { useState, useEffect, useCallback } from "react"
+import { useState, useEffect, useCallback, useMemo, Fragment } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Users, Plus, UserPlus, BarChart3, CheckCircle2, Circle, Settings, Sparkles, Network, MessagesSquare, Video } from "lucide-react"
 import { NotedIcon } from "@/components/noted/NotedIcon"
+import { SubStickMenuButton } from "@/components/SubStickMenuButton"
 import { CreateChatModal } from "@/components/stick-chats/CreateChatModal"
 import { CreateStickModal } from "@/components/create-stick-modal"
 import { BreadcrumbNav } from "@/components/breadcrumb-nav"
@@ -197,9 +198,29 @@ interface StickCardProps {
   onColorChange: (stickId: string, color: string) => void
   onOpenChat: (e: React.MouseEvent, stick: Stick) => void
   onOpenVideo: (e: React.MouseEvent) => void
+  isSubStick?: boolean
+  hasSubSticks?: boolean
+  isShowingSubSticks?: boolean
+  onCreateSubStick?: (stick: Stick) => void
+  onToggleShowSubSticks?: () => void
 }
 
-function StickCard({ stick, counts, canEdit, onClick, onOpenGantt, onOpenMap, onColorChange, onOpenChat, onOpenVideo }: Readonly<StickCardProps>) {
+function StickCard({
+  stick,
+  counts,
+  canEdit,
+  onClick,
+  onOpenGantt,
+  onOpenMap,
+  onColorChange,
+  onOpenChat,
+  onOpenVideo,
+  isSubStick = false,
+  hasSubSticks = false,
+  isShowingSubSticks = false,
+  onCreateSubStick,
+  onToggleShowSubSticks,
+}: Readonly<StickCardProps>) {
   const hasTasks = counts && counts.total > 0
 
   const handleClick = useCallback(() => {
@@ -230,15 +251,30 @@ function StickCard({ stick, counts, canEdit, onClick, onOpenGantt, onOpenMap, on
     e.stopPropagation()
   }, [])
 
+  const cardStyle: React.CSSProperties = isSubStick
+    ? {
+        borderColor: stick.color || "#ffffff",
+        borderTopWidth: "3px",
+        borderRightWidth: "3px",
+        borderBottomWidth: "3px",
+        borderLeftWidth: "8px",
+        borderStyle: "solid",
+      }
+    : {
+        borderColor: stick.color || "#ffffff",
+        borderWidth: "3px",
+        borderStyle: "solid",
+      }
+
+  const handleCreateSubStick = useCallback(() => {
+    onCreateSubStick?.(stick)
+  }, [onCreateSubStick, stick])
+
   return (
     <Card
       className="cursor-pointer hover:shadow-md transition-shadow"
       onClick={handleClick}
-      style={{
-        borderColor: stick.color || "#ffffff",
-        borderWidth: "3px",
-        borderStyle: "solid",
-      }}
+      style={cardStyle}
     >
       <CardHeader className="pb-3">
         {stick.topic && <CardTitle className="text-sm font-medium line-clamp-2">{stick.topic}</CardTitle>}
@@ -317,6 +353,17 @@ function StickCard({ stick, counts, canEdit, onClick, onOpenGantt, onOpenMap, on
                 disabled={!canEdit}
               />
             </div>
+            {!isSubStick && canEdit && onCreateSubStick && (
+              <div role="none" onClick={handleStopPropagation} onKeyDown={(e) => e.stopPropagation()}>
+                <SubStickMenuButton
+                  hasSubSticks={hasSubSticks}
+                  isShowingSubSticks={isShowingSubSticks}
+                  onCreateSubStick={handleCreateSubStick}
+                  onToggleShowSubSticks={onToggleShowSubSticks}
+                  indicatorColor={stick.color}
+                />
+              </div>
+            )}
           </div>
         </div>
       </CardContent>
@@ -346,6 +393,54 @@ export function PadPageClient({ pad, sticks, userRole }: Readonly<PadPageClientP
   const [selectedStick, setSelectedStick] = useState<Stick | null>(null)
   const [isFullscreenOpen, setIsFullscreenOpen] = useState(false)
   const [taskCounts, setTaskCounts] = useState<StickTaskCounts>({})
+
+  // Sub-stick state — families are hidden from the default grid; users opt in
+  // via any parent's menu. subStickParent drives the create modal into
+  // sub-stick mode when set.
+  const [showSubSticks, setShowSubSticks] = useState(false)
+  const [subStickParent, setSubStickParent] = useState<Stick | null>(null)
+
+  const subSticksByParent = useMemo(() => {
+    const map = new Map<string, Stick[]>()
+    for (const s of localSticks) {
+      const parentId = (s as { parent_stick_id?: string | null }).parent_stick_id
+      if (!parentId) continue
+      const arr = map.get(parentId) ?? []
+      arr.push(s)
+      map.set(parentId, arr)
+    }
+    return map
+  }, [localSticks])
+
+  const parentSticks = useMemo(
+    () => localSticks.filter((s) => !(s as { parent_stick_id?: string | null }).parent_stick_id),
+    [localSticks],
+  )
+
+  // Default feed = parents only. Families mode = only parents that have
+  // children, each followed by its sub-sticks in sequence.
+  const displaySticks = useMemo(() => {
+    if (!showSubSticks) return parentSticks
+    const result: Stick[] = []
+    for (const parent of parentSticks) {
+      const children = subSticksByParent.get(parent.id)
+      if (!children || children.length === 0) continue
+      result.push(parent, ...children)
+    }
+    return result
+  }, [showSubSticks, parentSticks, subSticksByParent])
+
+  const handleCreateSubStick = useCallback((parent: Stick) => {
+    setSubStickParent(parent)
+  }, [])
+
+  const handleToggleShowSubSticks = useCallback(() => {
+    setShowSubSticks((prev) => !prev)
+  }, [])
+
+  const handleCloseSubStickModal = useCallback(() => {
+    setSubStickParent(null)
+  }, [])
 
   // Gantt modal state
   const [ganttState, setGanttState] = useState<GanttState>({
@@ -731,27 +826,64 @@ export function PadPageClient({ pad, sticks, userRole }: Readonly<PadPageClientP
               </CardContent>
             </Card>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {localSticks.map((stick) => (
-                <StickCard
-                  key={stick.id}
-                  stick={stick}
-                  counts={taskCounts[stick.id]}
-                  canEdit={canCreateSticks}
-                  onClick={handleStickClick}
-                  onOpenGantt={handleOpenGantt}
-                  onOpenMap={handleOpenMap}
-                  onColorChange={handleStickColorChange}
-                  onOpenChat={handleOpenChat}
-                  onOpenVideo={handleOpenVideo}
-                />
-              ))}
-            </div>
+            <>
+              {showSubSticks && (
+                <div className="flex items-center gap-2 mb-4 px-3 py-2 rounded-md bg-amber-50 border border-amber-200">
+                  <span className="text-sm font-medium text-amber-900">Showing Sub Sticks</span>
+                  <span className="text-xs text-amber-700">— families only</span>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={handleToggleShowSubSticks}
+                    className="h-6 ml-auto text-xs text-amber-900 hover:bg-amber-100"
+                  >
+                    Show All Sticks
+                  </Button>
+                </div>
+              )}
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {displaySticks.map((stick) => {
+                  const isSubStick = Boolean((stick as { parent_stick_id?: string | null }).parent_stick_id)
+                  const hasSubSticks = !isSubStick && (subSticksByParent.get(stick.id)?.length ?? 0) > 0
+                  return (
+                    <Fragment key={stick.id}>
+                      <StickCard
+                        stick={stick}
+                        counts={taskCounts[stick.id]}
+                        canEdit={canCreateSticks}
+                        onClick={handleStickClick}
+                        onOpenGantt={handleOpenGantt}
+                        onOpenMap={handleOpenMap}
+                        onColorChange={handleStickColorChange}
+                        onOpenChat={handleOpenChat}
+                        onOpenVideo={handleOpenVideo}
+                        isSubStick={isSubStick}
+                        hasSubSticks={hasSubSticks}
+                        isShowingSubSticks={showSubSticks}
+                        onCreateSubStick={handleCreateSubStick}
+                        onToggleShowSubSticks={handleToggleShowSubSticks}
+                      />
+                    </Fragment>
+                  )
+                })}
+              </div>
+            </>
           )}
         </div>
 
         {/* Modals */}
         <CreateStickModal isOpen={isCreateModalOpen} onClose={handleCloseCreateModal} padId={pad.id} />
+
+        {/* Sub-stick create: reuses the same modal in sub-stick mode — the
+            parent's id + color travel along so the server wires the FK and
+            the family inherits one palette. */}
+        <CreateStickModal
+          isOpen={subStickParent !== null}
+          onClose={handleCloseSubStickModal}
+          padId={pad.id}
+          parentStickId={subStickParent?.id}
+          parentColor={subStickParent?.color}
+        />
 
         <PadInviteModal
           open={showInviteModal}

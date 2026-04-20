@@ -112,7 +112,8 @@ export default function DashboardPage() {
           <p className="text-sm text-gray-500 leading-relaxed">
             <span className="font-medium text-yellow-700">Your Stick</span> replaces Engage &middot;{" "}
             <span className="font-medium text-blue-700">Your Stick</span> replaces OneNote &middot;{" "}
-            <span className="font-medium text-purple-700">Your Stick</span> replaces MS Teams
+            <span className="font-medium text-purple-700">Your Stick</span> replaces MS Teams &middot;{" "}
+            <span className="font-medium text-green-700">Your Stick</span> replaces Folders
           </p>
           <p className="text-sm font-medium text-gray-600 mt-1">
             Your Stick is the source of truth.

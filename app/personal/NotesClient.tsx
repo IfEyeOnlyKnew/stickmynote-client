@@ -166,15 +166,43 @@ export function NotesClient({ initialNotes, userId, stats }: Readonly<NotesClien
   // Track loading state when clicking a card
   const [loadingNoteId, setLoadingNoteId] = useState<string | null>(null)
 
-  // Derived lists - deduplicated to prevent duplicate key warnings
+  // Show Sub Sticks mode — triggered from any parent's menu. When on, the
+  // feed collapses to families only (parents with children, each followed by
+  // their sub-sticks). Exit via any parent's menu or the top banner.
+  const [showSubSticks, setShowSubSticks] = useState(false)
+
+  // Derived lists - deduplicated to prevent duplicate key warnings. Parents
+  // only — sub-sticks are reintroduced by displayNotes in family mode.
   const uniqueNotes = useMemo(() => {
     const seen = new Set<string>()
     return allNotes.filter((note) => {
+      if (note.parent_stick_id) return false
       if (seen.has(note.id)) return false
       seen.add(note.id)
       return true
     })
   }, [allNotes])
+
+  // Parent-id → child sticks map. Used for family-mode assembly + to tell the
+  // card when to show the menu vs direct-create on its sub-stick icon.
+  const subSticksByParent = useMemo(() => {
+    const map = new Map<string, Note[]>()
+    for (const n of allNotes) {
+      if (!n.parent_stick_id) continue
+      const arr = map.get(n.parent_stick_id) ?? []
+      arr.push(n)
+      map.set(n.parent_stick_id, arr)
+    }
+    return map
+  }, [allNotes])
+
+  const subStickCountsByParent = useMemo(() => {
+    const map = new Map<string, number>()
+    for (const [parentId, children] of subSticksByParent) {
+      map.set(parentId, children.length)
+    }
+    return map
+  }, [subSticksByParent])
   
   const personalNotes = useMemo(() => uniqueNotes.filter((n) => !n.is_shared), [uniqueNotes])
   const sharedNotes = useMemo(() => uniqueNotes.filter((n) => n.is_shared), [uniqueNotes])
@@ -199,6 +227,21 @@ export function NotesClient({ initialNotes, userId, stats }: Readonly<NotesClien
     )
   }, [uniqueNotes, personalNotes, sharedNotes, searchTerm, searchFilter, groupsHook.selectedGroupId, groupsHook.getStickIdsForGroup])
 
+  // In family mode: keep only parents that have at least one child, and
+  // interleave each parent with its children so they render side-by-side.
+  // Parent date/sort order is preserved; children follow their parent
+  // regardless of their own created_at.
+  const displayNotes = useMemo(() => {
+    if (!showSubSticks) return filteredNotes
+    const result: Note[] = []
+    for (const parent of filteredNotes) {
+      const children = subSticksByParent.get(parent.id)
+      if (!children || children.length === 0) continue
+      result.push(parent, ...children)
+    }
+    return result
+  }, [showSubSticks, filteredNotes, subSticksByParent])
+
   // Create a new note and open it in fullscreen immediately
   const handleCreateNoteClick = useCallback(async () => {
     if (!userId || !isClient) {
@@ -213,6 +256,29 @@ export function NotesClient({ initialNotes, userId, stats }: Readonly<NotesClien
       console.error("Error creating note:", err)
     }
   }, [userId, isClient, router, handleCreateNote, selectedColor, windowSize, fullscreenHook])
+
+  // Create a sub-stick: inherits the parent's color so the family reads as
+  // one palette; opens fullscreen for immediate editing like a normal create.
+  const handleCreateSubStick = useCallback(
+    async (parent: Note) => {
+      if (!userId || !isClient) {
+        router.push("/")
+        return
+      }
+      try {
+        const parentColor = parent.color || selectedColor.value
+        const newSubStick = await handleCreateNote(parentColor, windowSize, parent.id)
+        fullscreenHook.openFullscreen(newSubStick.id)
+      } catch (err) {
+        console.error("Error creating sub stick:", err)
+      }
+    },
+    [userId, isClient, router, handleCreateNote, selectedColor, windowSize, fullscreenHook],
+  )
+
+  const handleToggleShowSubSticks = useCallback(() => {
+    setShowSubSticks((prev) => !prev)
+  }, [])
 
   // Handle clicking a card to open fullscreen
   const handleNoteClick = useCallback((noteId: string) => {
@@ -670,14 +736,35 @@ export function NotesClient({ initialNotes, userId, stats }: Readonly<NotesClien
             </div>
           )}
 
+          {/* Family-mode dismiss banner. Only route out when the view is
+              otherwise empty-looking, but always present so users never get
+              stuck if their filters collapse the family list. */}
+          {showSubSticks && (
+            <div className="flex items-center gap-2 mb-4 px-3 py-2 rounded-md bg-amber-50 border border-amber-200">
+              <span className="text-sm font-medium text-amber-900">Showing Sub Sticks</span>
+              <span className="text-xs text-amber-700">— families only</span>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={handleToggleShowSubSticks}
+                className="h-6 ml-auto text-xs text-amber-900 hover:bg-amber-100"
+              >
+                Show All Sticks
+              </Button>
+            </div>
+          )}
+
           {(() => {
-            if (filteredNotes.length === 0 && !loading) {
+            if (displayNotes.length === 0 && !loading) {
               return (
                 <div className="flex flex-col items-center justify-center py-16 text-gray-500">
                   <div className="text-6xl mb-4">📝</div>
-                  <h3 className="text-lg font-medium mb-2">No notes found</h3>
+                  <h3 className="text-lg font-medium mb-2">
+                    {showSubSticks ? "No sub sticks yet" : "No notes found"}
+                  </h3>
                   <p className="text-sm">
                     {(() => {
+                      if (showSubSticks) return "No sticks with sub sticks match the current filters. Create sub sticks from any stick's + icon."
                       if (groupsHook.selectedGroupId) return "No sticks in this group yet. Open a stick and add it to this group."
                       if (searchTerm) return "Try adjusting your search or filter"
                       return "Create your first note to get started!"
@@ -689,13 +776,17 @@ export function NotesClient({ initialNotes, userId, stats }: Readonly<NotesClien
             const GridComponent = groupByDate ? DateGroupedNoteGrid : SimpleNoteGrid
             return (
               <GridComponent
-                notes={filteredNotes}
+                notes={displayNotes}
                 onNoteClick={handleNoteClick}
                 onUpdateColor={handleUpdateNoteColor}
                 onLoadMore={loadMoreNotes}
                 hasMore={hasMore}
                 isLoadingMore={loadingMore}
                 loadingNoteId={loadingNoteId}
+                subStickCountsByParent={subStickCountsByParent}
+                isShowingSubSticks={showSubSticks}
+                onCreateSubStick={handleCreateSubStick}
+                onToggleShowSubSticks={handleToggleShowSubSticks}
               />
             )
           })()}

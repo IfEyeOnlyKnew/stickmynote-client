@@ -1,13 +1,20 @@
 "use client"
 
-import { useState, useEffect, useCallback } from "react"
+import type React from "react"
+import { useState, useEffect, useCallback, useMemo, Fragment } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
-import { Search, Zap } from "lucide-react"
+import { Button } from "@/components/ui/button"
+import { Search, Zap, MessagesSquare, Video } from "lucide-react"
 import { UserMenu } from "@/components/user-menu"
 import { BreadcrumbNav } from "@/components/breadcrumb-nav"
 import { PermissionBasedStickFullscreen } from "@/components/permission-based/PermissionBasedStickFullscreen"
+import { NotedIcon } from "@/components/noted/NotedIcon"
+import { StickMapButton } from "@/components/stick-map/StickMapButton"
+import { SubStickMenuButton } from "@/components/SubStickMenuButton"
+import { CreateStickModal } from "@/components/create-stick-modal"
+import { CreateChatModal } from "@/components/stick-chats/CreateChatModal"
 import type { Stick } from "@/types/pad"
 
 // ============================================================================
@@ -33,6 +40,7 @@ interface QuickSticksPageClientProps {
 
 interface QuickSticksState {
   sticks: QuickStick[]
+  subSticks: QuickStick[]
   loading: boolean
   searchQuery: string
   debouncedSearch: string
@@ -82,31 +90,107 @@ function formatDate(dateString: string): string {
 interface StickCardProps {
   stick: QuickStick
   onClick: (stick: QuickStick) => void
+  isSubStick?: boolean
+  hasSubSticks?: boolean
+  isShowingSubSticks?: boolean
+  onChatClick: (e: React.MouseEvent, stick: QuickStick) => void
+  onVideoClick: (e: React.MouseEvent) => void
+  onCreateSubStick?: (stick: QuickStick) => void
+  onToggleShowSubSticks?: () => void
 }
 
-function StickCard({ stick, onClick }: Readonly<StickCardProps>) {
+function StickCard({
+  stick,
+  onClick,
+  isSubStick = false,
+  hasSubSticks = false,
+  isShowingSubSticks = false,
+  onChatClick,
+  onVideoClick,
+  onCreateSubStick,
+  onToggleShowSubSticks,
+}: Readonly<StickCardProps>) {
   const handleClick = useCallback(() => {
     onClick(stick)
   }, [onClick, stick])
 
+  const handleStopPropagation = useCallback((e: React.MouseEvent) => {
+    e.stopPropagation()
+  }, [])
+
+  // Sub-sticks get a thicker left stripe in their own (parent-inherited)
+  // color; top-level cards use the original 4px visual.
+  const borderLeftWidth = isSubStick ? "8px" : "4px"
+
   return (
     <Card
       className="cursor-pointer hover:shadow-lg transition-shadow"
-      style={{ borderLeft: `4px solid ${stick.color}` }}
+      style={{ borderLeft: `${borderLeftWidth} solid ${stick.color}` }}
       onClick={handleClick}
     >
       <CardHeader>
-        <CardTitle className="text-lg line-clamp-2">
-          {stick.topic || "Untitled Stick"}
+        <CardTitle className="flex items-start justify-between gap-2 text-lg">
+          <span className="line-clamp-2 flex-1">{stick.topic || "Untitled Stick"}</span>
+          <div className="flex items-center gap-1 flex-shrink-0">
+            <span onClick={handleStopPropagation} onKeyDown={(e) => e.stopPropagation()} role="none">
+              <NotedIcon
+                stickId={stick.id}
+                stickTopic={stick.topic}
+                stickContent={stick.content}
+                size="sm"
+                openInNewTab
+              />
+            </span>
+            <span onClick={handleStopPropagation} onKeyDown={(e) => e.stopPropagation()} role="none">
+              <StickMapButton
+                stickId={stick.id}
+                stickTopic={stick.topic}
+                stickContent={stick.content}
+                stickColor={stick.color}
+                className="h-7 w-7 p-0"
+              />
+            </span>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-7 w-7 p-0"
+              onClick={(e) => onChatClick(e, stick)}
+              title="New chat"
+            >
+              <MessagesSquare className="h-4 w-4 text-purple-500 hover:text-purple-600" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-7 w-7 p-0"
+              onClick={onVideoClick}
+              title="Start video call"
+            >
+              <Video className="h-4 w-4 text-blue-500 hover:text-blue-600" />
+            </Button>
+            {!isSubStick && onCreateSubStick && (
+              <span onClick={handleStopPropagation} onKeyDown={(e) => e.stopPropagation()} role="none">
+                <SubStickMenuButton
+                  hasSubSticks={hasSubSticks}
+                  isShowingSubSticks={isShowingSubSticks}
+                  onCreateSubStick={() => onCreateSubStick(stick)}
+                  onToggleShowSubSticks={onToggleShowSubSticks}
+                  indicatorColor={stick.color}
+                />
+              </span>
+            )}
+          </div>
         </CardTitle>
         <div className="flex items-center gap-2 mt-2">
           <Badge variant="secondary" className="text-xs">
             {stick.pads.name}
           </Badge>
-          <Badge variant="outline" className="text-xs">
-            <Zap className="h-3 w-3 mr-1" />
-            QuickStick
-          </Badge>
+          {!isSubStick && (
+            <Badge variant="outline" className="text-xs">
+              <Zap className="h-3 w-3 mr-1" />
+              QuickStick
+            </Badge>
+          )}
         </div>
       </CardHeader>
       <CardContent>
@@ -127,6 +211,7 @@ export function QuickSticksPageClient({ user }: Readonly<QuickSticksPageClientPr
   // State
   const [state, setState] = useState<QuickSticksState>({
     sticks: [],
+    subSticks: [],
     loading: true,
     searchQuery: "",
     debouncedSearch: "",
@@ -136,6 +221,11 @@ export function QuickSticksPageClient({ user }: Readonly<QuickSticksPageClientPr
     selectedStick: null,
     isOpen: false,
   })
+
+  const [showSubSticks, setShowSubSticks] = useState(false)
+  const [subStickParent, setSubStickParent] = useState<QuickStick | null>(null)
+  const [chatModalOpen, setChatModalOpen] = useState(false)
+  const [chatStickTopic, setChatStickTopic] = useState("")
 
   // Debounce search
   useEffect(() => {
@@ -162,6 +252,7 @@ export function QuickSticksPageClient({ user }: Readonly<QuickSticksPageClientPr
       setState((prev) => ({
         ...prev,
         sticks: data.sticks || [],
+        subSticks: data.subSticks || [],
         loading: false,
       }))
     } catch (error) {
@@ -202,9 +293,58 @@ export function QuickSticksPageClient({ user }: Readonly<QuickSticksPageClientPr
     setState((prev) => ({
       ...prev,
       sticks: prev.sticks.filter((stick) => stick.id !== stickId),
+      subSticks: prev.subSticks.filter((stick) => stick.id !== stickId),
     }))
     handleCloseFullscreen()
   }, [handleCloseFullscreen])
+
+  const handleChatClick = useCallback((e: React.MouseEvent, stick: QuickStick) => {
+    e.stopPropagation()
+    setChatStickTopic(stick.topic || "Untitled Stick")
+    setChatModalOpen(true)
+  }, [])
+
+  const handleVideoClick = useCallback((e: React.MouseEvent) => {
+    e.stopPropagation()
+    window.open("/video", "_blank", "noopener,noreferrer")
+  }, [])
+
+  const handleCreateSubStick = useCallback((stick: QuickStick) => {
+    setSubStickParent(stick)
+  }, [])
+
+  const handleToggleShowSubSticks = useCallback(() => {
+    setShowSubSticks((prev) => !prev)
+  }, [])
+
+  const handleCloseSubStickModal = useCallback(() => {
+    setSubStickParent(null)
+    // Refetch so the new sub-stick shows up in the feed immediately.
+    fetchQuickSticks(state.debouncedSearch)
+  }, [fetchQuickSticks, state.debouncedSearch])
+
+  // Group sub-sticks by their parent id for fast lookup during render.
+  const subSticksByParent = useMemo(() => {
+    const map = new Map<string, QuickStick[]>()
+    for (const s of state.subSticks) {
+      if (!s.parent_stick_id) continue
+      const arr = map.get(s.parent_stick_id) ?? []
+      arr.push(s)
+      map.set(s.parent_stick_id, arr)
+    }
+    return map
+  }, [state.subSticks])
+
+  const displaySticks = useMemo(() => {
+    if (!showSubSticks) return state.sticks
+    const result: QuickStick[] = []
+    for (const parent of state.sticks) {
+      const children = subSticksByParent.get(parent.id)
+      if (!children || children.length === 0) continue
+      result.push(parent, ...children)
+    }
+    return result
+  }, [showSubSticks, state.sticks, subSticksByParent])
 
   // Derived state
   const hasSticks = state.sticks.length > 0
@@ -267,16 +407,51 @@ export function QuickSticksPageClient({ user }: Readonly<QuickSticksPageClientPr
         </Card>
       )}
 
+      {/* Show Sub Sticks banner */}
+      {showSubSticks && !state.loading && (
+        <div className="flex items-center gap-2 mb-4 px-3 py-2 rounded-md bg-amber-50 border border-amber-200">
+          <span className="text-sm font-medium text-amber-900">Showing Sub Sticks</span>
+          <span className="text-xs text-amber-700">— families only</span>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setShowSubSticks(false)}
+            className="h-6 ml-auto text-xs text-amber-900 hover:bg-amber-100"
+          >
+            Show All Sticks
+          </Button>
+        </div>
+      )}
+
       {/* Sticks Grid */}
       {!state.loading && hasSticks && (
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {state.sticks.map((stick) => (
-            <StickCard
-              key={stick.id}
-              stick={stick}
-              onClick={handleStickClick}
-            />
-          ))}
+          {displaySticks.map((stick) => {
+            const isSubStick = Boolean(stick.parent_stick_id)
+            const hasSubSticks = !isSubStick && (subSticksByParent.get(stick.id)?.length ?? 0) > 0
+            return (
+              <Fragment key={stick.id}>
+                <StickCard
+                  stick={stick}
+                  onClick={handleStickClick}
+                  isSubStick={isSubStick}
+                  hasSubSticks={hasSubSticks}
+                  isShowingSubSticks={showSubSticks}
+                  onChatClick={handleChatClick}
+                  onVideoClick={handleVideoClick}
+                  onCreateSubStick={isSubStick ? undefined : handleCreateSubStick}
+                  onToggleShowSubSticks={handleToggleShowSubSticks}
+                />
+              </Fragment>
+            )
+          })}
+        </div>
+      )}
+
+      {/* Empty state when families mode has nothing to show */}
+      {!state.loading && hasSticks && showSubSticks && displaySticks.length === 0 && (
+        <div className="text-center py-8 text-sm text-gray-500">
+          No QuickSticks have sub sticks yet.
         </div>
       )}
 
@@ -291,6 +466,26 @@ export function QuickSticksPageClient({ user }: Readonly<QuickSticksPageClientPr
           stickType="personal"
         />
       )}
+
+      {/* Sub-stick create modal (reuses the pad create modal in sub-stick mode) */}
+      {subStickParent?.pads?.id && (
+        <CreateStickModal
+          isOpen={subStickParent !== null}
+          onClose={handleCloseSubStickModal}
+          padId={subStickParent.pads.id}
+          parentStickId={subStickParent.id}
+          parentColor={subStickParent.color}
+        />
+      )}
+
+      {/* Chat Modal */}
+      <CreateChatModal
+        open={chatModalOpen}
+        onOpenChange={setChatModalOpen}
+        defaultName={chatStickTopic}
+        autoSubmit
+        openInNewTab
+      />
     </div>
   )
 }

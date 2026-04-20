@@ -137,6 +137,9 @@ function determineUserRole(isPadOwner: boolean, membership: { role: string } | n
 }
 
 async function fetchSticksWithRetry(db: DatabaseClient, padId: string): Promise<Stick[]> {
+  // Returns parents + their sub-sticks in one flat array. The client filters
+  // to parents by default and reassembles families when "Show Sub Sticks" is
+  // toggled on. parent_stick_id is preserved on each row to drive grouping.
   for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
     try {
       const { data, error } = await db

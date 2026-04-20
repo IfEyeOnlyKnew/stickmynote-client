@@ -13,6 +13,7 @@ export interface CreateNoteInput {
   content?: string | null
   color?: string | null
   topic?: string | null
+  parent_stick_id?: string | null
 }
 
 export interface UpdateNoteInput {
@@ -32,53 +33,61 @@ export async function listNotes(session: NotesSession, limit = 50, offset = 0) {
     const effectiveLimit = Math.min(limit, 100)
     const effectiveOffset = Math.max(offset, 0)
 
-    // Fetch notes
+    // Top-level sticks only. Sub-sticks are returned separately so the client
+    // can group them into families but pagination stays counted on parents.
     const notes = await query(
-      'SELECT * FROM personal_sticks WHERE user_id = $1 ORDER BY created_at DESC LIMIT $2 OFFSET $3',
+      'SELECT * FROM personal_sticks WHERE user_id = $1 AND parent_stick_id IS NULL ORDER BY created_at DESC LIMIT $2 OFFSET $3',
       [session.user.id, effectiveLimit, effectiveOffset]
     )
 
-    // Get total count for pagination
+    // Get total count for pagination (top-level only, matches the list query)
     const countResult = await query(
-      'SELECT COUNT(*) as count FROM personal_sticks WHERE user_id = $1',
+      'SELECT COUNT(*) as count FROM personal_sticks WHERE user_id = $1 AND parent_stick_id IS NULL',
       [session.user.id]
     )
     const total = Number.parseInt(countResult[0]?.count || '0', 10)
 
-    // Get note IDs for fetching related data
-    const noteIds = notes.map((n: { id: string }) => n.id)
-    console.log('[notes-handler] Note IDs being queried:', noteIds)
+    const parentIds = notes.map((n: { id: string }) => n.id)
 
-    // Fetch tabs (which contain hyperlinks) for all notes
+    // Fetch sub-sticks for the parents on this page (uses the partial index
+    // idx_personal_sticks_parent_stick_id).
+    let subSticks: any[] = []
+    if (parentIds.length > 0) {
+      subSticks = await query(
+        `SELECT * FROM personal_sticks
+         WHERE user_id = $1 AND parent_stick_id = ANY($2)
+         ORDER BY created_at DESC`,
+        [session.user.id, parentIds]
+      )
+    }
+
+    // Combined ids for tab/reply enrichment (parents + their sub-sticks)
+    const allIds = [...parentIds, ...subSticks.map((s: { id: string }) => s.id)]
+
+    // Fetch tabs (which contain hyperlinks) for all notes + sub-sticks
     let tabs: any[] = []
-    if (noteIds.length > 0) {
+    if (allIds.length > 0) {
       tabs = await query(
         `SELECT personal_stick_id, tab_name, tab_type, tags
          FROM personal_sticks_tabs
          WHERE personal_stick_id = ANY($1)`,
-        [noteIds]
+        [allIds]
       )
-      console.log('[notes-handler] Tabs fetched:', tabs.length)
-      if (tabs.length > 0) {
-        console.log('[notes-handler] First tab:', JSON.stringify(tabs[0]))
-      }
-    } else {
-      console.log('[notes-handler] No note IDs to query tabs for')
     }
 
-    // Fetch replies for all notes (include parent_reply_id for threading)
+    // Fetch replies for all notes + sub-sticks
     let replies: any[] = []
-    if (noteIds.length > 0) {
+    if (allIds.length > 0) {
       replies = await query(
         `SELECT id, content, color, created_at, updated_at, user_id, personal_stick_id, parent_reply_id
          FROM personal_sticks_replies
          WHERE personal_stick_id = ANY($1)
          ORDER BY created_at ASC`,
-        [noteIds]
+        [allIds]
       )
     }
 
-    return { status: 200, body: { notes, total, tabs, replies } }
+    return { status: 200, body: { notes, total, tabs, replies, subSticks } }
   } catch (error) {
     console.error('[notes-handler] listNotes error:', error)
     return { status: 500, body: { error: 'Failed to list notes' } }
@@ -92,11 +101,27 @@ export async function createNote(session: NotesSession, input: CreateNoteInput) 
     const content = input.content || ''
     const color = requireOptionalString(input.color) || '#FFFFA5'
     const topic = requireOptionalString(input.topic) || ''
+    const parentStickId = requireOptionalString(input.parent_stick_id) || null
+
+    // Validate parent (server-side; trigger is the final guard)
+    if (parentStickId) {
+      const parent = await querySingle(
+        `SELECT id, parent_stick_id FROM personal_sticks WHERE id = $1 AND user_id = $2`,
+        [parentStickId, session.user.id]
+      )
+      if (!parent) {
+        return { status: 400, body: { error: 'Parent stick not found or not owned by user' } }
+      }
+      if (parent.parent_stick_id) {
+        return { status: 400, body: { error: 'Sub-sticks can only be one level deep' } }
+      }
+    }
+
     const now = new Date().toISOString()
     const note = await querySingle(
-      `INSERT INTO personal_sticks (user_id, title, topic, content, color, is_shared, created_at, updated_at)
-       VALUES ($1, $2, $3, $4, $5, false, $6, $6) RETURNING *`,
-      [session.user.id, title, topic, content, color, now]
+      `INSERT INTO personal_sticks (user_id, title, topic, content, color, is_shared, parent_stick_id, created_at, updated_at)
+       VALUES ($1, $2, $3, $4, $5, false, $6, $7, $7) RETURNING *`,
+      [session.user.id, title, topic, content, color, parentStickId, now]
     )
     return { status: 201, body: { note } }
   } catch (error: any) {
