@@ -135,6 +135,7 @@ The book provides: narrative arc, cross-cutting pattern analysis, design rationa
 - Dual-mode reliability: WebSocket primary, polling fallback (5s/30s intervals)
 - Presence heartbeats: 30-second POST to `/api/user/presence`
 - Notification bell: combined notifications + chat requests with focus mode
+- Notification taxonomy: single `notifications` table, scattered writers share one contract, `type` drives icon + navigation
 - The escalation heuristic: caps ratio and exclamation marks detect frustration
 
 **Chapter 12: Video with LiveKit** (~400 lines)
@@ -143,6 +144,7 @@ The book provides: narrative arc, cross-cutting pattern analysis, design rationa
 - Token generation: 6-hour TTL, room join + publish + subscribe grants
 - WebSocket proxy: raw TCP pipe from `/livekit-ws/*` to internal LiveKit
 - Room management: 5-minute empty timeout, 10 participant max
+- Invitations: `video_room_participants` table, RSVP transitions, four-layer invite fan-out (toast + bell + rooms list + email)
 - Custom UI: speaker detection, screen share, emoji reactions via data channel
 
 ### Part V — Intelligence
@@ -202,6 +204,7 @@ The book provides: narrative arc, cross-cutting pattern analysis, design rationa
 - Custom virtualization: IntersectionObserver, not react-virtual
 - Grid layout hook: column calculation from viewport width
 - PWA stack: service worker registration, install prompt, offline indicator
+- SW fetch strategy: stale-while-revalidate for assets, network-first for navigation, hard bypass for `/video/`, `/livekit-ws`, `/ws`, `/api/auth/`, `/api/video/`
 - Accessibility context: 6 preferences (font size, contrast, motion, focus, links, line height)
 - KeyboardDetector: the invisible component that returns null
 - Pull-to-refresh with resistance formula: `distance * 0.5`

@@ -107,6 +107,24 @@ A separate `SWUpdateNotification` component handles the update flow. It polls fo
 
 The deliberate design choice here is no automatic reload. A collaboration tool cannot reload the page while the user is mid-sentence in a chat message or mid-drag on a sticky note. The user decides when to take the update.
 
+### Fetch Strategy and Exclusions
+
+The service worker's fetch handler routes requests by request type: stale-while-revalidate for API GETs and static assets, network-first with offline fallback for navigations. Each strategy has the same failure contract -- it always resolves to a valid `Response`. The handlers never hand `undefined` to `respondWith`, which would throw "Failed to convert value to 'Response'" and break the page. When both cache miss and network fail, a synthesized 503 Response takes the page's place so the error path is visible and debuggable instead of silent and cryptic.
+
+A small exclusion list names paths the service worker must not intercept at all:
+
+| Path prefix | Why it bypasses the SW |
+| ----------- | ---------------------- |
+| `/video/` | Video rooms render LiveKit's SDK; a stale cached page points to old chunk hashes |
+| `/api/video/` | Token generation and invite endpoints need fresh responses per call |
+| `/livekit-ws` | The raw TCP proxy to the LiveKit SFU -- the SW cannot speak WebRTC |
+| `/ws` | The application WebSocket; an intercepted upgrade is a broken upgrade |
+| `/api/auth/` | Cached auth responses cause redirect loops |
+
+Every path in the list shares a property: intercepting it delivers a worse experience than not having a service worker at all. The list grew after a post-deploy incident where invitees hitting `/video/join/<roomId>` saw the room window close instantly -- the SW returned a stale cached HTML shell referencing chunk hashes that no longer existed. The lesson is that service worker coverage should be an opt-out list for real-time paths, not a coverage-everything default.
+
+The cache version string (`stickmynote-v6` at time of writing) is bumped in the source when the fetch strategy changes. The activate handler deletes every cache whose name does not match the current version, which forces a clean slate after any strategy change. Old entries cannot poison a new strategy.
+
 ### Install Prompt
 
 The `PWAInstallPrompt` component handles two completely different install flows behind one interface. On Android and desktop Chrome, the browser fires a `beforeinstallprompt` event that the component captures and defers. When shown, it offers an "Install" button that calls `prompt()` on the deferred event. On iOS, there is no `beforeinstallprompt`. The component detects iOS via user agent, waits five seconds, and shows manual instructions: "Tap the share button, then Add to Home Screen."

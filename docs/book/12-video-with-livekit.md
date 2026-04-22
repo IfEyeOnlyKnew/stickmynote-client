@@ -87,6 +87,107 @@ Room URLs use the internal format `/video/join/<database-id>`. This replaced the
 
 ---
 
+## Invitations and Participants
+
+The original video model was creator-only. A user created a room, got a URL, and emailed that URL to whoever they wanted to join. The invitees never appeared in the creator's "Your Video Rooms" list on the sending side, and more critically, the invited users did not see the room anywhere in their own UI. They had to find the email, click the link, and hope the room still existed. Invitations left no trace in the application.
+
+The fix required a participants table.
+
+```sql
+CREATE TABLE video_room_participants (
+    id UUID PRIMARY KEY,
+    room_id UUID NOT NULL REFERENCES video_rooms(id) ON DELETE CASCADE,
+    user_id UUID REFERENCES users(id) ON DELETE CASCADE,
+    email TEXT,
+    invited_by UUID REFERENCES users(id) ON DELETE SET NULL,
+    status TEXT NOT NULL DEFAULT 'invited',  -- invited | joined | declined | left
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW(),
+    CHECK (user_id IS NOT NULL OR email IS NOT NULL)
+);
+```
+
+Two fields are nullable for a reason. `user_id` is null when the invitee is an LDAP-only user who has never signed in — the application knows their email from Active Directory but has no row for them in the `users` table yet. `email` is null when the invitee was picked from a search result that only had a user ID. The `CHECK` constraint ensures at least one identifier is present. Uniqueness is enforced by two partial indexes: one on `(room_id, user_id)` where `user_id IS NOT NULL`, another on `(room_id, LOWER(email))` where `email IS NOT NULL AND user_id IS NULL`. This prevents duplicate invites without forcing NULL into a single unique constraint, which PostgreSQL would happily accept multiple copies of.
+
+With the table in place, `GET /api/video/rooms` changed from "rooms I created" to a UNION:
+
+```sql
+SELECT vr.*, 'owner'::text AS role
+  FROM video_rooms vr
+ WHERE vr.created_by = $1
+UNION ALL
+SELECT vr.*, 'invitee'::text AS role
+  FROM video_rooms vr
+  JOIN video_room_participants vrp ON vrp.room_id = vr.id
+ WHERE vrp.user_id = $1 AND vr.created_by <> $1
+   AND vrp.status IN ('invited', 'joined')
+ ORDER BY created_at DESC
+```
+
+The `role` column lets the client render different controls per row. Owners see "Invite More People" and "Delete Room." Invitees see only "Copy Link" and "Join Room" -- they cannot delete a room they did not create, and the API enforces that with a `created_by = user.id` check on the DELETE endpoint.
+
+Four endpoints handle the invite lifecycle:
+
+| Endpoint | Purpose |
+| -------- | ------- |
+| `POST /api/video/rooms` | Create room, accept initial invitees in the body |
+| `POST /api/video/rooms/:id/invite` | Add more invitees to an existing room (creator-only) |
+| `PATCH /api/video/rooms/:id/participants` | Self-update status (`joined` / `declined` / `left`) |
+| `GET /api/video/invites/pending` | Count and list of unfinished invitations for the current user |
+
+The RSVP endpoint is a single-row UPDATE scoped by `room_id` and `user_id = auth.user.id`. There is no admin override, no "mark someone else as joined" operation. If you need to know whether a specific user accepted, you read the row they wrote. This keeps the permission model trivial.
+
+Status transitions happen at natural UI inflection points. Visiting `/video/join/<roomId>` as an invitee automatically PATCHes to `joined`. Dismissing the invite toast sends `declined`. The "Leave" button in the call could mark `left`, but currently doesn't -- a minor gap that does not affect functionality, since the LiveKit SFU knows who is actually connected.
+
+---
+
+## Invitation Notifications
+
+An invite that only surfaces next time the user opens `/video` is not really an invitation. It is a database row. A real invitation reaches the user wherever they are in the application and gives them a one-click path to the room.
+
+This is why the invite pipeline fans out to three destinations:
+
+```mermaid
+graph LR
+    INVITE["Invite action<br/>(POST rooms or POST rooms/:id/invite)"] --> PERSIST["Insert<br/>video_room_participants"]
+    INVITE --> BELL["Insert<br/>notifications row"]
+    INVITE --> WS["Publish<br/>video_invite WS event"]
+    INVITE --> EMAIL["Send email<br/>(/api/send-email)"]
+
+    WS -->|"live toast"| TOAST["VideoInviteNotifications"]
+    BELL -->|"persistent entry"| BELLUI["Notification bell"]
+    PERSIST -->|"visible on next load"| ROOMS["/video page"]
+    EMAIL -->|"off-network fallback"| INBOX["User's email"]
+
+    style WS fill:#1a1a2e,color:#fff
+    style BELL fill:#1a1a2e,color:#fff
+```
+
+The four destinations are deliberately redundant. Each one handles a user state the others miss. A user who is in the app right now sees the live toast (WS). A user who stepped away for coffee sees the bell entry when they return (notifications row). A user who was offline for the day sees the room in "Your Video Rooms" when they next open `/video` (participants row). A user who left for the weekend and does not open the app gets the email. Remove any one layer and some cohort of users silently misses invitations.
+
+All four happen fire-and-forget. If the WebSocket push fails, it gets logged but does not block the HTTP response. If the email service is down, the notification row is still inserted. The only failure that cascades is the participants insert itself -- and that is transactional with the HTTP response.
+
+The `video_invite` WebSocket event carries just enough payload to render a toast without another round trip:
+
+```json
+{
+  "type": "video_invite",
+  "payload": {
+    "roomId": "...",
+    "roomName": "...",
+    "roomUrl": "https://stickmynote.com/video/join/...",
+    "invitedBy": { "id": "...", "name": "..." }
+  },
+  "timestamp": 1745000000000
+}
+```
+
+The client's `VideoInviteNotifications` component is mounted in the root layout, so it listens on every page. When an invite arrives, it renders a toast with Join and Dismiss buttons. Join sends `{status: "joined"}` to the RSVP endpoint and opens the room URL in a new tab. Dismiss sends `{status: "declined"}` and hides the toast. The toast auto-dismisses after 20 seconds without declining -- the user might be looking at something else, and auto-declining on a missed toast would be user-hostile.
+
+The notifications row uses `type: 'video_call_invite'` with the room URL in `action_url` and the room ID in `related_id`. When the user clicks the bell entry, the generic notification-item handler navigates to `action_url`. The video chapter needs no special client code for the bell -- the notification-item icon switch renders a Video icon for the `video_call_invite` type and the existing click handler does the rest.
+
+---
+
 ## The WebSocket Proxy
 
 LiveKit's browser SDK needs a WebSocket connection to the LiveKit server, but the browser can only connect to the application server's domain. The LiveKit server sits on a different machine on the internal network, unreachable from the browser.

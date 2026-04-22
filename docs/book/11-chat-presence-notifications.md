@@ -207,34 +207,42 @@ flowchart LR
         A[Note replies]
         B[Stick replies]
         C[Reactions]
-        D[Shares]
-        E[Chat requests]
+        D[Kudos received]
+        E[Video invitations]
+        F[Chat requests]
     end
-    
+
     subgraph Pipeline
-        F[Activity record]
-        G[WebSocket push]
+        G[notifications row<br/>INSERT]
+        H[WebSocket push<br/>notification.new]
     end
-    
+
     subgraph UI
-        H[Bell icon with badge]
-        I[Notifications tab]
-        J[Chat Requests tab]
+        I[Bell icon with badge]
+        J[Notifications tab]
+        K[Chat Requests tab]
     end
-    
-    A --> F
-    B --> F
-    C --> F
-    D --> F
-    F --> G
-    G --> H
-    H --> I
-    H --> J
+
+    A --> G
+    B --> G
+    C --> G
+    D --> G
     E --> G
     G --> H
+    H --> I
+    I --> J
+    I --> K
+    F --> H
+    H --> I
 ```
 
-The notification data model converts activity records into a normalized shape. Each activity has an `action_type` (created, updated, replied, shared, reaction_added) that maps to a human-readable label. The conversion happens client-side in the hook, not server-side, which keeps the API response format stable while allowing the display format to evolve independently.
+The data model is a single `notifications` table. Rows have a `type` column drawn from a small taxonomy (`reply`, `mention`, `pad_invite`, `pad_update`, `reaction`, `tag`, `kudos_received`, `video_call_invite`), a free-form `title` and `message`, and three pointer columns (`related_id`, `related_type`, `action_url`) that link the notification to whatever it is about. The `action_url` is what the bell navigates to on click -- for video invites, that is the room join URL; for replies, the reply anchor; for kudos, the recognition page.
+
+Writers are scattered across the codebase by design. Kudos inserts directly from `lib/recognition/kudos.ts`. Task reminders insert from the automation scheduler. Video invites insert from the invite handler in `lib/livekit/participants.ts`. Each feature that wants to put something in the bell writes to the same table with its own `type`. There is no central "create notification" service that feature code has to route through. The table is the contract.
+
+Readers are simpler. `GET /api/notifications` returns rows scoped to the current user and organization, ordered by `created_at DESC`. The SQL aliases `is_read AS read` and left-joins `users` to produce a `created_by_user` payload so the response matches the client's `NotificationWithUser` type exactly. No client-side transformation runs between "fetched row" and "rendered notification item." This was not always the case -- an earlier version of the hook mapped activity records from a different table through an `action_type` translation layer, and that mapper rotted out of sync with what the API actually returned. Deleting the translation was the repair. The lesson is that "flexible server, strict client" is cheap to design and expensive to maintain; aligning the API response shape with the UI type directly is the cheaper position over time.
+
+The `notification-item` component dispatches icons and styles by `type`. New notification types require two lines: add the literal to the `NotificationType` union, add a case to the icon switch. Click navigation reuses `action_url` -- no per-type dispatch needed. The system grows by adding rows, not by adding code.
 
 The bell count formula is straightforward:
 
