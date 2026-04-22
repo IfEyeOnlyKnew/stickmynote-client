@@ -79,7 +79,7 @@ export function VideoInviteMoreDialog({
     <Dialog open={open} onOpenChange={(o) => (o ? onOpenChange(o) : handleClose())}>
       <DialogContent className="max-w-lg">
         <DialogHeader>
-          <DialogTitle>Invite more people to "{roomName}"</DialogTitle>
+          <DialogTitle>Invite more people to &ldquo;{roomName}&rdquo;</DialogTitle>
         </DialogHeader>
         <div className="py-2">
           <VideoInviteUserSearch

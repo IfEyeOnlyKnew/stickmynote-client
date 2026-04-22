@@ -107,7 +107,7 @@ export function VideoInviteNotifications() {
               to
             </p>
             <p className="text-sm text-gray-900 font-medium truncate mt-0.5">
-              "{invite.roomName}"
+              &ldquo;{invite.roomName}&rdquo;
             </p>
           </div>
           <button

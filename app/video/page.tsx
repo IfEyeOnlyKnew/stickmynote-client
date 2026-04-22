@@ -212,7 +212,7 @@ export default function VideoPage() {
             <Bell className="h-5 w-5 text-blue-600 flex-shrink-0" />
             <p className="text-sm text-blue-900 flex-1">
               You have <strong>{pendingCount}</strong> pending video{" "}
-              {pendingCount === 1 ? "invitation" : "invitations"}. Scroll to "Your Video Rooms" below to join.
+              {pendingCount === 1 ? "invitation" : "invitations"}. Scroll to &ldquo;Your Video Rooms&rdquo; below to join.
             </p>
           </CardContent>
         </Card>
