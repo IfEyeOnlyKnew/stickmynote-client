@@ -5,12 +5,13 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Video, Plus, Clock, Copy, Trash2, ExternalLink, Info } from "lucide-react"
+import { Video, Plus, Clock, Copy, Trash2, ExternalLink, Info, UserPlus, Bell } from "lucide-react"
 import { UserMenu } from "@/components/user-menu"
 import { useToast } from "@/hooks/use-toast"
 import { BreadcrumbNav } from "@/components/breadcrumb-nav"
 import { useHubModeGuard } from "@/hooks/use-hub-mode-guard"
-import { VideoInviteUserSearch } from "@/components/video/VideoInviteUserSearch"
+import { VideoInviteUserSearch, type VideoInvitee } from "@/components/video/VideoInviteUserSearch"
+import { VideoInviteMoreDialog } from "@/components/video/VideoInviteMoreDialog"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 
 interface VideoRoom {
@@ -21,6 +22,8 @@ interface VideoRoom {
   created_by: string
   multi_pak_id?: string
   pad_id?: string
+  role?: "owner" | "invitee"
+  participant_status?: string | null
 }
 
 export default function VideoPage() {
@@ -30,21 +33,35 @@ export default function VideoPage() {
   const [isLoading, setIsLoading] = useState(true)
   const [newRoomName, setNewRoomName] = useState("")
   const [inviteEmails, setInviteEmails] = useState<string[]>([])
+  const [invitees, setInvitees] = useState<VideoInvitee[]>([])
   const [isCreating, setIsCreating] = useState(false)
+  const [inviteMoreRoom, setInviteMoreRoom] = useState<VideoRoom | null>(null)
+  const [pendingCount, setPendingCount] = useState(0)
 
   // All callbacks MUST be defined before any conditional returns (Rules of Hooks)
   const handleEmailsChange = useCallback((emails: string[]) => {
     setInviteEmails(emails)
   }, [])
 
+  const handleInviteesChange = useCallback((next: VideoInvitee[]) => {
+    setInvitees(next)
+  }, [])
+
   const fetchRooms = useCallback(async () => {
     try {
-      const response = await fetch("/api/video/rooms")
-      if (!response.ok) {
+      const [roomsRes, pendingRes] = await Promise.all([
+        fetch("/api/video/rooms"),
+        fetch("/api/video/invites/pending"),
+      ])
+      if (!roomsRes.ok) {
         throw new Error("Failed to fetch rooms")
       }
-      const data = await response.json()
+      const data = await roomsRes.json()
       setRooms(data.rooms || [])
+      if (pendingRes.ok) {
+        const pending = await pendingRes.json()
+        setPendingCount(pending.count || 0)
+      }
     } catch (error) {
       console.error("[Video] Error fetching rooms:", error)
       toast({
@@ -75,7 +92,9 @@ export default function VideoPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           name: newRoomName,
-          inviteEmails: inviteEmails,
+          invitees,
+          // legacy field kept for any old consumers
+          inviteEmails,
         }),
       })
 
@@ -92,6 +111,7 @@ export default function VideoPage() {
 
       setNewRoomName("")
       setInviteEmails([])
+      setInvitees([])
       await fetchRooms()
     } catch (error) {
       console.error("[Video] Error creating room:", error)
@@ -103,7 +123,7 @@ export default function VideoPage() {
     } finally {
       setIsCreating(false)
     }
-  }, [newRoomName, inviteEmails, toast, fetchRooms])
+  }, [newRoomName, inviteEmails, invitees, toast, fetchRooms])
 
   const handleCopyLink = useCallback(async (roomUrl: string, roomName: string) => {
     try {
@@ -186,6 +206,18 @@ export default function VideoPage() {
         </div>
       </div>
 
+      {pendingCount > 0 && (
+        <Card className="mb-6 border-blue-300 bg-blue-50">
+          <CardContent className="py-4 flex items-center gap-3">
+            <Bell className="h-5 w-5 text-blue-600 flex-shrink-0" />
+            <p className="text-sm text-blue-900 flex-1">
+              You have <strong>{pendingCount}</strong> pending video{" "}
+              {pendingCount === 1 ? "invitation" : "invitations"}. Scroll to "Your Video Rooms" below to join.
+            </p>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Create Room Section */}
       <Card className="mb-6 border-blue-200">
         <CardHeader>
@@ -226,6 +258,7 @@ export default function VideoPage() {
               <VideoInviteUserSearch
                 selectedEmails={inviteEmails}
                 onEmailsChange={handleEmailsChange}
+                onInviteesChange={handleInviteesChange}
               />
             </div>
             <Button onClick={handleCreateRoom} disabled={isCreating} className="w-full bg-blue-600 hover:bg-blue-700">
@@ -250,7 +283,12 @@ export default function VideoPage() {
                 <CardHeader>
                   <CardTitle className="text-base flex items-center gap-2">
                     <Video className="h-4 w-4 text-blue-600" />
-                    {room.name}
+                    <span className="flex-1">{room.name}</span>
+                    {room.role === "invitee" && (
+                      <span className="text-[10px] font-medium uppercase tracking-wide bg-blue-100 text-blue-700 px-2 py-0.5 rounded">
+                        Invited
+                      </span>
+                    )}
                   </CardTitle>
                   <CardDescription className="text-xs">
                     <div className="flex items-center gap-1">
@@ -271,10 +309,22 @@ export default function VideoPage() {
                     <ExternalLink className="h-4 w-4 mr-2" />
                     Join Room
                   </Button>
-                  <Button onClick={() => handleDeleteRoom(room.id, room.name)} variant="destructive" className="w-full">
-                    <Trash2 className="h-4 w-4 mr-2" />
-                    Delete Room
-                  </Button>
+                  {room.role !== "invitee" && (
+                    <>
+                      <Button
+                        onClick={() => setInviteMoreRoom(room)}
+                        variant="outline"
+                        className="w-full"
+                      >
+                        <UserPlus className="h-4 w-4 mr-2" />
+                        Invite More People
+                      </Button>
+                      <Button onClick={() => handleDeleteRoom(room.id, room.name)} variant="destructive" className="w-full">
+                        <Trash2 className="h-4 w-4 mr-2" />
+                        Delete Room
+                      </Button>
+                    </>
+                  )}
                 </CardContent>
               </Card>
             ))}
@@ -290,6 +340,16 @@ export default function VideoPage() {
           </Card>
         )}
       </div>
+
+      {inviteMoreRoom && (
+        <VideoInviteMoreDialog
+          roomId={inviteMoreRoom.id}
+          roomName={inviteMoreRoom.name}
+          open={!!inviteMoreRoom}
+          onOpenChange={(open) => !open && setInviteMoreRoom(null)}
+          onInvited={fetchRooms}
+        />
+      )}
     </div>
   )
 }

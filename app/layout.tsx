@@ -11,6 +11,7 @@ import { ErrorBoundary } from "@/components/error-boundary"
 import { CookieConsentBanner } from "@/components/cookie-consent-banner"
 import { ServiceWorkerRegister } from "@/components/ServiceWorkerRegister"
 import { ChatRequestNotifications } from "@/components/chat/ChatRequestNotifications"
+import { VideoInviteNotifications } from "@/components/video/VideoInviteNotifications"
 import { PresenceTracker } from "@/components/PresenceTracker"
 import { PWAInstallPrompt } from "@/components/pwa/PWAInstallPrompt"
 import { OfflineIndicator } from "@/components/pwa/OfflineIndicator"
@@ -122,6 +123,7 @@ export default function RootLayout({
                   <MobileBottomNav />
                   <Toaster />
                   <ChatRequestNotifications />
+                  <VideoInviteNotifications />
                   <CookieConsentBanner />
                   <OfflineIndicator />
                   <PWAInstallPrompt />

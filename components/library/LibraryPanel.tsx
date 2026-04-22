@@ -20,9 +20,13 @@ import {
   Loader2,
   FolderOpen,
   X,
+  Cloud,
+  CloudOff,
+  RefreshCw,
 } from "lucide-react"
 import { toast } from "sonner"
 import { formatDistanceToNow } from "date-fns"
+import { isTauriDesktop, librarySync, type LibrarySyncStatus } from "@/lib/sync/library-sync"
 
 type StickType = "personal" | "concur" | "alliance" | "inference"
 
@@ -122,6 +126,10 @@ export function LibraryPanel({ stickId, stickType, readOnly, className, onFileCo
   const canDeleteAny = !readOnly && permissions.includes("delete_any")
   const canDeleteOwn = !readOnly && permissions.includes("delete_own")
 
+  const [syncStatus, setSyncStatus] = useState<LibrarySyncStatus | undefined>()
+  const tauri = isTauriDesktop()
+  const lastSyncUploadedRef = useRef(0)
+
   const fetchFiles = useCallback(async () => {
     try {
       const params = new URLSearchParams({ stickId, stickType })
@@ -143,6 +151,38 @@ export function LibraryPanel({ stickId, stickType, readOnly, className, onFileCo
   useEffect(() => {
     fetchFiles()
   }, [fetchFiles])
+
+  useEffect(() => {
+    if (!tauri) return
+    const unsub = librarySync.subscribe((snapshot) => {
+      setSyncStatus(snapshot.find((s) => s.stickId === stickId))
+    })
+    return unsub
+  }, [tauri, stickId])
+
+  useEffect(() => {
+    if (!syncStatus) return
+    if (syncStatus.uploaded > lastSyncUploadedRef.current) {
+      lastSyncUploadedRef.current = syncStatus.uploaded
+      fetchFiles()
+    }
+  }, [syncStatus, fetchFiles])
+
+  const handleStartSync = async () => {
+    try {
+      const mapping = await librarySync.addFolder(stickId, stickType)
+      if (mapping) toast.success(`Syncing ${mapping.localPath}`)
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Could not start sync")
+    }
+  }
+
+  const handleStopSync = async () => {
+    if (!syncStatus) return
+    if (!confirm("Stop syncing this folder? Already-uploaded files stay on the server.")) return
+    await librarySync.removeFolder(stickId)
+    toast.success("Sync stopped")
+  }
 
   const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFiles = e.target.files
@@ -249,7 +289,7 @@ export function LibraryPanel({ stickId, stickType, readOnly, className, onFileCo
     <div className={className}>
       {/* Header */}
       <div className="flex items-center justify-between mb-3">
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 min-w-0">
           <Badge variant="secondary" className="text-xs">
             {files.length} file{files.length === 1 ? "" : "s"}
           </Badge>
@@ -263,9 +303,47 @@ export function LibraryPanel({ stickId, stickType, readOnly, className, onFileCo
               Read-only
             </Badge>
           )}
+          {tauri && syncStatus && (
+            <div className="flex items-center gap-1.5 text-xs min-w-0" role="status" aria-live="polite">
+              {syncStatus.state === "syncing" || syncStatus.state === "scanning" ? (
+                <RefreshCw className="h-3.5 w-3.5 animate-spin text-blue-600 flex-shrink-0" />
+              ) : syncStatus.state === "error" ? (
+                <CloudOff className="h-3.5 w-3.5 text-red-600 flex-shrink-0" />
+              ) : (
+                <Cloud className="h-3.5 w-3.5 text-green-600 flex-shrink-0" />
+              )}
+              <span className="text-gray-600 truncate max-w-[160px]" title={syncStatus.localPath}>
+                {syncStatus.localPath.split(/[/\\]/).filter(Boolean).pop()}
+              </span>
+              {syncStatus.queued > 0 && (
+                <span className="text-gray-500">({syncStatus.queued})</span>
+              )}
+              <button
+                type="button"
+                onClick={handleStopSync}
+                className="text-gray-400 hover:text-red-600"
+                title="Stop syncing"
+                aria-label="Stop syncing this folder"
+              >
+                <X className="h-3 w-3" />
+              </button>
+            </div>
+          )}
         </div>
         {canUpload && (
-          <div>
+          <div className="flex items-center gap-1.5">
+            {tauri && !syncStatus && (
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={handleStartSync}
+                className="gap-1"
+                title="Keep a local folder in sync with this stick's library"
+              >
+                <Cloud className="h-4 w-4" />
+                Sync folder…
+              </Button>
+            )}
             <input
               ref={fileInputRef}
               type="file"

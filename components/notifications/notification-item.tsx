@@ -2,7 +2,7 @@
 
 import { useNotifications } from "@/hooks/use-notifications"
 import { Button } from "@/components/ui/button"
-import { Trash2, MessageSquare, Users, Tag, AtSign } from "lucide-react"
+import { Trash2, MessageSquare, Users, Tag, AtSign, Video, Award } from "lucide-react"
 import { formatDistanceToNow } from "date-fns"
 import type { NotificationWithUser } from "@/types/notifications"
 import { useRouter } from "next/navigation"
@@ -35,6 +35,10 @@ export function NotificationItem({ notification }: Readonly<NotificationItemProp
         return <Tag className="h-4 w-4" />
       case "mention":
         return <AtSign className="h-4 w-4" />
+      case "video_call_invite":
+        return <Video className="h-4 w-4" />
+      case "kudos_received":
+        return <Award className="h-4 w-4" />
       default:
         return <MessageSquare className="h-4 w-4" />
     }

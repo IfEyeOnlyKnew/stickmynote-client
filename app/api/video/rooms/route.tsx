@@ -3,6 +3,12 @@ import { createDatabaseClient } from "@/lib/database/database-adapter"
 import { getOrgContext } from "@/lib/auth/get-org-context"
 import { checkDLPPolicy } from "@/lib/dlp/policy-checker"
 import { createVideoRoom, deleteVideoRoom } from "@/lib/livekit/rooms"
+import {
+  addRoomParticipants,
+  listRoomsForUser,
+  notifyInvitees,
+  type Invitee,
+} from "@/lib/livekit/participants"
 
 export const dynamic = "force-dynamic"
 
@@ -56,7 +62,29 @@ async function sendInviteEmails(
   }
 }
 
-// GET - Fetch all rooms for the current user
+/**
+ * Normalise the request body to a canonical invitees list.
+ * Accepts either new-style `invitees: [{userId, email}]` or
+ * legacy `inviteEmails: string[]` for back-compat.
+ */
+function normaliseInvitees(body: {
+  invitees?: Invitee[]
+  inviteEmails?: string[]
+}): Invitee[] {
+  if (Array.isArray(body.invitees) && body.invitees.length > 0) {
+    return body.invitees
+      .filter((i) => i && typeof i.email === "string")
+      .map((i) => ({ userId: i.userId ?? null, email: i.email }))
+  }
+  if (Array.isArray(body.inviteEmails)) {
+    return body.inviteEmails
+      .filter((e): e is string => typeof e === "string" && e.length > 0)
+      .map((email) => ({ userId: null, email }))
+  }
+  return []
+}
+
+// GET - Fetch all rooms the user owns OR has been invited to
 export async function GET() {
   try {
     const db = await createDatabaseClient()
@@ -68,25 +96,15 @@ export async function GET() {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
-    const { data: rooms, error } = await db
-      .from("video_rooms")
-      .select("*")
-      .eq("created_by", user.id)
-      .order("created_at", { ascending: false })
-
-    if (error) {
-      console.error("Database error:", error)
-      throw error
-    }
-
-    return NextResponse.json({ rooms: rooms || [] })
+    const rooms = await listRoomsForUser(user.id)
+    return NextResponse.json({ rooms })
   } catch (error) {
     console.error("Error fetching video rooms:", error)
     return NextResponse.json({ error: "Failed to fetch rooms" }, { status: 500 })
   }
 }
 
-// POST - Create a new video room
+// POST - Create a new video room and invite participants
 export async function POST(request: NextRequest) {
   try {
     const db = await createDatabaseClient()
@@ -99,26 +117,55 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json()
-    const { name, inviteEmails = [] } = body
+    const { name } = body
+    const invitees = normaliseInvitees(body)
 
     if (!name) {
       return NextResponse.json({ error: "Room name is required" }, { status: 400 })
     }
 
-    const { data: userProfile } = await db.from("users").select("email, username").eq("id", user.id).single()
+    const { data: userProfile } = await db
+      .from("users")
+      .select("email, username, full_name")
+      .eq("id", user.id)
+      .single()
 
-    // DLP check for external video invites
+    const inviteEmails = invitees.map((i) => i.email).filter(Boolean)
     const dlpBlock = await checkInviteDLP(inviteEmails, user.id)
     if (dlpBlock) return dlpBlock
 
-    // Create room via LiveKit
     const room = await createVideoRoom(name, user.id)
+
+    const { createdUserIds } = await addRoomParticipants(room.id, user.id, invitees)
 
     if (inviteEmails.length > 0) {
       await sendInviteEmails(inviteEmails, name, room.room_url, userProfile)
     }
 
-    return NextResponse.json({ room: { id: room.id, room_url: room.room_url, name, livekit_room_name: room.livekit_room_name } })
+    if (createdUserIds.length > 0) {
+      const inviterName =
+        userProfile?.full_name || userProfile?.username || userProfile?.email || "A user"
+      const orgContext = await getOrgContext()
+      await notifyInvitees(
+        createdUserIds,
+        {
+          roomId: room.id,
+          roomName: name,
+          roomUrl: room.room_url,
+          invitedBy: { id: user.id, name: inviterName },
+        },
+        orgContext?.orgId ?? null,
+      )
+    }
+
+    return NextResponse.json({
+      room: {
+        id: room.id,
+        room_url: room.room_url,
+        name,
+        livekit_room_name: room.livekit_room_name,
+      },
+    })
   } catch (error) {
     console.error("Error creating video room:", error)
     return NextResponse.json({ error: "Failed to create room" }, { status: 500 })

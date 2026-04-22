@@ -3,11 +3,11 @@ import { db } from "@/lib/database/pg-client"
 import { getOrgContext } from "@/lib/auth/get-org-context"
 import { getCachedAuthUser, createRateLimitResponse, createUnauthorizedResponse } from "@/lib/auth/cached-auth"
 import { checkStickLibraryPermissions, type StickType } from "@/lib/library/library-permissions"
-import path from "node:path"
+import { getLibraryStorage } from "@/lib/storage/library-storage"
 import { randomUUID } from "node:crypto"
-import { promises as fs } from "node:fs"
 
-const MAX_FILE_SIZE = 50 * 1024 * 1024 // 50MB
+const MAX_FILE_SIZE_BROWSER = 50 * 1024 * 1024 // 50MB
+const MAX_FILE_SIZE_SYNC = 500 * 1024 * 1024 // 500MB for Tauri folder-sync uploads
 const ALLOWED_TYPES = new Set([
   "image/jpeg", "image/png", "image/gif", "image/webp", "image/svg+xml",
   "application/pdf",
@@ -92,6 +92,9 @@ export async function POST(request: NextRequest) {
     const stickId = formData.get("stickId") as string
     const stickType = formData.get("stickType") as StickType
     const description = formData.get("description") as string | null
+    const isSync = formData.get("sync") === "true"
+    const clientSha256 = (formData.get("sha256") as string | null) || null
+    const clientMtime = (formData.get("client_mtime") as string | null) || null
 
     if (!file || !stickId || !stickType) {
       return NextResponse.json({ error: "file, stickId, and stickType are required" }, { status: 400 })
@@ -103,42 +106,48 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Only the stick owner can upload files" }, { status: 403 })
     }
 
-    if (file.size > MAX_FILE_SIZE) {
-      return NextResponse.json({ error: "File size exceeds 50MB limit" }, { status: 400 })
+    const sizeLimit = isSync ? MAX_FILE_SIZE_SYNC : MAX_FILE_SIZE_BROWSER
+    if (file.size > sizeLimit) {
+      const mb = Math.floor(sizeLimit / 1024 / 1024)
+      return NextResponse.json({ error: `File size exceeds ${mb}MB limit` }, { status: 400 })
     }
 
-    if (!ALLOWED_TYPES.has(file.type)) {
+    // Sync-origin uploads skip the MIME allowlist — folder-sync carries arbitrary types.
+    if (!isSync && !ALLOWED_TYPES.has(file.type)) {
       return NextResponse.json({ error: `File type ${file.type} is not allowed` }, { status: 400 })
     }
 
-    // Store under: uploads/library/sticks/{stickId}/{uuid}-{filename}
-    const baseDir = process.env.UPLOAD_DIR || path.join(process.cwd(), "uploads")
-    const libraryDir = path.join(baseDir, "library", "sticks", stickId)
-    await fs.mkdir(libraryDir, { recursive: true })
-
     const sanitizedName = file.name.replaceAll(/[<>:"|?*]/g, "_").replaceAll("\\", "_")
     const uniqueFilename = `${randomUUID()}-${sanitizedName}`
-    const filePath = path.join(libraryDir, uniqueFilename)
-
     const buffer = Buffer.from(await file.arrayBuffer())
-    await fs.writeFile(filePath, buffer)
 
-    const relativePath = path.relative(baseDir, filePath).replaceAll("\\", "/")
-    const fileUrl = `/uploads/${relativePath}`
+    const storage = getLibraryStorage()
+    const stored = await storage.upload({
+      stickId,
+      filename: uniqueFilename,
+      buffer,
+      contentType: file.type,
+    })
+
+    const metadata: Record<string, unknown> = {}
+    if (isSync) metadata.sync_origin = "tauri"
+    if (clientSha256) metadata.sha256 = clientSha256
+    if (clientMtime) metadata.client_mtime = clientMtime
 
     const result = await db.query(
       `INSERT INTO library_files
-        (org_id, scope_type, scope_id, stick_type, filename, original_filename, file_path, file_url, mime_type, file_size, uploaded_by, description)
-       VALUES ($1, 'stick', $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+        (org_id, scope_type, scope_id, stick_type, filename, original_filename, file_path, file_url, mime_type, file_size, uploaded_by, description, metadata)
+       VALUES ($1, 'stick', $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
        RETURNING *`,
       [
         orgContext.orgId, stickId, stickType,
-        uniqueFilename, file.name, relativePath, fileUrl,
-        file.type, file.size, authResult.user.id, description,
+        uniqueFilename, file.name, stored.key, stored.publicUrl,
+        file.type, stored.size, authResult.user.id, description,
+        JSON.stringify(metadata),
       ],
     )
 
-    console.log(`[Library] File uploaded to stick ${stickId}: ${fileUrl}`)
+    console.log(`[Library] File uploaded to stick ${stickId} via ${storage.driverName}${isSync ? " [sync]" : ""}: ${stored.publicUrl}`)
 
     return NextResponse.json({ file: result.rows[0] }, { status: 201 })
   } catch (error) {

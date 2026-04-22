@@ -463,7 +463,7 @@ export function QuickSticksPageClient({ user }: Readonly<QuickSticksPageClientPr
           onClose={handleCloseFullscreen}
           onUpdate={handleUpdateStick}
           onDelete={handleDeleteStick}
-          stickType="personal"
+          stickType="alliance"
         />
       )}
 

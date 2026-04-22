@@ -3,8 +3,7 @@ import { db } from "@/lib/database/pg-client"
 import { getOrgContext } from "@/lib/auth/get-org-context"
 import { getCachedAuthUser, createRateLimitResponse, createUnauthorizedResponse } from "@/lib/auth/cached-auth"
 import { checkStickLibraryPermissions } from "@/lib/library/library-permissions"
-import { promises as fs } from "node:fs"
-import path from "node:path"
+import { getLibraryStorage } from "@/lib/storage/library-storage"
 
 /**
  * DELETE /api/library/[fileId] - Delete a file from a stick's folder
@@ -50,11 +49,8 @@ export async function DELETE(
       return NextResponse.json({ error: "Only the stick owner can delete files" }, { status: 403 })
     }
 
-    // Delete physical file
     try {
-      const baseDir = process.env.UPLOAD_DIR || path.join(process.cwd(), "uploads")
-      const filePath = path.join(baseDir, file.file_path)
-      await fs.unlink(filePath)
+      await getLibraryStorage().delete(file.file_path)
     } catch (err) {
       console.warn(`[Library] Could not delete physical file: ${file.file_path}`, err)
     }

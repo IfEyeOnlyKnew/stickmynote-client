@@ -34,6 +34,17 @@ export default function VideoJoinPage() {
         }
 
         setLivekitRoomName(room.livekit_room_name)
+
+        // Mark self as 'joined' if this user was an invitee.
+        // Fire-and-forget: silently no-ops for room owner or anyone
+        // without a participant row.
+        if (room.role === "invitee") {
+          fetch(`/api/video/rooms/${roomId}/participants`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ status: "joined" }),
+          }).catch(() => {})
+        }
       } catch {
         // Expected - room fetch may fail
         setError("Failed to load room information")

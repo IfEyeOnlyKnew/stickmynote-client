@@ -22,5 +22,11 @@ tauri-plugin-shell = "2"
 tauri-plugin-autostart = "2"
 tauri-plugin-global-shortcut = "2"
 tauri-plugin-deep-link = "2"
+
+# Folder-sync plugins (stick Library). Sync logic runs in TS, so cookies work.
+tauri-plugin-fs = "2"
+tauri-plugin-dialog = "2"
+tauri-plugin-store = "2"
+
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"

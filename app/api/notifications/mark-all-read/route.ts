@@ -1,11 +1,11 @@
-import { createDatabaseClient } from "@/lib/database/database-adapter"
-import { getCachedAuthUser } from "@/lib/auth/cached-auth"
 import { NextResponse } from "next/server"
+import { getCachedAuthUser } from "@/lib/auth/cached-auth"
+import { getOrgContext } from "@/lib/auth/get-org-context"
+import { db } from "@/lib/database/pg-client"
 
-// POST /api/notifications/mark-all-read - Mark all activities as read
-export async function POST(request: Request) {
+// POST /api/notifications/mark-all-read - Mark all of the user's notifications as read
+export async function POST() {
   try {
-    const db = await createDatabaseClient()
     const authResult = await getCachedAuthUser()
 
     if (authResult.rateLimited) {
@@ -14,29 +14,25 @@ export async function POST(request: Request) {
         { status: 429, headers: { "Retry-After": "30" } },
       )
     }
-
     if (!authResult.user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
-    const { data: activities, error: fetchError } = await db
-      .from("personal_sticks_activities")
-      .select("id, metadata")
-      .or("metadata->read.is.null,metadata->read.eq.false")
-
-    if (fetchError) {
-      console.error("Error fetching activities:", fetchError)
-      return NextResponse.json({ error: "Failed to fetch activities" }, { status: 500 })
+    const orgContext = await getOrgContext()
+    if (!orgContext) {
+      return NextResponse.json({ error: "No organization context" }, { status: 403 })
     }
 
-    // Update each activity's metadata to mark as read
-    const updates = activities.map((activity: { id: string; metadata: Record<string, unknown> | null }) => {
-      const metadata = activity.metadata || {}
-      metadata.read = true
-      return db.from("personal_sticks_activities").update({ metadata }).eq("id", activity.id)
-    })
-
-    await Promise.all(updates)
+    await db.query(
+      `UPDATE notifications
+          SET is_read = true,
+              read_at = NOW(),
+              updated_at = NOW()
+        WHERE user_id = $1
+          AND org_id = $2
+          AND is_read = false`,
+      [authResult.user.id, orgContext.orgId],
+    )
 
     return NextResponse.json({ success: true })
   } catch (error) {

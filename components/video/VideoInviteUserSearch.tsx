@@ -8,9 +8,15 @@ import { useUserSearch } from "@/hooks/useUserSearch"
 import { UserSearchResults } from "@/components/shared/UserSearchResults"
 import { SelectedUserBadges } from "@/components/shared/SelectedUserBadges"
 
+export interface VideoInvitee {
+  userId: string | null
+  email: string
+}
+
 interface VideoInviteUserSearchProps {
   readonly selectedEmails: string[]
   readonly onEmailsChange: (emails: string[]) => void
+  readonly onInviteesChange?: (invitees: VideoInvitee[]) => void
 }
 
 /**
@@ -20,6 +26,7 @@ interface VideoInviteUserSearchProps {
 export const VideoInviteUserSearch: React.FC<VideoInviteUserSearchProps> = ({
   selectedEmails,
   onEmailsChange,
+  onInviteesChange,
 }) => {
   // Track if we're the one updating the parent to avoid sync loops
   const isUpdatingParentRef = useRef(false)
@@ -55,13 +62,15 @@ export const VideoInviteUserSearch: React.FC<VideoInviteUserSearchProps> = ({
 
   // Notify parent when selected users change
   useEffect(() => {
-    const emails = selectedUsers
-      .map((u) => u.email)
-      .filter((e): e is string => !!e)
+    const invitees: VideoInvitee[] = selectedUsers
+      .filter((u) => !!u.email)
+      .map((u) => ({ userId: u.id, email: u.email as string }))
+    const emails = invitees.map((i) => i.email)
     // Mark that we're updating parent to avoid sync loop
     isUpdatingParentRef.current = true
     onEmailsChange(emails)
-  }, [selectedUsers, onEmailsChange])
+    onInviteesChange?.(invitees)
+  }, [selectedUsers, onEmailsChange, onInviteesChange])
 
   return (
     <div className="space-y-3">

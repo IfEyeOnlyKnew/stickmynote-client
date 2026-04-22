@@ -1,5 +1,20 @@
-export type NotificationType = "reply" | "mention" | "pad_invite" | "pad_update" | "reaction" | "tag"
-export type NotificationRelatedType = "note" | "stick" | "pad" | "reply" | "social_stick" | "social_pad"
+export type NotificationType =
+  | "reply"
+  | "mention"
+  | "pad_invite"
+  | "pad_update"
+  | "reaction"
+  | "tag"
+  | "kudos_received"
+  | "video_call_invite"
+export type NotificationRelatedType =
+  | "note"
+  | "stick"
+  | "pad"
+  | "reply"
+  | "social_stick"
+  | "social_pad"
+  | "video_room"
 
 export interface Notification {
   id: string

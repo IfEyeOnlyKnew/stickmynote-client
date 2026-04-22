@@ -31,6 +31,9 @@ async function getAuthAndOrg(): Promise<
 }
 
 // GET - Fetch user notifications
+// Returns rows shaped to match the client's NotificationWithUser type.
+// `is_read` column is aliased to `read` so the client receives the field
+// it expects without any further transformation.
 export async function handleGetNotifications(request: Request): Promise<NextResponse> {
   try {
     const auth = await getAuthAndOrg()
@@ -40,15 +43,42 @@ export async function handleGetNotifications(request: Request): Promise<NextResp
     const limit = Number.parseInt(searchParams.get("limit") || "50")
     const unreadOnly = searchParams.get("unread") === "true"
 
-    let queryStr = `SELECT * FROM notifications WHERE user_id = $1 AND org_id = $2`
+    const whereClauses = [`n.user_id = $1`, `n.org_id = $2`]
     const params: any[] = [auth.user.id, auth.orgId]
 
     if (unreadOnly) {
-      queryStr += ` AND is_read = false`
+      whereClauses.push(`n.is_read = false`)
     }
 
-    queryStr += ` ORDER BY created_at DESC LIMIT $3`
     params.push(limit)
+
+    const queryStr = `
+      SELECT
+        n.id,
+        n.user_id,
+        n.type,
+        n.title,
+        n.message,
+        n.related_id,
+        n.related_type,
+        n.action_url,
+        n.is_read AS read,
+        n.created_at,
+        n.created_by,
+        n.metadata,
+        CASE WHEN u.id IS NULL THEN NULL ELSE
+          jsonb_build_object(
+            'full_name', u.full_name,
+            'email',     u.email,
+            'avatar_url', u.avatar_url
+          )
+        END AS created_by_user
+      FROM notifications n
+      LEFT JOIN users u ON u.id = n.created_by
+      WHERE ${whereClauses.join(" AND ")}
+      ORDER BY n.created_at DESC
+      LIMIT $${params.length}
+    `
 
     const notifications = await query(queryStr, params)
 

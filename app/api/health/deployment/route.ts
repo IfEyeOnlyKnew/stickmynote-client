@@ -3,6 +3,7 @@ import { db } from "@/lib/database/pg-client"
 import { cache } from "@/lib/cache/memcached-client"
 import { emailService } from "@/lib/email/smtp"
 import { localStorage } from "@/lib/storage/local-storage"
+import { getLibraryStorage } from "@/lib/storage/library-storage"
 
 const USE_LOCAL_DATABASE = process.env.USE_LOCAL_DATABASE === "true"
 
@@ -96,14 +97,18 @@ export async function GET() {
     }
   }
 
-  // Check Storage
+  // Check Storage (generic uploads — avatars/branding/user-images)
   try {
     const storageHealth = await localStorage.healthCheck()
+    const libraryDriver = getLibraryStorage()
+    const libraryHealth = await libraryDriver.healthCheck()
     checks.services.storage = {
-      healthy: storageHealth.healthy,
-      message: storageHealth.message,
+      healthy: storageHealth.healthy && libraryHealth.healthy,
+      message: `${storageHealth.message}; library(${libraryDriver.driverName}): ${libraryHealth.message}`,
       details: {
         baseDir: process.env.UPLOAD_DIR || "uploads",
+        libraryDriver: libraryDriver.driverName,
+        fileStorageUrl: process.env.FILE_STORAGE_URL || null,
       },
     }
   } catch (error: any) {

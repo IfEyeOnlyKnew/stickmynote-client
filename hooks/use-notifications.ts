@@ -8,75 +8,11 @@ import type { NotificationWithUser } from "@/types/notifications"
 // Types
 // ============================================================================
 
-interface Activity {
-  id: string
-  note_id: string
-  user_id: string
-  action_type: string
-  metadata: Record<string, unknown> | null
-  created_at: string
-  triggered_by_user?: {
-    full_name: string
-    email: string
-    avatar_url?: string
-  }
-  notes?: {
-    topic: string
-  }
-}
-
 interface NotificationState {
   notifications: NotificationWithUser[]
   unreadCount: number
   loading: boolean
   error: string | null
-}
-
-// ============================================================================
-// Constants
-// ============================================================================
-
-const ACTION_TYPE_MAP: Record<string, string> = {
-  created: "created a note",
-  updated: "updated a note",
-  replied: "replied to your note",
-  shared: "shared a note",
-  stick_created: "created a stick",
-  stick_replied: "replied to your stick",
-  reaction_added: "reacted to your content",
-} as const
-
-const REPLY_ACTION_TYPES = new Set(["replied", "stick_replied"])
-
-// ============================================================================
-// Helpers
-// ============================================================================
-
-function activityToNotification(activity: Activity): NotificationWithUser {
-  const actionLabel = ACTION_TYPE_MAP[activity.action_type] || activity.action_type
-  const topicSuffix = activity.notes?.topic ? `: ${activity.notes.topic}` : ""
-
-  return {
-    id: activity.id,
-    user_id: activity.user_id,
-    type: REPLY_ACTION_TYPES.has(activity.action_type) ? "reply" : "pad_update",
-    title: activity.triggered_by_user?.full_name || "Someone",
-    message: `${actionLabel}${topicSuffix}`,
-    related_id: activity.note_id,
-    related_type: "note",
-    action_url: `/personal?note=${activity.note_id}`,
-    read: (activity.metadata?.read as boolean) || false,
-    created_at: activity.created_at,
-    created_by: activity.user_id,
-    metadata: activity.metadata || {},
-    created_by_user: activity.triggered_by_user
-      ? {
-          full_name: activity.triggered_by_user.full_name,
-          email: activity.triggered_by_user.email,
-          avatar_url: activity.triggered_by_user.avatar_url || null,
-        }
-      : undefined,
-  }
 }
 
 // ============================================================================
@@ -105,11 +41,11 @@ export function useNotifications() {
       }
 
       const data = await response.json()
-      const convertedNotifications = (data.notifications || []).map(activityToNotification)
-      const unreadCount = convertedNotifications.filter((n: NotificationWithUser) => !n.read).length
+      const notifications: NotificationWithUser[] = data.notifications || []
+      const unreadCount = notifications.filter((n) => !n.read).length
 
       setState({
-        notifications: convertedNotifications,
+        notifications,
         unreadCount,
         loading: false,
         error: null,
