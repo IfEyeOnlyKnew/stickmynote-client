@@ -571,7 +571,7 @@ function VideoCallContent({ roomName, onLeave, userName, isMinimized }: Readonly
 
         {showWhiteboard ? (
           <div className="h-full rounded-lg overflow-hidden border border-slate-800">
-            <Whiteboard />
+            <Whiteboard persistKey={`whiteboard:${roomName}`} />
           </div>
         ) : (
           renderGrid()

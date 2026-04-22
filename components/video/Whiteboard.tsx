@@ -32,6 +32,24 @@ interface WhiteboardProps {
   onDrawAction?: (action: DrawAction) => void
   incomingActions?: DrawAction[]
   className?: string
+  /**
+   * If set, the board's history is mirrored to sessionStorage under this
+   * key so closing and re-opening the whiteboard — or reloading the tab —
+   * keeps the drawing intact. Leave undefined for ephemeral boards.
+   */
+  persistKey?: string
+}
+
+function loadPersistedHistory(persistKey: string | undefined): DrawAction[] {
+  if (typeof window === "undefined" || !persistKey) return []
+  try {
+    const saved = window.sessionStorage.getItem(persistKey)
+    if (!saved) return []
+    const parsed = JSON.parse(saved)
+    return Array.isArray(parsed) ? (parsed as DrawAction[]) : []
+  } catch {
+    return []
+  }
 }
 
 const COLORS = ["#000000", "#EF4444", "#3B82F6", "#10B981", "#F59E0B", "#8B5CF6", "#EC4899", "#FFFFFF"]
@@ -91,7 +109,7 @@ const DRAW_TOOL_MAP: Record<string, (ctx: CanvasRenderingContext2D, action: Draw
   },
 }
 
-export function Whiteboard({ onDrawAction, incomingActions, className }: Readonly<WhiteboardProps>) {
+export function Whiteboard({ onDrawAction, incomingActions, className, persistKey }: Readonly<WhiteboardProps>) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const [isDrawing, setIsDrawing] = useState(false)
   type DrawTool = "pen" | "line" | "rect" | "circle" | "eraser" | "text"
@@ -99,8 +117,20 @@ export function Whiteboard({ onDrawAction, incomingActions, className }: Readonl
   const [color, setColor] = useState("#000000")
   const [lineWidth, setLineWidth] = useState(4)
   const [currentPoints, setCurrentPoints] = useState<Point[]>([])
-  const [history, setHistory] = useState<DrawAction[]>([])
+  // Lazy initializer reads persisted history synchronously so the resize
+  // effect below can immediately redraw everything on remount.
+  const [history, setHistory] = useState<DrawAction[]>(() => loadPersistedHistory(persistKey))
   const [redoStack, setRedoStack] = useState<DrawAction[]>([])
+
+  // Mirror history to sessionStorage so the board survives close/reopen.
+  useEffect(() => {
+    if (typeof window === "undefined" || !persistKey) return
+    try {
+      window.sessionStorage.setItem(persistKey, JSON.stringify(history))
+    } catch {
+      // quota exceeded or storage disabled — fail silently
+    }
+  }, [history, persistKey])
 
   // Canvas resize
   useEffect(() => {
