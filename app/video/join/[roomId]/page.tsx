@@ -91,6 +91,7 @@ export default function VideoJoinPage() {
     <div className="h-screen w-screen">
       <CustomVideoCall
         roomName={livekitRoomName}
+        roomId={roomId}
         onLeave={handleLeave}
       />
     </div>

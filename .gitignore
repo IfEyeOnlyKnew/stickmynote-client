@@ -64,3 +64,8 @@ schema.sql
 # SonarCloud exports
 sonar-issues*.json
 sonar-issues*.csv
+
+# Local tooling & dev-only configs
+.claude/settings.json
+.jscpd-report/
+.mcp.json

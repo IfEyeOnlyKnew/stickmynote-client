@@ -74,9 +74,15 @@ interface CustomVideoCallProps {
   onLeave: () => void
   userName?: string
   isMinimized?: boolean
+  /**
+   * The database room id (not the LiveKit room name). When present, the
+   * Leave button fires a best-effort PATCH to update this user's
+   * participant status to `left`. Owners and uninvited joiners are no-ops.
+   */
+  roomId?: string
 }
 
-export function CustomVideoCall({ roomName, onLeave, userName = "Guest", isMinimized = false }: Readonly<CustomVideoCallProps>) {
+export function CustomVideoCall({ roomName, roomId, onLeave, userName = "Guest", isMinimized = false }: Readonly<CustomVideoCallProps>) {
   const [token, setToken] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const livekitUrl = process.env.NEXT_PUBLIC_LIVEKIT_URL
@@ -128,7 +134,7 @@ export function CustomVideoCall({ roomName, onLeave, userName = "Guest", isMinim
       onDisconnected={onLeave}
     >
       <RoomAudioRenderer />
-      <VideoCallContent roomName={roomName} onLeave={onLeave} userName={userName} isMinimized={isMinimized} />
+      <VideoCallContent roomName={roomName} roomId={roomId} onLeave={onLeave} userName={userName} isMinimized={isMinimized} />
     </LiveKitRoom>
   )
 }
@@ -206,7 +212,7 @@ function getGridColsClass(count: number): string {
   return "grid-cols-4"
 }
 
-function VideoCallContent({ roomName, onLeave, userName, isMinimized }: Readonly<CustomVideoCallProps>) {
+function VideoCallContent({ roomName, roomId, onLeave, userName, isMinimized }: Readonly<CustomVideoCallProps>) {
   const room = useRoomContext()
   const participants = useParticipants()
   const { localParticipant, isMicrophoneEnabled, isCameraEnabled, isScreenShareEnabled } = useLocalParticipant()
@@ -330,9 +336,19 @@ function VideoCallContent({ roomName, onLeave, userName, isMinimized }: Readonly
   }, [localParticipant, isScreenShareEnabled, toast])
 
   const handleLeave = useCallback(() => {
+    // Best-effort mark participant as 'left'. No-op for owners and any
+    // joiner without a participant row (404), so we ignore the response.
+    if (roomId) {
+      fetch(`/api/video/rooms/${roomId}/participants`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: "left" }),
+        keepalive: true,
+      }).catch(() => {})
+    }
     room.disconnect()
     onLeave()
-  }, [room, onLeave])
+  }, [room, roomId, onLeave])
 
   const applyVideoEffect = useCallback(
     async (effect: VideoEffect, imageUrl?: string) => {
