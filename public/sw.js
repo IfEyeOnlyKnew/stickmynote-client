@@ -1,4 +1,4 @@
-const CACHE_VERSION = 5
+const CACHE_VERSION = 6
 const CACHE_NAME = `stickmynote-v${CACHE_VERSION}`
 const API_CACHE_NAME = `stickmynote-api-v${CACHE_VERSION}`
 const OFFLINE_PAGE = "/offline"
@@ -6,12 +6,33 @@ const OFFLINE_PAGE = "/offline"
 // Assets to cache immediately on install
 const PRECACHE_ASSETS = ["/", "/manifest.json", "/offline"]
 
+// Paths the SW must NOT intercept. Anything on these paths talks directly
+// to the network — the SW returning a stale or cached Response can break
+// real-time features (LiveKit WebRTC, video tokens, etc.).
+const NETWORK_ONLY_PATH_PREFIXES = [
+  "/video/",          // video rooms & join pages
+  "/api/video/",      // room + invite + token endpoints
+  "/livekit-ws",      // LiveKit WebSocket proxy
+  "/ws",              // app WebSocket
+  "/api/auth/",       // auth — cached auth causes redirect loops
+]
+
+function isNetworkOnly(url) {
+  return NETWORK_ONLY_PATH_PREFIXES.some((p) => url.pathname.startsWith(p))
+}
+
+// Minimal error Response so we never hand undefined to respondWith
+function fallbackErrorResponse() {
+  return new Response("Service unavailable", {
+    status: 503,
+    headers: { "Content-Type": "text/plain" },
+  })
+}
+
 // Install event: Cache core assets
 self.addEventListener("install", (event) => {
   event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => {
-      return cache.addAll(PRECACHE_ASSETS)
-    }),
+    caches.open(CACHE_NAME).then((cache) => cache.addAll(PRECACHE_ASSETS)),
   )
   self.skipWaiting()
 })
@@ -21,100 +42,88 @@ self.addEventListener("activate", (event) => {
   event.waitUntil(
     caches
       .keys()
-      .then((cacheNames) => {
-        return Promise.all(
+      .then((cacheNames) =>
+        Promise.all(
           cacheNames.map((cacheName) => {
             if (cacheName !== CACHE_NAME && cacheName !== API_CACHE_NAME) {
               return caches.delete(cacheName)
             }
           }),
-        )
-      })
-      .then(() => {
-        // Notify all clients that SW has been updated
-        return self.clients.matchAll({ type: "window" }).then((clients) => {
+        ),
+      )
+      .then(() =>
+        self.clients.matchAll({ type: "window" }).then((clients) => {
           clients.forEach((client) => {
             client.postMessage({ type: "SW_UPDATED", version: CACHE_VERSION })
           })
-        })
-      }),
+        }),
+      ),
   )
   self.clients.claim()
 })
 
-// Fetch event: Network First for HTML, Stale-While-Revalidate for API/Assets
+// Stale-while-revalidate helper. Always resolves to a valid Response.
+async function staleWhileRevalidate(cacheName, request) {
+  const cache = await caches.open(cacheName)
+  const cached = await cache.match(request)
+  const networkPromise = fetch(request)
+    .then((networkResponse) => {
+      if (networkResponse.ok) {
+        cache.put(request, networkResponse.clone()).catch(() => {})
+      }
+      return networkResponse
+    })
+    .catch(() => null)
+
+  if (cached) return cached
+  const fresh = await networkPromise
+  return fresh || fallbackErrorResponse()
+}
+
+// Network-first for navigations. Always resolves to a valid Response.
+async function navigationNetworkFirst(request) {
+  try {
+    const response = await fetch(request)
+    if (response.ok) {
+      const clone = response.clone()
+      caches.open(CACHE_NAME).then((cache) => cache.put(request, clone)).catch(() => {})
+    }
+    return response
+  } catch {
+    const cached = await caches.match(request)
+    if (cached) return cached
+    const offline = await caches.match(OFFLINE_PAGE)
+    if (offline) return offline
+    const root = await caches.match("/")
+    if (root) return root
+    return fallbackErrorResponse()
+  }
+}
+
+// Fetch event
 self.addEventListener("fetch", (event) => {
   const url = new URL(event.request.url)
 
-  // Skip non-http(s) requests
   if (!url.protocol.startsWith("http")) return
 
-  // Handle API requests (Stale-While-Revalidate)
+  // Bypass the SW entirely for real-time paths
+  if (isNetworkOnly(url)) return
+
+  // API requests (GET only) → stale-while-revalidate
   if (url.pathname.startsWith("/api/")) {
-    // Skip non-GET requests for caching to avoid side effects
     if (event.request.method !== "GET") return
-
-    // Never cache auth endpoints — stale auth responses cause redirect loops
-    if (url.pathname.startsWith("/api/auth/")) return
-
-    event.respondWith(
-      caches.open(API_CACHE_NAME).then((cache) => {
-        return cache.match(event.request).then((cachedResponse) => {
-          const fetchPromise = fetch(event.request)
-            .then((networkResponse) => {
-              if (networkResponse.ok) {
-                cache.put(event.request, networkResponse.clone())
-              }
-              return networkResponse
-            })
-            .catch(() => cachedResponse)
-
-          return cachedResponse || fetchPromise
-        })
-      }),
-    )
+    event.respondWith(staleWhileRevalidate(API_CACHE_NAME, event.request))
     return
   }
 
-  // Handle Navigation/HTML requests (Network First with offline fallback)
+  // Navigation requests → network-first with offline fallback
   if (event.request.mode === "navigate") {
-    event.respondWith(
-      fetch(event.request)
-        .then((response) => {
-          // Cache successful navigation responses
-          if (response.ok) {
-            const responseClone = response.clone()
-            caches.open(CACHE_NAME).then((cache) => {
-              cache.put(event.request, responseClone)
-            })
-          }
-          return response
-        })
-        .catch(() => {
-          return caches.match(event.request).then((cached) => {
-            return cached || caches.match(OFFLINE_PAGE) || caches.match("/")
-          })
-        }),
-    )
+    event.respondWith(navigationNetworkFirst(event.request))
     return
   }
 
-  // Handle Static Assets (Stale-While-Revalidate)
-  event.respondWith(
-    caches.open(CACHE_NAME).then((cache) => {
-      return cache.match(event.request).then((cachedResponse) => {
-        const fetchPromise = fetch(event.request)
-          .then((networkResponse) => {
-            if (networkResponse.ok) {
-              cache.put(event.request, networkResponse.clone())
-            }
-            return networkResponse
-          })
-          .catch(() => cachedResponse)
-        return cachedResponse || fetchPromise
-      })
-    }),
-  )
+  // Everything else (static assets) → stale-while-revalidate
+  event.respondWith(staleWhileRevalidate(CACHE_NAME, event.request))
 })
 
 // Background Sync for Offline Edits
@@ -125,7 +134,6 @@ self.addEventListener("sync", (event) => {
 })
 
 async function syncOfflineActions() {
-  // Open IndexedDB to get queued actions
   const db = await openDB()
   const tx = db.transaction("offline-actions", "readwrite")
   const store = tx.objectStore("offline-actions")
@@ -138,11 +146,9 @@ async function syncOfflineActions() {
         headers: action.headers,
         body: action.body,
       })
-      // Remove successful action from queue
       const deleteTx = db.transaction("offline-actions", "readwrite")
       deleteTx.objectStore("offline-actions").delete(action.id)
     } catch {
-      // Will retry on next sync
       break
     }
   }
@@ -199,14 +205,12 @@ self.addEventListener("notificationclick", (event) => {
   const url = event.notification.data?.url || "/"
   event.waitUntil(
     self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((clients) => {
-      // Focus existing window if available
       for (const client of clients) {
         if (client.url.includes(self.location.origin) && "focus" in client) {
           client.navigate(url)
           return client.focus()
         }
       }
-      // Open new window
       return self.clients.openWindow(url)
     }),
   )
