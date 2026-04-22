@@ -46,6 +46,28 @@ import { Whiteboard } from "@/components/video/Whiteboard"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "./video-sheet"
 import { Badge } from "@/components/ui/badge"
+import { useToast } from "@/hooks/use-toast"
+
+// Map a DOMException / media error to a user-friendly message.
+function formatMediaError(kind: "camera" | "microphone" | "screen", err: unknown): string {
+  const errObj = err as { name?: string; message?: string } | undefined
+  const name = errObj?.name || ""
+  const device = kind === "microphone" ? "microphone" : kind === "screen" ? "screen" : "camera"
+
+  if (name === "NotAllowedError" || name === "PermissionDeniedError") {
+    return `${device[0].toUpperCase() + device.slice(1)} permission denied. Click the site icon in the address bar and allow ${device} access, then try again.`
+  }
+  if (name === "NotReadableError" || name === "TrackStartError") {
+    return `${device[0].toUpperCase() + device.slice(1)} is in use by another app. Close Zoom/Teams/other browser tabs and try again.`
+  }
+  if (name === "NotFoundError" || name === "DevicesNotFoundError") {
+    return `No ${device} found on this device.`
+  }
+  if (name === "OverconstrainedError") {
+    return `${device[0].toUpperCase() + device.slice(1)} doesn't meet the required constraints.`
+  }
+  return `Couldn't start ${device}: ${errObj?.message || name || "unknown error"}`
+}
 
 interface CustomVideoCallProps {
   roomName: string
@@ -190,6 +212,7 @@ function VideoCallContent({ roomName, onLeave, userName, isMinimized }: Readonly
   const { localParticipant, isMicrophoneEnabled, isCameraEnabled, isScreenShareEnabled } = useLocalParticipant()
   const speakingParticipants = useSpeakingParticipants()
   const { chatMessages, send: sendChatMessage } = useChat()
+  const { toast } = useToast()
 
   const [showParticipants, setShowParticipants] = useState(false)
   const [showChat, setShowChat] = useState(false)
@@ -268,16 +291,43 @@ function VideoCallContent({ roomName, onLeave, userName, isMinimized }: Readonly
   }
 
   const toggleMic = useCallback(async () => {
-    await localParticipant.setMicrophoneEnabled(!isMicrophoneEnabled)
-  }, [localParticipant, isMicrophoneEnabled])
+    try {
+      await localParticipant.setMicrophoneEnabled(!isMicrophoneEnabled)
+    } catch (err) {
+      console.error("[Video] Mic toggle failed:", err)
+      toast({
+        title: "Microphone error",
+        description: formatMediaError("microphone", err),
+        variant: "destructive",
+      })
+    }
+  }, [localParticipant, isMicrophoneEnabled, toast])
 
   const toggleCam = useCallback(async () => {
-    await localParticipant.setCameraEnabled(!isCameraEnabled)
-  }, [localParticipant, isCameraEnabled])
+    try {
+      await localParticipant.setCameraEnabled(!isCameraEnabled)
+    } catch (err) {
+      console.error("[Video] Camera toggle failed:", err)
+      toast({
+        title: "Camera error",
+        description: formatMediaError("camera", err),
+        variant: "destructive",
+      })
+    }
+  }, [localParticipant, isCameraEnabled, toast])
 
   const toggleScreenShare = useCallback(async () => {
-    await localParticipant.setScreenShareEnabled(!isScreenShareEnabled)
-  }, [localParticipant, isScreenShareEnabled])
+    try {
+      await localParticipant.setScreenShareEnabled(!isScreenShareEnabled)
+    } catch (err) {
+      console.error("[Video] Screen share toggle failed:", err)
+      toast({
+        title: "Screen share error",
+        description: formatMediaError("screen", err),
+        variant: "destructive",
+      })
+    }
+  }, [localParticipant, isScreenShareEnabled, toast])
 
   const handleLeave = useCallback(() => {
     room.disconnect()
