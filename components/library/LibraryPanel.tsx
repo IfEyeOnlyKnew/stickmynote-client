@@ -146,7 +146,7 @@ export function LibraryPanel({ stickId, stickType, readOnly, className, onFileCo
     } finally {
       setLoading(false)
     }
-  }, [stickId, stickType])
+  }, [stickId, stickType, onFileCountChange])
 
   useEffect(() => {
     fetchFiles()
